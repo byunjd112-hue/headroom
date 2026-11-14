@@ -3,3 +3,4 @@ __pycache__/
 config/state/
 config/state_sim/
 results/
+*.zip
