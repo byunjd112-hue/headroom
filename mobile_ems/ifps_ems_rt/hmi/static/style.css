@@ -275,3 +275,23 @@ input.in, select.in { background: rgba(6,12,34,.8); border-color: rgba(96,140,24
 .sldleg i.l { width: 18px; height: 4px; border-radius: 2px; vertical-align: 3px; } .sldleg i.l.on { background: #5aa8ff; box-shadow: 0 0 6px #5aa8ff; }
 .sldleg i.l.off { background: repeating-linear-gradient(90deg, #33456f 0 4px, transparent 4px 7px); } .sldleg i.l.flt { background: #ff4d64; }
 .sldleg i.c { width: 10px; height: 10px; border-radius: 2px; } .sldleg i.c.closed { background: #2de2c8; } .sldleg i.c.open { background: transparent; border: 1.5px solid #ffb547; } .sldleg i.c.trip { background: #ff4d64; }
+
+/* ═══════════ 개요 오른쪽: 발전·부하 현황 ═══════════ */
+.sumrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.sumrow > div { background: rgba(6,12,34,.55); border: 1px solid rgba(96,140,240,.16); border-radius: 12px; padding: 8px 10px; }
+.sumrow .mid { font-size: 16px; white-space: nowrap; }
+.srcrows { display: grid; gap: 4px; }
+.srow { display: grid; grid-template-columns: 74px 78px 1fr 84px 34px; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; font-size: 12.5px; }
+.srow:nth-child(even) { background: rgba(72,110,210,.12); }
+.srow .nm i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 8px currentColor; }
+.srow .v { text-align: right; color: var(--text); }
+.srow .sb { height: 6px; background: rgba(6,12,34,.8); border-radius: 4px; overflow: hidden; } .srow .sb i { display: block; height: 100%; border-radius: 4px; transition: width .6s; }
+.srow canvas.sp { width: 84px; height: 26px; display: block; }
+.srow .ss { font-size: 11px; color: var(--muted); text-align: right; } .srow .ss.on { color: var(--ok); } .srow .ss.bad { color: var(--alarm); }
+.socbar { position: relative; height: 12px; border-radius: 7px; background: rgba(6,12,34,.8); border: 1px solid rgba(96,140,240,.18); margin-top: 10px; }
+.socbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 7px; transition: width .6s; box-shadow: 0 0 12px rgba(160,124,255,.5); }
+.socbar b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #ffb547; }
+.socax { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+.srow { grid-template-columns: 1fr auto 84px 34px; grid-template-areas: "nm v sp ss" "sb sb sp ss"; row-gap: 5px; }
+.srow .nm { grid-area: nm; } .srow .v { grid-area: v; } .srow .sb { grid-area: sb; } .srow canvas.sp { grid-area: sp; } .srow .ss { grid-area: ss; }
+.ov { grid-template-columns: minmax(0, 1fr) 390px; }

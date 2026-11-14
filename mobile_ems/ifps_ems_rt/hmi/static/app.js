@@ -35,6 +35,46 @@ setInterval(() => { const d = new Date(); $("#clk").textContent = d.toTimeString
 async function ack(ids) { if (!can("operator")) return loginDialog(); const r = await api("/api/ack", { ids }); if (r.ok) toast(`경보 ${r.n}건 확인`, "ok"); poll(); }
 
 /* ════════════════ 1. 개요 */
+/* 개요 오른쪽: 발전원·부하 현황, 금일 시간대별 발전량, ESS */
+function spark(c, ys, color, H = 30, lo = null, hi = null) {
+  const dpr = window.devicePixelRatio || 1, W = c.clientWidth; if (!W) return; c.style.height = H + "px";
+  if (c.width !== Math.round(W * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); if (ys.length < 2) return;
+  const mn = lo ?? Math.min(0, ...ys), mx = hi ?? Math.max(1, ...ys) * 1.1, X = i => i / (ys.length - 1) * W, Y = v => H - 2 - (v - mn) / (mx - mn || 1) * (H - 4);
+  g.beginPath(); ys.forEach((v, i) => i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v))); g.strokeStyle = color; g.lineWidth = 1.6; g.stroke();
+  g.lineTo(W, H); g.lineTo(0, H); g.closePath(); const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, color + "66"); gr.addColorStop(1, color + "00"); g.fillStyle = gr; g.fill();
+}
+function ovRight(s) {
+  const k = s.kpi, D = s.devices, devOk = n => D[n] && D[n].link !== "두절";
+  const rows = [["PV", "태양광", k.pv, 400, "#f5d000", 2, true], ["DG", "디젤", k.dg, 100, "#ff7a45", 3, D.DG && D.DG.on], ["FC", "연료전지", k.fc, 100, "#2de2c8", 4, D.FC && D.FC.on],
+    ["ESS", "ESS", k.ess, 500, "#a07cff", 5, true], ["LOAD", "총 부하", k.load, 400, "#3d8bff", 1, true]];
+  const box = $("#srcRows");
+  if (!box.dataset.built) { box.dataset.built = 1; box.innerHTML = rows.map(r => `<div class="srow"><span class="nm"><i style="background:${r[4]}"></i>${r[1]}</span><span class="v mono" id="sv-${r[0]}">—</span>
+      <span class="sb"><i id="sb-${r[0]}" style="background:${r[4]}"></i></span><canvas class="sp" id="sp-${r[0]}"></canvas><span class="ss" id="ss-${r[0]}"></span></div>`).join(""); }
+  const win = S.trend.slice(-900);
+  rows.forEach(([id, nm, v, cap, col, ci, on]) => {
+    const lost = id === "DG" || id === "FC" || id === "ESS" ? !devOk(id) : !devOk("MTR");
+    $("#sv-" + id).textContent = lost ? "####" : (id === "ESS" && v > 0 ? "+" : "") + F.kw(v) + " kW";
+    $("#sb-" + id).style.width = Math.min(100, Math.abs(v) / cap * 100) + "%";
+    const ss = $("#ss-" + id); ss.textContent = lost ? "두절" : id === "ESS" ? (v < -0.5 ? "충전" : v > 0.5 ? "방전" : "대기") : id === "LOAD" ? "급전" : on && Math.abs(v) > 0.5 ? "운전" : "정지";
+    ss.className = "ss " + (lost ? "bad" : ss.textContent === "정지" || ss.textContent === "대기" ? "" : "on");
+    spark($("#sp-" + id), win.map(r => r[ci]), col);
+  });
+  const gen = k.pv + k.dg + k.fc + Math.max(0, k.ess);
+  $("#bGen").textContent = F.kw(gen) + " kW"; $("#bLoad").textContent = F.kw(k.load) + " kW"; $("#bEss").textContent = (k.ess < -0.5 ? "충전 " : k.ess > 0.5 ? "방전 " : "") + F.kw(Math.abs(k.ess)) + " kW";
+  $("#balPill").className = "pill " + (k.ess < -0.5 ? "info" : "ok"); $("#balPill").textContent = k.ess < -0.5 ? `잉여 ${F.kw(-k.ess)}kW → ESS 충전` : k.ess > 0.5 ? `부족 ${F.kw(k.ess)}kW ← ESS` : "수급 균형";
+  // ESS
+  $("#socBig").innerHTML = `${F.n(k.soc, 1)}<small>%</small>`; $("#socBig").className = "big " + (k.soc < 19 ? "badc" : k.soc < 25 ? "warnc" : "");
+  $("#socDir").textContent = k.ess < -0.5 ? `▲ 충전 ${F.kw(-k.ess)} kW` : k.ess > 0.5 ? `▼ 방전 ${F.kw(k.ess)} kW` : "대기";
+  $("#socFill").style.width = Math.max(0, Math.min(100, k.soc)) + "%"; $("#socFill").style.background = k.soc < 19 ? "#ff4d64" : k.soc < 25 ? "#ffb547" : "linear-gradient(90deg,#7c5cff,#a07cff)";
+  spark($("#socSpark"), win.map(r => r[6]), "#a07cff", 54, 0, 100);
+  $("#eKw").textContent = `${k.ess >= 0 ? "+" : ""}${F.kw(k.ess)} kW`; $("#eKwh").textContent = `${F.n(Math.max(0, (k.soc / 100 - 0.15) * 1000), 0)} kWh`; $("#eH").textContent = k.ess_h ? `${F.hrs(k.ess_h)} h` : "—";
+  $("#essPill").className = "pill " + (devOk("ESS") ? (k.soc < 25 ? "warn" : "ok") : "bad"); $("#essPill").textContent = devOk("ESS") ? (k.ess < -0.5 ? "충전" : k.ess > 0.5 ? "방전" : "대기") : "두절";
+  // 금일 시간대별 (15초마다)
+  const e = s.energy; $("#dayTot").textContent = `발전 ${F.n(e.pv + e.dg + e.fc, 1)} · 부하 ${F.n(e.load, 1)} kWh`;
+  if (!P_OV._hrT || Date.now() - P_OV._hrT > 15000 || !P_OV._hrs) { P_OV._hrT = Date.now(); api("/api/energy").then(r => { P_OV._hrs = r.hours; if ($("#ovHr")) drawHourly($("#ovHr"), r.hours, 170); }); }
+  else if ($("#ovHr")) drawHourly($("#ovHr"), P_OV._hrs, 170);
+}
 const P_OV = {
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("ov.title", "운전 개요")}</h2><span class="sub" id="ovSub"></span></div>
@@ -51,13 +91,16 @@ const P_OV = {
         <div class="panel"><div class="hd"><h3>${t("ov.trend", "전력 추세 · 15분")}</h3><div class="spacer"></div><div class="legend" id="ovLeg"></div></div><div class="bd"><canvas class="chart" id="ovChart"></canvas></div></div>
       </div>
       <div class="right">
-        <div class="panel"><div class="hd"><h3>${t("ov.balance", "전력 수급")}</h3><div class="spacer"></div><span class="pill" id="balPill">—</span></div><div class="bd">
-          <div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="lab">${t("k.gen", "공급")}</div><div class="mid" id="bGen">—</div></div><div style="text-align:right"><div class="lab">${t("k.load", "소비")}</div><div class="mid" id="bLoad">—</div></div></div>
-          <div class="stack" style="margin-top:10px" id="bStack"></div><div class="legend" style="margin-top:8px" id="bLeg"></div></div></div>
-        <div class="panel"><div class="hd"><h3>${t("ov.ess", "에너지 저장")}</h3><div class="spacer"></div><span class="pill" id="essPill">—</span></div><div class="bd">
-          <div class="ring gauge" id="socRing"></div>
-          <div class="stbtns" id="essSt"></div>
-          <div class="kv band" style="margin-top:12px"><span class="k">출력</span><span class="v" id="eKw">—</span><span class="k">가용 에너지</span><span class="v" id="eKwh">—</span><span class="k">자립 시간</span><span class="v" id="eH">—</span><span class="k">운전 범위</span><span class="v" id="eRng">—</span></div></div></div>
+        <div class="panel"><div class="hd"><h3>발전 · 부하 현황</h3><div class="spacer"></div><span class="pill" id="balPill">—</span></div><div class="bd">
+          <div class="sumrow"><div><div class="lab">총 발전</div><div class="mid" id="bGen">—</div></div><div><div class="lab">총 부하</div><div class="mid" id="bLoad">—</div></div><div><div class="lab">ESS</div><div class="mid" id="bEss">—</div></div></div>
+          <div class="srcrows" id="srcRows"></div><div class="muted" style="font-size:11px;margin-top:6px">막대: 정격 대비 · 그래프: 최근 15분</div></div></div>
+        <div class="panel"><div class="hd"><h3>금일 발전량 · 부하량</h3><div class="spacer"></div><span class="sub" id="dayTot"></span></div><div class="bd"><canvas id="ovHr" style="width:100%;display:block"></canvas>
+          <div class="legend" style="margin-top:8px"><span><i style="background:#f5d000"></i>PV</span><span><i style="background:#ff7a45"></i>DG</span><span><i style="background:#2de2c8"></i>FC</span><span><i style="background:#a07cff"></i>ESS 방전</span><span><i style="background:#3d8bff"></i>부하</span></div></div></div>
+        <div class="panel"><div class="hd"><h3>${t("ov.ess", "ESS 충전 상태")}</h3><div class="spacer"></div><span class="pill" id="essPill">—</span></div><div class="bd">
+          <div style="display:flex;align-items:baseline;gap:10px"><div class="big" id="socBig">—</div><span class="muted" id="socDir"></span></div>
+          <div class="socbar"><i id="socFill"></i><b style="left:15%"></b><b style="left:90%"></b></div><div class="socax"><span>0</span><span>하한 15</span><span>상한 90</span><span>100%</span></div>
+          <div class="lab" style="margin-top:12px">최근 15분 충전율 추이</div><canvas id="socSpark" style="width:100%;display:block;margin-top:4px"></canvas>
+          <div class="kv band" style="margin-top:10px"><span class="k">출력</span><span class="v" id="eKw">—</span><span class="k">가용 에너지</span><span class="v" id="eKwh">—</span><span class="k">자립 시간</span><span class="v" id="eH">—</span></div></div></div>
         <div class="panel"><div class="hd"><h3>${t("ov.fuel", "연료 · 수소")}</h3></div><div class="bd" style="display:grid;gap:12px">
           <div><div style="display:flex;justify-content:space-between"><span class="lab">${t("k.fuel", "디젤 연료")}</span><span class="mono" id="fuelV">—</span></div><div class="bar" style="margin-top:6px"><i id="fuelB" style="background:var(--dg)"></i></div><div class="muted" style="font-size:12px;margin-top:4px" id="fuelH"></div></div>
           <div><div style="display:flex;justify-content:space-between"><span class="lab">${t("k.h2", "수소 저장")}</span><span class="mono" id="h2V">—</span></div><div class="bar" style="margin-top:6px"><i id="h2B" style="background:var(--fc)"></i></div><div class="muted" style="font-size:12px;margin-top:4px" id="h2H"></div></div></div></div>
@@ -82,19 +125,7 @@ const P_OV = {
     // 결선도
     sldUpdate(s);
     // 수급
-    $("#bGen").textContent = F.kw(k.pv + k.dg + k.fc + Math.max(0, k.ess)) + " kW"; $("#bLoad").textContent = F.kw(k.load) + " kW";
-    const parts = [["PV", k.pv, "pv"], ["DG", k.dg, "dg"], ["FC", k.fc, "fc"], ["ESS", Math.max(0, k.ess), "ess"]]; const tot = parts.reduce((a, p) => a + p[1], 0) || 1;
-    $("#bStack").innerHTML = parts.map(p => `<i style="width:${p[1] / tot * 100}%;background:var(--${p[2]})" title="${p[0]} ${F.kw(p[1])}kW"></i>`).join("");
-    $("#bLeg").innerHTML = parts.map(p => `<span><i style="background:var(--${p[2]})"></i>${p[0]} ${F.n(p[1] / tot * 100, 0)}%</span>`).join("");
-    $("#balPill").className = "pill " + (k.ess < -0.5 ? "info" : "ok"); $("#balPill").textContent = k.ess < -0.5 ? `잉여 ${F.kw(-k.ess)}kW → ESS` : "수급 균형";
-    // ESS
-    $("#socRing").innerHTML = gauge(k.soc, 260) + `<div class="c" style="top:78px"><div class="mid">${F.n(k.soc, 1)}<small style="font-size:16px;color:var(--muted)">%</small></div><div class="lab">SOC</div></div>`;
-    const est = !devOk("ESS") ? "off" : val("ESS.status") < 0.5 ? "off" : k.ess < -0.5 ? "chg" : k.ess > 0.5 ? "dis" : "idle";
-    $("#essSt").innerHTML = [["chg", "충전 중", '<path d="M7 7h-.5A3.5 3.5 0 0 0 3 10.5v3A3.5 3.5 0 0 0 6.5 17H7M17 7h.5a3.5 3.5 0 0 1 3.5 3.5v3a3.5 3.5 0 0 1-3.5 3.5H17M13 5l-3 7h4l-3 7"/>'], ["dis", "방전 중", '<rect x="3" y="8" width="16" height="8" rx="2"/><path d="M19 11h2v2h-2"/><rect x="5" y="10" width="4" height="4" fill="currentColor"/>'],
-      ["idle", "대기 중", '<circle cx="12" cy="12" r="8"/><path d="M10 9v6M14 9v6"/>'], ["off", "정지", '<circle cx="12" cy="12" r="8"/><rect x="9" y="9" width="6" height="6" rx="1"/>']].map(([k2, l, ic]) => `<div class="${est === k2 ? "on" : ""}"><svg viewBox="0 0 24 24">${ic}</svg>${l}</div>`).join("");
-    $("#eKw").textContent = `${k.ess >= 0 ? "+" : ""}${F.kw(k.ess)} kW`; $("#eKwh").textContent = `${F.n(Math.max(0, (k.soc / 100 - 0.15) * 1000), 0)} kWh`;
-    $("#eH").textContent = k.ess_h ? `${F.hrs(k.ess_h)} h` : "—"; $("#eRng").textContent = "15 – 90 %";
-    $("#essPill").className = "pill " + (devOk("ESS") ? (k.soc < 25 ? "warn" : "ok") : "bad"); $("#essPill").textContent = devOk("ESS") ? (k.ess < -0.5 ? "충전" : k.ess > 0.5 ? "방전" : "대기") : "두절";
+    ovRight(s);
     // 연료·수소
     $("#fuelV").textContent = `${F.n(k.fuel, 0)} / 2,000 L`; $("#fuelB").style.width = Math.min(100, k.fuel / 20) + "%"; $("#fuelH").textContent = `정격 운전 시 ${F.hrs(k.fuel_h)}시간`;
     $("#h2V").textContent = `${F.n(k.h2, 0)} / 1,000 Nm³`; $("#h2B").style.width = Math.min(100, k.h2 / 10) + "%"; $("#h2H").textContent = `연료전지 정격 ${F.hrs(k.h2_h)}시간 · 하한 100Nm³`;
