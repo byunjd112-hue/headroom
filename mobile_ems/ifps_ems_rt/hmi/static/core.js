@@ -5,13 +5,18 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const h = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 
+/* 테마 변수 읽기: TV("--pv") → "#e8c547", TA("--edge", .12) → "rgba(150,160,110,.12)" */
+const TV = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const TA = (n, a) => `rgba(${TV(n)},${a})`;
 const S = { snap: null, token: null, me: { role: "viewer", name: "조회" }, lang: "ko", page: "overview", trend: [], trendT: 0, ok: true, lastOk: 0 };
-try { S.token = sessionStorage.getItem("ems.token"); S.lang = localStorage.getItem("ems.lang") || "ko"; } catch (e) { }
+S.theme = "olive";
+try { S.token = sessionStorage.getItem("ems.token"); S.lang = localStorage.getItem("ems.lang") || "ko"; S.theme = localStorage.getItem("ems.theme") || "olive"; } catch (e) { }
+document.documentElement.dataset.theme = S.theme;
 
 /* ── 다국어 */
 const I18N = {
   en: {
-    "nav.overview": "Overview", "nav.control": "Control", "nav.alarms": "Alarms", "nav.trends": "Trends", "nav.energy": "Energy & Forecast", "nav.comm": "Comms", "nav.eng": "Debug",
+    "nav.overview": "Overview", "nav.control": "Control", "nav.alarms": "Alarms", "nav.trends": "Trends", "grp.mon": "MONITOR", "grp.ctl": "CONTROL", "grp.mgt": "MANAGE", "nav.energy": "Energy & Forecast", "nav.comm": "Comms", "nav.eng": "Debug",
     "foot.latest": "Latest alarm", "btn.ack": "Ack", "btn.ackall": "Ack all", "btn.acksel": "Ack selected", "btn.login": "Log in", "btn.logout": "Log out",
     "btn.start": "START", "btn.stop": "STOP", "btn.cancel": "Cancel", "btn.select": "Select", "btn.execute": "EXECUTE", "btn.read": "Read", "btn.write": "Write",
     "ov.title": "System Overview", "ov.sld": "Single-Line Diagram · Live Power Flow", "ov.balance": "Power Balance", "ov.ess": "Energy Storage", "ov.fuel": "Fuel & Hydrogen",
@@ -39,7 +44,7 @@ const F = {
 };
 const PRIO = { 1: "긴급", 2: "높음", 3: "보통", 4: "낮음" }, PRIO_EN = { 1: "CRIT", 2: "HIGH", 3: "MED", 4: "LOW" };
 const prioTxt = p => S.lang === "ko" ? PRIO[p] : PRIO_EN[p];
-const COLORS = { load: "#3d8bff", pv: "#f5d000", dg: "#ff7a45", fc: "#2de2c8", ess: "#a07cff", soc: "#2de2c8", h2: "#2de2c8", reserve: "#a07cff" };
+const COLORS = new Proxy({}, { get: (_, k) => TV("--" + ({ soc: "ess", h2: "fc", reserve: "g1" }[k] || k)) });
 
 /* ── 통신 */
 async function api(path, body) {
@@ -126,12 +131,12 @@ class Chart {
     o.series.filter(s => s.axis !== "r" && !s.hidden).forEach(s => { const i = idx(s.key); rows.forEach(r => { const v = r[i]; if (v > lmax) lmax = v; if (v < lmin) lmin = v; }); });
     const step = niceStep((lmax - lmin) / 5); lmax = Math.ceil(lmax / step) * step; lmin = Math.floor(lmin / step) * step;
     const X = tm => L + (tm - t0) / (o.window * 1000) * pw, YL = v => T + ph - (v - lmin) / (lmax - lmin || 1) * ph, YR = v => T + ph - (v - o.rmin) / (o.rmax - o.rmin) * ph;
-    g.font = "11px " + getComputedStyle(document.body).getPropertyValue("--mono"); g.strokeStyle = "rgba(96,140,240,.12)"; g.fillStyle = "#7f8fbf"; g.lineWidth = 1;
+    g.font = "11px " + getComputedStyle(document.body).getPropertyValue("--mono"); g.strokeStyle = TA("--edge", .12); g.fillStyle = TV("--muted"); g.lineWidth = 1;
     for (let v = lmin; v <= lmax + 1e-9; v += step) { const y = Math.round(YL(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke(); g.textAlign = "right"; g.fillText(fmtAxis(v), L - 6, y + 4); }
     if (lmin < 0) { g.strokeStyle = "#3a4d62"; g.beginPath(); g.moveTo(L, YL(0)); g.lineTo(L + pw, YL(0)); g.stroke(); }
     if (R > 20) { g.textAlign = "left"; for (let k = 0; k <= 4; k++) { const v = o.rmin + (o.rmax - o.rmin) * k / 4; g.fillText(fmtAxis(v), L + pw + 6, YR(v) + 4); } }
     g.textAlign = "center"; const tickS = o.window <= 900 ? 120 : o.window <= 3600 ? 600 : 1800;
-    for (let tm = Math.ceil(t0 / (tickS * 1000)) * tickS * 1000; tm <= now; tm += tickS * 1000) { const x = X(tm); g.fillText(new Date(tm).toTimeString().slice(0, 5), x, H - 6); g.strokeStyle = "rgba(96,140,240,.06)"; g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); }
+    for (let tm = Math.ceil(t0 / (tickS * 1000)) * tickS * 1000; tm <= now; tm += tickS * 1000) { const x = X(tm); g.fillText(new Date(tm).toTimeString().slice(0, 5), x, H - 6); g.strokeStyle = TA("--edge", .06); g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); }
     g.fillStyle = "#6f8197"; g.textAlign = "left"; g.fillText(o.yl, 4, T + 8);
     o.series.forEach(s => {
       if (s.hidden) return; const i = idx(s.key); if (i < 0 || !rows.length) return; const Y = s.axis === "r" ? YR : YL;
@@ -163,7 +168,7 @@ function gauge(pct, size = 260) {
     ticks += `<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${v <= 15 || v >= 90 ? "#ffb547" : "#7f93c8"}" stroke-width="${major ? 2 : 1.2}" opacity="${major ? 1 : .6}"/>`;
     if (major) { const [tx, ty] = P(d, r + 38); ticks += `<text x="${tx.toFixed(1)}" y="${(ty + 4).toFixed(1)}" text-anchor="middle" fill="#8b9bc6" font-size="11">${v}</text>`; }
   }
-  return `<svg width="${size}" height="${size * 0.78}" viewBox="0 0 ${size} ${size * 0.78}"><defs><linearGradient id="gg" x1="0" x2="1"><stop offset="0" stop-color="#3d6bff"/><stop offset="1" stop-color="#2de2c8"/></linearGradient>
+  return `<svg width="${size}" height="${size * 0.78}" viewBox="0 0 ${size} ${size * 0.78}"><defs><linearGradient id="gg" x1="0" x2="1"><stop offset="0" stop-color="var(--accent2)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient>
     <filter id="gglow"><feGaussianBlur stdDeviation="3"/></filter></defs>
     <path d="${arc(a0, a0 + sw, r)}" fill="none" stroke="rgba(30,52,120,.9)" stroke-width="18" stroke-linecap="round"/>
     ${p > 0.005 ? `<path d="${arc(a0, a0 + sw * p, r)}" fill="none" stroke="url(#gg)" stroke-width="18" stroke-linecap="round" filter="url(#gglow)" opacity=".6"/><path d="${arc(a0, a0 + sw * p, r)}" fill="none" stroke="url(#gg)" stroke-width="18" stroke-linecap="round"/>` : ""}${ticks}</svg>`;

@@ -46,8 +46,8 @@ function spark(c, ys, color, H = 30, lo = null, hi = null) {
 }
 function ovRight(s) {
   const k = s.kpi, D = s.devices, devOk = n => D[n] && D[n].link !== "두절";
-  const rows = [["PV", "태양광", k.pv, 400, "#f5d000", 2, true], ["DG", "디젤", k.dg, 100, "#ff7a45", 3, D.DG && D.DG.on], ["FC", "연료전지", k.fc, 100, "#2de2c8", 4, D.FC && D.FC.on],
-    ["ESS", "ESS", k.ess, 500, "#a07cff", 5, true], ["LOAD", "총 부하", k.load, 400, "#3d8bff", 1, true]];
+  const rows = [["PV", "태양광", k.pv, 400, TV("--pv"), 2, true], ["DG", "디젤", k.dg, 100, TV("--dg"), 3, D.DG && D.DG.on], ["FC", "연료전지", k.fc, 100, TV("--fc"), 4, D.FC && D.FC.on],
+    ["ESS", "ESS", k.ess, 500, TV("--ess"), 5, true], ["LOAD", "총 부하", k.load, 400, TV("--load"), 1, true]];
   const box = $("#srcRows");
   if (!box.dataset.built) { box.dataset.built = 1; box.innerHTML = rows.map(r => `<div class="srow"><span class="nm"><i style="background:${r[4]}"></i>${r[1]}</span><span class="v mono" id="sv-${r[0]}">—</span>
       <span class="sb"><i id="sb-${r[0]}" style="background:${r[4]}"></i></span><canvas class="sp" id="sp-${r[0]}"></canvas><span class="ss" id="ss-${r[0]}"></span></div>`).join(""); }
@@ -66,8 +66,8 @@ function ovRight(s) {
   // ESS
   $("#socBig").innerHTML = `${F.n(k.soc, 1)}<small>%</small>`; $("#socBig").className = "big " + (k.soc < 19 ? "badc" : k.soc < 25 ? "warnc" : "");
   $("#socDir").textContent = k.ess < -0.5 ? `▲ 충전 ${F.kw(-k.ess)} kW` : k.ess > 0.5 ? `▼ 방전 ${F.kw(k.ess)} kW` : "대기";
-  $("#socFill").style.width = Math.max(0, Math.min(100, k.soc)) + "%"; $("#socFill").style.background = k.soc < 19 ? "#ff4d64" : k.soc < 25 ? "#ffb547" : "linear-gradient(90deg,#7c5cff,#a07cff)";
-  spark($("#socSpark"), win.map(r => r[6]), "#a07cff", 54, 0, 100);
+  $("#socFill").style.width = Math.max(0, Math.min(100, k.soc)) + "%"; $("#socFill").style.background = k.soc < 19 ? "#ff4d64" : k.soc < 25 ? "#ffb547" : "linear-gradient(90deg,#7c5cff,var(--ess))";
+  spark($("#socSpark"), win.map(r => r[6]), TV("--ess"), 54, 0, 100);
   $("#eKw").textContent = `${k.ess >= 0 ? "+" : ""}${F.kw(k.ess)} kW`; $("#eKwh").textContent = `${F.n(Math.max(0, (k.soc / 100 - 0.15) * 1000), 0)} kWh`; $("#eH").textContent = k.ess_h ? `${F.hrs(k.ess_h)} h` : "—";
   $("#essPill").className = "pill " + (devOk("ESS") ? (k.soc < 25 ? "warn" : "ok") : "bad"); $("#essPill").textContent = devOk("ESS") ? (k.ess < -0.5 ? "충전" : k.ess > 0.5 ? "방전" : "대기") : "두절";
   // 금일 시간대별 (15초마다)
@@ -95,7 +95,7 @@ const P_OV = {
           <div class="sumrow"><div><div class="lab">총 발전</div><div class="mid" id="bGen">—</div></div><div><div class="lab">총 부하</div><div class="mid" id="bLoad">—</div></div><div><div class="lab">ESS</div><div class="mid" id="bEss">—</div></div></div>
           <div class="srcrows" id="srcRows"></div><div class="muted" style="font-size:11px;margin-top:6px">막대: 정격 대비 · 그래프: 최근 15분</div></div></div>
         <div class="panel"><div class="hd"><h3>금일 발전량 · 부하량</h3><div class="spacer"></div><span class="sub" id="dayTot"></span></div><div class="bd"><canvas id="ovHr" style="width:100%;display:block"></canvas>
-          <div class="legend" style="margin-top:8px"><span><i style="background:#f5d000"></i>PV</span><span><i style="background:#ff7a45"></i>DG</span><span><i style="background:#2de2c8"></i>FC</span><span><i style="background:#a07cff"></i>ESS 방전</span><span><i style="background:#3d8bff"></i>부하</span></div></div></div>
+          <div class="legend" style="margin-top:8px"><span><i style="background:var(--pv)"></i>PV</span><span><i style="background:var(--dg)"></i>DG</span><span><i style="background:var(--fc)"></i>FC</span><span><i style="background:var(--ess)"></i>ESS 방전</span><span><i style="background:var(--load)"></i>부하</span></div></div></div>
         <div class="panel"><div class="hd"><h3>${t("ov.ess", "ESS 충전 상태")}</h3><div class="spacer"></div><span class="pill" id="essPill">—</span></div><div class="bd">
           <div style="display:flex;align-items:baseline;gap:10px"><div class="big" id="socBig">—</div><span class="muted" id="socDir"></span></div>
           <div class="socbar"><i id="socFill"></i><b style="left:15%"></b><b style="left:90%"></b></div><div class="socax"><span>0</span><span>하한 15</span><span>상한 90</span><span>100%</span></div>
@@ -421,12 +421,26 @@ const P_ENG = {
 };
 
 /* ════════════════ 라우팅·주기 갱신 */
+const PAGE_META = {
+  overview: ["mon", "계측", "MONITOR", "SYSTEM OVERVIEW", "전원·부하·모선 상태를 한 화면에서 감시"],
+  energy: ["mon", "계측", "MONITOR", "ENERGY & FORECAST", "발전량·부하량 적산과 24시간 예측 정밀도"],
+  trends: ["mon", "계측", "MONITOR", "HISTORICAL TRENDS", "1초 표본 4시간 추세"],
+  control: ["ctl", "제어", "CONTROL", "EQUIPMENT CONTROL", "선택-실행(SBO) 지령 · 자동 급전"],
+  alarms: ["mgt", "관리", "MANAGE", "ALARM MANAGEMENT", "경보 확인·이력 · 감사 기록 무결성"],
+  comm: ["mgt", "관리", "MANAGE", "COMMUNICATIONS", "이중 경로 통신 품질 · 수집 주기 · 워치독"],
+  eng: ["mgt", "관리", "MANAGE", "ENGINEERING", "레지스터·프레임·포인트 · 고장 주입"],
+};
+function decoratePage(p) {
+  const hd = $("#main .pagehd"), m = PAGE_META[p]; if (!hd || !m || hd.querySelector(".pcat")) return;
+  hd.insertAdjacentHTML("afterbegin", `<span class="pcat ${m[0]}"><b>${S.lang === "ko" ? m[1] : m[2]}</b>${m[3]}</span>`);
+  const sub = hd.querySelector(".sub"); if (sub && !sub.textContent.trim()) sub.textContent = m[4];
+}
 const PAGES = { overview: P_OV, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG };
 let mounted = null;
 function render() {
   if (!S.snap) return; const p = PAGES[S.page] ? S.page : "overview";
   $$("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === p));
-  if (mounted !== p + S.lang) { clearInterval(P_ENG._ex); const m = $("#main"); PAGES[p].mount(m); applyI18n(m); mounted = p + S.lang; }
+  if (mounted !== p + S.lang + S.theme) { clearInterval(P_ENG._ex); const m = $("#main"); PAGES[p].mount(m); applyI18n(m); decoratePage(p); mounted = p + S.lang + S.theme; }
   try { PAGES[p].update(S.snap); } catch (e) { console.error(e); }
 }
 window.addEventListener("hashchange", () => { S.page = location.hash.slice(1) || "overview"; mounted = null; render(); });
@@ -444,5 +458,6 @@ async function pollTrend() {
 }
 setInterval(() => { const stale = Date.now() - S.lastOk > 3500; $("#stale").classList.toggle("on", stale && S.lastOk > 0); const c = $("#conn"); c.className = "conn" + (stale ? " bad" : ""); c.textContent = stale ? "● SERVER LOST" : "● LINK " + (S.snap ? F.n(S.snap.stats.last_ms, 0) + "ms" : ""); }, 500);
 $$("#lang button").forEach(x => x.classList.toggle("on", x.dataset.l === S.lang));
+$$("#themeSeg button").forEach(b => { b.classList.toggle("on", b.dataset.th === S.theme); b.onclick = () => { S.theme = b.dataset.th; document.documentElement.dataset.theme = S.theme; try { localStorage.setItem("ems.theme", S.theme); } catch (e) { } $$("#themeSeg button").forEach(x => x.classList.toggle("on", x === b)); mounted = null; render(); if (S.page === "energy") P_EN.draw(); }; });
 S.page = location.hash.slice(1) || "overview"; renderUser(); applyI18n();
 poll(); pollTrend(); setInterval(poll, 1000); setInterval(pollTrend, 2000); setInterval(() => P_ENG.pollTrace(), 700);

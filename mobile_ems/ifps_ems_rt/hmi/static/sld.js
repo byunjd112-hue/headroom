@@ -12,7 +12,7 @@ const SRC = [
 const LOADS = [
   { id: "L1", name: "1등급 필수 부하", en: "CLASS 1 · CRITICAL", x: 220, kw: "LOAD.p1_kw", bus: "A", col: "#ff6b8a" },
   { id: "L2", name: "2등급 중요 부하", en: "CLASS 2 · ESSENTIAL", x: 665, kw: "LOAD.p2_kw", bus: "B", col: "#ffb547" },
-  { id: "L3", name: "3등급 일반 부하", en: "CLASS 3 · GENERAL", x: 865, kw: "LOAD.p3_kw", bus: "B", col: "#3d8bff" },
+  { id: "L3", name: "3등급 일반 부하", en: "CLASS 3 · GENERAL", x: 865, kw: "LOAD.p3_kw", bus: "B", col: TV("--load") },
 ];
 const ANSI_TXT = { 27: "27 저전압", 32: "32 역전력", 50: "50 순시 과전류", 51: "51 한시 과전류", 59: "59 과전압", 64: "64 지락", 81: "81 주파수", 87: "87 차동" };
 const ICON = {
@@ -50,16 +50,16 @@ function sldSvg() {
     ${cbSym(n.id, n.x, BUS_Y - 54)}${faultMark(n.id, n.x, top + 14)}${hex(n, SY, SR, `var(--${n.col})`, ICON[n.id], false)}`).join("");
   const lds = LOADS.map(n => `
     <path class="ln" id="lu-${n.id}" d="M${n.x} ${BUS_Y} V${BUS_Y + 37}"/><path class="ln" id="ld-${n.id}" d="M${n.x} ${BUS_Y + 55} V${LY - LR}"/>
-    <path class="flow" id="f-${n.id}" d="M${n.x} ${BUS_Y + 57} V${LY - LR - 2}" stroke="#5aa8ff"/>
+    <path class="flow" id="f-${n.id}" d="M${n.x} ${BUS_Y + 57} V${LY - LR - 2}" stroke="var(--live)"/>
     <text class="fv" id="fv-${n.id}" x="${n.x - 12}" y="${BUS_Y + 88}" text-anchor="end"></text>
     ${cbSym(n.id, n.x, BUS_Y + 46)}${faultMark(n.id, n.x, BUS_Y + 92)}${hex(n, LY, LR, n.col, ICON.L, true)}`).join("");
   return `<svg class="sld" viewBox="0 0 1000 610" preserveAspectRatio="xMidYMid meet">
-    <defs><radialGradient id="hexFill" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="#1d3a86"/><stop offset="1" stop-color="#0a1538"/></radialGradient>
-      <linearGradient id="hexStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2de2c8"/><stop offset="1" stop-color="#3d6bff"/></linearGradient>
+    <defs><radialGradient id="hexFill" cx="50%" cy="40%" r="65%"><stop offset="0" style="stop-color:var(--hexA)"/><stop offset="1" style="stop-color:var(--hexB)"/></radialGradient>
+      <linearGradient id="hexStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--hexS1)"/><stop offset="1" style="stop-color:var(--hexS2)"/></linearGradient>
       <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="1000" height="610"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
     ${src}
     <path class="bus" id="busA" d="M40 ${BUS_Y} H478"/><path class="bus" id="busB" d="M522 ${BUS_Y} H960"/>
-    <path class="flow" id="f-TIE" d="M430 ${BUS_Y} H570" stroke="#5aa8ff"/>
+    <path class="flow" id="f-TIE" d="M430 ${BUS_Y} H570" stroke="var(--live)"/>
     ${cbSym("TIE", 500, BUS_Y, true)}${faultMark("TIE", 500, BUS_Y - 46)}
     <text class="buslbl" x="44" y="${BUS_Y + 22}" id="blA">${ko ? "모선 A" : "BUS A"}</text><text class="buslbl" x="530" y="${BUS_Y + 22}" id="blB">${ko ? "모선 B" : "BUS B"}</text>
     <text class="fv" id="fv-TIE" x="500" y="${BUS_Y + 46}" text-anchor="middle"></text>
