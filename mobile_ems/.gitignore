@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+config/state/
+config/state_sim/
+results/

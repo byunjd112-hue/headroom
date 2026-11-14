@@ -1,0 +1,524 @@
+# -*- coding: utf-8 -*-
+"""HMI 실행 엔진. 실행기(Runtime)를 스레드로 돌리고 제어화면·디버그 도구가 쓸 상태를 모은다.
+
+스레드 구성
+  수집 스레드   scan_s 주기로 Runtime.scan → 경보 판정 → 추세 기록 → 상태 저장
+  지령 스레드   지령 대기열을 하나씩 처리(자동 제어, 운용자 지령). 지령 응답 대기가 수집 주기를 막지 않는다
+  가상 장치     --sim일 때만. 부하·PV 변화를 만들어 가상 장치에 넣는다
+장치 소켓은 modbus.Client의 잠금으로 보호되므로 수집·지령·레지스터 탐색이 같은 연결을 섞어 써도 프레임이 섞이지 않는다.
+"""
+import collections, copy, json, math, os, queue, random, secrets, tempfile, threading, time
+from datetime import datetime, timezone
+from ifps_ems import __version__ as CORE_VERSION
+from ifps_ems.solar import clear_pv_kw
+from ifps_ems.config import SUP
+from .. import __version__ as RT_VERSION
+from .. import modbus as mb, pointmap as pm
+from ..runtime import Runtime
+from ..simplant import Plant
+
+PRIO_TXT = {1: "긴급", 2: "높음", 3: "보통", 4: "낮음"}
+ROLES = {"viewer": 0, "operator": 1, "engineer": 2}
+FLAG_TXT = {0: "정상", 1: "급변", 2: "고착", 3: "갱신 지연", 5: "범위 밖"}
+
+
+def wall_iso(ts=None):
+    return datetime.fromtimestamp(time.time() if ts is None else ts).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def sd_notify(msg):
+    """systemd 알림(Type=notify, WatchdogSec). NOTIFY_SOCKET이 없으면(Windows·수동 실행) 아무것도 하지 않는다."""
+    addr = os.environ.get("NOTIFY_SOCKET")
+    if not addr or not hasattr(__import__("socket"), "AF_UNIX"): return
+    import socket
+    if addr.startswith("@"): addr = "\0" + addr[1:]
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as so: so.sendto(msg.encode(), addr)
+    except OSError:
+        pass
+
+
+# ───────────────────────────────── 경보 관리 (ISA-18.2 형식: 발생·복귀·확인)
+class AlarmManager:
+    def __init__(self):
+        self.items = {}; self.hist = collections.deque(maxlen=2000); self.n = 0; self.lock = threading.Lock()
+
+    def _new(self, key, prio, src, text, state):
+        self.n += 1
+        a = {"id": self.n, "key": key, "prio": prio, "src": src, "text": text, "state": state, "acked": False,
+             "t_on": time.time(), "t_off": None if state == "ACT" else time.time(), "ack_by": None}
+        self.items[key] = a; self.hist.appendleft({"t": a["t_on"], "ev": "발생", "prio": prio, "src": src, "text": text})
+        return a
+
+    def set(self, key, cond, prio, src, text):
+        with self.lock:
+            a = self.items.get(key)
+            if cond:
+                if a is None: self._new(key, prio, src, text, "ACT")
+                elif a["state"] == "RTN":
+                    a.update(state="ACT", acked=False, t_on=time.time(), t_off=None, text=text, prio=prio)
+                    self.hist.appendleft({"t": time.time(), "ev": "재발생", "prio": prio, "src": src, "text": text})
+                else: a["text"] = text
+            elif a is not None and a["state"] == "ACT":
+                a["state"] = "RTN"; a["t_off"] = time.time()
+                self.hist.appendleft({"t": time.time(), "ev": "복귀", "prio": a["prio"], "src": a["src"], "text": a["text"]})
+                if a["acked"]: del self.items[key]
+
+    def event(self, prio, src, text):
+        """한 번 생기고 끝나는 사건 경보(지령 실패 등). 확인하면 사라진다."""
+        with self.lock:
+            self._new(f"evt.{self.n + 1}", prio, src, text, "RTN")
+
+    def ack(self, ids, who):
+        with self.lock:
+            n = 0
+            for k, a in list(self.items.items()):
+                if ids == "all" or a["id"] in ids:
+                    if not a["acked"]:
+                        a["acked"] = True; a["ack_by"] = who; n += 1
+                        self.hist.appendleft({"t": time.time(), "ev": "확인", "prio": a["prio"], "src": a["src"], "text": a["text"] + f" (확인: {who})"})
+                    if a["state"] == "RTN": del self.items[k]
+            return n
+
+    def snapshot(self):
+        with self.lock:
+            lst = sorted(self.items.values(), key=lambda a: (a["acked"], a["state"] != "ACT", a["prio"], -a["t_on"]))
+            cnt = {p: {"act": 0, "unack": 0} for p in (1, 2, 3, 4)}
+            for a in lst:
+                if a["state"] == "ACT": cnt[a["prio"]]["act"] += 1
+                if not a["acked"]: cnt[a["prio"]]["unack"] += 1
+            return [dict(a) for a in lst], cnt
+
+    def journal(self, n=300):
+        with self.lock:
+            return list(self.hist)[:n]
+
+
+# ───────────────────────────────── 가상 장치 구동(현장 부하·PV 변화 모사)
+class SimDriver:
+    def __init__(self, plant, site):
+        self.p = plant; self.site = site; self.hold = {}; self.cloud = 0.9; self.run = True; self.t_last = time.time()
+        self.scn = ""; self.extra_load = 0.0
+
+    def step(self):
+        now = datetime.now(); hr = now.hour + now.minute / 60 + now.second / 3600; doy = now.timetuple().tm_yday
+        self.cloud += 0.02 * (0.85 - self.cloud) + random.gauss(0, 0.015); self.cloud = min(1.02, max(0.15, self.cloud))
+        day = 1 / (1 + math.exp(-(hr - 7.5) * 2)) * 1 / (1 + math.exp((hr - 18.5) * 2))
+        p1 = 28 + random.gauss(0, 0.4)
+        p2 = 22 + 18 * day + random.gauss(0, 0.8)
+        p3 = 9 + 16 * day * (0.6 + 0.4 * math.sin(math.pi * max(0.0, min(1.0, (hr - 7) / 12)))) + random.gauss(0, 0.8) + self.extra_load
+        clear = float(clear_pv_kw(self.site, doy, hr)); pv = max(0.0, clear * self.cloud * (1 + random.gauss(0, 0.01)))
+        temp = 16 + 7 * math.sin(2 * math.pi * (hr - 9) / 24) + random.gauss(0, 0.05)
+        vals = {"LOAD.p1_kw": p1, "LOAD.p2_kw": p2, "LOAD.p3_kw": max(0.0, p3), "PV.kw": pv, "ENV.temp": temp,
+                "ENV.press": 1012.5 + random.gauss(0, 0.05), "ENV.rh": 55 + random.gauss(0, 0.3)}
+        for k, v in vals.items():
+            if k in self.hold: v = self.hold[k]
+            if k in self.p.by_tag: self.p.set(k, v)
+        tot = sum(self.hold.get(k, vals[k]) for k in ("LOAD.p1_kw", "LOAD.p2_kw", "LOAD.p3_kw"))
+        self.p.set("LOAD.kw", self.hold.get("LOAD.kw", tot))
+        dg_on = self.p.get("DG.status") > 0.5                                  # 디젤 연료 소비
+        if dg_on and "DG.fuel_l" not in self.hold:
+            self.p.set("DG.fuel_l", max(0.0, self.p.get("DG.fuel_l") - 90 * 0.28 / 3600))
+        fc_kw = self.p.get("FC.kw")
+        if fc_kw > 0 and "H2.nm3" not in self.hold:
+            self.p.set("H2.nm3", max(0.0, self.p.get("H2.nm3") - fc_kw * 0.75 / 3600))
+
+    def loop(self):
+        while self.run:
+            try: self.step()
+            except Exception:
+                pass
+            time.sleep(1.0)
+
+    def scenario(self, name):
+        self.scn = name
+        if name == "load_surge": self.extra_load = 60.0
+        elif name == "cloud": self.hold["PV.kw"] = max(0.0, self.p.get("PV.kw") * 0.3)
+        elif name == "night": self.hold["PV.kw"] = 0.0
+        elif name == "soc_low": self.p.set("ESS.soc", 22.0)
+        elif name == "soc_critical": self.p.set("ESS.soc", 17.0)
+        elif name == "h2_low": self.p.set("H2.nm3", 130.0)
+        elif name == "normal":
+            self.hold.clear(); self.extra_load = 0.0; self.scn = ""
+            self.p.muted.clear(); self.p.no_ack.clear(); self.p.down.clear()
+            for d in ("DG", "FC"):
+                if f"{d}.mode" in self.p.by_tag: self.p.set(f"{d}.mode", 0)
+        else: raise ValueError(f"시나리오 없음: {name}")
+
+
+# ───────────────────────────────── 엔진
+class Engine:
+    def __init__(self, cfg_path, sim=False, plan_dir=None, days_since_deploy=30):
+        self.cfg_path = os.path.abspath(cfg_path)
+        with open(self.cfg_path, encoding="utf-8") as f: cfg = json.load(f)
+        self.hcfg = {"bind": "127.0.0.1", "port": 8080, "pin_operator": "1111", "pin_engineer": "2222", "session_min": 30, "sbo_s": 10.0}
+        self.hcfg.update(cfg.get("hmi", {}))
+        base = os.path.dirname(self.cfg_path); self.sim = sim; self.plant = None; self.simdrv = None
+        run_path = self.cfg_path
+        if sim:
+            pts = pm.load(os.path.join(base, cfg["pointmap"]))
+            units = {n: d["unit"] for n, d in cfg["devices"].items()}
+            self.plant = Plant(pts, units); pa, pb = self.plant.start(self.hcfg.get("sim_ports", [0, 0]))
+            c2 = copy.deepcopy(cfg); c2["allow"] = ["127.0.0.0/8"]
+            for n in c2["devices"]: c2["devices"][n]["paths"] = [["127.0.0.1", pa], ["127.0.0.1", pb]]
+            c2["pointmap"] = os.path.join(base, cfg["pointmap"]); c2["state_dir"] = os.path.join(base, cfg.get("state_dir", "state") + "_sim")
+            fd, run_path = tempfile.mkstemp(prefix="ems_sim_", suffix=".json")
+            with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(c2, f, ensure_ascii=False)
+            self.sim_ports = (pa, pb)
+        self.rt = Runtime(run_path); self.cfg = self.rt.cfg
+        if sim:
+            self.simdrv = SimDriver(self.plant, self.rt.site)
+        self.plan_note = "규칙 운전(충전율 문턱값)"
+        if plan_dir:
+            from ..planlink import PlanPolicy
+            hist = os.path.join(self.rt.state_dir, "history.csv")
+            if not os.path.exists(hist) or sum(1 for _ in open(hist, encoding="utf-8")) < 800:
+                hist = os.path.join(plan_dir, "sample_site_data.csv")
+            self.rt.policy = PlanPolicy(self.rt.site, hist, plan_dir, days_since_deploy); self.plan_note = "예측 기반 운전계획(동적계획법)"
+        self.lock = threading.RLock(); self.alarms = AlarmManager(); self.jobs = queue.Queue(); self.busy = None
+        self.auto = bool(self.cfg.get("auto", True)); self.running = False
+        self.trend = collections.deque(maxlen=4 * 3600); self.scan_ms = collections.deque(maxlen=600)
+        self.trace = collections.deque(maxlen=3000); self.trace_n = 0; self.trace_on = True; self.trace_lock = threading.Lock()
+        self.tokens = {}; self.selects = {}; self.last_decision = None; self._ev_i = 0; self.t_start = time.time(); self.fc_set_written = None
+        self.ack_info = {}
+        for n, lk in self.rt.links.items():
+            for k, cl in lk.cl.items():
+                cl.tag = (n, k); cl.trace = self._tracer(cl)
+        self.rt.note("기동", f"HMI 엔진 기동 (EMS RT v{RT_VERSION}, 핵심 v{CORE_VERSION}, {'가상 장치' if sim else '실장치'} 모드)")
+
+    # ── 프레임 추적
+    def _tracer(self, cl):
+        def tr(direction, data, rtt):
+            if not self.trace_on: return
+            with self.trace_lock:
+                self.trace_n += 1
+                rec = {"i": self.trace_n, "t": time.time(), "dev": cl.tag[0], "path": cl.tag[1], "dir": direction, "host": f"{cl.host}:{cl.port}", "unit": cl.unit,
+                       "rtt": None if rtt is None else round(rtt * 1000, 2)}
+                if isinstance(data, (bytes, bytearray)):
+                    rec["hex"] = data.hex(" "); rec["n"] = len(data); rec["fc"] = data[7] if len(data) > 7 else None
+                else:
+                    rec["txt"] = str(data); rec["n"] = 0; rec["fc"] = None
+                self.trace.append(rec)
+        return tr
+
+    # ── 기동·정지
+    def start(self):
+        self.running = True
+        threading.Thread(target=self._scan_loop, name="scan", daemon=True).start()
+        threading.Thread(target=self._exec_loop, name="exec", daemon=True).start()
+        if self.simdrv:
+            self.simdrv.step(); threading.Thread(target=self.simdrv.loop, name="sim", daemon=True).start()
+
+    def stop(self):
+        self.running = False
+        if self.simdrv: self.simdrv.run = False
+        time.sleep(0.3)
+        try: self.rt.save()
+        finally:
+            self.rt.close()
+            if self.plant: self.plant.stop()
+
+    # ── 수집 주기
+    def _scan_loop(self):
+        period = float(self.cfg.get("scan_s", 1.0)); nxt = time.monotonic(); k = 0
+        while self.running:
+            a = time.monotonic()
+            try:
+                with self.lock:
+                    self.rt.scan(); self._post_scan()
+            except Exception as e:                                               # 어떤 실패든 수집은 이어 간다
+                self.rt.note("오류", f"수집 주기 예외: {type(e).__name__}: {e}")
+            dt = time.monotonic() - a; k += 1
+            self.scan_ms.append(dt * 1000); self.rt.max_scan_s = max(self.rt.max_scan_s, dt)
+            if dt > period:
+                self.rt.n_over += 1; self.rt.note("주기", f"주기 초과 {dt:.2f}초")
+            stuck = self.rt.wd.check(self.rt.now())
+            self.alarms.set("wd", bool(stuck), 1, "EMS", "프로세스 정지 감지: " + ", ".join(stuck) if stuck else "프로세스 정지")
+            if k == 1: sd_notify("READY=1")
+            if not stuck: sd_notify("WATCHDOG=1")                                   # 수집·제어가 모두 살아 있을 때만 systemd 감시 신호
+            if self.auto and self.busy is None and self.jobs.empty() and self.rt.now() - self.rt.t_ctl >= float(self.cfg.get("ctrl_s", 60.0)):
+                self.jobs.put({"kind": "auto", "who": "EMS"})
+            if k % 10 == 0:
+                try: self.rt.save()
+                except OSError: pass
+            nxt += period; slp = nxt - time.monotonic()
+            if slp < -5 * period: nxt = time.monotonic(); slp = 0
+            time.sleep(max(0.0, slp))
+
+    def _post_scan(self):
+        rt = self.rt; v = rt.val; g = lambda k, d=0.0: v.get(k, d); s = rt.site
+        k = self.kpi()
+        self.trend.append([round(time.time() * 1000), round(k["load"], 2), round(k["pv"], 2), round(k["dg"], 2), round(k["fc"], 2), round(k["ess"], 2),
+                           round(k["soc"], 2), round(k["h2"], 1), round(k["reserve_margin"], 1)])
+        A = self.alarms
+        for n, st in rt.lm.state.items():
+            A.set(f"link.{n}", st == "두절", 1, n, f"{n} 통신 두절 — 지령 차단, 직전 유효값 유지")
+            dead = [p for p, a in rt.links[n].alive.items() if not a]
+            A.set(f"deg.{n}", st == "경로 저하", 3, n, f"{n} 통신 경로 저하 — 경로 {','.join(dead) or '?'} 무응답")
+        for tag, f in rt.flag.items():
+            dev = tag.split(".")[0]
+            A.set(f"q5.{tag}", f == 5, 3, dev, f"{tag} 측정값 범위 밖 — 직전 유효값 유지")
+            A.set(f"q3.{tag}", f == 3, 3, dev, f"{tag} 값 갱신 지연(>{SUP['stale_s']:.0f}초)")
+        soc = g("ESS.soc", 60.0)
+        A.set("soc.ll", soc < s.soc_min * 100 + 4, 1, "ESS", f"ESS 충전율 매우 낮음 {soc:.1f}% — 디젤 강제 기동 영역")
+        A.set("soc.lo", s.soc_min * 100 + 4 <= soc < 25, 2, "ESS", f"ESS 충전율 낮음 {soc:.1f}%")
+        A.set("soc.hi", soc > s.soc_max * 100 - 1, 4, "ESS", f"ESS 충전율 상한 근접 {soc:.1f}% — PV 출력 제한 가능")
+        h2 = g("H2.nm3", s.h2_nm3)
+        A.set("h2.lo", h2 < s.h2_nm3 * s.h2_min * 1.5, 2, "FC", f"수소 잔량 낮음 {h2:.0f}Nm³")
+        if "DG.fuel_l" in v: A.set("fuel.lo", g("DG.fuel_l") < 300, 3, "DG", f"디젤 연료 낮음 {g('DG.fuel_l'):.0f}L")
+        A.set("reserve", k["reserve_need"], 3, "EMS", f"N-1 순동 예비력 부족 {k['reserve_margin']:.0f}kW — 연료전지 병렬 필요")
+        for n, d in rt.dev.items():
+            A.set(f"man.{n}", d.manual, 4, n, f"{n} 현장 수동 모드 — EMS 지령 차단")
+        A.set("auto.off", not self.auto, 4, "EMS", "자동 제어 해제 — 운용자 수동 지령 운전")
+        evs = rt.events
+        for e in evs[self._ev_i:]:
+            t = e["text"]
+            if e["kind"] == "지령" and ("무응답" in t or "실패" in t): A.event(2, t.split()[0], t)
+            elif e["kind"] == "지령" and "차단" in t: A.event(3, t.split()[0], t)
+            elif e["kind"] == "주기": A.event(4, "EMS", t)
+            elif e["kind"] == "오류": A.event(2, "EMS", t)
+        self._ev_i = len(evs)
+
+    # ── 지령 처리
+    def _exec_loop(self):
+        while self.running:
+            try: job = self.jobs.get(timeout=0.5)
+            except queue.Empty:
+                self.rt.wd.kick("제어", self.rt.now()); continue
+            self.busy = job
+            try:
+                if job["kind"] == "auto": self._auto_control(job.get("who", "EMS"))
+                elif job["kind"] == "cmd": self._do_cmd(job)
+            except Exception as e:
+                self.rt.note("오류", f"지령 처리 예외: {type(e).__name__}: {e}")
+            finally:
+                self.busy = None; self.rt.wd.kick("제어", self.rt.now())
+
+    def _send(self, dev, cmd, who):
+        n0 = len(self.rt.cmd.log); ok, dt = self.rt.cmd.send(dev, cmd)
+        for e in self.rt.cmd.log[n0:]:
+            e["wall"] = wall_iso(); e["who"] = who; self.rt.note("지령", e["text"], actor=who)
+        return ok, dt
+
+    def _auto_control(self, who):
+        rt = self.rt; rt.t_ctl = rt.now(); t0 = time.monotonic()
+        want = rt.decide(); note = getattr(rt.policy, "note", "") if rt.policy else "규칙 운전"
+        done = []
+        for n in ("DG", "FC"):
+            if n not in rt.dev: continue
+            if want[n] != rt.dev[n].on:
+                ok, dt = self._send(n, "start" if want[n] else "stop", who); done.append({"dev": n, "on": want[n], "ok": ok, "dt": round(dt, 2)})
+        fcl = rt.links.get("FC")
+        if fcl is not None and "FC.kw_set" in fcl.by_tag and rt.dev.get("FC") and rt.dev["FC"].on:
+            policy_fc = bool(want["_policy"][1])
+            sp = 0.0 if (want.get("_reserve") and not policy_fc) else rt.site.fc_kw      # 예비력만으로 병렬한 연료전지는 대기 운전
+            if self.fc_set_written != sp and fcl.write("FC.kw_set", sp):
+                self.fc_set_written = sp; rt.note("지령", f"FC 출력 설정 {sp:.0f}kW ({'순동 예비 대기' if sp == 0 else '정격 운전'})", actor=who)
+        self.last_decision = {"t": wall_iso(), "want": {k: bool(v) for k, v in want.items() if not k.startswith("_")}, "reserve": bool(want.get("_reserve")),
+                              "policy": note or "규칙 운전", "action": list(want["_policy"]), "done": done, "ms": round((time.monotonic() - t0) * 1000)}
+
+    def _do_cmd(self, job):
+        dev, cmd, who = job["dev"], job["cmd"], job["who"]
+        if cmd == "set":
+            tag, val = job["tag"], job["value"]; ok = self.rt.links[dev].write(tag, val)
+            self.rt.cmd.log.append({"t": 0, "dev": dev, "cmd": f"set {tag}={val}", "ok": ok, "text": f"{tag} 설정 {val} {'완료' if ok else '실패'}", "wall": wall_iso(), "who": who})
+            self.rt.note("지령", f"{tag} 설정 {val} {'완료' if ok else '실패'}", actor=who)
+            if tag == "FC.kw_set": self.fc_set_written = val
+            return
+        self._send(dev, cmd, who)
+
+    # ── 선택-실행(SBO) 지령: 선택 후 sbo_s초 안에 실행해야 한다
+    def select(self, dev, cmd, who, tag=None, value=None):
+        rt = self.rt
+        if dev not in rt.links: return {"ok": False, "why": "정의되지 않은 장치"}
+        if cmd == "set":
+            p = rt.links[dev].by_tag.get(tag)
+            if p is None or p["rw"] != "w": return {"ok": False, "why": f"쓰기 점 아님: {tag}"}
+            try: value = float(value)
+            except (TypeError, ValueError): return {"ok": False, "why": "설정값 오류"}
+            if (p["lo"] is not None and value < p["lo"]) or (p["hi"] is not None and value > p["hi"]): return {"ok": False, "why": f"설정 범위 {p['lo']}~{p['hi']} 밖"}
+            if not rt.lm.controllable(dev): return {"ok": False, "why": "통신 두절"}
+            why = ""
+        else:
+            if dev not in rt.dev: return {"ok": False, "why": "지령 대상 아님(감시 전용 장치)"}
+            why = rt.cmd.check(dev, cmd)
+        if why: return {"ok": False, "why": why}
+        sid = secrets.token_hex(8); self.selects[sid] = {"dev": dev, "cmd": cmd, "who": who, "tag": tag, "value": value, "exp": time.time() + float(self.hcfg["sbo_s"])}
+        rt.note("선택", f"{dev} {cmd}{' ' + str(tag) + '=' + str(value) if cmd == 'set' else ''} 선택(SBO)", actor=who)
+        return {"ok": True, "sid": sid, "exp_s": float(self.hcfg["sbo_s"])}
+
+    def operate(self, sid, who):
+        s = self.selects.pop(sid, None)
+        if s is None: return {"ok": False, "why": "선택 없음 또는 이미 사용"}
+        if time.time() > s["exp"]: return {"ok": False, "why": "선택 시간 초과 — 다시 선택"}
+        if s["who"] != who: return {"ok": False, "why": "선택한 운용자와 다름"}
+        self.jobs.put({"kind": "cmd", **s}); return {"ok": True, "queued": self.jobs.qsize()}
+
+    def cancel(self, sid, who):
+        s = self.selects.pop(sid, None)
+        if s: self.rt.note("선택", f"{s['dev']} {s['cmd']} 선택 취소", actor=who)
+        return {"ok": True}
+
+    def set_auto(self, on, who):
+        self.auto = bool(on); self.rt.note("운전", f"자동 제어 {'설정' if on else '해제'}", actor=who); return {"ok": True, "auto": self.auto}
+
+    def control_now(self, who):
+        self.jobs.put({"kind": "auto", "who": who}); self.rt.note("운전", "제어 주기 즉시 실행 요청", actor=who); return {"ok": True}
+
+    # ── 인증
+    def login(self, pin, name="운용자"):
+        role = None
+        if secrets.compare_digest(str(pin), str(self.hcfg["pin_engineer"])): role = "engineer"
+        elif secrets.compare_digest(str(pin), str(self.hcfg["pin_operator"])): role = "operator"
+        if role is None:
+            self.rt.note("보안", "로그인 실패(PIN 불일치)", actor=name); return {"ok": False, "why": "PIN 불일치"}
+        tok = secrets.token_urlsafe(24); self.tokens[tok] = {"role": role, "name": name, "exp": time.time() + 60 * float(self.hcfg["session_min"])}
+        self.rt.note("보안", f"로그인 ({role})", actor=name); return {"ok": True, "token": tok, "role": role, "name": name}
+
+    def logout(self, tok):
+        s = self.tokens.pop(tok, None)
+        if s: self.rt.note("보안", "로그아웃", actor=s["name"])
+        return {"ok": True}
+
+    def session(self, tok):
+        s = self.tokens.get(tok or "")
+        if s is None: return None
+        if time.time() > s["exp"]: self.tokens.pop(tok, None); return None
+        s["exp"] = time.time() + 60 * float(self.hcfg["session_min"]); return s
+
+    # ── 상태
+    def kpi(self):
+        rt = self.rt; v = rt.val; g = lambda k, d=0.0: v.get(k, d); s = rt.site
+        on = lambda n: rt.dev[n].on if n in rt.dev else g(f"{n}.status") > 0.5
+        load, pv, dg, fc, ess = g("LOAD.kw"), g("PV.kw"), g("DG.kw"), g("FC.kw"), g("ESS.kw")
+        online = [s.ess_kw] * int(g("ESS.status", 1) > 0.5) + [float(self.cfg.get("g1_kw", 100.0))] + [s.dg_kw] * int(on("DG")) + [s.fc_kw] * int(on("FC"))
+        l12 = g("LOAD.p1_kw") + g("LOAD.p2_kw"); margin = (sum(online) - max(online)) - l12 if online else -l12
+        soc = g("ESS.soc", 0.0); h2 = g("H2.nm3", 0.0); fuel = g("DG.fuel_l", 0.0)
+        ess_h = ((soc / 100 - s.soc_min) * s.ess_kwh / ess) if ess > 1 else None
+        return {"load": load, "pv": pv, "dg": dg, "fc": fc, "ess": ess, "soc": soc, "h2": h2, "fuel": fuel, "l1": g("LOAD.p1_kw"), "l2": g("LOAD.p2_kw"), "l3": g("LOAD.p3_kw"),
+                "gen": pv + dg + fc + max(ess, 0.0), "renew": (min(pv, load) / load * 100) if load > 1 else 0.0, "reserve_margin": margin, "reserve_need": margin < 0,
+                "online_kw": online, "ess_h": ess_h, "h2_h": h2 / (s.fc_kw * s.fc_nm3_per_kwh) if s.fc_kw else None, "fuel_h": fuel / (s.dg_kw * s.dg_l_per_kwh) if s.dg_kw else None,
+                "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "g1_kw": float(self.cfg.get("g1_kw", 100.0))}
+
+    def snapshot(self):
+        rt = self.rt; now = rt.now()
+        with self.lock:
+            vals = {}
+            for p in rt.pts:
+                t = p["tag"]
+                if p["rw"] != "r": continue
+                vals[t] = {"v": rt.val.get(t), "f": rt.flag.get(t, 3 if t not in rt.val else 0), "age": round(now - rt.t_upd[t], 1) if t in rt.t_upd else None}
+            devs = {}
+            for n, lk in rt.links.items():
+                paths = {}
+                for k, cl in lk.cl.items():
+                    paths[k] = {"alive": lk.alive.get(k, False), "host": f"{cl.host}:{cl.port}", "unit": cl.unit, "ok": cl.n_ok, "err": cl.n_err,
+                                "rtt": None if cl.last_rtt is None else round(cl.last_rtt * 1000, 2), "last_err": cl.last_err,
+                                "age": round(now - rt.lm.last[n][k], 1)}
+                d = rt.dev.get(n)
+                devs[n] = {"link": rt.lm.state[n], "since": round(now - rt.lm.since[n], 1), "ctl": n in rt.dev, "paths": paths,
+                           "on": (d.on if d else rt.val.get(f"{n}.status", 0) > 0.5), "manual": d.manual if d else False, "online": rt.lm.controllable(n),
+                           "seq_ack": rt.val.get(f"{n}.seq_ack"), "hb": rt.val.get(f"{n}.hb")}
+            sm = list(self.scan_ms)
+        alarms, cnt = self.alarms.snapshot()
+        st = sorted(sm); top = max(5.0, (st[-1] if st else 1.0) * 1.1); nb = 24
+        hist = [0] * nb
+        for x in sm: hist[min(nb - 1, int(x / top * nb))] += 1
+        return {"t": time.time(), "wall": wall_iso(), "utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "uptime": round(time.time() - self.t_start),
+                "site": rt.site.name, "mode": rt.mode, "run_mode": self.cfg.get("run_mode", "개발"), "sim": self.sim, "auto": self.auto,
+                "policy": self.plan_note, "version": {"rt": RT_VERSION, "core": CORE_VERSION}, "values": vals, "devices": devs, "kpi": self.kpi(),
+                "alarms": alarms[:200], "alarm_cnt": cnt, "cmdlog": rt.cmd.log[-60:][::-1], "events": rt.events[-150:][::-1],
+                "decision": self.last_decision, "busy": (self.busy or {}).get("kind"), "queue": self.jobs.qsize(),
+                "next_ctrl_s": max(0.0, round(float(self.cfg.get("ctrl_s", 60.0)) - (now - rt.t_ctl), 1)), "ctrl_s": float(self.cfg.get("ctrl_s", 60.0)),
+                "stats": {"n_scan": rt.n_scan, "n_over": rt.n_over, "max_ms": round(rt.max_scan_s * 1000, 1), "last_ms": round(sm[-1], 1) if sm else None,
+                          "avg_ms": round(sum(sm) / len(sm), 1) if sm else None, "p95_ms": round(st[int(len(st) * 0.95) - 1], 1) if len(st) > 20 else None,
+                          "scan_s": float(self.cfg.get("scan_s", 1.0)), "wd": {k: (None if t is None else round(now - t, 1)) for k, t in rt.wd.last.items()},
+                          "trace_n": self.trace_n, "audit_seq": rt.audit.seq, "hist": hist, "hist_top": round(top, 1)},
+                "sim_state": self.sim_state() if self.sim else None}
+
+    def sim_state(self):
+        p = self.plant
+        return {"muted": sorted(p.muted), "noack": sorted(p.no_ack), "down": sorted(p.down), "hold": dict(self.simdrv.hold), "scenario": self.simdrv.scn,
+                "ports": list(self.sim_ports), "manual": [d for d in ("DG", "FC") if f"{d}.mode" in p.by_tag and p.get(f"{d}.mode") > 0.5]}
+
+    def trend_since(self, since_ms=0):
+        return [r for r in list(self.trend) if r[0] > since_ms]
+
+    def trace_since(self, since=0, limit=500):
+        with self.trace_lock:
+            out = [r for r in self.trace if r["i"] > since]
+        return out[-limit:]
+
+    def points(self):
+        rt = self.rt; now = rt.now(); out = []
+        with self.lock:
+            for p in rt.pts:
+                t = p["tag"]
+                out.append({**p, "v": rt.val.get(t), "f": rt.flag.get(t), "ftxt": FLAG_TXT.get(rt.flag.get(t), "-") if p["rw"] == "r" else "지령",
+                            "age": round(now - rt.t_upd[t], 1) if t in rt.t_upd else None})
+        return out
+
+    # ── 디버그: 레지스터 탐색기
+    def _client(self, q):
+        if q.get("host"):
+            return mb.Client(q["host"], int(q.get("port", 502)), int(q.get("unit", 1)), float(self.cfg.get("timeout_s", 0.5)), self.cfg["allow"]), True
+        lk = self.rt.links[q["dev"]]; return lk.cl[q.get("path", "A")], False
+
+    def mb_read(self, q):
+        fc = int(q.get("fc", 3)); addr = int(q.get("addr", 0)); n = int(q.get("count", 10))
+        cl, tmp = self._client(q)
+        if tmp: cl.tag = ("직접", f"{cl.host}"); cl.trace = self._tracer(cl)
+        t0 = time.monotonic()
+        try:
+            regs = cl.read_bits(addr, n, fc) if fc in (1, 2) else cl.read(addr, n, fc)
+            rtt = round((time.monotonic() - t0) * 1000, 2)
+        finally:
+            if tmp: cl.close()
+        tags = {}
+        if not tmp:
+            for p in self.rt.pts:
+                if p["device"] == q["dev"] and p["fc"] == fc: tags[p["addr"]] = p["tag"]
+        return {"ok": True, "fc": fc, "addr": addr, "regs": regs, "tags": {str(k): v for k, v in tags.items()}, "rtt": rtt}
+
+    def mb_write(self, q, who):
+        fc = int(q.get("fc", 6)); addr = int(q["addr"]); vals = [int(x) & 0xFFFF for x in q["values"]]
+        cl, tmp = self._client(q)
+        if tmp: cl.tag = ("직접", f"{cl.host}"); cl.trace = self._tracer(cl)
+        try:
+            if fc == 5: cl.write_coil(addr, bool(vals[0]))
+            elif fc == 6: cl.write(addr, vals[:1])
+            else: cl.write(addr, vals, fc=16)
+        finally:
+            if tmp: cl.close()
+        tgt = q.get("host") or f"{q['dev']}/{q.get('path', 'A')}"
+        self.rt.note("엔지니어링", f"레지스터 쓰기 {tgt} fc{fc} @{addr} = {vals}", actor=who)
+        return {"ok": True}
+
+    # ── 디버그: 가상 장치 고장 주입
+    def sim_action(self, q, who):
+        if not self.sim: raise ValueError("가상 장치 모드가 아님")
+        a = q["action"]; p = self.plant; tgt = q.get("target")
+        if a == "mute": (p.muted.add if q.get("on", True) else p.muted.discard)(tgt)
+        elif a == "noack": (p.no_ack.add if q.get("on", True) else p.no_ack.discard)(tgt)
+        elif a == "down": (p.down.add if q.get("on", True) else p.down.discard)(tgt)
+        elif a == "manual": p.set(f"{tgt}.mode", 1 if q.get("on", True) else 0)
+        elif a == "set":
+            tag = q["tag"]; val = float(q["value"])
+            if tag not in p.by_tag: raise ValueError(f"점 없음: {tag}")
+            if q.get("hold", True) and tag in ("LOAD.p1_kw", "LOAD.p2_kw", "LOAD.p3_kw", "PV.kw", "LOAD.kw", "ENV.temp", "ENV.press", "ENV.rh", "DG.fuel_l", "H2.nm3"):
+                self.simdrv.hold[tag] = val
+            p.set(tag, val)
+        elif a == "release": self.simdrv.hold.pop(q["tag"], None)
+        elif a == "scenario": self.simdrv.scenario(q["name"])
+        else: raise ValueError(f"동작 없음: {a}")
+        self.rt.note("시뮬레이터", f"고장 주입 {a} {tgt or q.get('tag') or q.get('name') or ''} {q.get('on', '')}".strip(), actor=who)
+        return {"ok": True, "sim": self.sim_state()}
+
+    def audit_verify(self):
+        ok, msg = self.rt.audit.verify(); return {"ok": ok, "msg": msg, "seq": self.rt.audit.seq}
+
+    def runtime_info(self):
+        c = copy.deepcopy(self.cfg); c.pop("hmi", None)
+        return {"config": c, "site": self.rt.site.to_dict(), "cfg_path": self.cfg_path, "state_dir": self.rt.state_dir, "sim": self.sim,
+                "version": {"rt": RT_VERSION, "core": CORE_VERSION}, "crypto": {"module": self.rt.audit.c.module, "verified": self.rt.audit.c.verified},
+                "sup": SUP, "policy": self.plan_note}

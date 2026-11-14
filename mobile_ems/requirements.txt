@@ -1,0 +1,2 @@
+# 표준 라이브러리 외 의존성은 numpy 하나뿐이다(예측·운전계획). 폐쇄망 반입 시: pip download numpy -d wheels
+numpy>=1.22

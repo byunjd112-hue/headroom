@@ -1,0 +1,31 @@
+# 이동형 전력체계 EMS — 자동 기동 등록 예(systemd)
+#   sudo cp service/ifps-ems.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now ifps-ems
+# 실행기(수집·제어)와 제어화면(HMI)이 한 프로세스다. 수집·제어 스레드가 모두 살아 있을 때만 WATCHDOG=1을 보내므로
+# 어느 하나가 멈추면 systemd가 10초 안에 재기동한다.
+[Unit]
+Description=IFPS Mobile EMS runtime + HMI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+WorkingDirectory=/opt/ifps_ems
+Environment=PYTHONPATH=/opt/ifps_ems PYTHONUNBUFFERED=1
+ExecStartPre=/usr/bin/python3 -m ifps_ems verify
+ExecStart=/usr/bin/python3 -m ifps_ems_rt.hmi /opt/ifps_ems/config/runtime.json --plan /opt/ifps_ems/results
+Restart=always
+RestartSec=2
+WatchdogSec=10
+TimeoutStopSec=10
+User=ems
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ifps_ems/config/state
+RestrictAddressFamilies=AF_INET AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=192.168.10.0/24 127.0.0.0/8
+
+[Install]
+WantedBy=multi-user.target

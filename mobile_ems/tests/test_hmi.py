@@ -1,0 +1,106 @@
+# -*- coding: utf-8 -*-
+"""제어화면(HMI) 시험. 가상 장치 + 실행 엔진 + 웹 서버를 띄우고 HTTP와 Modbus TCP로 실제 동작을 확인한다."""
+import json, os, shutil, sys, tempfile, time, unittest, urllib.request, urllib.error
+HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
+sys.path.insert(0, ROOT)
+from ifps_ems_rt.hmi.engine import Engine
+from ifps_ems_rt.hmi.server import serve
+
+
+class TestHmi(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.td = tempfile.mkdtemp()
+        for f in ("runtime.json", "pointmap.csv"): shutil.copy(os.path.join(ROOT, "config", f), cls.td)
+        p = os.path.join(cls.td, "runtime.json"); cfg = json.load(open(p, encoding="utf-8"))
+        cfg["ctrl_s"] = 3600; cfg["timeout_s"] = 0.3; cfg["hmi"] = {"pin_operator": "4321", "pin_engineer": "8765", "sbo_s": 5}
+        with open(p, "w", encoding="utf-8") as f: json.dump(cfg, f, ensure_ascii=False)
+        cls.eng = Engine(p, sim=True); cls.eng.start(); cls.httpd = serve(cls.eng, "127.0.0.1", 0)
+        cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"; time.sleep(2.5)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown(); cls.eng.stop(); shutil.rmtree(cls.td, ignore_errors=True)
+
+    def req(self, path, body=None, tok=None):
+        r = urllib.request.Request(self.base + path, data=None if body is None else json.dumps(body).encode(), method="GET" if body is None else "POST")
+        if tok: r.add_header("X-EMS-Token", tok)
+        try:
+            with urllib.request.urlopen(r, timeout=5) as f: return f.status, json.loads(f.read())
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read())
+
+    def login(self, pin):
+        return self.req("/api/login", {"pin": pin, "name": "시험"})[1]["token"]
+
+    def wait(self, cond, limit=6.0):
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < limit:
+            s = self.req("/api/snapshot")[1]
+            if cond(s): return s, time.monotonic() - t0
+            time.sleep(0.2)
+        self.fail("조건 미충족")
+
+    def test_1_static_and_snapshot(self):
+        with urllib.request.urlopen(self.base + "/", timeout=5) as f:
+            html = f.read().decode(); self.assertIn("IFPS", html); self.assertIn("default-src 'self'", f.headers["Content-Security-Policy"])
+        s = self.req("/api/snapshot")[1]
+        self.assertEqual(set(s["devices"]), {"DG", "FC", "ESS", "MTR"}); self.assertTrue(all(d["link"] == "정상" for d in s["devices"].values()))
+        self.assertGreater(s["kpi"]["load"], 30); self.assertEqual(s["me"]["role"], "viewer")
+        self.assertGreater(len(self.req("/api/trend")[1]["rows"]), 0); self.assertGreater(len(self.req("/api/trace")[1]["rows"]), 0)
+        self.assertEqual(self.req("/static/../../runtime.py")[0], 404)                                # 경로 이탈 차단
+
+    def test_2_auth_and_roles(self):
+        self.assertFalse(self.req("/api/login", {"pin": "0000"})[1]["ok"])
+        self.assertEqual(self.req("/api/select", {"dev": "DG", "cmd": "start"})[0], 403)             # 조회 권한으로 지령 불가
+        op = self.login("4321")
+        self.assertEqual(self.req("/api/sim", {"action": "mute", "target": "DG"}, op)[0], 403)        # 운용자는 고장 주입 불가
+        self.assertEqual(self.req("/api/mb/write", {"dev": "DG", "addr": 40, "values": [1]}, op)[0], 403)
+
+    def test_3_sbo_command_with_ack(self):
+        op = self.login("4321"); r = self.req("/api/select", {"dev": "DG", "cmd": "stop"}, op)[1]
+        self.assertFalse(r["ok"]); self.assertIn("중복", r["why"])                                    # 정지 중 정지 = 중복 지령 차단
+        sid = self.req("/api/select", {"dev": "DG", "cmd": "start"}, op)[1]["sid"]
+        self.assertFalse(self.req("/api/operate", {"sid": "bogus"}, op)[1]["ok"])
+        self.assertTrue(self.req("/api/operate", {"sid": sid}, op)[1]["ok"])
+        self.assertFalse(self.req("/api/operate", {"sid": sid}, op)[1]["ok"])                         # 한 번 쓴 선택은 재사용 불가
+        s, dt = self.wait(lambda s: s["devices"]["DG"]["on"]); self.assertLess(dt, 3.0)
+        self.assertEqual(int(self.eng.plant.get("DG.status")), 1); self.assertTrue(any("응답 확인" in c["text"] for c in s["cmdlog"]))
+        sid = self.req("/api/select", {"dev": "DG", "cmd": "stop"}, op)[1]["sid"]; self.req("/api/operate", {"sid": sid}, op)
+        self.wait(lambda s: not s["devices"]["DG"]["on"])
+        r = self.req("/api/select", {"dev": "FC", "cmd": "set", "tag": "FC.kw_set", "value": 500}, op)[1]
+        self.assertFalse(r["ok"]); self.assertIn("범위", r["why"])                                     # 설정 범위 검사
+
+    def test_4_fault_injection_alarms_and_parallel_scan(self):
+        en = self.login("8765"); op = self.login("4321")
+        self.assertTrue(self.req("/api/sim", {"action": "down", "target": "A", "on": True}, en)[1]["ok"])
+        s, _ = self.wait(lambda s: s["devices"]["DG"]["link"] == "경로 저하")
+        self.req("/api/sim", {"action": "mute", "target": "ESS", "on": True}, en)
+        s, dt = self.wait(lambda s: s["devices"]["ESS"]["link"] == "두절"); self.assertLess(dt, 3.5)   # 두절 감지 3초 한도(+폴링)
+        self.assertTrue(any(a["key"] == "link.ESS" and a["prio"] == 1 for a in s["alarms"]))
+        self.assertLess(s["stats"]["last_ms"], 600)                                                    # 병렬 수집: 무응답 장치가 있어도 시간 초과 1회 안
+        self.req("/api/sim", {"action": "scenario", "name": "normal"}, en)
+        s, _ = self.wait(lambda s: all(d["link"] == "정상" for d in s["devices"].values()))
+        n = self.req("/api/ack", {"ids": "all"}, op)[1]["n"]; self.assertGreater(n, 0)
+        s = self.req("/api/snapshot")[1]; self.assertFalse(any(a["key"] == "link.ESS" for a in s["alarms"]))  # 복귀+확인 = 목록에서 사라짐
+
+    def test_5_register_explorer_and_audit(self):
+        op = self.login("4321"); en = self.login("8765")
+        r = self.req("/api/mb/read?dev=DG&path=B&fc=3&addr=0&count=8", tok=op)[1]
+        self.assertTrue(r["ok"]); self.assertEqual(len(r["regs"]), 8); self.assertEqual(r["tags"]["4"], "DG.kw")
+        self.assertTrue(self.req("/api/mb/write", {"dev": "DG", "path": "A", "fc": 16, "addr": 40, "values": [7, 8]}, en)[1]["ok"])
+        self.assertEqual(self.req("/api/mb/read?dev=DG&path=A&fc=3&addr=40&count=2", tok=op)[1]["regs"], [7, 8])
+        r = self.req("/api/mb/read?host=8.8.8.8&port=502&unit=1&fc=3&addr=0&count=1", tok=op)[1]
+        self.assertFalse(r["ok"]); self.assertIn("허용 목록", r["why"])                                  # 직접 접속도 허용 목록 검사
+        v = self.req("/api/audit/verify")[1]; self.assertTrue(v["ok"], v["msg"])
+        self.assertTrue(any("레지스터 쓰기" in (e["data"].get("text", "")) for e in self.req("/api/audit?n=50")[1]["rows"]))
+
+    def test_6_auto_control_runs(self):
+        op = self.login("4321"); self.req("/api/control_now", {}, op)
+        s, _ = self.wait(lambda s: s["decision"] is not None)
+        self.assertIn("DG", s["decision"]["want"]); self.assertEqual(len(s["decision"]["action"]), 3)
+        self.assertEqual(self.req("/api/snapshot")[1]["stats"]["n_over"], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
