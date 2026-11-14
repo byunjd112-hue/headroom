@@ -227,3 +227,27 @@ input.in, select.in { background: rgba(6,12,34,.8); border-color: rgba(96,140,24
 .stbtns div svg { display: block; margin: 0 auto 4px; width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; }
 .stbtns div.on { color: #dffaf5; border-color: #2de2c8; box-shadow: 0 0 0 1px #2de2c8 inset, 0 0 16px rgba(45,226,200,.25); background: rgba(45,226,200,.08); }
 .gauge .c .mid { font-size: 30px; font-weight: 500; }
+
+/* ═══════════ 발전·예측 / 장비 일러스트 ═══════════ */
+.eqsvg { width: 100%; height: auto; display: block; filter: drop-shadow(0 10px 18px rgba(0,0,0,.35)); }
+.eqsvg.eqlost { filter: grayscale(.8) brightness(.7); }
+.eqpulse { animation: eqp 1.6s ease-in-out infinite; } @keyframes eqp { 50% { opacity: .25; } }
+.eqspin { animation: eqs 1.2s linear infinite; } @keyframes eqs { to { transform: rotate(360deg); } }
+.eqsmoke { animation: eqk 2.4s ease-out infinite; } @keyframes eqk { from { transform: translate(0, 6px); opacity: .9; } to { transform: translate(6px, -10px); opacity: 0; } }
+.dev .eqimg { width: 210px; flex: none; margin: -8px -6px -4px 0; }
+.dev .toprow { display: flex; gap: 10px; align-items: center; }
+.en-tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+.en-tiles .tile .big { font-size: 26px; }
+.en-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+.accbig { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.accbig > div { background: rgba(6,12,34,.55); border: 1px solid rgba(96,140,240,.16); border-radius: 14px; padding: 12px 14px; }
+.accbig .big { font-size: 26px; } .accbig .ok { color: var(--ok); }
+.hb { display: grid; grid-template-columns: 70px 1fr 54px; gap: 8px; align-items: center; font-size: 12px; margin: 6px 0; }
+.hb .tr { position: relative; height: 10px; background: rgba(6,12,34,.8); border-radius: 6px; }
+.hb .tr i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; }
+.hb .tr b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #ffb547; }
+.eqgal { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
+.eqgal .panel .bd { padding-top: 4px; } .eqgal .cap { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
+@media (max-width: 1400px) { .en-tiles { grid-template-columns: repeat(3, 1fr); } .eqgal { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1100px) { .en-grid { grid-template-columns: 1fr; } .dev .eqimg { width: 150px; } }
+.en-grid canvas { width: 100%; display: block; } .accbig .lab { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

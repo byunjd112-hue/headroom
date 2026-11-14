@@ -25,6 +25,7 @@
     <a href="#overview" data-p="overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span data-i18n="nav.overview">개요</span></a>
     <a href="#control" data-p="control"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l5 3"/></svg><span data-i18n="nav.control">설비 제어</span></a>
     <a href="#alarms" data-p="alarms"><svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 1 1 12 0v6l2 2H4z"/><path d="M10 21h4"/></svg><span data-i18n="nav.alarms">경보</span><i class="badge" id="nb-alm" hidden>0</i></a>
+    <a href="#energy" data-p="energy"><svg viewBox="0 0 24 24"><rect x="4" y="12" width="3.5" height="8" rx="1"/><rect x="10.25" y="7" width="3.5" height="13" rx="1"/><rect x="16.5" y="3" width="3.5" height="17" rx="1"/></svg><span data-i18n="nav.energy">발전·예측</span></a>
     <a href="#trends" data-p="trends"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="m4 15 5-5 4 4 7-8"/></svg><span data-i18n="nav.trends">추세</span></a>
     <a href="#comm" data-p="comm"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 11.5 17 6.5M7 12.5l10 5"/></svg><span data-i18n="nav.comm">통신 진단</span></a>
     <a href="#eng" data-p="eng"><svg viewBox="0 0 24 24"><path d="m9 8-5 4 5 4M15 8l5 4-5 4M13 5l-2 14"/></svg><span data-i18n="nav.eng">디버그</span></a>
@@ -43,6 +44,8 @@
 <div class="modal-bg" id="modal"><div class="modal" id="modalBox"></div></div>
 <div class="toast" id="toast"></div>
 <script src="core.js"></script>
+<script src="equip.js"></script>
+<script src="energy.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

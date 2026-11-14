@@ -181,6 +181,8 @@ class Engine:
         self.trace = collections.deque(maxlen=3000); self.trace_n = 0; self.trace_on = True; self.trace_lock = threading.Lock()
         self.tokens = {}; self.selects = {}; self.last_decision = None; self._ev_i = 0; self.t_start = time.time(); self.fc_set_written = None
         self.ack_info = {}
+        self.plan_dir = plan_dir; self.fc_cache = None; self.fc_lock = threading.Lock()
+        self.energy = self._energy_zero(); self._t_en = None
         for n, lk in self.rt.links.items():
             for k, cl in lk.cl.items():
                 cl.tag = (n, k); cl.trace = self._tracer(cl)
@@ -206,6 +208,7 @@ class Engine:
         self.running = True
         threading.Thread(target=self._scan_loop, name="scan", daemon=True).start()
         threading.Thread(target=self._exec_loop, name="exec", daemon=True).start()
+        self.forecast()                                                          # 예측·정밀도 사전 계산(백그라운드)
         if self.simdrv:
             self.simdrv.step(); threading.Thread(target=self.simdrv.loop, name="sim", daemon=True).start()
 
@@ -245,9 +248,80 @@ class Engine:
             if slp < -5 * period: nxt = time.monotonic(); slp = 0
             time.sleep(max(0.0, slp))
 
+    @staticmethod
+    def _energy_zero():
+        return {"day": datetime.now().strftime("%Y-%m-%d"), "pv": 0.0, "dg": 0.0, "fc": 0.0, "load": 0.0, "ess_chg": 0.0, "ess_dis": 0.0,
+                "fuel_l": 0.0, "h2_nm3": 0.0, "peak_load": 0.0, "peak_pv": 0.0, "hours": [[0.0] * 6 for _ in range(24)]}
+
+    def _integrate(self, k):
+        """전력량 적산(사다리꼴 대신 1초 직사각형). 자정에 초기화. hours: 시간대별 [PV, DG, FC, ESS방전, 부하, ESS충전] kWh."""
+        now = time.time(); day = datetime.now().strftime("%Y-%m-%d"); e = self.energy
+        if e["day"] != day: self.energy = e = self._energy_zero()
+        if self._t_en is not None:
+            h = min(now - self._t_en, 5.0) / 3600.0; s = self.rt.site; hr = datetime.now().hour
+            parts = [max(k["pv"], 0), max(k["dg"], 0), max(k["fc"], 0), max(k["ess"], 0), max(k["load"], 0), max(-k["ess"], 0)]
+            for i, key in enumerate(("pv", "dg", "fc", "ess_dis", "load", "ess_chg")):
+                e[key] += parts[i] * h; e["hours"][hr][i] += parts[i] * h
+            e["fuel_l"] += parts[1] * h * s.dg_l_per_kwh; e["h2_nm3"] += parts[2] * h * s.fc_nm3_per_kwh
+            e["peak_load"] = max(e["peak_load"], k["load"]); e["peak_pv"] = max(e["peak_pv"], k["pv"])
+        self._t_en = now
+
+    # ── 예측·정밀도(백테스트). 무거우므로 10분마다 백그라운드 갱신
+    def forecast(self, force=False):
+        with self.fc_lock:
+            c = self.fc_cache
+            if c is None or force or time.time() - c["_t"] > 600:
+                if not getattr(self, "_fc_busy", False):
+                    self._fc_busy = True; threading.Thread(target=self._compute_forecast, daemon=True).start()
+            return c or {"ok": False, "why": "예측 계산 중…"}
+
+    def _compute_forecast(self):
+        try:
+            import numpy as np
+            from ifps_ems import dataio
+            from ifps_ems.forecast import LoadForecaster, PVForecaster, BUCKET, bucket_of
+            site = self.rt.site; hist = os.path.join(self.rt.state_dir, "history.csv"); src = "현장 실측 이력(history.csv)"
+            if not os.path.exists(hist) or sum(1 for _ in open(hist, encoding="utf-8")) < 8 * 96 + 1:
+                hist = os.path.join(self.plan_dir or os.path.join(os.path.dirname(self.cfg_path), "..", "results"), "sample_site_data.csv"); src = "합성 현장 자료(실측 8일 미만)"
+            d = dataio.load_csv(hist, site); n = d["n"]
+            fl, fp = LoadForecaster(site), PVForecaster(site)
+            md = self.plan_dir or os.path.dirname(hist); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp)
+            o = n - 1; l50, llo, lhi, _ = fl.predict(d, o); p50, plo, phi, _ = fp.predict(d, o)
+            # 백테스트: 마지막 7일, 6시간 간격 발행
+            el = {b: [] for b in range(len(BUCKET))}; ep = {b: [] for b in range(len(BUCKET))}; cl = []; cp = []; mean_l = float(np.mean(d["load"][-7 * 96:]))
+            day_l, day_p, pts = [], [], []
+            for oo in range(n - 7 * 96 - 1, n - 97, 24):
+                a, alo, ahi, _ = fl.predict(d, oo); b, blo, bhi, _ = fp.predict(d, oo)
+                yl = d["load"][oo + 1:oo + 97]; yp = d["pv"][oo + 1:oo + 97]; day_m = d["clear"][oo + 1:oo + 97] > 0.05 * site.pv_kwp
+                for h in range(96):
+                    bb = bucket_of(h + 1); el[bb].append(abs(a[h] - yl[h]) / mean_l)
+                    if day_m[h]: ep[bb].append(abs(b[h] - yp[h]) / site.pv_kwp); cp.append(blo[h] <= yp[h] <= bhi[h])
+                    cl.append(alo[h] <= yl[h] <= ahi[h])
+                day_l.append(abs(a.sum() - yl.sum()) / yl.sum()); day_p.append(abs(b.sum() - yp.sum()) / max(yp.sum(), 1))
+                pts += [[float(a[h]), float(yl[h])] for h in range(0, 96, 8)]
+            mk = lambda e: [round(float(np.mean(e[b])) * 100, 2) if e[b] else None for b in range(len(BUCKET))]
+            ts = d["ts"]; dates = sorted(set(t[:10] for t in ts))[-14:]; daily = []
+            for dd in dates:
+                m = np.array([t.startswith(dd) for t in ts])
+                daily.append({"d": dd, "load": round(float(d["load"][m].sum() * 0.25), 1), "pv": round(float(d["pv"][m].sum() * 0.25), 1),
+                              "clear": round(float(d["clear"][m].sum() * 0.25), 1), "peak": round(float(d["load"][m].max()), 1)})
+            r = lambda a: [round(float(x), 2) for x in a]
+            out = {"ok": True, "source": src, "trained": {"load": tl, "pv": tp}, "issued": ts[-1], "hist_ts": ts[-96:], "load_act": r(d["load"][-96:]), "pv_act": r(d["pv"][-96:]),
+                   "clear_hist": r(d["clear"][-96:]), "load": r(l50), "load_lo": r(llo), "load_hi": r(lhi), "pv": r(p50), "pv_lo": r(plo), "pv_hi": r(phi),
+                   "acc": {"load_nmae": round(float(np.mean(sum(el.values(), []))) * 100, 2), "pv_nmae": round(float(np.mean(sum(ep.values(), []))) * 100, 2),
+                           "load_cov": round(float(np.mean(cl)) * 100, 1), "pv_cov": round(float(np.mean(cp)) * 100, 1) if cp else None,
+                           "load_day": round(float(np.mean(day_l)) * 100, 2), "pv_day": round(float(np.mean(day_p)) * 100, 2),
+                           "buckets": list(BUCKET), "load_by_h": mk(el), "pv_by_h": mk(ep), "n_issue": len(day_l), "scatter": pts[:400], "limit": 15.0},
+                   "daily": daily, "_t": time.time(), "calc_s": None}
+            with self.fc_lock: self.fc_cache = out
+        except Exception as e:
+            with self.fc_lock: self.fc_cache = {"ok": False, "why": f"예측 계산 실패: {type(e).__name__}: {e}", "_t": time.time()}
+        finally:
+            self._fc_busy = False
+
     def _post_scan(self):
         rt = self.rt; v = rt.val; g = lambda k, d=0.0: v.get(k, d); s = rt.site
-        k = self.kpi()
+        k = self.kpi(); self._integrate(k)
         self.trend.append([round(time.time() * 1000), round(k["load"], 2), round(k["pv"], 2), round(k["dg"], 2), round(k["fc"], 2), round(k["ess"], 2),
                            round(k["soc"], 2), round(k["h2"], 1), round(k["reserve_margin"], 1)])
         A = self.alarms
@@ -434,7 +508,7 @@ class Engine:
                           "avg_ms": round(sum(sm) / len(sm), 1) if sm else None, "p95_ms": round(st[int(len(st) * 0.95) - 1], 1) if len(st) > 20 else None,
                           "scan_s": float(self.cfg.get("scan_s", 1.0)), "wd": {k: (None if t is None else round(now - t, 1)) for k, t in rt.wd.last.items()},
                           "trace_n": self.trace_n, "audit_seq": rt.audit.seq, "hist": hist, "hist_top": round(top, 1)},
-                "sim_state": self.sim_state() if self.sim else None}
+                "sim_state": self.sim_state() if self.sim else None, "energy": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in self.energy.items() if k != "hours"}}
 
     def sim_state(self):
         p = self.plant
@@ -513,6 +587,9 @@ class Engine:
         else: raise ValueError(f"동작 없음: {a}")
         self.rt.note("시뮬레이터", f"고장 주입 {a} {tgt or q.get('tag') or q.get('name') or ''} {q.get('on', '')}".strip(), actor=who)
         return {"ok": True, "sim": self.sim_state()}
+
+    def energy_hours(self):
+        return {"day": self.energy["day"], "cols": ["pv", "dg", "fc", "ess_dis", "load", "ess_chg"], "hours": [[round(x, 3) for x in r] for r in self.energy["hours"]]}
 
     def audit_verify(self):
         ok, msg = self.rt.audit.verify(); return {"ok": ok, "msg": msg, "seq": self.rt.audit.seq}

@@ -62,6 +62,8 @@ def make_handler(eng):
                 if p == "/api/audit": return self._send(200, {"rows": eng.rt.audit.tail(int(q.get("n", 200)))[::-1]})
                 if p == "/api/audit/verify": return self._send(200, eng.audit_verify())
                 if p == "/api/info": return self._send(200, eng.runtime_info())
+                if p == "/api/forecast": return self._send(200, {k: v for k, v in eng.forecast(q.get("force") == "1").items() if not k.startswith("_")})
+                if p == "/api/energy": return self._send(200, eng.energy_hours())
                 if p == "/api/mb/read":
                     if self._sess("operator") is None: return
                     return self._send(200, eng.mb_read(q))

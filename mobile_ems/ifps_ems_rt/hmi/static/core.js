@@ -11,7 +11,7 @@ try { S.token = sessionStorage.getItem("ems.token"); S.lang = localStorage.getIt
 /* ── 다국어 */
 const I18N = {
   en: {
-    "nav.overview": "Overview", "nav.control": "Control", "nav.alarms": "Alarms", "nav.trends": "Trends", "nav.comm": "Comms", "nav.eng": "Debug",
+    "nav.overview": "Overview", "nav.control": "Control", "nav.alarms": "Alarms", "nav.trends": "Trends", "nav.energy": "Energy & Forecast", "nav.comm": "Comms", "nav.eng": "Debug",
     "foot.latest": "Latest alarm", "btn.ack": "Ack", "btn.ackall": "Ack all", "btn.acksel": "Ack selected", "btn.login": "Log in", "btn.logout": "Log out",
     "btn.start": "START", "btn.stop": "STOP", "btn.cancel": "Cancel", "btn.select": "Select", "btn.execute": "EXECUTE", "btn.read": "Read", "btn.write": "Write",
     "ov.title": "System Overview", "ov.sld": "Single-Line Diagram · Live Power Flow", "ov.balance": "Power Balance", "ov.ess": "Energy Storage", "ov.fuel": "Fuel & Hydrogen",

@@ -200,7 +200,7 @@ const P_CTL = {
     $("#devs").innerHTML = Object.keys(s.devices).map(n => {
       const [ko, en, col] = DEVINFO[n] || [n, "", "load"]; const ctl = s.devices[n].ctl;
       return `<div class="panel dev" id="dv-${n}"><div class="hd"><span class="lamp" id="lp-${n}"></span><h3 style="color:var(--text)">${n} · ${ko}</h3><div class="spacer"></div><span class="pill" id="lk-${n}">—</span></div>
-      <div class="bd"><div class="muted" style="font-size:12px;margin:-4px 0 8px">${en}</div><div class="row"><div><div class="lab">출력</div><div class="big" id="kw2-${n}" style="color:var(--${col})">—</div></div><div class="spacer"></div><div style="text-align:right"><div class="lab">상태</div><div class="mid" id="sx-${n}">—</div></div></div>
+      <div class="bd"><div class="toprow"><div style="flex:1;min-width:0"><div class="muted" style="font-size:12px;margin:-4px 0 8px">${en}</div><div class="row"><div><div class="lab">출력</div><div class="big" id="kw2-${n}" style="color:var(--${col})">—</div></div><div class="spacer"></div><div style="text-align:right"><div class="lab">상태</div><div class="mid" id="sx-${n}">—</div></div></div></div><div class="eqimg" id="eq-${n}"></div></div>
       <div class="meta" id="mt-${n}"></div>
       ${ctl ? `<div class="acts"><button class="btn go" data-c="start" data-d="${n}">▶ ${t("btn.start", "기동")}</button><button class="btn stop" data-c="stop" data-d="${n}">■ ${t("btn.stop", "정지")}</button>
         ${n === "FC" ? `<div class="spacer"></div><input class="in" id="fcSp" type="number" min="0" max="100" step="5" style="width:80px" placeholder="kW"><button class="btn" id="fcSet">출력 설정</button>` : ""}</div><div class="interlock" id="il-${n}"></div>` : `<div class="interlock muted" style="color:var(--muted)">감시 전용 — EMS는 지령하지 않음</div>`}</div></div>`;
@@ -221,6 +221,9 @@ const P_CTL = {
           : n === "ESS" ? [["SOC", F.n(val("ESS.soc")) + " %"], ["방향", val("ESS.kw") < 0 ? "충전" : "방전"], ["생존 HB", F.n(d.hb, 0)], ["경로", Object.entries(d.paths).map(([k, p]) => k + (p.alive ? "●" : "○")).join(" ")]]
             : [["PV", F.kw(val("PV.kw")) + " kW"], ["기온", F.n(val("ENV.temp")) + " °C"], ["습도", F.n(val("ENV.rh"), 0) + " %"], ["경로", Object.entries(d.paths).map(([k, p]) => k + (p.alive ? "●" : "○")).join(" ")]];
       $("#mt-" + n).innerHTML = meta.map(([a, b]) => `<div><div class="lab">${a}</div><div class="v">${b}</div></div>`).join("");
+      const eqs = { on: n === "MTR" ? !lost : d.on, lost, value: n === "ESS" ? val("ESS.soc") : n === "FC" ? F.n(val("FC.kw"), 0) : n === "MTR" ? F.n(val("LOAD.kw"), 0) : undefined };
+      const sig = JSON.stringify([eqs.on, eqs.lost, n === "ESS" ? Math.round(eqs.value) : eqs.value]); const eqb = $("#eq-" + n);
+      if (eqb && eqb.dataset.sig !== sig) { eqb.dataset.sig = sig; eqb.innerHTML = equipSvg(n, eqs); }
       const il = $("#il-" + n); if (il) { il.textContent = lost ? "⚠ 통신 두절 — 지령 차단" : d.manual ? "⚠ 현장 수동 모드 — EMS 지령 차단" : (s.busy ? "지령 처리 중…" : ""); }
       $$(`#devs [data-d="${n}"]`).forEach(b => { b.disabled = !can("operator") || lost || d.manual || (b.dataset.c === "start" ? d.on : !d.on); });
     }
@@ -442,7 +445,7 @@ const P_ENG = {
 };
 
 /* ════════════════ 라우팅·주기 갱신 */
-const PAGES = { overview: P_OV, control: P_CTL, alarms: P_ALM, trends: P_TR, comm: P_CM, eng: P_ENG };
+const PAGES = { overview: P_OV, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG };
 let mounted = null;
 function render() {
   if (!S.snap) return; const p = PAGES[S.page] ? S.page : "overview";

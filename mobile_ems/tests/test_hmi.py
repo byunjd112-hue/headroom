@@ -2,7 +2,7 @@
 """제어화면(HMI) 시험. 가상 장치 + 실행 엔진 + 웹 서버를 띄우고 HTTP와 Modbus TCP로 실제 동작을 확인한다."""
 import json, os, shutil, sys, tempfile, time, unittest, urllib.request, urllib.error
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
-sys.path.insert(0, ROOT)
+sys.path.insert(0, ROOT); sys.path.insert(0, HERE)
 from ifps_ems_rt.hmi.engine import Engine
 from ifps_ems_rt.hmi.server import serve
 
@@ -15,7 +15,9 @@ class TestHmi(unittest.TestCase):
         p = os.path.join(cls.td, "runtime.json"); cfg = json.load(open(p, encoding="utf-8"))
         cfg["ctrl_s"] = 3600; cfg["timeout_s"] = 0.3; cfg["hmi"] = {"pin_operator": "4321", "pin_engineer": "8765", "sbo_s": 5}
         with open(p, "w", encoding="utf-8") as f: json.dump(cfg, f, ensure_ascii=False)
-        cls.eng = Engine(p, sim=True); cls.eng.start(); cls.httpd = serve(cls.eng, "127.0.0.1", 0)
+        from test_rt import ensure_sample
+        ensure_sample(os.path.join(ROOT, "results"))
+        cls.eng = Engine(p, sim=True, plan_dir=os.path.join(ROOT, "results")); cls.eng.start(); cls.httpd = serve(cls.eng, "127.0.0.1", 0)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"; time.sleep(2.5)
 
     @classmethod
@@ -100,6 +102,19 @@ class TestHmi(unittest.TestCase):
         s, _ = self.wait(lambda s: s["decision"] is not None)
         self.assertIn("DG", s["decision"]["want"]); self.assertEqual(len(s["decision"]["action"]), 3)
         self.assertEqual(self.req("/api/snapshot")[1]["stats"]["n_over"], 0)
+
+    def test_7_forecast_accuracy_and_energy(self):
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < 20:
+            f = self.req("/api/forecast")[1]
+            if f.get("ok"): break
+            time.sleep(0.5)
+        self.assertTrue(f["ok"], f.get("why")); self.assertEqual(len(f["load"]), 96); self.assertEqual(len(f["pv_act"]), 96)
+        self.assertTrue(all(lo <= hi for lo, hi in zip(f["load_lo"], f["load_hi"])))
+        self.assertLess(f["acc"]["load_nmae"], 15.0); self.assertLess(f["acc"]["pv_nmae"], 15.0); self.assertGreaterEqual(f["acc"]["load_cov"], 70.0)
+        self.assertEqual(len(f["daily"]), 14)
+        e = self.req("/api/energy")[1]; self.assertEqual(len(e["hours"]), 24)
+        s = self.req("/api/snapshot")[1]["energy"]; self.assertGreater(s["load"], 0.0)                 # 금일 부하 전력량 적산
 
 
 if __name__ == "__main__":
