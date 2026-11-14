@@ -18,6 +18,9 @@ from ..runtime import Runtime
 from ..simplant import Plant
 
 PRIO_TXT = {1: "긴급", 2: "높음", 3: "보통", 4: "낮음"}
+FEEDERS = ("PV", "DG", "FC", "ESS", "G1", "TIE", "L1", "L2", "L3")
+FEEDER_TXT = {"PV": "태양광", "DG": "디젤", "FC": "연료전지", "ESS": "ESS", "G1": "복합전력", "TIE": "모선 연계", "L1": "1등급 부하", "L2": "2등급 부하", "L3": "3등급 부하"}
+ANSI = {0: "", 27: "27 저전압", 32: "32 역전력", 50: "50 순시 과전류", 51: "51 한시 과전류", 59: "59 과전압", 64: "64 지락", 81: "81 주파수 이상", 87: "87 차동"}
 ROLES = {"viewer": 0, "operator": 1, "engineer": 2}
 FLAG_TXT = {0: "정상", 1: "급변", 2: "고착", 3: "갱신 지연", 5: "범위 밖"}
 
@@ -111,10 +114,13 @@ class SimDriver:
         temp = 16 + 7 * math.sin(2 * math.pi * (hr - 9) / 24) + random.gauss(0, 0.05)
         vals = {"LOAD.p1_kw": p1, "LOAD.p2_kw": p2, "LOAD.p3_kw": max(0.0, p3), "PV.kw": pv, "ENV.temp": temp,
                 "ENV.press": 1012.5 + random.gauss(0, 0.05), "ENV.rh": 55 + random.gauss(0, 0.3)}
+        cbo = lambda f: (self.p.get(f"CB.{f}") > 0.5 and self.p.get(f"CB.{f}") < 1.5) if f"CB.{f}" in self.p.by_tag else True
+        for tag, f in (("LOAD.p1_kw", "L1"), ("LOAD.p2_kw", "L2"), ("LOAD.p3_kw", "L3"), ("PV.kw", "PV")):
+            if not cbo(f): vals[tag] = 0.0; self.hold.pop(tag, None)                      # 차단기 개방·트립 → 급전 없음
         for k, v in vals.items():
             if k in self.hold: v = self.hold[k]
             if k in self.p.by_tag: self.p.set(k, v)
-        tot = sum(self.hold.get(k, vals[k]) for k in ("LOAD.p1_kw", "LOAD.p2_kw", "LOAD.p3_kw"))
+        tot = sum(vals[k] if not cbo(f) else self.hold.get(k, vals[k]) for k, f in (("LOAD.p1_kw", "L1"), ("LOAD.p2_kw", "L2"), ("LOAD.p3_kw", "L3")))
         self.p.set("LOAD.kw", self.hold.get("LOAD.kw", tot))
         dg_on = self.p.get("DG.status") > 0.5                                  # 디젤 연료 소비
         if dg_on and "DG.fuel_l" not in self.hold:
@@ -130,6 +136,10 @@ class SimDriver:
                 pass
             time.sleep(1.0)
 
+    def trip(self, f, code):
+        """급전선 고장: 보호 IED가 차단기를 트립(2)하고 보호 요소 코드를 남긴 상태를 모사."""
+        self.p.set(f"CB.{f}", 2); self.p.set(f"FLT.{f}", code)
+
     def scenario(self, name):
         self.scn = name
         if name == "load_surge": self.extra_load = 60.0
@@ -138,8 +148,13 @@ class SimDriver:
         elif name == "soc_low": self.p.set("ESS.soc", 22.0)
         elif name == "soc_critical": self.p.set("ESS.soc", 17.0)
         elif name == "h2_low": self.p.set("H2.nm3", 130.0)
+        elif name in ("fault_l3", "fault_dg", "fault_ess"):
+            f, code = {"fault_l3": ("L3", 51), "fault_dg": ("DG", 87), "fault_ess": ("ESS", 64)}[name]; self.trip(f, code)
+        elif name == "tie_open": self.p.set("CB.TIE", 0)
         elif name == "normal":
             self.hold.clear(); self.extra_load = 0.0; self.scn = ""
+            for f in FEEDERS:
+                if f"CB.{f}" in self.p.by_tag: self.p.set(f"CB.{f}", 1); self.p.set(f"FLT.{f}", 0)
             self.p.muted.clear(); self.p.no_ack.clear(); self.p.down.clear()
             for d in ("DG", "FC"):
                 if f"{d}.mode" in self.p.by_tag: self.p.set(f"{d}.mode", 0)
@@ -344,6 +359,14 @@ class Engine:
         for n, d in rt.dev.items():
             A.set(f"man.{n}", d.manual, 4, n, f"{n} 현장 수동 모드 — EMS 지령 차단")
         A.set("auto.off", not self.auto, 4, "EMS", "자동 제어 해제 — 운용자 수동 지령 운전")
+        for f in FEEDERS:                                                              # 차단기 상태(보호 IED 게이트웨이)
+            c = v.get(f"CB.{f}")
+            if c is None: continue
+            code = int(round(v.get(f"FLT.{f}", 0)))
+            A.set(f"cb.trip.{f}", c > 1.5, 1 if f in ("L1", "DG", "ESS", "G1", "TIE") else 2, f"CB-{f}", f"CB-{f} {FEEDER_TXT[f]} 차단기 트립 — {ANSI.get(code, f'보호요소 {code}')}")
+            A.set(f"cb.open.{f}", c < 0.5, 3 if f == "TIE" else 4, f"CB-{f}", f"CB-{f} {FEEDER_TXT[f]} 차단기 개방")
+        if "BUS.a_v" in v:
+            A.set("bus.a", v["BUS.a_v"] < 300, 1, "BUS-A", "모선 A 무전압(정전)"); A.set("bus.b", v.get("BUS.b_v", 440) < 300, 1, "BUS-B", "모선 B 무전압(정전)")
         evs = rt.events
         for e in evs[self._ev_i:]:
             t = e["text"]
@@ -584,6 +607,14 @@ class Engine:
             p.set(tag, val)
         elif a == "release": self.simdrv.hold.pop(q["tag"], None)
         elif a == "scenario": self.simdrv.scenario(q["name"])
+        elif a == "fault":
+            f = q["target"]
+            if f not in FEEDERS: raise ValueError(f"급전선 없음: {f}")
+            self.simdrv.trip(f, int(q.get("code", 51)))
+        elif a == "cb":
+            f = q["target"]
+            if f not in FEEDERS: raise ValueError(f"급전선 없음: {f}")
+            p.set(f"CB.{f}", 1 if q.get("on", True) else 0); p.set(f"FLT.{f}", 0)
         else: raise ValueError(f"동작 없음: {a}")
         self.rt.note("시뮬레이터", f"고장 주입 {a} {tgt or q.get('tag') or q.get('name') or ''} {q.get('on', '')}".strip(), actor=who)
         return {"ok": True, "sim": self.sim_state()}

@@ -116,6 +116,18 @@ class TestHmi(unittest.TestCase):
         e = self.req("/api/energy")[1]; self.assertEqual(len(e["hours"]), 24)
         s = self.req("/api/snapshot")[1]["energy"]; self.assertGreater(s["load"], 0.0)                 # 금일 부하 전력량 적산
 
+    def test_8_breaker_trip_shown_and_deenergizes_feeder(self):
+        en = self.login("8765"); op = self.login("4321")
+        self.assertTrue(self.req("/api/sim", {"action": "fault", "target": "L3", "code": 51}, en)[1]["ok"])
+        s, dt = self.wait(lambda s: (s["values"]["CB.L3"]["v"] or 0) > 1.5 and s["values"]["LOAD.p3_kw"]["v"] == 0.0)
+        a = [x for x in s["alarms"] if x["key"] == "cb.trip.L3"]; self.assertTrue(a); self.assertIn("51 한시 과전류", a[0]["text"])
+        self.assertEqual(s["values"]["FLT.L3"]["v"], 51.0); self.assertGreater(s["values"]["BUS.b_v"]["v"], 400)   # 급전선 고장은 모선을 살려 둔다
+        self.req("/api/sim", {"action": "cb", "target": "L3", "on": True}, en)
+        s, _ = self.wait(lambda s: s["values"]["CB.L3"]["v"] == 1.0 and s["values"]["LOAD.p3_kw"]["v"] > 0)
+        self.req("/api/ack", {"ids": "all"}, op); s = self.req("/api/snapshot")[1]
+        self.assertFalse(any(x["key"] == "cb.trip.L3" for x in s["alarms"]))
+        with urllib.request.urlopen(self.base + "/sld.js", timeout=5) as f: self.assertIn("sldUpdate", f.read().decode())
+
 
 if __name__ == "__main__":
     unittest.main()

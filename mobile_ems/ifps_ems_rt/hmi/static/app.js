@@ -35,51 +35,6 @@ setInterval(() => { const d = new Date(); $("#clk").textContent = d.toTimeString
 async function ack(ids) { if (!can("operator")) return loginDialog(); const r = await api("/api/ack", { ids }); if (r.ok) toast(`경보 ${r.n}건 확인`, "ok"); poll(); }
 
 /* ════════════════ 1. 개요 */
-const SRC = [
-  { id: "PV", name: "태양광 PV", en: "SOLAR PV", x: 110, col: "pv", kw: "PV.kw", sub: "80kWp × 5" },
-  { id: "DG", name: "디젤 발전기", en: "DIESEL GEN", x: 300, col: "dg", kw: "DG.kw", sub: "100kW" },
-  { id: "FC", name: "수소 연료전지", en: "FUEL CELL", x: 490, col: "fc", kw: "FC.kw", sub: "100kW" },
-  { id: "ESS", name: "ESS (PCS)", en: "ESS (PCS)", x: 680, col: "ess", kw: "ESS.kw", sub: "1,000kWh / 500kW" },
-  { id: "G1", name: "복합전력 G1", en: "HYBRID G1", x: 870, col: "g1", kw: null, sub: "100kW" },
-];
-const LOADS = [{ id: "L1", name: "1등급 필수 부하", en: "CLASS 1 · CRITICAL", x: 200, kw: "LOAD.p1_kw" }, { id: "L2", name: "2등급 중요 부하", en: "CLASS 2 · ESSENTIAL", x: 500, kw: "LOAD.p2_kw" }, { id: "L3", name: "3등급 일반 부하", en: "CLASS 3 · NON-ESSENTIAL", x: 800, kw: "LOAD.p3_kw" }];
-const ICON = {
-  PV: '<path d="M3 8h18l-2.2 9H5.2z"/><path d="M8.5 8 7.6 17M15.5 8l.9 9M4.1 12.5h15.8"/><path d="M12 17v3M8 20h8"/><circle cx="19" cy="3.6" r="1.6"/>',
-  DG: '<rect x="3" y="8" width="13" height="10" rx="1.5"/><path d="M16 11h3v4h-3M6 8V5h5v3M10.2 10.5 8 13.5h3l-2.2 3"/>',
-  FC: '<circle cx="7.5" cy="12" r="3.2"/><circle cx="16.5" cy="12" r="3.2"/><path d="M10.7 12h2.6M5.5 4.5v3M18.5 16.5v3"/>',
-  ESS: '<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M19 10.5h2v3h-2M11.5 9 9 12.5h3.5L10 15.5"/>',
-  G1: '<path d="M12 3 7.5 21M12 3l4.5 18M8.8 15.5h6.4M10 10.5h4M5 7.5h14M9 21h6"/>',
-  L: '<path d="M4 21V9l6-3.5V21M10 21v-9.5h10V21M13 14.5h1.5M16.5 14.5H18M13 17.5h1.5M16.5 17.5H18M2.5 21h19"/>',
-};
-const hexPts = (cx, cy, r) => Array.from({ length: 6 }, (_, k) => { const a = Math.PI / 180 * (60 * k - 90); return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`; }).join(" ");
-function sldSvg() {
-  const hex = (n, cy, r, color, icon, isLoad) => `<g class="node" id="n-${n.id}">
-    <polygon class="hexo" points="${hexPts(n.x, cy, r)}"/><polygon class="hexi" points="${hexPts(n.x, cy, r - 9)}"/>
-    <g class="ico" stroke="${color}" transform="translate(${n.x - 19.2},${cy - 19.2}) scale(1.6)">${icon}</g>
-    <text class="nm" x="${n.x}" y="${cy + r + 24}" text-anchor="middle">${S.lang === "ko" ? n.name : n.en}</text>
-    <text x="${n.x}" y="${cy + r + 50}" text-anchor="middle"><tspan class="kw" id="kw-${n.id}">—</tspan><tspan class="u" dx="4">kW</tspan></text>
-    <text class="st" x="${n.x}" y="${cy + r + 68}" text-anchor="middle" id="st-${n.id}" fill="var(--muted)">—</text>
-    ${n.id === "ESS" ? `<rect x="${n.x - 55}" y="${cy + r + 78}" width="110" height="5" rx="2.5" fill="rgba(6,12,34,.9)"/><rect x="${n.x - 55}" y="${cy + r + 78}" width="0" height="5" rx="2.5" fill="var(--ess)" id="socbar"/><text class="u" id="sub-ESS" x="${n.x}" y="${cy + r + 97}" text-anchor="middle"></text>`
-      : isLoad ? "" : `<text class="tag" x="${n.x}" y="${cy + r + 86}" text-anchor="middle" id="tg-${n.id}" fill="var(--muted)">${n.sub || ""}</text>`}
-  </g>`;
-  const SY = 78, R = 50, BUS = 300, LY = 410, LR = 44;
-  const src = SRC.map(n => `<path class="wire" id="w-${n.id}" d="M${n.x} ${SY + R + 104} V${BUS}"/><path class="flow" id="f-${n.id}" d="M${n.x} ${SY + R + 106} V${BUS - 4}" stroke="var(--${n.col})"/>
-    <rect class="cb closed" id="cb-${n.id}" x="${n.x - 6}" y="${BUS - 32}" width="12" height="12" rx="3"/>${hex(n, SY, R, `var(--${n.col})`, ICON[n.id], false)}`).join("");
-  const lds = LOADS.map((n, i) => `<path class="wire live" d="M${n.x} ${BUS} V${LY - LR}"/><path class="flow" id="f-${n.id}" d="M${n.x} ${BUS + 4} V${LY - LR - 2}" stroke="var(--load)"/>
-    <rect class="cb closed" x="${n.x - 6}" y="${BUS + 22}" width="12" height="12" rx="3"/>${hex(n, LY, LR, ["#ff6b8a", "#ffb547", "#3d8bff"][i], ICON.L, true)}`).join("");
-  return `<svg class="sld" viewBox="0 0 1000 530" preserveAspectRatio="xMidYMid meet">
-    <defs><radialGradient id="hexFill" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="#1d3a86"/><stop offset="1" stop-color="#0a1538"/></radialGradient>
-      <linearGradient id="hexStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2de2c8"/><stop offset="1" stop-color="#3d6bff"/></linearGradient>
-      <linearGradient id="busGrad" gradientUnits="userSpaceOnUse" x1="40" y1="0" x2="960" y2="0"><stop offset="0" stop-color="#2de2c8" stop-opacity=".2"/><stop offset=".5" stop-color="#5aa8ff"/><stop offset="1" stop-color="#2de2c8" stop-opacity=".2"/></linearGradient>
-      <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="1000" height="530"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-    ${src}<line class="bus" x1="40" y1="${BUS}" x2="960" y2="${BUS}"/><text class="buslbl" x="44" y="${BUS + 22}">${S.lang === "ko" ? "AC 주 모선" : "AC MAIN BUS"}</text>${lds}</svg>`;
-}
-function setFlow(id, kw, cap) {
-  const f = document.getElementById("f-" + id); if (!f) return; const a = Math.abs(kw || 0);
-  if (a < 0.5) { f.style.opacity = 0; return; } f.style.opacity = .95;
-  f.style.animationDuration = Math.max(0.35, 2.6 - 2.2 * Math.min(1, a / (cap || 100))) + "s"; f.style.animationDirection = kw < 0 ? "reverse" : "normal";
-  f.style.strokeWidth = 2 + 3 * Math.min(1, a / (cap || 100));
-}
 const P_OV = {
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("ov.title", "운전 개요")}</h2><span class="sub" id="ovSub"></span></div>
@@ -91,7 +46,7 @@ const P_OV = {
     </div>
     <div class="grid ov">
       <div class="grid" style="align-content:start">
-        <div class="panel"><div class="hd"><h3>${t("ov.sld", "단선 결선도 · 실시간 전력 흐름")}</h3><span class="sub mono" id="busbal"></span><div class="spacer"></div><div class="legend"><span><i style="background:var(--pv)"></i>PV</span><span><i style="background:var(--dg)"></i>DG</span><span><i style="background:var(--fc)"></i>FC</span><span><i style="background:var(--ess)"></i>ESS</span></div></div>
+        <div class="panel"><div class="hd"><h3>${t("ov.sld", "단선 결선도 · 실시간 전력 흐름")}</h3><span class="sub mono" id="busbal"></span><div class="spacer"></div><div class="legend sldleg"><span><i class="l on"></i>통전</span><span><i class="l off"></i>무전압</span><span><i class="l flt"></i>고장</span><span><i class="c closed"></i>투입</span><span><i class="c open"></i>개방</span><span><i class="c trip"></i>트립</span></div></div>
           <div class="bd" style="padding:6px 10px 10px">${sldSvg()}</div></div>
         <div class="panel"><div class="hd"><h3>${t("ov.trend", "전력 추세 · 15분")}</h3><div class="spacer"></div><div class="legend" id="ovLeg"></div></div><div class="bd"><canvas class="chart" id="ovChart"></canvas></div></div>
       </div>
@@ -125,27 +80,7 @@ const P_OV = {
     $("#tRes").innerHTML = `${k.reserve_margin >= 0 ? "+" : ""}${F.n(k.reserve_margin, 0)}<small>kW</small>`; $("#tRes").className = "big " + (k.reserve_need ? "warnc" : "okc");
     $("#tResSt").textContent = k.reserve_need ? t("k.need", "예비력 부족 → FC 병렬") : t("k.ok", "N-1 만족"); $("#tOnl").textContent = `병렬 ${k.online_kw.length}대`;
     // 결선도
-    const st = (id, txt, col) => { const e = $("#st-" + id); if (e) { e.textContent = txt; e.setAttribute("fill", col); } };
-    const pk = { PV: k.pv, DG: k.dg, FC: k.fc, ESS: k.ess };
-    SRC.forEach(n => {
-      const g = $("#n-" + n.id); const lost = n.id === "PV" ? !devOk("MTR") : n.id === "G1" ? false : !devOk(n.id);
-      if (n.kw) $("#kw-" + n.id).textContent = lost ? "####" : F.kw(pk[n.id]);
-      const on = n.id === "PV" ? k.pv > 0.5 : n.id === "ESS" ? (val("ESS.status") > 0.5) : n.id === "G1" ? true : (D[n.id] && D[n.id].on);
-      g.classList.toggle("lost", lost); g.classList.toggle("on", !!on && !lost); g.classList.toggle("off", !on && !lost);
-      const cb = $("#cb-" + n.id); cb.setAttribute("class", "cb " + (lost ? "unk" : (on || n.id === "PV" || n.id === "G1") ? "closed" : "open"));
-      $("#w-" + n.id).setAttribute("class", "wire" + (on && !lost ? " live" : ""));
-      if (lost) st(n.id, S.lang === "ko" ? "통신 두절" : "COMM LOSS", "var(--alarm)");
-      else if (n.id === "PV") st(n.id, k.pv > 0.5 ? (S.lang === "ko" ? "발전 중" : "GENERATING") : (S.lang === "ko" ? "발전 없음" : "IDLE"), k.pv > 0.5 ? "var(--pv)" : "var(--muted)");
-      else if (n.id === "ESS") st(n.id, k.ess > 0.5 ? (S.lang === "ko" ? "방전" : "DISCHARGING") : k.ess < -0.5 ? (S.lang === "ko" ? "충전" : "CHARGING") : (S.lang === "ko" ? "대기" : "STANDBY"), "var(--ess)");
-      else if (n.id === "G1") st(n.id, S.lang === "ko" ? "계통 형성" : "GRID-FORMING", "var(--g1)");
-      else st(n.id, on ? (S.lang === "ko" ? "운전" : "RUNNING") : (S.lang === "ko" ? "정지" : "STOPPED"), on ? "var(--ok)" : "var(--muted)");
-      const tg = $("#tg-" + n.id); if (tg && D[n.id] && D[n.id].ctl) { tg.textContent = D[n.id].manual ? "LOCAL · MANUAL" : "REMOTE · AUTO"; tg.setAttribute("fill", D[n.id].manual ? "var(--warn)" : "var(--muted)"); }
-      setFlow(n.id, lost ? 0 : (n.id === "G1" ? 0 : pk[n.id]), n.id === "PV" ? 400 : n.id === "ESS" ? 300 : 100);
-    });
-    $("#socbar").setAttribute("width", 110 * Math.max(0, Math.min(1, k.soc / 100)));
-    $("#sub-ESS").textContent = `SOC ${F.n(k.soc, 1)}%`;
-    LOADS.forEach(n => { $("#kw-" + n.id).textContent = devOk("MTR") ? F.kw(val(n.kw)) : "####"; st(n.id, S.lang === "ko" ? "급전 중" : "ENERGIZED", "var(--ok)"); setFlow(n.id, val(n.kw), 150); });
-    const bal = k.gen - k.load; $("#busbal").textContent = `Σ${S.lang === "ko" ? "공급" : "GEN"} ${F.kw(k.gen)} · Σ${S.lang === "ko" ? "부하" : "LOAD"} ${F.kw(k.load)} kW`;
+    sldUpdate(s);
     // 수급
     $("#bGen").textContent = F.kw(k.pv + k.dg + k.fc + Math.max(0, k.ess)) + " kW"; $("#bLoad").textContent = F.kw(k.load) + " kW";
     const parts = [["PV", k.pv, "pv"], ["DG", k.dg, "dg"], ["FC", k.fc, "fc"], ["ESS", Math.max(0, k.ess), "ess"]]; const tot = parts.reduce((a, p) => a + p[1], 0) || 1;
@@ -413,9 +348,11 @@ const P_ENG = {
         <div class="panel"><div class="hd"><h3>장치 고장 주입</h3></div><div class="bd np"><table class="t"><thead><tr><th>장치</th><th>무응답 (시간 초과)</th><th>지령 무시 (무응답)</th><th>현장 수동 모드</th></tr></thead><tbody id="simDev"></tbody></table></div>
           <div class="bd"><div class="lab" style="margin-bottom:8px">통신 경로 단절 (전 장치)</div><div style="display:flex;gap:8px" id="simPath"></div></div></div>
         <div class="panel"><div class="hd"><h3>운전 시나리오</h3></div><div class="bd" style="display:flex;flex-wrap:wrap;gap:8px" id="simScn">
-          ${[["load_surge", "부하 급증 +60kW"], ["cloud", "구름 통과 (PV −70%)"], ["night", "야간 (PV 0)"], ["soc_low", "ESS 충전율 22%"], ["soc_critical", "ESS 충전율 17%"], ["h2_low", "수소 잔량 130Nm³"], ["normal", "▶ 정상 복귀 (전 고장 해제)"]].map(([k, v]) => `<button class="btn ${k === "normal" ? "go" : ""}" data-s="${k}">${v}</button>`).join("")}</div>
+          ${[["load_surge", "부하 급증 +60kW"], ["cloud", "구름 통과 (PV −70%)"], ["night", "야간 (PV 0)"], ["soc_low", "ESS 충전율 22%"], ["soc_critical", "ESS 충전율 17%"], ["h2_low", "수소 잔량 130Nm³"], ["fault_l3", "3등급 급전선 과전류 트립"], ["fault_dg", "디젤 차동(87) 트립"], ["fault_ess", "ESS 지락(64) 트립"], ["tie_open", "모선 연계 개방"], ["normal", "▶ 정상 복귀 (전 고장 해제)"]].map(([k, v]) => `<button class="btn ${k === "normal" ? "go" : ""}" data-s="${k}">${v}</button>`).join("")}</div>
           <div class="bd" style="border-top:1px solid var(--line)"><div class="lab" style="margin-bottom:8px">값 강제 (가상 장치 레지스터)</div><div class="form"><label>TAG<select class="in" id="svTag">${tags.map(x => `<option>${x}</option>`).join("")}</select></label><label>값<input class="in" id="svVal" type="number" step="any" style="width:100px"></label><label style="flex-direction:row;gap:6px;align-items:center;text-transform:none"><input type="checkbox" id="svHold" checked>유지</label><button class="btn eng" id="svGo">적용</button></div>
-          <div id="simHold" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"></div></div></div></div>`;
+          <div id="simHold" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"></div></div></div></div>
+      <div class="panel" style="margin-top:18px"><div class="hd"><h3>급전선 차단기 · 보호 동작 주입</h3><div class="spacer"></div><span class="sub">보호 IED가 차단기를 트립하고 ANSI 보호요소 코드를 게이트웨이로 보고하는 상황을 모사</span></div>
+        <div class="bd np"><table class="t"><thead><tr><th>급전선</th><th>차단기 상태</th><th>보호요소</th><th>고장 주입</th><th>조작</th></tr></thead><tbody id="simCb"></tbody></table></div></div>`;
     const act = async b => { if (!can("engineer")) { toast("엔지니어 권한 필요", "bad"); return loginDialog(); } const r = await api("/api/sim", b); if (r.ok) { S.snap.sim_state = r.sim; this.simUpdate(); toast("고장 주입 적용", "ok"); } else toast(r.why, "bad"); };
     this._simAct = act;
     $$("#simScn [data-s]").forEach(b => b.onclick = () => act({ action: "scenario", name: b.dataset.s }));
@@ -426,6 +363,14 @@ const P_ENG = {
     const s = S.snap; if (!s || !s.sim || !$("#simDev")) return; const ss = s.sim_state; const tog = (on, a, tgt) => `<button class="btn sm ${on ? "stop" : ""}" data-a="${a}" data-t="${tgt}" data-on="${on ? 0 : 1}">${on ? "● 적용 중 — 해제" : "적용"}</button>`;
     $("#simDev").innerHTML = Object.keys(s.devices).map(n => `<tr><td><b>${n}</b></td><td>${tog(ss.muted.includes(n), "mute", n)}</td><td>${s.devices[n].ctl ? tog(ss.noack.includes(n), "noack", n) : `<span class="muted">—</span>`}</td><td>${s.devices[n].ctl ? tog(ss.manual.includes(n), "manual", n) : `<span class="muted">—</span>`}</td></tr>`).join("");
     $("#simPath").innerHTML = ["A", "B"].map(p => `<span>경로 ${p} ${tog(ss.down.includes(p), "down", p)}</span>`).join("");
+    const FD = [["PV", "태양광"], ["DG", "디젤"], ["FC", "연료전지"], ["ESS", "ESS"], ["G1", "복합전력 G1"], ["TIE", "모선 연계"], ["L1", "1등급 부하"], ["L2", "2등급 부하"], ["L3", "3등급 부하"]];
+    const cbE = $("#simCb"); if (cbE && !cbE.dataset.built) { cbE.dataset.built = 1; cbE.innerHTML = FD.map(([f, nm]) => `<tr><td><b>CB-${f}</b> <span class="muted">${nm}</span></td><td id="sc-${f}"></td><td class="mono" id="sf-${f}"></td>
+        <td><select class="in" id="scd-${f}" style="height:26px"><option value="51">51 한시 과전류</option><option value="50">50 순시 과전류</option><option value="87">87 차동</option><option value="64">64 지락</option><option value="27">27 저전압</option><option value="59">59 과전압</option><option value="81">81 주파수</option><option value="32">32 역전력</option></select>
+        <button class="btn sm stop" data-flt="${f}">트립</button></td><td><button class="btn sm" data-cbo="${f}">개방</button> <button class="btn sm go" data-cbc="${f}">투입·복구</button></td></tr>`).join("");
+      $$("#simCb [data-flt]").forEach(b => b.onclick = () => this._simAct({ action: "fault", target: b.dataset.flt, code: +$("#scd-" + b.dataset.flt).value }));
+      $$("#simCb [data-cbo]").forEach(b => b.onclick = () => this._simAct({ action: "cb", target: b.dataset.cbo, on: false }));
+      $$("#simCb [data-cbc]").forEach(b => b.onclick = () => this._simAct({ action: "cb", target: b.dataset.cbc, on: true })); }
+    FD.forEach(([f]) => { const c = Math.round(val("CB." + f) ?? -1), e = $("#sc-" + f); if (!e) return; e.innerHTML = c === 1 ? `<span class="pill ok">투입</span>` : c === 2 ? `<span class="pill bad">트립</span>` : c === 0 ? `<span class="pill warn">개방</span>` : `<span class="pill">미상</span>`; const fc = Math.round(val("FLT." + f) || 0); $("#sf-" + f).textContent = fc ? (ANSI_TXT[fc] || fc) : "—"; });
     $$("#simDev [data-a], #simPath [data-a]").forEach(b => b.onclick = () => this._simAct({ action: b.dataset.a, target: b.dataset.t, on: b.dataset.on === "1" }));
     $("#simHold").innerHTML = Object.entries(ss.hold).map(([k, v]) => `<span class="pill eng">${k} = ${F.n(v, 1)} <a href="#" data-r="${k}" style="color:#fff;margin-left:6px;text-decoration:none">✕</a></span>`).join("") || `<span class="muted" style="font-size:12px">강제 유지 값 없음${ss.scenario ? " · 시나리오: " + ss.scenario : ""}</span>`;
     $$("#simHold [data-r]").forEach(a => a.onclick = e => { e.preventDefault(); this._simAct({ action: "release", tag: a.dataset.r }); });

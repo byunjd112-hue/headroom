@@ -251,3 +251,27 @@ input.in, select.in { background: rgba(6,12,34,.8); border-color: rgba(96,140,24
 @media (max-width: 1400px) { .en-tiles { grid-template-columns: repeat(3, 1fr); } .eqgal { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 1100px) { .en-grid { grid-template-columns: 1fr; } .dev .eqimg { width: 150px; } }
 .en-grid canvas { width: 100%; display: block; } .accbig .lab { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ═══════════ 단선결선도: 통전·무전압·고장, 차단기 ═══════════ */
+.sld .ln { fill: none; stroke-width: 3.2; stroke-linecap: round; transition: stroke .3s; }
+.sld .ln.on { stroke: #5aa8ff; filter: url(#glow); }
+.sld .ln.off { stroke: #33456f; stroke-dasharray: 5 6; }
+.sld .ln.flt { stroke: #ff4d64; stroke-width: 4; filter: url(#glow); animation: fltb .8s steps(2, start) infinite; }
+@keyframes fltb { 50% { opacity: .35; } }
+.sld .bus { stroke-width: 7; stroke-linecap: round; fill: none; transition: stroke .3s; }
+.sld .bus.on { stroke: #6fb4ff; filter: url(#glow); } .sld .bus.off { stroke: #33456f; stroke-dasharray: 10 8; }
+.sld .cbk rect { stroke-width: 2; } .sld .cbk .x { stroke-width: 2.4; stroke-linecap: round; display: none; }
+.sld .cbk.closed rect { fill: #2de2c8; stroke: #2de2c8; filter: url(#glow); }
+.sld .cbk.open rect { fill: #0a1230; stroke: #ffb547; }
+.sld .cbk.trip rect { fill: #ff4d64; stroke: #ffb3be; filter: url(#glow); animation: fltb .8s steps(2, start) infinite; } .sld .cbk.trip .x { display: block; stroke: #fff; }
+.sld .cbk.unk rect { fill: #0a1230; stroke: #6f80ad; stroke-dasharray: 3 3; }
+.sld .cbl { fill: #7f8fbf; font: 600 10px var(--mono); } .sld .cbs { fill: #aab8dc; font: 600 10px var(--sans); } .sld .cbs.t { fill: #ff4d64; } .sld .cbs.o { fill: #ffb547; }
+.sld .fv { fill: #dfe8ff; font: 600 11.5px var(--sans); }
+.sld .fltm circle { fill: #ff4d64; filter: url(#glow); animation: fltb .8s steps(2, start) infinite; } .sld .fltm path { fill: #fff; }
+.sld .fltm rect { fill: rgba(60,8,20,.92); stroke: #ff4d64; } .sld .fltm text { fill: #ffd0d8; font: 700 11px var(--sans); }
+.sld .node.flt .hexo { stroke: #ff4d64; stroke-width: 3; animation: fltb .8s steps(2, start) infinite; }
+.sld .node.flt .ico { stroke: #ff4d64; }
+.sld .buslbl { font-size: 12px; font-weight: 600; }
+.sldleg i.l { width: 18px; height: 4px; border-radius: 2px; vertical-align: 3px; } .sldleg i.l.on { background: #5aa8ff; box-shadow: 0 0 6px #5aa8ff; }
+.sldleg i.l.off { background: repeating-linear-gradient(90deg, #33456f 0 4px, transparent 4px 7px); } .sldleg i.l.flt { background: #ff4d64; }
+.sldleg i.c { width: 10px; height: 10px; border-radius: 2px; } .sldleg i.c.closed { background: #2de2c8; } .sldleg i.c.open { background: transparent; border: 1.5px solid #ffb547; } .sldleg i.c.trip { background: #ff4d64; }

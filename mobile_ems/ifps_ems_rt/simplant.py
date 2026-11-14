@@ -4,7 +4,7 @@
 장치 번호(unit)마다 레지스터 묶음을 두고, 지령 규약(hal.py)에 따라 응답한다. 한 프로세스가 통신 경로 A·B 두 포트를 연다.
 시험용 조작: mute(장치) 무응답, noack(장치) 지령을 받고도 동작하지 않음, path_down(경로) 경로 단절.
 """
-import socketserver, struct, threading, time
+import math, socketserver, struct, threading, time
 from . import modbus as mb
 
 
@@ -15,7 +15,8 @@ class Plant:
         self.muted = set(); self.no_ack = set(); self.down = set(); self.pending = {}; self.srv = []; self.run = False
         self.by_tag = {p["tag"]: p for p in pts}
         for tag, v in {"LOAD.kw": 80.0, "LOAD.p1_kw": 30.0, "LOAD.p2_kw": 30.0, "LOAD.p3_kw": 20.0, "PV.kw": 40.0, "ESS.soc": 60.0, "ESS.status": 1,
-                       "H2.nm3": 700.0, "DG.fuel_l": 900.0, "ENV.temp": 20.0, "ENV.press": 1013.0, "ENV.rh": 50.0}.items():
+                       "H2.nm3": 700.0, "DG.fuel_l": 900.0, "ENV.temp": 20.0, "ENV.press": 1013.0, "ENV.rh": 50.0, "BUS.hz": 60.0,
+                       **{f"CB.{f}": 1 for f in ("PV", "DG", "FC", "ESS", "G1", "TIE", "L1", "L2", "L3")}}.items():
             if tag in self.by_tag: self.set(tag, v)
 
     # 공학값 접근
@@ -42,8 +43,14 @@ class Plant:
                     self.set(f"{dev}.status", 1 if cmd == 1 else 0); self.set(f"{dev}.seq_ack", seq); self.set(f"{dev}.cmd", 0); self.pending.pop((dev, seq), None)
             if f"{dev}.hb" in self.by_tag: self.set(f"{dev}.hb", (int(round(self.get(f"{dev}.hb"))) + 1) % 60000)
         g = lambda t: self.get(t) if t in self.by_tag else 0.0
-        dg = 90.0 * g("DG.status"); fc = 100.0 * g("FC.status") * 0.05 if g("FC.kw_set") == 0 else g("FC.kw_set") * g("FC.status")
-        ess = g("LOAD.kw") - g("PV.kw") - dg - fc
+        cb = lambda f: (int(round(self.get(f"CB.{f}"))) == 1) if f"CB.{f}" in self.by_tag else True     # 차단기 투입(1)일 때만 모선과 연결
+        dg = 90.0 * g("DG.status") * cb("DG"); fc = (100.0 * g("FC.status") * 0.05 if g("FC.kw_set") == 0 else g("FC.kw_set") * g("FC.status")) * cb("FC")
+        ess = (g("LOAD.kw") - g("PV.kw") - dg - fc) * cb("ESS")
+        if "BUS.a_v" in self.by_tag:
+            a_live = cb("DG") and g("DG.status") > 0.5 or cb("FC") and g("FC.status") > 0.5 or (cb("TIE") and (cb("ESS") or cb("G1")))
+            b_live = (cb("ESS") and g("ESS.status") > 0.5) or cb("G1") or (cb("TIE") and a_live)
+            self.set("BUS.a_v", 440.0 + (abs(math.sin(now)) * 1.5) if a_live else 0.0); self.set("BUS.b_v", 440.0 + abs(math.cos(now)) * 1.5 if b_live else 0.0)
+            self.set("BUS.hz", 60.0 + math.sin(now / 7) * 0.03 if (a_live or b_live) else 0.0)
         for tag, v in (("DG.kw", dg), ("FC.kw", fc), ("ESS.kw", ess)):
             if tag in self.by_tag: self.set(tag, v)
         if "ESS.soc" in self.by_tag: self.set("ESS.soc", min(90.0, max(10.0, g("ESS.soc") - ess * dt / 3600 / 1000.0 * 100)))
