@@ -118,9 +118,9 @@ const P_EN = {
     if (sig !== this._sig) {
       this._sig = sig; const lost = n => D[n].link === "두절";
       const items = [["PV", "태양광 어레이", `${F.n(k.pv, 1)} kW`, { on: k.pv > 0.5, lost: lost("MTR") }], ["DG", "디젤 발전기", `${F.n(k.dg, 1)} kW`, { on: D.DG.on, lost: lost("DG") }],
-        ["FC", "수소 연료전지", `${F.n(k.fc, 1)} kW`, { on: D.FC.on, lost: lost("FC"), value: F.n(k.fc, 0) }], ["ESS", "배터리 ESS", `SOC ${F.n(k.soc, 1)}%`, { on: D.ESS.on, lost: lost("ESS"), value: k.soc }],
-        ["MTR", "계측·환경 분전반", `${F.n(k.load, 1)} kW`, { on: !lost("MTR"), lost: lost("MTR"), value: F.n(k.load, 0) }]];
-      $("#eqGal").innerHTML = items.map(([id, nm, v, st]) => `<div class="panel"><div class="bd">${equipSvg(id, st)}<div class="cap"><b>${nm}</b><span class="mono">${v}</span></div>
+        ["FC", "수소 연료전지", `${F.n(k.fc, 1)} kW`, { on: D.FC.on, lost: lost("FC"), value: F.n(k.fc, 0) + " kW" }], ["ESS", "배터리 ESS", `SOC ${F.n(k.soc, 1)}%`, { on: D.ESS.on, lost: lost("ESS"), value: F.n(k.soc, 0) + "% SOC" }],
+        ["MTR", "계측·환경 분전반", `${F.n(k.load, 1)} kW`, { on: !lost("MTR"), lost: lost("MTR"), value: F.n(k.load, 0) + " kW" }]];
+      $("#eqGal").innerHTML = items.map(([id, nm, v, st]) => `<div class="panel"><div class="bd">${equipPhoto(id, st)}<div class="cap"><b>${nm}</b><span class="mono">${v}</span></div>
         <div class="muted" style="font-size:12px">${st.lost ? "통신 두절" : st.on ? "운전 · 정상" : "정지 · 대기"}</div></div></div>`).join("");
     }
     if (!this._t2 || Date.now() - this._t2 > 15000) { this._t2 = Date.now(); api("/api/energy").then(e2 => { this.hrs = e2.hours; if ($("#hrC")) drawHourly($("#hrC"), this.hrs); }); }

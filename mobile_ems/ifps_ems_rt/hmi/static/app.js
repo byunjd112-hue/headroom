@@ -86,11 +86,15 @@ const P_OV = {
     </div>
     <div class="grid ov">
       <div class="grid" style="align-content:start">
+        <div class="panel"><div class="hd"><h3>작전지 전개 현황</h3><span class="sub">배치도 위 실시간 상태 · 장비를 누르면 설비 제어로 이동</span><div class="spacer"></div><span class="pill" id="siteSum">—</span></div>
+          <div class="bd" style="padding:8px 12px 12px">${siteHtml()}</div></div>
         <div class="panel"><div class="hd"><h3>${t("ov.sld", "단선 결선도 · 실시간 전력 흐름")}</h3><span class="sub mono" id="busbal"></span><div class="spacer"></div><div class="legend sldleg"><span><i class="l on"></i>통전</span><span><i class="l off"></i>무전압</span><span><i class="l flt"></i>고장</span><span><i class="c closed"></i>투입</span><span><i class="c open"></i>개방</span><span><i class="c trip"></i>트립</span></div></div>
           <div class="bd" style="padding:6px 10px 10px">${sldSvg()}</div></div>
         <div class="panel"><div class="hd"><h3>${t("ov.trend", "전력 추세 · 15분")}</h3><div class="spacer"></div><div class="legend" id="ovLeg"></div></div><div class="bd"><canvas class="chart" id="ovChart"></canvas></div></div>
       </div>
       <div class="right">
+        <div class="panel"><div class="hd"><h3>발전원 구성</h3><div class="spacer"></div><span class="sub" id="mixSub"></span></div><div class="bd mixbd"><div id="mixDn"></div><div class="mixleg" id="mixLeg"></div></div></div>
+        <div class="panel"><div class="hd"><h3>경보 매트릭스</h3><div class="spacer"></div><a class="sub" href="#alarms" style="color:var(--accent);text-decoration:none">경보 관리 →</a></div><div class="bd" id="almMtx"></div></div>
         <div class="panel"><div class="hd"><h3>발전 · 부하 현황</h3><div class="spacer"></div><span class="pill" id="balPill">—</span></div><div class="bd">
           <div class="sumrow"><div><div class="lab">총 발전</div><div class="mid" id="bGen">—</div></div><div><div class="lab">총 부하</div><div class="mid" id="bLoad">—</div></div><div><div class="lab">ESS</div><div class="mid" id="bEss">—</div></div></div>
           <div class="srcrows" id="srcRows"></div><div class="muted" style="font-size:11px;margin-top:6px">막대: 정격 대비 · 그래프: 최근 15분</div></div></div>
@@ -124,6 +128,14 @@ const P_OV = {
     $("#tResSt").textContent = k.reserve_need ? t("k.need", "예비력 부족 → FC 병렬") : t("k.ok", "N-1 만족"); $("#tOnl").textContent = `병렬 ${k.online_kw.length}대`;
     const tw = S.trend.slice(-600);                                             // KPI 미니 추세(최근 10분)
     [["load", 1, TV("--load")], ["pv", 2, TV("--pv")], ["soc", 6, TV("--ess")], ["res", 8, TV("--g1")]].forEach(([id, ci, col]) => { const c = $("#tsp-" + id); if (c) spark(c, tw.map(r => r[ci]), col, 34, id === "soc" ? 0 : null, id === "soc" ? 100 : null); });
+    // 작전지 전개 현황 · 발전원 구성 · 경보 매트릭스
+    siteUpdate(s);
+    const sst = siteState(s), nbad = Object.values(sst).filter(x => x.st === "bad").length;
+    $("#siteSum").className = "pill " + (nbad ? "bad" : "ok"); $("#siteSum").textContent = nbad ? `이상 ${nbad}개소` : `전 장비 정상 · ${Object.keys(sst).length}개소`;
+    const mix = [["태양광", k.pv, TV("--pv")], ["디젤", k.dg, TV("--dg")], ["연료전지", k.fc, TV("--fc")], ["ESS 방전", Math.max(0, k.ess), TV("--ess")]], gsum = mix.reduce((x, m) => x + m[1], 0);
+    $("#mixDn").innerHTML = mixDonut(mix, gsum); $("#mixSub").textContent = `부하 ${F.kw(k.load)} kW`;
+    $("#mixLeg").innerHTML = mix.map(([n, v, c]) => `<div><i style="background:${c}"></i><span>${n}</span><b class="mono">${F.kw(v)}</b><em>${gsum > 0 ? F.n(v / gsum * 100, 0) : 0}%</em></div>`).join("") + `<div class="ren"><span>재생에너지 비율</span><b>${F.n(k.renew, 0)}%</b></div>`;
+    $("#almMtx").innerHTML = alarmMatrix(s.alarms);
     // 결선도
     sldUpdate(s);
     // 수급
@@ -189,9 +201,9 @@ const P_CTL = {
           : n === "ESS" ? [["SOC", F.n(val("ESS.soc")) + " %"], ["방향", val("ESS.kw") < 0 ? "충전" : "방전"], ["생존 HB", F.n(d.hb, 0)], ["경로", Object.entries(d.paths).map(([k, p]) => k + (p.alive ? "●" : "○")).join(" ")]]
             : [["PV", F.kw(val("PV.kw")) + " kW"], ["기온", F.n(val("ENV.temp")) + " °C"], ["습도", F.n(val("ENV.rh"), 0) + " %"], ["경로", Object.entries(d.paths).map(([k, p]) => k + (p.alive ? "●" : "○")).join(" ")]];
       $("#mt-" + n).innerHTML = meta.map(([a, b]) => `<div><div class="lab">${a}</div><div class="v">${b}</div></div>`).join("");
-      const eqs = { on: n === "MTR" ? !lost : d.on, lost, value: n === "ESS" ? val("ESS.soc") : n === "FC" ? F.n(val("FC.kw"), 0) : n === "MTR" ? F.n(val("LOAD.kw"), 0) : undefined };
-      const sig = JSON.stringify([eqs.on, eqs.lost, n === "ESS" ? Math.round(eqs.value) : eqs.value]); const eqb = $("#eq-" + n);
-      if (eqb && eqb.dataset.sig !== sig) { eqb.dataset.sig = sig; eqb.innerHTML = equipSvg(n, eqs); }
+      const eqs = { on: n === "MTR" ? !lost : d.on, lost, value: n === "ESS" ? F.n(val("ESS.soc"), 0) + "% SOC" : n === "FC" ? F.n(val("FC.kw"), 0) + " kW" : n === "MTR" ? F.n(val("LOAD.kw"), 0) + " kW" : n === "DG" && d.on ? F.n(val("DG.kw"), 0) + " kW" : undefined };
+      const sig = JSON.stringify([eqs.on, eqs.lost, eqs.value]); const eqb = $("#eq-" + n);
+      if (eqb && eqb.dataset.sig !== sig) { eqb.dataset.sig = sig; eqb.innerHTML = equipPhoto(n, eqs); }
       const il = $("#il-" + n); if (il) { il.textContent = lost ? "⚠ 통신 두절 — 지령 차단" : d.manual ? "⚠ 현장 수동 모드 — EMS 지령 차단" : (s.busy ? "지령 처리 중…" : ""); }
       $$(`#devs [data-d="${n}"]`).forEach(b => { b.disabled = !can("operator") || lost || d.manual || (b.dataset.c === "start" ? d.on : !d.on); });
     }
