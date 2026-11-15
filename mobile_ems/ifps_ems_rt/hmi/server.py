@@ -4,7 +4,7 @@
 권한  viewer(로그인 없음): 조회   operator: 지령·경보 확인·자동 제어 전환   engineer: + 레지스터 쓰기·고장 주입
 기본 접속 주소는 127.0.0.1(노트북 자신)이다. 다른 단말에서 보려면 runtime.json의 hmi.bind를 바꾼다.
 """
-import json, mimetypes, os, threading, time, traceback
+import json, math, mimetypes, os, threading, time, traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from .. import modbus as mb
@@ -18,12 +18,14 @@ def make_handler(eng):
     class H(BaseHTTPRequestHandler):
         server_version = "IFPS-EMS-HMI"; sys_version = ""; timeout = 15        # 느린 연결(slowloris) 차단
 
-        def log_message(self, fmt, *a):            # 접속 기록은 감사 기록에만(지령 계열) 남긴다
+        def log_message(self, format, *args):       # pylint: disable=redefined-builtin — 상위 클래스와 같은 인자 이름            # 접속 기록은 감사 기록에만(지령 계열) 남긴다
             pass
 
         # ── 응답
         def _send(self, code, body, ctype="application/json; charset=utf-8", extra=None):
-            if isinstance(body, (dict, list)): body = json.dumps(body, ensure_ascii=False, default=_jdefault).encode("utf-8")
+            if isinstance(body, (dict, list)):
+                try: body = json.dumps(body, ensure_ascii=False, default=_jdefault, allow_nan=False).encode("utf-8")
+                except ValueError: body = json.dumps(_finite(body), ensure_ascii=False, default=_jdefault).encode("utf-8")     # NaN·무한대는 null 로(브라우저 JSON 해석 실패 방지)
             elif isinstance(body, str): body = body.encode("utf-8")
             self.send_response(code)
             self.send_header("Content-Type", ctype); self.send_header("Content-Length", str(len(body)))
@@ -46,9 +48,11 @@ def make_handler(eng):
 
         def _body(self):
             n = int(self.headers.get("Content-Length") or 0)
-            if n > MAX_BODY: raise ValueError("요청 본문이 너무 큼")
+            if n < 0 or n > MAX_BODY: raise ValueError("요청 본문 길이 오류")
             raw = self.rfile.read(n) if n else b"{}"
-            return json.loads(raw.decode("utf-8") or "{}")
+            b = json.loads(raw.decode("utf-8") or "{}")
+            if not isinstance(b, dict): raise ValueError("요청 본문은 JSON 객체여야 함")
+            return b
 
         # ── GET
         def do_GET(self):
@@ -60,10 +64,14 @@ def make_handler(eng):
                 if p == "/api/trace": return self._send(200, {"rows": eng.trace_since(int(q.get("since", 0)), int(q.get("limit", 500))), "on": eng.trace_on})
                 if p == "/api/points": return self._send(200, {"rows": eng.points()})
                 if p == "/api/journal": return self._send(200, {"rows": eng.alarms.journal(int(q.get("n", 300)))})
-                if p == "/api/audit": return self._send(200, {"rows": eng.rt.audit.tail(int(q.get("n", 200)))[::-1]})
+                if p == "/api/audit":
+                    if self._sess("operator") is None: return
+                    return self._send(200, {"rows": eng.rt.audit.tail(int(q.get("n", 200)))[::-1]})
                 if p == "/api/audit/verify": return self._send(200, eng.audit_verify())
                 if p == "/api/info": return self._send(200, eng.runtime_info())
-                if p == "/api/forecast": return self._send(200, {k: v for k, v in eng.forecast(q.get("force") == "1").items() if not k.startswith("_")})
+                if p == "/api/forecast":
+                    if q.get("force") == "1" and self._sess("operator") is None: return           # 다시 계산은 무거운 작업
+                    return self._send(200, {k: v for k, v in eng.forecast(q.get("force") == "1").items() if not k.startswith("_")})
                 if p == "/api/energy": return self._send(200, eng.energy_hours())
                 if p == "/api/layout": return self._send(200, eng.layout())
                 if p == "/api/photos": return self._send(200, eng.photos())
@@ -77,7 +85,7 @@ def make_handler(eng):
                 return self._static(p)
             except mb.ModbusError as e:
                 return self._send(200, {"ok": False, "why": f"통신 오류: {e}"})
-            except (KeyError, ValueError, TypeError) as e:
+            except (KeyError, ValueError, TypeError, AttributeError, IndexError) as e:
                 return self._err(400, f"요청 오류: {e}")
             except Exception as e:
                 traceback.print_exc(); return self._err(500, f"{type(e).__name__}: {e}")
@@ -111,7 +119,7 @@ def make_handler(eng):
                     return
                 if p == "/api/auto":
                     s = self._sess("operator")
-                    if s: self._send(200, eng.set_auto(b.get("on", True), s["name"]))
+                    if s: self._send(200, eng.set_auto(_flag(b.get("on", True)), s["name"]))
                     return
                 if p == "/api/control_now":
                     s = self._sess("operator")
@@ -124,8 +132,10 @@ def make_handler(eng):
                         eng.rt.note("경보", f"경보 확인 {n}건", actor=s["name"]); self._send(200, {"ok": True, "n": n})
                     return
                 if p == "/api/trace":
-                    eng.trace_on = bool(b.get("on", True)); return self._send(200, {"ok": True, "on": eng.trace_on})
+                    if self._sess("operator") is None: return
+                    eng.trace_on = _flag(b.get("on", True)); return self._send(200, {"ok": True, "on": eng.trace_on})
                 if p == "/api/trace/clear":
+                    if self._sess("operator") is None: return
                     with eng.trace_lock: eng.trace.clear()
                     return self._send(200, {"ok": True})
                 if p == "/api/mb/write":
@@ -147,12 +157,25 @@ def make_handler(eng):
                 return self._err(404, "없음")
             except mb.ModbusError as e:
                 return self._send(200, {"ok": False, "why": f"통신 오류: {e}"})
-            except (KeyError, ValueError, TypeError) as e:
+            except (KeyError, ValueError, TypeError, AttributeError, IndexError) as e:
                 return self._err(400, f"요청 오류: {e}")
             except Exception as e:
                 traceback.print_exc(); return self._err(500, f"{type(e).__name__}: {e}")
 
     return H
+
+
+def _flag(x):
+    """JSON 참·거짓만 받는다(문자열 "false" 를 참으로 읽지 않게)."""
+    if isinstance(x, bool): return x
+    raise ValueError("참·거짓 값이 아님")
+
+
+def _finite(o):
+    if isinstance(o, float): return o if math.isfinite(o) else None
+    if isinstance(o, dict): return {k: _finite(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)): return [_finite(v) for v in o]
+    return o
 
 
 def _jdefault(o):
@@ -167,7 +190,7 @@ def _jdefault(o):
 
 
 def serve(eng, bind=None, port=None):
-    bind = bind or eng.hcfg["bind"]; port = int(port or eng.hcfg["port"])
+    bind = bind or eng.hcfg["bind"]; port = int(eng.hcfg["port"] if port is None else port)      # 0 은 빈 포트 자동 선택
     class Srv(ThreadingHTTPServer):
         request_queue_size = 64                 # 기본 5: 동시 접속이 몰리면 SYN 재전송(1초) 지연이 생긴다
         daemon_threads = True

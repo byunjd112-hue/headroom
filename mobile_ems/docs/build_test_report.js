@@ -24,7 +24,7 @@ b.push(GAP()); b.push(P("한계: 실장비, 보호 IED 게이트웨이, HILS 연
 b.push(H1("2. 결과 요약"));
 const sum = [
   ["단위·통합 시험", "전 항목 통과", `${S.n_tests}건 중 ${S.tests_ok ? S.n_tests : "일부"}건 통과`, ok(S.tests_ok)],
-  ["코드 커버리지(문장)", "70% 이상(목표)", `${f(S.coverage_pct, 1)}%`, ok(S.coverage_pct >= 70)],
+  ["코드 실행률(문장 / 분기)", "신뢰성 시험 결과서(RL-001) 기준", `${f(S.stmt.pct, 1)}% / ${f(S.branch.pct, 1)}%`, ok(S.stmt.pct >= 90)],
   ["통신 두절 감지", "3.0초 이내", `최대 ${f(mx(D.comm_lost_s))}초 (${D.comm_lost_s.length}회)`, ok(mx(D.comm_lost_s) <= 3.0)],
   ["무응답 → 대체 전원 지령", "5.0초 이내", `최대 ${f(mx(D.fallback_s))}초, 성공 ${D.fallback_s.filter(x => x !== null).length}/${D.fallback_s.length}`, ok(mx(D.fallback_s) <= 5.0 && D.fallback_s.every(x => x !== null))],
   ["수집 주기", "1초, 주기 초과 0회", `평균 ${f(D.soak.avg_ms)}ms, 최대 ${f(D.soak.max_ms)}ms, 초과 ${D.soak.overruns}회`, ok(D.soak.overruns === 0)],
@@ -44,7 +44,7 @@ b.push(H1("3. 동적 시험")); b.push(H2("3.1 단위·통합 시험"));
 b.push(P(`총 ${S.n_tests}건, 소요 ${S.unittest_s}초. 가상 장치는 Modbus TCP 서버로 동작하므로 모의 객체가 아니라 실제 프레임이 오간다.`));
 b.push(TBL(["시험 항목", "결과"], S.tests.map(t => { const [n, r] = t.split(" | "); return [n.trim(), r === "ok" ? "통과" : r]; }), [80, 20], { mono: [0], center: [1] }));
 b.push(H2("3.2 코드 커버리지"));
-b.push(P(`전체 문장 커버리지 ${f(S.coverage_pct, 1)}%. 낮은 모듈은 명령줄 도구·기동 스크립트처럼 시험 대상 밖의 실행 경로가 많은 파일이다.`));
+b.push(P(`문장 실행률 ${f(S.stmt.pct, 1)}%, 분기 실행률 ${f(S.branch.pct, 1)}%(상세와 미실행 사유는 HAES-IFPS-EMS-RL-001). 낮은 모듈은 명령줄 도구·기동 스크립트처럼 시험 대상 밖의 실행 경로가 많은 파일이다.`));
 b.push(TBL(["모듈", "문장 수", "커버리지(%)"], S.coverage_files.map(x => [x[0], x[2], f(x[1], 1)]), [64, 18, 18], { mono: [0], center: [1, 2] }));
 b.push(H2("3.3 요구 성능 시험(고장 주입)"));
 const row = (n, a, lim, how) => [n, a.map(x => f(x)).join(", "), f(avg(a)), f(mx(a)), lim, how];
@@ -82,7 +82,8 @@ b.push(TBL(["번호", "결함", "원인", "조치", "확인"], [
   ["D-02", "무응답 지령이 장치 회복 후 뒤늦게 실행(디젤 의도치 않은 기동)", "실패한 지령의 cmd 레지스터를 남겨 둠", "최종 실패 시 cmd=0 취소 쓰기, 결과 기록", "회귀 시험 추가(수정 전 실패 확인)"],
   ["D-03", "동시 접속 시 일부 응답 1.5~2.3초 지연", "웹 서버 접속 대기열 5", "대기열 64", `최대 ${D.http.max_ms}ms`],
   ["D-04", "로그인·로그아웃·대화상자 버튼, 배치도 마커 미동작", "CSP(script-src 'self')가 인라인 onclick 차단", "이벤트 위임(data-act)으로 전환", "브라우저 자동 시험"],
-  ["D-05", "미사용 import 등 정적 결함 5건", "정리 누락", "제거", "pyflakes 0건"]], [9, 27, 22, 24, 18], { center: [0] }));
+  ["D-05", "미사용 import 등 정적 결함 5건", "정리 누락", "제거", "pyflakes 0건"],
+  ["D-06", "Rev16 독립 검토에서 찾은 결함 42건(통신·제어·서버 22, 화면 20)", "신뢰성 시험 결과서 7장", "전 건 조치", "재발 방지 시험 18건 외"]], [9, 27, 22, 24, 18], { center: [0] }));
 
 b.push(H1("7. 한계와 후속 시험"));
 ["실장비 FAT: 제작사 레지스터 주소·지령 규약·응답 시간 확인", "보호 IED 게이트웨이 연동: 차단기 상태·보호요소 코드 주소 검증", "HILS: 고장 시나리오별 EMS 판단과 보호 협조 검증", "72시간 내구 시험과 전원 차단·재기동 시험(상태 파일 원자적 저장 확인)", "현장 실측 이력 8일 이상 확보 후 예측 모델 재학습·재평가", "다중 단말 동시 운용(운용자·엔지니어 동시 접속) 시험"].forEach(t => b.push(NUM(t)));

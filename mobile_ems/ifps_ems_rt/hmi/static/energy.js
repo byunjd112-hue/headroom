@@ -41,7 +41,7 @@ function drawDaily(c, rows, H = 250) { if (H === "fill") H = Math.max(80, c.pare
     [[r.load, TV("--load"), x + bw / 2 - w - 2], [r.pv, TV("--pv"), x + bw / 2 + 2]].forEach(([v, col, gx]) => { const gr = g.createLinearGradient(0, Y(v), 0, T + ph); gr.addColorStop(0, col); gr.addColorStop(1, col + "30"); g.fillStyle = gr; g.beginPath(); g.roundRect ? g.roundRect(gx, Y(v), w, T + ph - Y(v), [4, 4, 0, 0]) : g.rect(gx, Y(v), w, T + ph - Y(v)); g.fill(); });
     if (bw >= 44 || i % 2 === 0) { g.fillStyle = TV("--muted"); g.textAlign = "center"; g.fillText(r.d.slice(5), x + bw / 2, H - 7); }
   });
-  g.beginPath(); smoothPath(g, rows.map((r, i) => [L + i * bw + bw / 2, Y(r.clear)])); g.strokeStyle = "color-mix(in srgb, var(--pv) 60%, transparent)"; g.setLineDash([4, 4]); g.lineWidth = 1.5; g.stroke(); g.setLineDash([]);
+  g.beginPath(); smoothPath(g, rows.map((r, i) => [L + i * bw + bw / 2, Y(r.clear)])); g.strokeStyle = TV("--pv") + "99"; g.setLineDash([4, 4]); g.lineWidth = 1.5; g.stroke(); g.setLineDash([]);
 }
 
 function drawHourly(c, hrs, H = 230) { if (H === "fill") H = Math.max(80, c.parentElement.clientHeight);
@@ -85,13 +85,16 @@ const P_EN = {
       <div class="panel"><div class="hd"><h3>금일 시간대별 발전량</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--pv)"></i>PV</span><span><i style="background:var(--dg)"></i>DG</span><span><i style="background:var(--fc)"></i>FC</span><span><i style="background:var(--ess)"></i>ESS 방전</span><span><i style="background:var(--load)"></i>부하</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="hrC"></canvas></div></div></div>
       <div class="panel"><div class="hd"><h3>일별 발전·부하 (최근 14일)</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--load)"></i>부하 kWh</span><span><i style="background:var(--pv)"></i>PV kWh</span><span><i style="background:color-mix(in srgb, var(--pv) 60%, transparent)"></i>청천 PV 가능량</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="dayC"></canvas></div></div></div>
     </div></div>`;
-    $("#enRe").onclick = async () => { await api("/api/forecast?force=1"); toast("예측 재계산 요청", "ok"); setTimeout(() => this.load(), 2500); };
+    $("#enRe").onclick = async () => { if (!can("operator")) { toast("운용자 권한 필요", "bad"); return loginDialog(); } const r = await api("/api/forecast?force=1"); if (r.ok === false && !r.why) return; toast("예측 재계산 요청", "ok"); setTimeout(() => this.load(), 2500); };
+    clearTimeout(this._retry); this._retry = null;
     this.load(); clearInterval(this._t); this._t = setInterval(() => { if (S.page === "energy") this.load(); }, 10000);
     this._ro = new ResizeObserver(() => this.draw()); this._ro.observe($("#fcL"));
   },
   async load() {
-    const [f, e] = await Promise.all([api("/api/forecast"), api("/api/energy")]); this.hrs = e.hours;
-    if (f.ok) this.fc = f; else { $("#accSub").textContent = f.why; setTimeout(() => this.load(), 1500); }
+    const [f, e] = await Promise.all([api("/api/forecast"), api("/api/energy")]);
+    if (S.page !== "energy" || !$("#accSub")) return;                       // 응답이 오기 전에 화면을 떠났다
+    if (e.hours) this.hrs = e.hours;
+    if (f.ok) this.fc = f; else { $("#accSub").textContent = f.why || "예측 계산 중"; clearTimeout(this._retry); this._retry = setTimeout(() => this.load(), 1500); }   // 재시도는 한 줄기만
     this.draw();
   },
   draw() {

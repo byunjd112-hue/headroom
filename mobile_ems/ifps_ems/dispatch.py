@@ -144,7 +144,7 @@ def simulate(site, load, pv, lclass, hrs, policy, soc0=0.6, h2_0=None):
     fuel = shed = 0.0; starts = silent = 0
     for k in range(len(load)):
         a = policy(k, soc, h2, dgp)
-        soc2, h2b, short, curt = pl.step(np.array([soc]), h2, a, load[k], pv[k], lclass[k])
+        soc2, h2b, short, _ = pl.step(np.array([soc]), h2, a, load[k], pv[k], lclass[k])
         fuel += a[0] * site.dg_kw * DT_H * site.dg_l_per_kwh; starts += int(a[0] and not dgp); silent += int(a[0] and silent_hour(hrs[k]))
         shed += float(short[0]) * DT_H; soc = float(np.clip(soc2[0], site.soc_min, site.soc_max)); h2 = float(h2b); dgp = a[0]
     return {"fuel_l": fuel, "dg_starts": starts, "dg_silent_h": silent * DT_H, "shed_kwh": shed, "soc_end": soc, "h2_end": h2}

@@ -14,7 +14,7 @@ function fitCanvas() {
   app.style.transform = `translate(${((innerWidth - CANVAS_W * s) / 2).toFixed(1)}px, ${((innerHeight - CANVAS_H * s) / 2).toFixed(1)}px) scale(${s})`;
   ["modal", "toast", "stale"].forEach(id => { const e = document.getElementById(id); if (e && e.parentElement !== app) app.appendChild(e); });
 }
-const DPR = () => (window.devicePixelRatio || 1) * Math.max(1, (window.S && S.scale) || 1);
+const DPR = () => (window.devicePixelRatio || 1) * Math.max(1, (typeof S !== "undefined" && S.scale) || 1);   // S 는 const 라 window.S 가 아니다
 const TV = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const TA = (n, a) => `rgba(${TV(n)},${a})`;
 const S = { snap: null, token: null, me: { role: "viewer", name: "조회" }, lang: "ko", page: "overview", trend: [], trendT: 0, ok: true, lastOk: 0 };
@@ -70,9 +70,9 @@ async function api(path, body) {
 /* ── 알림·대화상자 */
 function toast(msg, kind = "") { const el = h(`<div class="${kind}">${esc(msg)}</div>`); $("#toast").appendChild(el); setTimeout(() => el.remove(), 4200); }
 function modal(html, onMount) { const bg = $("#modal"), box = $("#modalBox"); box.innerHTML = html; bg.classList.add("on"); applyI18n(box); if (onMount) onMount(box); return box; }
-function closeModal() { $("#modal").classList.remove("on"); $("#modalBox").innerHTML = ""; if (S._sboTimer) { clearInterval(S._sboTimer); S._sboTimer = null; } }
+function closeModal() { $("#modal").classList.remove("on"); $("#modalBox").innerHTML = ""; if (S._sboTimer) { clearInterval(S._sboTimer); S._sboTimer = null; } S._sboSid = null; }
 $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && !S._sboTimer) closeModal(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#modal").classList.contains("on")) { if (S._sboSid) api("/api/cancel", { sid: S._sboSid }); closeModal(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#modal").classList.contains("on")) { const sid = S._sboSid; closeModal(); if (sid && S.token) api("/api/cancel", { sid }); } });
 
 function loginDialog() {
   const sim = S.snap && S.snap.sim;
@@ -85,7 +85,7 @@ function loginDialog() {
     <div id="lgErr" class="badc"></div></div></div>
   <div class="ft"><button class="btn" data-act="close">취소</button><button class="btn pri" id="lgGo">로그인</button></div>`, box => {
     const go = async () => {
-      const r = await api("/api/login", { pin: $("#lgPin", box).value, name: $("#lgName", box).value.trim() || "운용자" });
+      let r; try { r = await api("/api/login", { pin: $("#lgPin", box).value, name: $("#lgName", box).value.trim() || "운용자" }); } catch (e) { r = { ok: false, why: "서버에 연결할 수 없습니다" }; }
       if (!r.ok) { $("#lgErr", box).textContent = r.why; return; }
       S.token = r.token; S.me = { role: r.role, name: r.name }; try { sessionStorage.setItem("ems.token", r.token); } catch (e) { }
       closeModal(); toast(`${r.name} — ${r.role === "engineer" ? "엔지니어" : "운용자"} 권한`, "ok"); renderUser(); render();
@@ -146,7 +146,7 @@ class Chart {
     if (lmin < 0) { g.strokeStyle = "#3a4d62"; g.beginPath(); g.moveTo(L, YL(0)); g.lineTo(L + pw, YL(0)); g.stroke(); }
     if (R > 20) { g.textAlign = "left"; for (let k = 0; k <= 4; k++) { const v = o.rmin + (o.rmax - o.rmin) * k / 4; g.fillText(fmtAxis(v), L + pw + 6, YR(v) + 4); } }
     g.textAlign = "center"; const tickS = o.window <= 900 ? 120 : o.window <= 3600 ? 600 : 1800;
-    for (let tm = Math.ceil(t0 / (tickS * 1000)) * tickS * 1000; tm <= now; tm += tickS * 1000) { const x = X(tm); g.fillText(new Date(tm).toTimeString().slice(0, 5), x, H - 6); g.strokeStyle = TA("--edge", .06); g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); }
+    for (let tm = Math.ceil(t0 / (tickS * 1000)) * tickS * 1000; tm <= now; tm += tickS * 1000) { const x = X(tm); g.fillText(new Date(tm).toTimeString().slice(0, 5), R > 20 ? x : Math.min(x, L + pw - 15), H - 6); g.strokeStyle = TA("--edge", .06); g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); }
     g.fillStyle = "#6f8197"; g.textAlign = "left"; g.fillText(o.yl, 4, T + 8);
     o.series.forEach(s => {
       if (s.hidden) return; const i = idx(s.key); if (i < 0 || !rows.length) return; const Y = s.axis === "r" ? YR : YL;

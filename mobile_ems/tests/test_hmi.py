@@ -88,14 +88,14 @@ class TestHmi(unittest.TestCase):
 
     def test_5_register_explorer_and_audit(self):
         op = self.login("4321"); en = self.login("8765")
-        r = self.req("/api/mb/read?dev=DG&path=B&fc=3&addr=0&count=8", tok=op)[1]
-        self.assertTrue(r["ok"]); self.assertEqual(len(r["regs"]), 8); self.assertEqual(r["tags"]["4"], "DG.kw")
+        r = self.req("/api/mb/read?dev=DG&path=B&fc=3&addr=0&count=5", tok=op)[1]
+        self.assertTrue(r["ok"]); self.assertEqual(len(r["regs"]), 5); self.assertEqual(r["tags"]["4"], "DG.kw")
         self.assertTrue(self.req("/api/mb/write", {"dev": "DG", "path": "A", "fc": 16, "addr": 40, "values": [7, 8]}, en)[1]["ok"])
         self.assertEqual(self.req("/api/mb/read?dev=DG&path=A&fc=3&addr=40&count=2", tok=op)[1]["regs"], [7, 8])
         r = self.req("/api/mb/read?host=8.8.8.8&port=502&unit=1&fc=3&addr=0&count=1", tok=op)[1]
         self.assertFalse(r["ok"]); self.assertIn("허용 목록", r["why"])                                  # 직접 접속도 허용 목록 검사
         v = self.req("/api/audit/verify")[1]; self.assertTrue(v["ok"], v["msg"])
-        self.assertTrue(any("레지스터 쓰기" in (e["data"].get("text", "")) for e in self.req("/api/audit?n=50")[1]["rows"]))
+        self.assertTrue(any("레지스터 쓰기" in (e["data"].get("text", "")) for e in self.req("/api/audit?n=50", tok=self.login("4321"))[1]["rows"]))
 
     def test_6_auto_control_runs(self):
         op = self.login("4321"); self.req("/api/control_now", {}, op)
@@ -138,7 +138,7 @@ class TestHmi(unittest.TestCase):
         self.assertEqual(self.req("/api/layout", {"items": items + [{"uid": "e", "kind": "TANK", "bind": "", "x": 1, "y": 1}]}, op)[0], 400)      # 정의되지 않은 종류
         self.assertEqual(self.req("/api/layout", {"items": [dict(items[0], x=5000)]}, op)[0], 400)                                               # 좌표 범위
         self.assertEqual(self.req("/api/layout", {"items": [items[0], dict(items[1], uid="a")]}, op)[0], 400)                                    # 식별자 중복
-        self.assertTrue(any("배치 변경" in e["data"].get("text", "") for e in self.req("/api/audit?n=50")[1]["rows"]))
+        self.assertTrue(any("배치 변경" in e["data"].get("text", "") for e in self.req("/api/audit?n=50", tok=self.login("4321"))[1]["rows"]))
         self.assertTrue(self.req("/api/layout/reset", {}, op)[1]["ok"]); self.assertIsNone(self.req("/api/layout")[1]["items"])
 
     def test_10_security_lockout_hash_and_gate(self):

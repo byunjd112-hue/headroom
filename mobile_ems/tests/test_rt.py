@@ -167,13 +167,17 @@ class TestPlanLink(Base):
         res = os.path.join(CORE, "results"); ensure_sample(res)
         pol = PlanPolicy(self.rt.site, os.path.join(res, "sample_site_data.csv"), res)
         self.rt.scan(); a = pol(dict(self.rt.val), 14.0)
-        self.assertEqual(pol.note, "계획 운전"); self.assertEqual(len(a), 3); self.assertTrue(all(x in (0, 1) for x in a))
+        self.assertEqual(pol.note, "계획 운전(실측 이력)"); self.assertEqual(len(a), 3); self.assertTrue(all(x in (0, 1) for x in a))
         self.assertEqual(len(pol.fc["load"]), 96)
         short = os.path.join(self.td, "short.csv")
         with open(os.path.join(res, "sample_site_data.csv"), encoding="utf-8") as f, open(short, "w", encoding="utf-8") as g: g.writelines(f.readlines()[:200])
         pol2 = PlanPolicy(self.rt.site, short, res); a2 = pol2(dict(self.rt.val), 14.0)
         self.assertIn("규칙 운전", pol2.note); self.assertEqual(len(a2), 3)                                 # 이력이 모자라면 규칙 운전
         self.rt.policy = pol; self.assertIsInstance(self.rt.decide(), dict)
+        clk = [0.0]; pol3 = PlanPolicy(self.rt.site, short, res, demo_csv=os.path.join(res, "sample_site_data.csv"), clock=lambda: clk[0])
+        pol3(dict(self.rt.val), 14.0); self.assertEqual(pol3.note, "계획 운전(시연용 합성 이력)"); self.assertEqual(pol3.k, 0)      # 시연: 합성 자료, 현재 시각대에 맞춘 계획
+        self.assertAlmostEqual(float((pol3.V is not None) and 14.25), 14.25); clk[0] = 1900.0; pol3(dict(self.rt.val), 14.5); self.assertEqual(pol3.k, 2)   # 15분 칸을 시간으로 따라간다
+        t_old = pol3.t_plan; clk[0] = 3700.0; pol3(dict(self.rt.val), 15.0); self.assertGreater(pol3.t_plan, t_old)               # 1시간 지나면 다시 계획
 
 
 if __name__ == "__main__":

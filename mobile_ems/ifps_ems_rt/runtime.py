@@ -9,7 +9,7 @@
   5) 기록      15분 평균을 학습용 자료로 쌓고, 지령과 통신 사건을 감사 기록에 남긴다
 보호 차단과 우회 복구는 보호 IED가 수행한다. 이 실행기는 차단기 상태를 읽어 감시·기록하고 전원 지령만 낸다.
 """
-import csv, json, os, threading, time
+import csv, json, math, os, threading, time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from ifps_ems import supervisor as sv, dispatch as dp, security
@@ -29,13 +29,15 @@ class Runtime:
         if bad: raise ValueError("대응표 오류: " + "; ".join(bad))
         self.clock, self.wall = clock, wall; self._nlock = threading.Lock()
         self.site = Site(**{k: v for k, v in self.cfg.get("site", {}).items() if k in Site.keys()})
-        self.links = {n: DeviceLink(n, [tuple(p) for p in d["paths"]], d["unit"], self.pts, self.cfg["allow"], self.cfg.get("timeout_s", 0.5)) for n, d in self.cfg["devices"].items()}
+        self.links = {n: DeviceLink(n, [tuple(p) for p in d["paths"]], d["unit"], self.pts, self.cfg["allow"], self.cfg.get("timeout_s", 0.5), int(d.get("gap", 0))) for n, d in self.cfg["devices"].items()}
         self.pool = ThreadPoolExecutor(max_workers=max(2, sum(len(lk.cl) for lk in self.links.values())), thread_name_prefix="scan")
         self.ctl = [n for n in self.links if f"{n}.cmd" in self.links[n].by_tag]
         self.dev = {n: sv.Device(n) for n in self.ctl}
         self.cmd = RtCommander({n: self.links[n] for n in self.ctl}, self.dev, clock=clock)
+        self.cmd.gate = self.controllable; self.cmd.tick = lambda: self.wd.kick("제어", self.now())
+        self.cmd.done_s = {n: float(d["done_s"]) for n, d in self.cfg["devices"].items() if "done_s" in d}
         self.lm = sv.LinkMonitor(list(self.links)); self.wd = sv.Watchdog(["수집", "제어"])
-        self.val = {}; self.flag = {}; self.t_upd = {}; self.hb_seen = {}; self.hb_stop = {}; self.t0 = clock(); self.events = []; self.n_scan = 0; self.n_over = 0; self.max_scan_s = 0.0
+        self.val = {}; self.flag = {}; self.t_upd = {}; self.hb_seen = {}; self.hb_stop = {}; self.t0 = clock(); self.events = []; self.ev_n = 0; self.audit_err = ""; self.n_scan = 0; self.n_over = 0; self.max_scan_s = 0.0
         self.state_dir = os.path.join(base, self.cfg.get("state_dir", "state")); os.makedirs(self.state_dir, exist_ok=True)
         self.key_note = ""
         if key is None: key, self.key_note = security.load_or_create_key(self.state_dir)
@@ -48,15 +50,18 @@ class Runtime:
     def now(self): return self.clock() - self.t0
 
     def note(self, kind, text, actor="ems"):
+        """사건을 남긴다. 감사 기록 파일에 쓰지 못해도(디스크 가득·권한) 예외를 내지 않는다 — 감시·제어 주기가 멈추면 안 된다."""
         with self._nlock:
-            self.events.append({"t": round(self.now(), 2), "wall": self.wall().strftime("%Y-%m-%d %H:%M:%S"), "kind": kind, "text": text, "actor": actor})
+            self.ev_n += 1
+            self.events.append({"id": self.ev_n, "t": round(self.now(), 2), "wall": self.wall().strftime("%Y-%m-%d %H:%M:%S"), "kind": kind, "text": text, "actor": actor})
             if len(self.events) > 5000: del self.events[:1000]
-            self.audit.append(actor, kind, {"text": text})
+            try: self.audit.append(actor, kind, {"text": text}); self.audit_err = ""
+            except OSError as e: self.audit_err = f"{type(e).__name__}: {e}"
 
     # ── 1)~3) 수집·통신 감시·품질 확인
     def _read_parallel(self):
         """모든 장치·경로를 동시에 읽는다. 응답 없는 장치가 있어도 한 주기는 시간 초과 1회 안에 끝난다."""
-        futs = {(n, k): self.pool.submit(lk._read_blocks, cl) for n, lk in self.links.items() for k, cl in lk.cl.items()}
+        futs = {(n, k): self.pool.submit(lk.read_blocks, cl) for n, lk in self.links.items() for k, cl in lk.cl.items()}
         out = {}
         for n, lk in self.links.items():
             vals = None
@@ -64,8 +69,8 @@ class Runtime:
                 try:
                     v = futs[(n, k)].result(); lk.alive[k] = True
                     if vals is None: vals = v
-                except mb.ModbusError as e:
-                    lk.alive[k] = False; lk.err = str(e)
+                except Exception as e:                              # 한 장치의 어떤 오류도 다른 장치 수집을 막지 않는다
+                    lk.alive[k] = False; lk.err = str(e) if isinstance(e, mb.ModbusError) else f"{type(e).__name__}: {e}"
             out[n] = vals
         return out
 
@@ -78,14 +83,27 @@ class Runtime:
             if v is None: continue
             if was == "재조회 대기":                                 # 복구 뒤 첫 수집: 달라진 값을 반영한 뒤 제어 재개
                 diff = self.lm.resync(n, v, {k: self.val.get(k) for k in v}, t); self.note("통신", f"{n} 복구, 변경 {len(diff)}건 반영")
-            for tag, x in v.items():
-                p = lk.by_tag[tag]; f = 0
-                if (p["lo"] is not None and x < p["lo"]) or (p["hi"] is not None and x > p["hi"]): f = 5
-                if f == 0: self.val[tag] = x; self.t_upd[tag] = t
-                self.flag[tag] = f
-        for n, st in self.lm.check(t).items():
-            if not any(e["text"].startswith(f"{n} 통신") and e["text"].endswith(st) for e in self.events[-20:]): self.note("통신", f"{n} 통신 {st}")
-        for n in self.links:                                          # 생존 계수(hb) 정지: 통신은 되는데 장치 제어기가 멈춘 경우
+            self._take(lk, v, t)
+        for n, st in self.lm.check(t).items(): self.note("통신", f"{n} 통신 {st}")          # check 는 바뀐 것만 돌려준다
+        self._check_hb(t)
+        for tag, tu in self.t_upd.items():
+            if t - tu > SUP["stale_s"] and self.flag.get(tag) == 0: self.flag[tag] = 3      # 갱신 지연
+        self._refresh_devices()
+        self.wd.kick("수집", t); self.n_scan += 1
+        self._accumulate()
+        return {"t": t, "bad": {k: f for k, f in self.flag.items() if f}, "link": {n: s for n, s in self.lm.state.items() if s != "정상"}}
+
+    def _take(self, lk, v, t):
+        """읽은 값을 품질 확인 뒤 반영한다. 범위 밖·NaN·무한대는 버리고 직전 유효값을 둔다(품질 5)."""
+        for tag, x in v.items():
+            p = lk.by_tag[tag]
+            bad = not math.isfinite(x) or (p["lo"] is not None and x < p["lo"]) or (p["hi"] is not None and x > p["hi"])
+            if not bad: self.val[tag] = x; self.t_upd[tag] = t
+            self.flag[tag] = 5 if bad else 0
+
+    def _check_hb(self, t):
+        """생존 계수(hb) 정지: 통신은 되는데 장치 제어기가 멈춘 경우."""
+        for n in self.links:
             hb = self.val.get(f"{n}.hb")
             if hb is None: continue
             last = self.hb_seen.get(n)
@@ -93,15 +111,12 @@ class Runtime:
             stop = t - self.hb_seen[n][1] > SUP["stale_s"]
             if stop != self.hb_stop.get(n, False): self.note("통신", f"{n} 생존 계수 {'정지 — 지령 차단' if stop else '재개'}")
             self.hb_stop[n] = stop
-        for tag, tu in self.t_upd.items():
-            if t - tu > SUP["stale_s"] and self.flag.get(tag) == 0: self.flag[tag] = 3      # 갱신 지연
+
+    def _refresh_devices(self):
         for n in self.ctl:
             self.dev[n].online = self.controllable(n)
             if f"{n}.status" in self.val: self.dev[n].on = int(round(self.val[f"{n}.status"])) == 1
             if f"{n}.mode" in self.val: self.dev[n].manual = int(round(self.val[f"{n}.mode"])) == 1
-        self.wd.kick("수집", t); self.n_scan += 1
-        self._accumulate()
-        return {"t": t, "bad": {k: f for k, f in self.flag.items() if f}, "link": {n: s for n, s in self.lm.state.items() if s != "정상"}}
 
     def controllable(self, n):
         """지령 가능: 통신 경로가 살아 있고 장치 생존 계수(hb)가 멈추지 않았다."""
@@ -130,6 +145,7 @@ class Runtime:
                 n0 = len(self.cmd.log); ok, dt = self.cmd.send(n, "start" if want[n] else "stop")
                 for e in self.cmd.log[n0:]: self.note("지령", e["text"])
                 done.append((n, want[n], ok, round(dt, 2)))
+        if len(self.cmd.log) > 2000: del self.cmd.log[:1000]
         self.wd.kick("제어", self.now())
         return done
 
@@ -176,7 +192,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="ifps_ems_rt"); ap.add_argument("config"); ap.add_argument("--scans", type=int, default=None); ap.add_argument("--check", action="store_true", help="대응표와 접속만 확인")
     a = ap.parse_args(argv); rt = Runtime(a.config)
     if a.check:
-        r = rt.scan(); print("장치", len(rt.links), "대 | 읽은 점", len(rt.val), "| 통신 이상", r["link"] or "없음", "| 품질 이상", r["bad"] or "없음"); rt.close(); return 0 if not r["link"] else 1
+        r = rt.scan(); dead = {n: lk.err or "무응답" for n, lk in rt.links.items() if not any(lk.alive.values())}      # 두절 판정(2초)을 기다리지 않고 1회 수집 결과로 본다
+        half = {n: "경로 " + ",".join(k for k, ok in lk.alive.items() if not ok) + " 무응답" for n, lk in rt.links.items() if n not in dead and not all(lk.alive.values())}
+        print("장치", len(rt.links), "대 | 읽은 점", len(rt.val), "| 통신 이상", dead or "없음", "| 경로 저하", half or "없음", "| 품질 이상", r["bad"] or "없음"); rt.close(); return 1 if dead else 0
     try: rt.run(a.scans)
     finally: rt.close()
     return 0

@@ -88,6 +88,9 @@ class AlarmManager:
     def event(self, prio, src, text):
         """한 번 생기고 끝나는 사건 경보(지령 실패 등). 확인하면 사라진다."""
         with self.lock:
+            for a in self.items.values():                                # 같은 내용의 미확인 사건은 횟수만 올린다(주기마다 반복되는 차단 사유가 목록을 채우지 않게)
+                if a["key"].startswith("evt.") and not a["acked"] and a["src"] == src and a.get("base", a["text"]) == text:
+                    a["count"] = a.get("count", 1) + 1; a["base"] = text; a["text"] = f"{text} (×{a['count']})"; a["t_on"] = a["t_off"] = time.time(); return
             self._new(f"evt.{self.n + 1}", prio, src, text, "RTN")
 
     def ack(self, ids, who):
@@ -119,7 +122,7 @@ class AlarmManager:
 class SimDriver:
     def __init__(self, plant, site):
         self.p = plant; self.site = site; self.hold = {}; self.cloud = 0.9; self.run = True; self.t_last = time.time()
-        self.scn = ""; self.extra_load = 0.0
+        self.scn = ""; self.extra_load = 0.0; self.err = ""
 
     def step(self):
         now = datetime.now(); hr = now.hour + now.minute / 60 + now.second / 3600; doy = now.timetuple().tm_yday
@@ -208,17 +211,17 @@ class Engine:
         self.plan_note = "규칙 운전(충전율 문턱값)"
         if plan_dir:
             from ..planlink import PlanPolicy
-            hist = os.path.join(self.rt.state_dir, "history.csv")
-            if not os.path.exists(hist) or sum(1 for _ in open(hist, encoding="utf-8")) < 800:
-                hist = os.path.join(plan_dir, "sample_site_data.csv")
-            self.rt.policy = PlanPolicy(self.rt.site, hist, plan_dir, days_since_deploy); self.plan_note = "예측 기반 운전계획(동적계획법)"
+            # 실측 이력이 8일 미만이면: 가상 장치 시연은 합성 자료로 계획하고, 실장치는 이력이 쌓일 때까지 규칙 운전한다
+            self.rt.policy = PlanPolicy(self.rt.site, os.path.join(self.rt.state_dir, "history.csv"), plan_dir, days_since_deploy,
+                                        demo_csv=os.path.join(plan_dir, "sample_site_data.csv") if sim else None); self.plan_note = "예측 기반 운전계획(동적계획법)"
+        self._tag_dev = {p["tag"]: p["device"] for p in self.rt.pts}
         self.lock = threading.RLock(); self.alarms = AlarmManager(); self.jobs = queue.Queue(); self.busy = None
         self.auto = bool(self.cfg.get("auto", True)); self.running = False
         self.trend = collections.deque(maxlen=4 * 3600); self.scan_ms = collections.deque(maxlen=600)
         self.trace = collections.deque(maxlen=3000); self.trace_n = 0; self.trace_on = True; self.trace_lock = threading.Lock()
         self.tokens = {}; self.selects = {}; self.last_decision = None; self._ev_i = 0; self.t_start = time.time(); self.fc_set_written = None
         self.ack_info = {}; self.fail = {}                                      # 로그인 실패 {출처: [횟수, 잠금 해제 시각]}
-        self.plan_dir = plan_dir; self.fc_cache = None; self.fc_lock = threading.Lock()
+        self.plan_dir = plan_dir; self._fc_busy = False; self.fc_cache = None; self.fc_lock = threading.Lock()
         self.energy = self._energy_zero(); self._t_en = None
         for n, lk in self.rt.links.items():
             for k, cl in lk.cl.items():
@@ -293,10 +296,10 @@ class Engine:
 
     def _integrate(self, k):
         """전력량 적산(사다리꼴 대신 1초 직사각형). 자정에 초기화. hours: 시간대별 [PV, DG, FC, ESS방전, 부하, ESS충전] kWh."""
-        now = time.time(); day = datetime.now().strftime("%Y-%m-%d"); e = self.energy
+        now = time.monotonic(); day = datetime.now().strftime("%Y-%m-%d"); e = self.energy       # 간격은 단조 시계(벽시계 조정에 영향받지 않게)
         if e["day"] != day: self.energy = e = self._energy_zero()
         if self._t_en is not None:
-            h = min(now - self._t_en, 5.0) / 3600.0; s = self.rt.site; hr = datetime.now().hour
+            h = min(max(now - self._t_en, 0.0), 5.0) / 3600.0; s = self.rt.site; hr = datetime.now().hour
             parts = [max(k["pv"], 0), max(k["dg"], 0), max(k["fc"], 0), max(k["ess"], 0), max(k["load"], 0), max(-k["ess"], 0)]
             for i, key in enumerate(("pv", "dg", "fc", "ess_dis", "load", "ess_chg")):
                 e[key] += parts[i] * h; e["hours"][hr][i] += parts[i] * h
@@ -309,7 +312,7 @@ class Engine:
         with self.fc_lock:
             c = self.fc_cache
             if c is None or force or time.time() - c["_t"] > 600:
-                if not getattr(self, "_fc_busy", False):
+                if not self._fc_busy:
                     self._fc_busy = True; threading.Thread(target=self._compute_forecast, daemon=True).start()
             return c or {"ok": False, "why": "예측 계산 중…"}
 
@@ -369,15 +372,19 @@ class Engine:
                         rt.note("통신", f"{n} 통신 {st}")
                         if n in rt.dev: rt.dev[n].online = rt.controllable(n)
                         self.alarms.set(f"link.{n}", st == "두절", 1, n, f"{n} 통신 두절 — 지령 차단, 직전 유효값 유지")
+                    self.purge()
             except Exception as e:
                 self.rt.note("오류", f"감시 주기 예외: {type(e).__name__}: {e}")
 
     def _post_scan(self):
-        rt = self.rt; v = rt.val; g = lambda k, d=0.0: v.get(k, d); s = rt.site
         k = self.kpi(); self._integrate(k)
         self.trend.append([round(time.time() * 1000), round(k["load"], 2), round(k["pv"], 2), round(k["dg"], 2), round(k["fc"], 2), round(k["ess"], 2),
                            round(k["soc"], 2), round(k["h2"], 1), round(k["reserve_margin"], 1)])
-        A = self.alarms
+        self._alarms_comm(); self._alarms_process(k); self._alarms_grid(); self._alarms_events()
+
+    def _alarms_comm(self):
+        """통신·품질 경보."""
+        rt = self.rt; A = self.alarms
         for n, st in rt.lm.state.items():
             A.set(f"link.{n}", st == "두절", 1, n, f"{n} 통신 두절 — 지령 차단, 직전 유효값 유지")
             dead = [p for p, a in rt.links[n].alive.items() if not a]
@@ -386,7 +393,14 @@ class Engine:
         for tag, f in rt.flag.items():
             dev = tag.split(".")[0]
             A.set(f"q5.{tag}", f == 5, 3, dev, f"{tag} 측정값 범위 밖 — 직전 유효값 유지")
-            A.set(f"q3.{tag}", f == 3, 3, dev, f"{tag} 값 갱신 지연(>{SUP['stale_s']:.0f}초)")
+            src = self._tag_dev.get(tag, dev)                                 # 그 점을 읽어 오는 장치(예: PV.kw 는 계측 게이트웨이)
+            lost = rt.lm.state.get(src) in ("두절", "재조회 대기")           # 장치 두절이면 '통신 두절' 경보 하나로 충분하다(점마다 올리지 않는다)
+            A.set(f"q3.{tag}", f == 3 and not lost, 3, dev, f"{tag} 값 갱신 지연(>{SUP['stale_s']:.0f}초)")
+        A.set("audit", bool(rt.audit_err), 2, "EMS", f"감사 기록 쓰기 실패 — 저장 공간·권한 확인 ({rt.audit_err})")
+
+    def _alarms_process(self, k):
+        """공정 경보: 충전율·수소·연료·예비력·운전 모드."""
+        rt = self.rt; v = rt.val; g = lambda k, d=0.0: v.get(k, d); s = rt.site; A = self.alarms
         soc = g("ESS.soc", 60.0)
         A.set("soc.ll", soc < s.soc_min * 100 + 4, 1, "ESS", f"ESS 충전율 매우 낮음 {soc:.1f}% — 디젤 강제 기동 영역")
         A.set("soc.lo", s.soc_min * 100 + 4 <= soc < 25, 2, "ESS", f"ESS 충전율 낮음 {soc:.1f}%")
@@ -398,7 +412,11 @@ class Engine:
         for n, d in rt.dev.items():
             A.set(f"man.{n}", d.manual, 4, n, f"{n} 현장 수동 모드 — EMS 지령 차단")
         A.set("auto.off", not self.auto, 4, "EMS", "자동 제어 해제 — 운용자 수동 지령 운전")
-        for f in FEEDERS:                                                              # 차단기 상태(보호 IED 게이트웨이)
+
+    def _alarms_grid(self):
+        """차단기·모선 경보(보호 IED 게이트웨이)."""
+        v = self.rt.val; A = self.alarms
+        for f in FEEDERS:
             c = v.get(f"CB.{f}")
             if c is None: continue
             code = int(round(v.get(f"FLT.{f}", 0)))
@@ -406,14 +424,19 @@ class Engine:
             A.set(f"cb.open.{f}", c < 0.5, 3 if f == "TIE" else 4, f"CB-{f}", f"CB-{f} {FEEDER_TXT[f]} 차단기 개방")
         if "BUS.a_v" in v:
             A.set("bus.a", v["BUS.a_v"] < 300, 1, "BUS-A", "모선 A 무전압(정전)"); A.set("bus.b", v.get("BUS.b_v", 440) < 300, 1, "BUS-B", "모선 B 무전압(정전)")
-        evs = rt.events
-        for e in evs[self._ev_i:]:
+
+    def _alarms_events(self):
+        """사건(지령 실패·차단, 주기 초과, 내부 오류)을 경보로 옮긴다."""
+        rt = self.rt; A = self.alarms
+        if rt.lm.state.get("FC") != "정상" or rt.hb_stop.get("FC"): self.fc_set_written = None      # 통신 복구·제어기 재기동 뒤에는 설정값을 다시 쓴다
+        evs = [e for e in list(rt.events) if e["id"] > self._ev_i]             # 번호 기준: 다른 스레드가 덧붙이거나 앞부분을 잘라도 빠뜨리지 않는다
+        for e in evs:
             t = e["text"]
-            if e["kind"] == "지령" and ("무응답" in t or "실패" in t): A.event(2, t.split()[0], t)
+            if e["kind"] == "지령" and ("무응답" in t or "실패" in t or "미변화" in t): A.event(2, t.split()[0], t)
             elif e["kind"] == "지령" and "차단" in t: A.event(3, t.split()[0], t)
             elif e["kind"] == "주기": A.event(4, "EMS", t)
             elif e["kind"] == "오류": A.event(2, "EMS", t)
-        self._ev_i = len(evs)
+        if evs: self._ev_i = evs[-1]["id"]
 
     # ── 지령 처리
     def _exec_loop(self):
@@ -434,6 +457,7 @@ class Engine:
         n0 = len(self.rt.cmd.log); ok, dt = self.rt.cmd.send(dev, cmd)
         for e in self.rt.cmd.log[n0:]:
             e["wall"] = wall_iso(); e["who"] = who; self.rt.note("지령", e["text"], actor=who)
+        if len(self.rt.cmd.log) > 2000: del self.rt.cmd.log[:1000]
         return ok, dt
 
     def _auto_control(self, who):
@@ -445,22 +469,27 @@ class Engine:
             if n not in rt.dev: continue
             if want[n] != rt.dev[n].on:
                 ok, dt = self._send(n, "start" if want[n] else "stop", who); done.append({"dev": n, "on": want[n], "ok": ok, "dt": round(dt, 2)})
-        fcl = rt.links.get("FC")
-        if fcl is not None and "FC.kw_set" in fcl.by_tag and rt.dev.get("FC") and rt.dev["FC"].on:
-            policy_fc = bool(want["_policy"][1])
-            sp = 0.0 if (want.get("_reserve") and not policy_fc) else rt.site.fc_kw      # 예비력만으로 병렬한 연료전지는 대기 운전
-            if self.fc_set_written != sp and fcl.write("FC.kw_set", sp):
-                self.fc_set_written = sp; rt.note("지령", f"FC 출력 설정 {sp:.0f}kW ({'순동 예비 대기' if sp == 0 else '정격 운전'})", actor=who)
+        self._fc_setpoint(want, who)
         self.last_decision = {"t": wall_iso(), "want": {k: bool(v) for k, v in want.items() if not k.startswith("_")}, "reserve": bool(want.get("_reserve")),
                               "policy": note or "규칙 운전", "action": list(want["_policy"]), "done": done, "ms": round((time.monotonic() - t0) * 1000)}
+
+    def _fc_setpoint(self, want, who):
+        """연료전지 출력 설정: 예비력만으로 병렬했으면 대기(0 kW), 계획이 골랐으면 정격."""
+        rt = self.rt; fcl = rt.links.get("FC"); on = bool(rt.dev.get("FC") and rt.dev["FC"].on)
+        if not on: self.fc_set_written = None                                    # 정지했다가 다시 기동하면 설정값을 다시 쓴다
+        if fcl is None or "FC.kw_set" not in fcl.by_tag or not on: return
+        sp = 0.0 if (want.get("_reserve") and not bool(want["_policy"][1])) else rt.site.fc_kw
+        if self.fc_set_written != sp and fcl.write("FC.kw_set", sp):
+            self.fc_set_written = sp; rt.note("지령", f"FC 출력 설정 {sp:.0f}kW ({'순동 예비 대기' if sp == 0 else '정격 운전'})", actor=who)
 
     def _do_cmd(self, job):
         dev, cmd, who = job["dev"], job["cmd"], job["who"]
         if cmd == "set":
-            tag, val = job["tag"], job["value"]; ok = self.rt.links[dev].write(tag, val)
+            tag, val = job["tag"], job["value"]
+            ok = self.rt.controllable(dev) and self.rt.links[dev].write(tag, val)                 # 선택 뒤 실행까지 사이에 통신이 끊겼으면 보내지 않는다
             self.rt.cmd.log.append({"t": 0, "dev": dev, "cmd": f"set {tag}={val}", "ok": ok, "text": f"{tag} 설정 {val} {'완료' if ok else '실패'}", "wall": wall_iso(), "who": who})
             self.rt.note("지령", f"{tag} 설정 {val} {'완료' if ok else '실패'}", actor=who)
-            if tag == "FC.kw_set": self.fc_set_written = val
+            if tag == "FC.kw_set" and ok: self.fc_set_written = val
             return
         self._send(dev, cmd, who)
 
@@ -471,8 +500,10 @@ class Engine:
         if cmd == "set":
             p = rt.links[dev].by_tag.get(tag)
             if p is None or p["rw"] != "w": return {"ok": False, "why": f"쓰기 점 아님: {tag}"}
+            if not (str(tag).endswith("_set") or str(tag).startswith("LDS.")): return {"ok": False, "why": f"설정 대상 아님: {tag} (기동·정지는 지령으로, 순번·지령 레지스터는 직접 쓸 수 없음)"}
             try: value = float(value)
             except (TypeError, ValueError): return {"ok": False, "why": "설정값 오류"}
+            if not math.isfinite(value): return {"ok": False, "why": "설정값 오류(유한한 수가 아님)"}
             if (p["lo"] is not None and value < p["lo"]) or (p["hi"] is not None and value > p["hi"]): return {"ok": False, "why": f"설정 범위 {p['lo']}~{p['hi']} 밖"}
             if not rt.controllable(dev): return {"ok": False, "why": "통신 두절" if not rt.lm.controllable(dev) else "장치 생존 계수(hb) 정지"}
             why = ""
@@ -480,14 +511,14 @@ class Engine:
             if dev not in rt.dev: return {"ok": False, "why": "지령 대상 아님(감시 전용 장치)"}
             why = rt.cmd.check(dev, cmd)
         if why: return {"ok": False, "why": why}
-        sid = secrets.token_hex(8); self.selects[sid] = {"dev": dev, "cmd": cmd, "who": who, "tag": tag, "value": value, "exp": time.time() + float(self.hcfg["sbo_s"])}
+        sid = secrets.token_hex(8); self.selects[sid] = {"dev": dev, "cmd": cmd, "who": who, "tag": tag, "value": value, "exp": time.monotonic() + float(self.hcfg["sbo_s"])}
         rt.note("선택", f"{dev} {cmd}{' ' + str(tag) + '=' + str(value) if cmd == 'set' else ''} 선택(SBO)", actor=who)
         return {"ok": True, "sid": sid, "exp_s": float(self.hcfg["sbo_s"])}
 
     def operate(self, sid, who):
         s = self.selects.pop(sid, None)
         if s is None: return {"ok": False, "why": "선택 없음 또는 이미 사용"}
-        if time.time() > s["exp"]: return {"ok": False, "why": "선택 시간 초과 — 다시 선택"}
+        if time.monotonic() > s["exp"]: return {"ok": False, "why": "선택 시간 초과 — 다시 선택"}
         if s["who"] != who: return {"ok": False, "why": "선택한 운용자와 다름"}
         self.jobs.put({"kind": "cmd", **s}); return {"ok": True, "queued": self.jobs.qsize()}
 
@@ -527,7 +558,7 @@ class Engine:
         return bad, warn
 
     def login(self, pin, name="운용자", src="local"):
-        now = time.time(); f = self.fail.get(src, [0, 0])
+        now = time.monotonic(); f = self.fail.get(src, [0, 0])
         if f[1] > now:
             return {"ok": False, "why": f"로그인 잠금 — {int(f[1] - now)}초 후 다시 시도"}
         role = "engineer" if self._pin_ok(pin, "engineer") else "operator" if self._pin_ok(pin, "operator") else None
@@ -537,7 +568,7 @@ class Engine:
             else: self.rt.note("보안", f"로그인 실패(PIN 불일치) {f[0]}/{self.LOCK_N}", actor=name)
             self.fail[src] = f; return {"ok": False, "why": "PIN 불일치"}
         self.fail.pop(src, None)
-        tok = secrets.token_urlsafe(24); self.tokens[tok] = {"role": role, "name": name, "exp": time.time() + 60 * float(self.hcfg["session_min"])}
+        tok = secrets.token_urlsafe(24); self.tokens[tok] = {"role": role, "name": name, "exp": time.monotonic() + 60 * float(self.hcfg["session_min"])}
         self.rt.note("보안", f"로그인 ({role})", actor=name); return {"ok": True, "token": tok, "role": role, "name": name}
 
     def logout(self, tok):
@@ -548,8 +579,15 @@ class Engine:
     def session(self, tok):
         s = self.tokens.get(tok or "")
         if s is None: return None
-        if time.time() > s["exp"]: self.tokens.pop(tok, None); return None
-        s["exp"] = time.time() + 60 * float(self.hcfg["session_min"]); return s
+        if time.monotonic() > s["exp"]: self.tokens.pop(tok, None); return None
+        s["exp"] = time.monotonic() + 60 * float(self.hcfg["session_min"]); return s
+
+    def purge(self):
+        """만료된 세션·선택·잠금 기록을 지운다(감시 주기에서 호출)."""
+        now = time.monotonic()
+        for d in (self.tokens, self.selects):
+            for k in [k for k, v in list(d.items()) if now > v["exp"]]: d.pop(k, None)
+        for k in [k for k, f in list(self.fail.items()) if f[1] and now > f[1] + 3600]: self.fail.pop(k, None)
 
     # ── 상태
     def kpi(self):
@@ -565,33 +603,30 @@ class Engine:
                 "online_kw": online, "ess_h": ess_h, "h2_h": h2 / (s.fc_kw * s.fc_nm3_per_kwh) if s.fc_kw else None, "fuel_h": fuel / (s.dg_kw * s.dg_l_per_kwh) if s.dg_kw else None,
                 "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "elz": elz, "g1_kw": float(self.cfg.get("g1_kw", 100.0))}
 
+    def _snap_values(self, now):
+        rt = self.rt
+        return {p["tag"]: {"v": rt.val.get(p["tag"]), "f": rt.flag.get(p["tag"], 3 if p["tag"] not in rt.val else 0),
+                           "age": round(now - rt.t_upd[p["tag"]], 1) if p["tag"] in rt.t_upd else None} for p in rt.pts if p["rw"] == "r"}
+
+    def _snap_device(self, n, lk, now):
+        rt = self.rt; d = rt.dev.get(n)
+        paths = {k: {"alive": lk.alive.get(k, False), "host": f"{cl.host}:{cl.port}", "unit": cl.unit, "ok": cl.n_ok, "err": cl.n_err,
+                     "rtt": None if cl.last_rtt is None else round(cl.last_rtt * 1000, 2), "last_err": cl.last_err, "age": round(now - rt.lm.last[n][k], 1)} for k, cl in lk.cl.items()}
+        return {"link": rt.lm.state[n], "since": round(now - rt.lm.since[n], 1), "ctl": n in rt.dev, "paths": paths,
+                "on": (d.on if d else (rt.val.get(f"{n}.status") or 0) > 0.5), "manual": d.manual if d else False, "online": rt.controllable(n), "hb_stop": rt.hb_stop.get(n, False),
+                "seq_ack": rt.val.get(f"{n}.seq_ack"), "hb": rt.val.get(f"{n}.hb")}
+
     def snapshot(self):
         rt = self.rt; now = rt.now()
         with self.lock:
-            vals = {}
-            for p in rt.pts:
-                t = p["tag"]
-                if p["rw"] != "r": continue
-                vals[t] = {"v": rt.val.get(t), "f": rt.flag.get(t, 3 if t not in rt.val else 0), "age": round(now - rt.t_upd[t], 1) if t in rt.t_upd else None}
-            devs = {}
-            for n, lk in rt.links.items():
-                paths = {}
-                for k, cl in lk.cl.items():
-                    paths[k] = {"alive": lk.alive.get(k, False), "host": f"{cl.host}:{cl.port}", "unit": cl.unit, "ok": cl.n_ok, "err": cl.n_err,
-                                "rtt": None if cl.last_rtt is None else round(cl.last_rtt * 1000, 2), "last_err": cl.last_err,
-                                "age": round(now - rt.lm.last[n][k], 1)}
-                d = rt.dev.get(n)
-                devs[n] = {"link": rt.lm.state[n], "since": round(now - rt.lm.since[n], 1), "ctl": n in rt.dev, "paths": paths,
-                           "on": (d.on if d else rt.val.get(f"{n}.status", 0) > 0.5), "manual": d.manual if d else False, "online": rt.controllable(n), "hb_stop": rt.hb_stop.get(n, False),
-                           "seq_ack": rt.val.get(f"{n}.seq_ack"), "hb": rt.val.get(f"{n}.hb")}
-            sm = list(self.scan_ms)
+            vals = self._snap_values(now); devs = {n: self._snap_device(n, lk, now) for n, lk in rt.links.items()}; sm = list(self.scan_ms)
         alarms, cnt = self.alarms.snapshot()
         st = sorted(sm); top = max(5.0, (st[-1] if st else 1.0) * 1.1); nb = 24
         hist = [0] * nb
         for x in sm: hist[min(nb - 1, int(x / top * nb))] += 1
         return {"t": time.time(), "wall": wall_iso(), "utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "uptime": round(time.time() - self.t_start),
                 "site": rt.site.name, "mode": rt.mode, "run_mode": self.cfg.get("run_mode", "개발"), "sim": self.sim, "auto": self.auto,
-                "policy": self.plan_note, "version": {"rt": RT_VERSION, "core": CORE_VERSION}, "values": vals, "devices": devs, "kpi": self.kpi(),
+                "policy": (getattr(self.rt.policy, "note", "") or self.plan_note) if self.rt.policy else self.plan_note, "version": {"rt": RT_VERSION, "core": CORE_VERSION}, "values": vals, "devices": devs, "kpi": self.kpi(),
                 "alarms": alarms[:200], "alarm_cnt": cnt, "cmdlog": rt.cmd.log[-60:][::-1], "events": rt.events[-150:][::-1],
                 "decision": self.last_decision, "busy": (self.busy or {}).get("kind"), "queue": self.jobs.qsize(),
                 "next_ctrl_s": max(0.0, round(float(self.cfg.get("ctrl_s", 60.0)) - (now - rt.t_ctl), 1)), "ctrl_s": float(self.cfg.get("ctrl_s", 60.0)),
@@ -646,7 +681,9 @@ class Engine:
         return {"ok": True, "fc": fc, "addr": addr, "regs": regs, "tags": {str(k): v for k, v in tags.items()}, "rtt": rtt}
 
     def mb_write(self, q, who):
-        fc = int(q.get("fc", 6)); addr = int(q["addr"]); vals = [int(x) & 0xFFFF for x in q["values"]]
+        fc = int(q.get("fc", 6)); addr = int(q["addr"]); vals = [int(x) for x in q["values"]]
+        if not vals or fc not in (5, 6, 16): raise ValueError("쓰기 값 없음 또는 기능 코드 오류(5/6/16)")
+        if not 0 <= addr <= 0xFFFF or any(not 0 <= v <= 0xFFFF for v in vals): raise ValueError("주소·값은 0~65535")
         cl, tmp = self._client(q)
         if tmp: cl.tag = ("직접", f"{cl.host}"); cl.trace = self._tracer(cl)
         try:
@@ -660,29 +697,30 @@ class Engine:
         return {"ok": True}
 
     # ── 디버그: 가상 장치 고장 주입
+    SIM_HOLD = ("LOAD.p1_kw", "LOAD.p2_kw", "LOAD.p3_kw", "PV.kw", "LOAD.kw", "ENV.temp", "ENV.press", "ENV.rh", "DG.fuel_l", "H2.nm3")
+
+    def _sim_set(self, q):
+        tag = q["tag"]; val = float(q["value"]); p = self.plant
+        if tag not in p.by_tag: raise ValueError(f"점 없음: {tag}")
+        if q.get("hold", True) and tag in self.SIM_HOLD: self.simdrv.hold[tag] = val
+        p.set(tag, val)
+
+    def _sim_feeder(self, q):
+        f = q["target"]
+        if f not in FEEDERS: raise ValueError(f"급전선 없음: {f}")
+        if q["action"] == "fault": self.simdrv.trip(f, int(q.get("code", 51)))
+        else: self.plant.set(f"CB.{f}", 1 if q.get("on", True) else 0); self.plant.set(f"FLT.{f}", 0)
+
     def sim_action(self, q, who):
         if not self.sim: raise ValueError("가상 장치 모드가 아님")
-        a = q["action"]; p = self.plant; tgt = q.get("target")
-        if a == "mute": (p.muted.add if q.get("on", True) else p.muted.discard)(tgt)
-        elif a == "noack": (p.no_ack.add if q.get("on", True) else p.no_ack.discard)(tgt)
-        elif a == "down": (p.down.add if q.get("on", True) else p.down.discard)(tgt)
-        elif a == "manual": p.set(f"{tgt}.mode", 1 if q.get("on", True) else 0)
-        elif a == "set":
-            tag = q["tag"]; val = float(q["value"])
-            if tag not in p.by_tag: raise ValueError(f"점 없음: {tag}")
-            if q.get("hold", True) and tag in ("LOAD.p1_kw", "LOAD.p2_kw", "LOAD.p3_kw", "PV.kw", "LOAD.kw", "ENV.temp", "ENV.press", "ENV.rh", "DG.fuel_l", "H2.nm3"):
-                self.simdrv.hold[tag] = val
-            p.set(tag, val)
+        a = q["action"]; p = self.plant; tgt = q.get("target"); on = q.get("on", True)
+        flags = {"mute": p.muted, "noack": p.no_ack, "down": p.down}
+        if a in flags: (flags[a].add if on else flags[a].discard)(tgt)
+        elif a == "manual": p.set(f"{tgt}.mode", 1 if on else 0)
+        elif a == "set": self._sim_set(q)
         elif a == "release": self.simdrv.hold.pop(q["tag"], None)
         elif a == "scenario": self.simdrv.scenario(q["name"])
-        elif a == "fault":
-            f = q["target"]
-            if f not in FEEDERS: raise ValueError(f"급전선 없음: {f}")
-            self.simdrv.trip(f, int(q.get("code", 51)))
-        elif a == "cb":
-            f = q["target"]
-            if f not in FEEDERS: raise ValueError(f"급전선 없음: {f}")
-            p.set(f"CB.{f}", 1 if q.get("on", True) else 0); p.set(f"FLT.{f}", 0)
+        elif a in ("fault", "cb"): self._sim_feeder(q)
         else: raise ValueError(f"동작 없음: {a}")
         self.rt.note("시뮬레이터", f"고장 주입 {a} {tgt or q.get('tag') or q.get('name') or ''} {q.get('on', '')}".strip(), actor=who)
         return {"ok": True, "sim": self.sim_state()}

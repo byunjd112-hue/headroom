@@ -139,7 +139,7 @@ pre.code { margin: 0; padding: 12px; background: #0a0f15; border-radius: 8px; bo
 .hist { display: flex; align-items: flex-end; gap: 2px; height: 90px; } .hist i { flex: 1; background: linear-gradient(180deg, #3ec6ff, #1f6ea3); border-radius: 2px 2px 0 0; min-height: 1px; }
 
 /* ── 대화상자 */
-.modal-bg { position: fixed; inset: 0; background: rgba(3,6,10,.66); backdrop-filter: blur(3px); display: none; place-items: center; z-index: 50; }
+.modal-bg { position: fixed; inset: 0; background: rgba(3,6,10,.78); display: none; place-items: center; z-index: 50; }
 .modal-bg.on { display: grid; }
 .modal { width: min(460px, calc(100vw - 32px)); background: linear-gradient(180deg, #142030, #0f1822); border: 1px solid #2c3d50; border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
 .modal .hd { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; } .modal .hd h3 { margin: 0; font-size: 15px; }
@@ -157,8 +157,8 @@ pre.code { margin: 0; padding: 12px; background: #0a0f15; border-radius: 8px; bo
 
 /* ═══════════ THEME v2 — 딥 네이비 · 글래스 카드 · 발광 헥사곤 ═══════════ */
 :root {
-  --bg: #070d24; --bg2: var(--bg2); --panel: #0e1838; --panel2: #13204a; --panel3: #182a5c;
-  --line: rgba(var(--edge),.16); --line2: rgba(var(--edge),.28); --text: #e6ecfb; --text2: var(--text2); --muted: var(--muted);
+  --bg: #070d24; --bg2: #0a1230; --panel: #0e1838; --panel2: #13204a; --panel3: #182a5c;
+  --line: rgba(var(--edge),.16); --line2: rgba(var(--edge),.28); --text: #e6ecfb; --text2: #aab8dc; --muted: #7486b4;
   --accent: var(--accent); --accent2: #3d8bff; --ok: #2de2a6;
   --pv: #f5d000; --dg: #ff7a45; --fc: var(--accent); --ess: #a07cff; --g1: #4aa3ff; --load: #3d8bff;
   --r: 18px; --r2: 10px; --sh: 0 0 0 1px rgba(120,160,255,.04) inset, 0 20px 50px rgba(0,0,10,.45);
@@ -560,3 +560,24 @@ td.ell { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-spac
 .sitebd { flex-direction: column; gap: 8px; }
 .sitebd .site { flex: 1 1 auto; min-height: 0; height: auto; width: auto; max-width: 100%; align-self: center; }
 .sitebd #layBar { flex: none; width: 100%; } .sitebd .laybar { margin-top: 0; }
+
+/* ═══ Rev16 화면 결함 보완 ═══ */
+/* 남색 주제: 보조 글자색이 비어 있던 것(자기 참조 변수) */
+:root[data-theme="navy"] { --bg2: #0a1230; --text2: #aab8dc; --muted: #7486b4; }
+/* 머리줄 경보 수: 주제 규칙이 배경을 지워 글자가 안 보이던 것 */
+:root[data-theme] .almsum .pc.p1.on { background: var(--alarm); color: #fff; border-color: #ff8796; }
+:root[data-theme] .almsum .pc.p2.on { background: var(--p2); color: #1b0d00; border-color: #ffb27d; }
+:root[data-theme] .almsum .pc.p3.on { background: var(--p3); color: #231a00; border-color: #ffe08b; }
+:root[data-theme] .almsum .pc.p4.on { background: #1f3b56; color: #cfe8ff; border-color: #2f5f8a; }
+/* 탭 화면(경보·디버그): 본문이 화면 높이 안에서 줄어들고 표 안에서 스크롤 */
+#almBody, #engBody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#almBody > .panel, #engBody > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+#almBody > .panel > .bd, #engBody > .panel > .bd { flex: 1; min-height: 0; overflow: auto; height: auto; max-height: none; }
+#engBody > .grid { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+#engBody > .grid > * { min-height: 0; }
+#engBody > .grid > .panel { display: flex; flex-direction: column; overflow: hidden; }
+#engBody > .grid > .panel > .bd { flex: 1; min-height: 0; overflow: auto; height: auto; max-height: none; }
+#engBody > .grid > .panel > .bd > .scroll { max-height: none; }
+#engBody > .grid > .grid, #engBody > .grid > div:not(.panel) { overflow: auto; align-content: start; }
+#engBody > .panel + .panel { margin-top: 12px !important; flex: 0 1 auto; max-height: 46%; }
+td.nw, th.nw { white-space: nowrap; } table.tc td.ell { max-width: 120px; }

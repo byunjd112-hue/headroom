@@ -7,14 +7,14 @@ function siteState(s) {
   const r = (st, v, t) => ({ st, v, t });
   const out = {
     G1: cb("G1") === 2 || cb("DG") === 2 ? r("bad", `DG ${F.kw(k.dg)} kW`, "차단기 트립") : lost("DG") ? r("bad", "####", "통신 두절")
-      : r(D.DG.on ? "ok" : "ok", D.DG.on ? `DG ${F.kw(k.dg)} kW` : "계통 형성 100 kW", D.DG.on ? "디젤 운전" : "계통 형성"),
+      : r((D.DG || {}).on ? "ok" : "ok", (D.DG || {}).on ? `DG ${F.kw(k.dg)} kW` : "계통 형성 100 kW", (D.DG || {}).on ? "디젤 운전" : "계통 형성"),
     ESS: cb("ESS") === 2 ? r("bad", "0 kW", "트립") : lost("ESS") ? r("bad", "####", "통신 두절") : r(Math.abs(k.ess) > 0.5 ? "ok" : "idle", `${k.ess < 0 ? "▲" : "▼"} ${F.kw(Math.abs(k.ess))} kW · ${F.n(k.soc, 0)}%`, k.ess < -0.5 ? "충전" : k.ess > 0.5 ? "방전" : "대기"),
-    PV: cb("PV") === 2 ? r("bad", "0 kW", "트립") : r(k.pv > 0.5 ? "ok" : "idle", `${F.kw(k.pv)} kW`, k.pv > 0.5 ? "발전" : "발전 없음"),
-    FC: cb("FC") === 2 ? r("bad", "0 kW", "트립") : lost("FC") ? r("bad", "####", "통신 두절") : r(D.FC.on ? "ok" : "idle", `${F.kw(k.fc)} kW · H₂ ${F.n(k.h2, 0)}`, D.FC.on ? "운전" : "정지"),
+    PV: !gw ? r("bad", "####", "게이트웨이 두절") : cb("PV") === 2 ? r("bad", "0 kW", "트립") : r(k.pv > 0.5 ? "ok" : "idle", `${F.kw(k.pv)} kW`, k.pv > 0.5 ? "발전" : "발전 없음"),
+    FC: cb("FC") === 2 ? r("bad", "0 kW", "트립") : lost("FC") ? r("bad", "####", "통신 두절") : r((D.FC || {}).on ? "ok" : "idle", `${F.kw(k.fc)} kW · H₂ ${F.n(k.h2, 0)}`, (D.FC || {}).on ? "운전" : "정지"),
     DIST: !gw ? r("bad", "####", "게이트웨이 두절") : r((val("BUS.a_v") || 0) > 300 && (val("BUS.b_v") || 0) > 300 ? "ok" : "bad", `${F.n(val("BUS.a_v"), 0)} V · ${F.n(val("BUS.hz"), 2)} Hz`, cb("TIE") === 1 ? "모선 연계" : "연계 개방"),
     EMS: r(s.alarm_cnt[1].act ? "bad" : "ok", `${s.auto ? "AUTO" : "MANUAL"} · ${F.n(s.stats.last_ms, 0)} ms`, s.alarm_cnt[1].act ? `긴급 경보 ${s.alarm_cnt[1].act}` : "정상"),
   };
-  ["L1", "L2", "L3"].forEach((f, i) => { const kw = [k.l1, k.l2, k.l3][i], c = cb(f); out[f] = c === 2 ? r("bad", "0 kW", "트립 · 정전") : c === 0 ? r("idle", "0 kW", "개방") : r("ok", `${F.kw(kw)} kW`, "급전 중"); });
+  ["L1", "L2", "L3"].forEach((f, i) => { const kw = [k.l1, k.l2, k.l3][i], c = cb(f); out[f] = !gw ? r("bad", "####", "게이트웨이 두절") : c === 2 ? r("bad", "0 kW", "트립 · 정전") : c === 0 ? r("idle", "0 kW", "개방") : r("ok", `${F.kw(kw)} kW`, "급전 중"); });
   return out;
 }
 /* 장비 카드: photos/ 폴더에 실사 이미지가 있으면 사진, 없으면 자체 벡터 일러스트 + 상태 띠 */
@@ -43,9 +43,10 @@ function mixDonut(parts, total, size = 148) {
 }
 
 /* 경보 매트릭스(장비 × 우선순위) */
-const MTX_ROWS = [["DG", ["DG", "CB-DG"]], ["FC", ["FC", "CB-FC"]], ["ESS", ["ESS", "CB-ESS"]], ["PV·계측", ["MTR", "CB-PV", "PV"]], ["모선·배전", ["BUS-A", "BUS-B", "CB-TIE", "CB-G1"]], ["부하", ["CB-L1", "CB-L2", "CB-L3"]], ["EMS", ["EMS"]]];
+const MTX_ROWS = [["DG", ["DG", "CB-DG"]], ["FC·수전해", ["FC", "CB-FC", "ELZ"]], ["ESS", ["ESS", "CB-ESS"]], ["PV·계측", ["MTR", "CB-PV", "PV"]], ["모선·배전", ["BUS-A", "BUS-B", "CB-TIE", "CB-G1"]], ["부하", ["CB-L1", "CB-L2", "CB-L3"]], ["EMS·기타", ["EMS"]]];
+const MTX_KNOWN = new Set(MTX_ROWS.flatMap(r => r[1]));
 function alarmMatrix(alarms) {
-  const cnt = MTX_ROWS.map(([, srcs]) => [1, 2, 3, 4].map(p => alarms.filter(a => a.prio === p && srcs.includes(a.src) && (a.state === "ACT" || !a.acked)).length));
+  const cnt = MTX_ROWS.map(([, srcs]) => [1, 2, 3, 4].map(p => alarms.filter(a => a.prio === p && (srcs.includes(a.src) || (srcs[0] === "EMS" && !MTX_KNOWN.has(a.src))) && (a.state === "ACT" || !a.acked)).length));   // 표에 없는 출처는 마지막 줄에 모은다(머리줄 합계와 일치)
   return `<div class="mtx"><span></span>${[1, 2, 3, 4].map(p => `<span class="mh">${prioTxt(p)}</span>`).join("")}
     ${MTX_ROWS.map(([nm], i) => `<span class="mr">${nm}</span>${cnt[i].map((n, j) => `<span class="mc ${n ? "p" + (j + 1) : ""}">${n}</span>`).join("")}`).join("")}</div>`;
 }
@@ -103,7 +104,7 @@ function mapEqSt(s, it) {
   const c = cbF && gw ? Math.round(val("CB." + cbF) ?? 1) : 1;
   if (c === 2) return { on: false, fault: true };                      // 차단기 트립 → 고장 표시
   if (c === 0) return { on: false };                                   // 차단기 개방 → 정지 표시
-  return ({ G1: { on: D.DG.on, lost: lost("DG") }, ESS: { on: true, lost: lost("ESS"), soc: Math.round(k.soc / 5) * 5 }, PV: { on: k.pv > .5 }, FC: { on: D.FC.on, lost: lost("FC") },
+  return ({ G1: { on: (D.DG || {}).on, lost: lost("DG") }, ESS: { on: true, lost: lost("ESS"), soc: Math.round(k.soc / 5) * 5 }, PV: { on: k.pv > .5 }, FC: { on: (D.FC || {}).on, lost: lost("FC") },
     DIST: { on: true, lost: lost("MTR") }, EMS: { on: true } })[b] || { on: true };
 }
 function siteMapSvg(s) {
@@ -157,7 +158,7 @@ function siteUpdate(s, force) {
     if (force || box.dataset.sig !== sig) { box.dataset.sig = sig; box.innerHTML = siteMapSvg(s); layBindDrag(); }
     const D = s.devices, gw = D.MTR && D.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? 1) : 1, k = s.kpi;
     const busLive = (val("BUS.a_v") ?? 440) > 300 || (val("BUS.b_v") ?? 440) > 300;
-    const flow = { G1: D.DG.on ? k.dg : 0, ESS: Math.abs(k.ess), PV: k.pv, FC: k.fc, L1: k.l1, L2: k.l2, L3: k.l3, RING: k.load, EMSP: 1, DIST: k.load, EMS: 1 };
+    const flow = { G1: (D.DG || {}).on ? k.dg : 0, ESS: Math.abs(k.ess), PV: k.pv, FC: k.fc, L1: k.l1, L2: k.l2, L3: k.l3, RING: k.load, EMSP: 1, DIST: k.load, EMS: 1 };
     (L.cab || []).forEach(([a, b, f], i) => {
       const e = document.getElementById("mf-" + i); if (!e) return; const c = ["RING", "EMSP", "DIST", "EMS", ""].includes(f) ? 1 : cb(f);
       const cls = c === 2 ? "flt" : c === 0 || !busLive ? "off" : (flow[f] || 0) > .5 ? "on" : "idle";
@@ -219,4 +220,4 @@ function layToggleEdit() {
   if (L.edit) { L.edit = false; layoutLoad(); return; }
   L.edit = true; L.sel = null; siteRebuild();
 }
-document.addEventListener("keydown", e => { if (L.edit && L.sel && (e.key === "Delete" || e.key === "Backspace") && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); layDelete(); } });
+document.addEventListener("keydown", e => { if (S.page === "overview" && $("#siteBox") && L.edit && L.sel && (e.key === "Delete" || e.key === "Backspace") && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); layDelete(); } });

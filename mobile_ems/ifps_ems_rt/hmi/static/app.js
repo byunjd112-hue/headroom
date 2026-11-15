@@ -15,7 +15,7 @@ function renderHeader() {
   $("#chips").innerHTML = [
     `<span class="chip info"><span class="dot"></span>${S.lang === "ko" ? m[0] : m[1]}</span>`,
     `<span class="chip ${s.auto ? "ok" : "warn"}"><span class="dot"></span>${s.auto ? (S.lang === "ko" ? "자동 제어" : "AUTO DISPATCH") : (S.lang === "ko" ? "수동 운전" : "MANUAL")}</span>`,
-    `<span class="chip ${nLost ? "bad" : nOk === devs.length ? "ok" : "warn"}"><span class="dot"></span>${S.lang === "ko" ? "통신" : "COMMS"} ${nOk}/${devs.length}</span>`,
+    `<span class="chip ${nLost ? "bad" : nOk === devs.length ? "ok" : "warn"}"><span class="dot"></span>${S.lang === "ko" ? "통신" : "COMMS"} ${devs.length - nLost}/${devs.length}${nLost || nOk === devs.length ? "" : (S.lang === "ko" ? " · 경로 저하" : " · DEGRADED")}</span>`,
     `<span class="chip ${s.run_mode === "운용" ? "ok" : "warn"}"><span class="dot"></span>${s.run_mode === "운용" ? (S.lang === "ko" ? "운용" : "OPERATIONAL") : (S.lang === "ko" ? "개발 모드" : "DEV MODE")}</span>`,
     s.sim ? `<span class="chip sim"><span class="dot"></span>SIM</span>` : "",
   ].join("");
@@ -123,7 +123,7 @@ const P_SLD = {
       <span class="k">주파수</span><span class="v">${F.n(val("BUS.hz"), 2)} Hz</span><span class="k">연계 차단기</span><span class="v">${cb("TIE") === 1 ? "투입" : cb("TIE") === 0 ? "개방" : cb("TIE") === 2 ? "트립" : "미상"}</span>
       <span class="k">Σ 발전 / Σ 부하</span><span class="v">${F.kw(k.gen)} / ${F.kw(k.load)} kW</span><span class="k">ESS</span><span class="v">${k.ess < -.5 ? "충전 " + F.kw(-k.ess) : k.ess > .5 ? "방전 " + F.kw(k.ess) : "대기"} kW</span>`;
     $("#sldCb").innerHTML = CB_ROWS.map(([f, nm]) => { const c = cb(f), code = Math.round(val("FLT." + f) || 0);
-      return `<tr><td class="mono"><b>CB-${f}</b></td><td>${nm}</td><td>${c === 1 ? `<span class="pill ok">투입</span>` : c === 2 ? `<span class="pill bad">트립</span>` : c === 0 ? `<span class="pill warn">개방</span>` : `<span class="pill">미상</span>`}</td><td class="mono muted">${code ? (ANSI_TXT[code] || code) : ""}</td></tr>`; }).join("");
+      return `<tr><td class="mono nw"><b>CB-${f}</b></td><td class="ell">${nm}</td><td class="nw" style="text-align:right">${c === 1 ? `<span class="pill ok">투입</span>` : c === 2 ? `<span class="pill bad">트립${code ? " · " + esc(String(ANSI_TXT[code] || code)) : ""}</span>` : c === 0 ? `<span class="pill warn">개방</span>` : `<span class="pill">미상</span>`}</td></tr>`; }).join("");
     this.chart.set(["t", "load", "pv", "dg", "fc", "ess", "soc", "h2", "reserve"], S.trend);
   },
 };
@@ -203,7 +203,7 @@ const P_CTL = {
         FC: [mode, ["수소", F.n(val("H2.nm3"), 0) + " Nm³"], ["순번 ACK", F.n(d && d.seq_ack, 0)], hb],
         ELZ: [mode, ["생산", F.n(val("ELZ.h2_rate"), 1) + " Nm³/h"], ["저장", F.n(val("H2.nm3"), 0) + " Nm³"], hb],
         EMS: [["정책", s.policy.includes("예측") ? "예측 계획" : "규칙"], ["주기 초과", s.stats.n_over + "회"], ["감사 기록", s.stats.audit_seq + "건"], ["가동", F.dur(s.uptime)]],
-        MTR: [["모선 A", F.n(val("BUS.a_v"), 0) + " V"], ["기온", F.n(val("ENV.temp")) + " °C"], ["습도", F.n(val("ENV.rh"), 0) + " %"], ["경로", d ? paths(d) : "—"]] }[u.id];
+        MTR: lost ? [["모선 A", "####"], ["기온", "####"], ["습도", "####"], ["경로", d ? paths(d) : "—"]] : [["모선 A", F.n(val("BUS.a_v"), 0) + " V"], ["기온", F.n(val("ENV.temp")) + " °C"], ["습도", F.n(val("ENV.rh"), 0) + " %"], ["경로", d ? paths(d) : "—"]] }[u.id];
       $("#mt-" + u.id).innerHTML = meta.map(([a, b]) => `<div><div class="lab">${a}</div><div class="v">${b}</div></div>`).join("");
       const eqs = { on, lost, fault: c === 2, value: u.id === "ESS" ? F.n(k.soc, 0) + "% SOC" : u.id === "EMS" || u.id === "G1" ? undefined : on && u.kw ? F.n(val(u.kw), 0) + " kW" : undefined };
       const sig = JSON.stringify(eqs), eqb = $("#eq-" + u.id);
@@ -216,7 +216,7 @@ const P_CTL = {
     for (const [f] of CB_ROWS) {
       const c = cb(f), code = Math.round(val("FLT." + f) || 0);
       $("#cbs2-" + f).innerHTML = c === 1 ? `<span class="pill ok">투입</span>` : c === 2 ? `<span class="pill bad">트립</span>` : c === 0 ? `<span class="pill warn">개방</span>` : `<span class="pill">미상</span>`;
-      $("#cbf-" + f).textContent = code ? (ANSI_TXT[code] || code) : "—"; $("#cbk-" + f).textContent = ld[f] !== undefined ? F.kw(ld[f]) : "";
+      $("#cbf-" + f).textContent = code ? (ANSI_TXT[code] || code) : "—"; $("#cbk-" + f).textContent = ld[f] === undefined ? "" : gw ? F.kw(ld[f]) : "####";
       $$(`#cbRows [data-shed="${f}"]`).forEach(b => { b.disabled = !can("operator") || !gw || (b.dataset.v === "2" ? c !== 1 : c === 1); });
     }
     if (L.items) {
@@ -251,23 +251,24 @@ const P_ALM = {
         <button class="btn" id="ackSel">${t("btn.acksel", "선택 확인")}</button><button class="btn pri" id="ackAll">${t("btn.ackall", "전체 확인")}</button></div>
         <div class="bd np scroll hfill"><table class="t"><thead><tr><th style="width:28px"><input type="checkbox" id="selAll"></th><th>우선</th><th>발생 시각</th><th>장치</th><th>내용</th><th>상태</th><th>복귀</th><th>확인</th></tr></thead><tbody id="almRows"></tbody></table></div></div>`;
       this.filter = "all"; $$("#almF button").forEach(b => b.onclick = () => { this.filter = b.dataset.f; $$("#almF button").forEach(x => x.classList.toggle("on", x === b)); this.update(S.snap); });
-      $("#ackAll").onclick = () => ack("all"); $("#ackSel").onclick = () => { if (this.sel.size) ack([...this.sel]); this.sel.clear(); };
-      $("#selAll").onchange = e => { this.sel = e.target.checked ? new Set(S.snap.alarms.map(a => a.id)) : new Set(); this.update(S.snap); };
+      $("#ackAll").onclick = () => ack("all"); $("#ackSel").onclick = () => { if (this.sel.size) ack([...this.sel]); this.sel.clear(); $("#selAll").checked = false; };
+      $("#selAll").onchange = e => { this.sel = e.target.checked ? new Set(this.rows(S.snap).map(a => a.id)) : new Set(); this.update(S.snap); };
       this.update(S.snap);
     } else if (this.tab === "journal") {
       B.innerHTML = `<div class="panel"><div class="hd"><h3>경보 이력 (최근 300건)</h3><div class="spacer"></div><button class="btn sm" id="jr">새로 고침</button></div><div class="bd np scroll hfill"><table class="t"><thead><tr><th>시각</th><th>구분</th><th>우선</th><th>장치</th><th>내용</th></tr></thead><tbody id="jrRows"></tbody></table></div></div>`;
-      const load = async () => { const r = await api("/api/journal?n=300"); $("#jrRows").innerHTML = r.rows.map(e => `<tr><td class="mono">${F.dt(e.t)}</td><td><span class="pill ${e.ev === "발생" || e.ev === "재발생" ? "bad" : e.ev === "복귀" ? "ok" : "info"}">${e.ev}</span></td><td><span class="pr p${e.prio}">${e.prio}</span></td><td>${esc(e.src)}</td><td>${esc(e.text)}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">이력 없음</td></tr>`; };
+      const load = async () => { const r = await api("/api/journal?n=300"); if (!$("#jrRows") || !r.rows) return; $("#jrRows").innerHTML = r.rows.map(e => `<tr><td class="mono">${F.dt(e.t)}</td><td><span class="pill ${e.ev === "발생" || e.ev === "재발생" ? "bad" : e.ev === "복귀" ? "ok" : "info"}">${e.ev}</span></td><td><span class="pr p${e.prio}">${e.prio}</span></td><td>${esc(e.src)}</td><td>${esc(e.text)}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">이력 없음</td></tr>`; };
       $("#jr").onclick = load; load();
     } else {
       B.innerHTML = `<div class="panel"><div class="hd"><h3>감사 기록 (audit.log, 최근 200건)</h3><div class="spacer"></div><span id="avRes" class="sub"></span><button class="btn" id="av">${t("alm.verify", "무결성 검증")}</button><button class="btn sm" id="ar">새로 고침</button></div>
         <div class="bd np scroll hfill"><table class="t"><thead><tr><th class="n">순번</th><th>시각</th><th>주체</th><th>구분</th><th>내용</th><th>MAC</th></tr></thead><tbody id="auRows"></tbody></table></div></div>`;
-      const load = async () => { const r = await api("/api/audit?n=200"); $("#auRows").innerHTML = r.rows.map(e => `<tr><td class="n">${e.seq}</td><td class="mono">${esc((e.ts || "").replace("T", " ").slice(0, 19))}</td><td>${esc(e.actor)}</td><td>${esc(e.kind)}</td><td>${esc((e.data && e.data.text) || JSON.stringify(e.data))}</td><td class="mono muted">${esc((e.mac || "").slice(0, 12))}…</td></tr>`).join(""); };
-      $("#ar").onclick = load; $("#av").onclick = async () => { const r = await api("/api/audit/verify"); $("#avRes").innerHTML = r.ok ? `<span class="okc">✔ ${esc(r.msg)}</span>` : `<span class="badc">✖ ${esc(r.msg)}</span>`; }; load();
+      const load = async () => { const r = await api("/api/audit?n=200"); if (!$("#auRows")) return; if (!r.rows) { $("#auRows").innerHTML = `<tr><td colspan="6" class="empty">감사 기록은 운용자 이상 로그인 후 볼 수 있습니다</td></tr>`; return; } $("#auRows").innerHTML = r.rows.map(e => `<tr><td class="n">${e.seq}</td><td class="mono">${esc((e.ts || "").replace("T", " ").slice(0, 19))}</td><td>${esc(e.actor)}</td><td>${esc(e.kind)}</td><td>${esc((e.data && e.data.text) || JSON.stringify(e.data))}</td><td class="mono muted">${esc((e.mac || "").slice(0, 12))}…</td></tr>`).join(""); };
+      $("#ar").onclick = load; $("#av").onclick = async () => { const r = await api("/api/audit/verify"); if (!$("#avRes")) return; $("#avRes").innerHTML = r.ok ? `<span class="okc">✔ ${esc(r.msg)}</span>` : `<span class="badc">✖ ${esc(r.msg)}</span>`; }; load();
     }
   },
+  rows(s) { let r = s.alarms; if (this.filter === "unack") r = r.filter(a => !a.acked); if (this.filter === "act") r = r.filter(a => a.state === "ACT"); return r; },
   update(s) {
     if (this.tab !== "list" || !$("#almRows")) return;
-    let rows = s.alarms; if (this.filter === "unack") rows = rows.filter(a => !a.acked); if (this.filter === "act") rows = rows.filter(a => a.state === "ACT");
+    const rows = this.rows(s);
     $("#almRows").innerHTML = rows.length ? rows.map(a => `<tr class="${a.acked ? "" : "unack"} ${a.state === "RTN" ? "rtn" : ""} ${this.sel.has(a.id) ? "sel" : ""}" data-id="${a.id}">
       <td><input type="checkbox" ${this.sel.has(a.id) ? "checked" : ""} data-id="${a.id}"></td><td><span class="pr p${a.prio}">${a.prio} ${prioTxt(a.prio)}</span></td><td class="mono">${F.dt(a.t_on)}</td><td>${esc(a.src)}</td><td>${esc(a.text)}</td>
       <td>${a.state === "ACT" ? `<span class="pill bad">발생</span>` : `<span class="pill ok">복귀</span>`}</td><td class="mono muted">${a.t_off ? F.time(a.t_off) : ""}</td><td>${a.acked ? `<span class="muted">${esc(a.ack_by || "")}</span>` : `<button class="btn sm" data-ack="${a.id}">확인</button>`}</td></tr>`).join("")
@@ -282,7 +283,7 @@ const P_TR = {
   win: 900,
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("tr.title", "추세")}</h2><span class="sub">1초 표본 · 최대 4시간 보관 · 그래프 위에 마우스를 올리면 값 표시</span><div class="spacer"></div>
-      <div class="seg" id="trWin"><button data-w="300">5분</button><button data-w="900" class="on">15분</button><button data-w="3600">1시간</button><button data-w="14400">4시간</button></div><a class="btn" href="/api/export/trend.csv">CSV 내보내기</a></div>
+      <div class="seg" id="trWin">${[[300, "5분"], [900, "15분"], [3600, "1시간"], [14400, "4시간"]].map(([w, n]) => `<button data-w="${w}"${w === this.win ? ' class="on"' : ""}>${n}</button>`).join("")}</div><a class="btn" href="/api/export/trend.csv">CSV 내보내기</a></div>
     <div class="pg" style="grid-template-rows:3fr 2fr"><div class="panel"><div class="hd"><h3>전력 (kW)</h3><div class="spacer"></div><div class="legend" id="trLeg"></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="trA"></canvas></div></div></div>
       <div class="panel"><div class="hd"><h3>ESS 충전율 (%) · N-1 예비력 여유 (kW)</h3></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="trB"></canvas></div></div></div></div>`;
     this.a = new Chart($("#trA"), { fill: true, window: this.win, series: [{ key: "load", label: "부하", color: COLORS.load, w: 2.2 }, { key: "pv", label: "PV", color: COLORS.pv, fill: true }, { key: "dg", label: "DG", color: COLORS.dg, fill: true }, { key: "fc", label: "FC", color: COLORS.fc, fill: true }, { key: "ess", label: "ESS", color: COLORS.ess }] });
@@ -346,7 +347,8 @@ const P_ENG = {
     const tg = $("#exTgt"); tg.onchange = () => { $("#exCustom").style.display = tg.value === "custom" ? "contents" : "none"; };
     const q = () => { const v = tg.value; const base = v === "custom" ? { host: $("#exHost").value.trim(), port: $("#exPort").value, unit: $("#exUnit").value } : { dev: v.split("|")[0], path: v.split("|")[1] }; return Object.assign(base, { fc: $("#exFc").value, addr: $("#exAddr").value, count: $("#exCnt").value }); };
     const read = async () => {
-      if (!can("operator")) { $("#exAuto").checked = false; return loginDialog(); }
+      if (!$("#exRows")) { clearInterval(this._ex); this._ex = null; return; }
+      if (!can("operator")) { $("#exAuto").checked = false; clearInterval(this._ex); this._ex = null; return loginDialog(); }      // 자동 갱신을 멈춘다(매초 로그인 창이 다시 뜨지 않게)
       const r = await api("/api/mb/read?" + new URLSearchParams(q())); if (!r.ok) { $("#exRows").innerHTML = `<tr><td colspan="8" class="empty badc">${esc(r.why)}</td></tr>`; $("#exInfo").textContent = ""; return; }
       $("#exInfo").textContent = `${r.regs.length}개 · 왕복 ${r.rtt} ms`; const bits = r.fc <= 2;
       const ord = $("#exOrd").value; this._exLast = r;
@@ -358,7 +360,10 @@ const P_ENG = {
     $("#exRead").onclick = read; $("#exOrd").onchange = () => { if (this._exLast) read(); }; $("#exAuto").onchange = e => { clearInterval(this._ex); this._ex = e.target.checked ? setInterval(read, 1000) : null; };
     $("#wrGo").onclick = async () => {
       if (!can("engineer")) { toast("엔지니어 권한 필요", "bad"); return loginDialog(); }
-      const vals = $("#wrVals").value.split(",").map(x => x.trim()).filter(Boolean).map(x => parseInt(x, x.startsWith("0x") ? 16 : 10)); if (!vals.length || vals.some(Number.isNaN)) return toast("값 형식 오류", "bad");
+      const toks = $("#wrVals").value.split(",").map(x => x.trim()).filter(Boolean), at = $("#wrAddr").value.trim();
+      if (!toks.length || !toks.every(x => /^(0x[0-9a-f]{1,4}|\d{1,5})$/i.test(x))) return toast("값 형식 오류 — 0~65535 정수 또는 0x0000~0xFFFF, 쉼표 구분", "bad");
+      const vals = toks.map(x => parseInt(x, /^0x/i.test(x) ? 16 : 10)); if (vals.some(v => v > 65535)) return toast("값 범위 오류 — 0~65535", "bad");
+      if (!/^\d{1,5}$/.test(at) || +at > 65535) return toast("주소를 0~65535 정수로 입력하십시오", "bad");
       const qq = q(); if (!confirm(`${qq.host || qq.dev + "/" + qq.path} fc${$("#wrFc").value} 주소 ${$("#wrAddr").value} ← [${vals.join(", ")}]\n실장치에 씁니다. 계속합니까?`)) return;
       const r = await api("/api/mb/write", Object.assign(qq, { fc: +$("#wrFc").value, addr: +$("#wrAddr").value, values: vals })); $("#wrRes").innerHTML = r.ok ? `<span class="okc">✔ 쓰기 완료 — 감사 기록됨</span>` : `<span class="badc">✖ ${esc(r.why)}</span>`;
     };
@@ -401,8 +406,8 @@ const P_ENG = {
   async points() {
     $("#engBody").innerHTML = `<div class="panel"><div class="hd"><h3>자료 대응표 (pointmap.csv) · 실시간 값</h3><div class="spacer"></div><input class="in" id="ptQ" placeholder="TAG·장치 검색" style="width:220px"><button class="btn sm" id="ptR">새로 고침</button></div>
       <div class="bd np scroll hfill"><table class="t"><thead><tr><th>TAG</th><th>장치</th><th>FC:주소</th><th>자료형</th><th class="n">배율</th><th>단위</th><th class="n">하한</th><th class="n">상한</th><th>R/W</th><th class="n">공학값</th><th>품질</th><th class="n">경과 s</th></tr></thead><tbody id="ptRows"></tbody></table></div></div>`;
-    const load = async () => { const r = await api("/api/points"); this._pts = r.rows; draw(); };
-    const draw = () => { const qq = $("#ptQ").value.toLowerCase(); $("#ptRows").innerHTML = (this._pts || []).filter(p => !qq || (p.tag + p.device).toLowerCase().includes(qq)).map(p => `<tr><td class="mono"><b>${esc(p.tag)}</b></td><td>${esc(p.device)}</td><td class="mono">${p.fc}:${p.addr}</td><td class="mono">${p.type}</td><td class="n">${p.scale}</td><td>${esc(p.unit)}</td><td class="n">${p.lo ?? ""}</td><td class="n">${p.hi ?? ""}</td><td>${p.rw === "w" ? `<span class="pill warn">W</span>` : `<span class="pill">R</span>`}</td><td class="n">${p.v === null || p.v === undefined ? "—" : F.n(p.v, 2)}</td><td>${p.rw === "w" ? `<span class="muted">지령</span>` : `<span class="pill ${p.f ? "bad" : "ok"}">${esc(p.ftxt)}</span>`}</td><td class="n">${p.age ?? ""}</td></tr>`).join(""); };
+    const load = async () => { const r = await api("/api/points"); if (!$("#ptRows") || !r.rows) return; this._pts = r.rows; draw(); };
+    const draw = () => { if (!$("#ptRows")) return; const qq = $("#ptQ").value.toLowerCase(); $("#ptRows").innerHTML = (this._pts || []).filter(p => !qq || (p.tag + p.device).toLowerCase().includes(qq)).map(p => `<tr><td class="mono"><b>${esc(p.tag)}</b></td><td>${esc(p.device)}</td><td class="mono">${p.fc}:${p.addr}</td><td class="mono">${p.type}</td><td class="n">${p.scale}</td><td>${esc(p.unit)}</td><td class="n">${p.lo ?? ""}</td><td class="n">${p.hi ?? ""}</td><td>${p.rw === "w" ? `<span class="pill warn">W</span>` : `<span class="pill">R</span>`}</td><td class="n">${p.v === null || p.v === undefined ? "—" : F.n(p.v, 2)}</td><td>${p.rw === "w" ? `<span class="muted">지령</span>` : `<span class="pill ${p.f ? "bad" : "ok"}">${esc(p.ftxt)}</span>`}</td><td class="n">${p.age ?? ""}</td></tr>`).join(""); };
     $("#ptQ").oninput = draw; $("#ptR").onclick = load; load(); this._ex = setInterval(() => { if (this.tab === "points") load(); }, 2000);
   },
   sim() {
@@ -422,7 +427,7 @@ const P_ENG = {
     const act = async b => { if (!can("engineer")) { toast("엔지니어 권한 필요", "bad"); return loginDialog(); } const r = await api("/api/sim", b); if (r.ok) { S.snap.sim_state = r.sim; this.simUpdate(); toast("고장 주입 적용", "ok"); } else toast(r.why, "bad"); };
     this._simAct = act;
     $$("#simScn [data-s]").forEach(b => b.onclick = () => act({ action: "scenario", name: b.dataset.s }));
-    $("#svGo").onclick = () => act({ action: "set", tag: $("#svTag").value, value: parseFloat($("#svVal").value), hold: $("#svHold").checked });
+    $("#svGo").onclick = () => { const x = parseFloat($("#svVal").value); if (!Number.isFinite(x)) return toast("값을 숫자로 입력하십시오", "bad"); act({ action: "set", tag: $("#svTag").value, value: x, hold: $("#svHold").checked }); };
     this.simUpdate();
   },
   simUpdate() {
@@ -443,6 +448,7 @@ const P_ENG = {
   },
   async info() {
     const r = await api("/api/info"); const v = await api("/api/audit/verify");
+    if (this.tab !== "info" || S.page !== "eng" || !$("#engBody") || !r.version) return;
     $("#engBody").innerHTML = `<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div class="panel"><div class="hd"><h3>실행 정보</h3></div><div class="bd"><div class="kv band">
       <span class="k">EMS 연동 계층</span><span class="v">v${r.version.rt}</span><span class="k">핵심 프로그램</span><span class="v">v${r.version.core}</span><span class="k">운전 정책</span><span class="v" style="font-family:var(--sans)">${esc(r.policy)}</span>
       <span class="k">설정 파일</span><span class="v">${esc(r.cfg_path)}</span><span class="k">상태 폴더</span><span class="v">${esc(r.state_dir)}</span><span class="k">모드</span><span class="v">${r.sim ? "가상 장치" : "실장치"}</span>
@@ -486,12 +492,15 @@ function render() {
   if (mounted !== p + S.lang + S.theme) { clearInterval(P_ENG._ex); const m = $("#main"); PAGES[p].mount(m); applyI18n(m); decoratePage(p); mounted = p + S.lang + S.theme; }
   try { PAGES[p].update(S.snap); } catch (e) { console.error(e); }
 }
-window.addEventListener("hashchange", () => { S.page = location.hash.slice(1) || "overview"; mounted = null; render(); });
+window.addEventListener("hashchange", () => {
+  if (L.edit) { if (L.dirty) toast("저장하지 않은 배치 변경을 버렸습니다", "bad"); L.edit = false; L.sel = null; L.dirty = false; layoutLoad(); }     // 배치 편집은 개요 화면 안에서만
+  S.page = location.hash.slice(1) || "overview"; mounted = null; render(); });
 $$("#lang button").forEach(b => b.onclick = () => { S.lang = b.dataset.l; try { localStorage.setItem("ems.lang", S.lang); } catch (e) { } $$("#lang button").forEach(x => x.classList.toggle("on", x === b)); applyI18n(); mounted = null; renderUser(); renderHeader(); render(); });
 
 async function poll() {
   try {
-    const s = await api("/api/snapshot"); S.snap = s; S.lastOk = Date.now();
+    const s = await api("/api/snapshot"); if (!s || !s.values || !s.devices) return;      // 오류 응답(500 등)이면 갱신하지 않는다 → 3.5초 뒤 '서버 응답 없음' 표시
+    S.snap = s; S.lastOk = Date.now();
     if (s.me && (s.me.role !== S.me.role)) { if (S.token && s.me.role === "viewer") { S.token = null; try { sessionStorage.removeItem("ems.token"); } catch (e) { } toast("세션 만료 — 다시 로그인하세요", "bad"); } S.me = s.me; renderUser(); }
     renderHeader(); render();
   } catch (e) { }

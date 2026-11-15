@@ -43,7 +43,7 @@ def _orders(addr, regs):
         print(f"{addr + i:>6} {pr[0]:04X} {pr[1]:04X} " + " ".join(f"{mb.decode(pr, 'f32', 1, o):>13.5g} {mb.decode(pr, 'u32', 1, o):>11}" for o in mb.ORDERS))
 
 
-def main(argv=None):
+def _parser():
     ap = argparse.ArgumentParser(prog="mbtool", description="Modbus TCP 현장 점검 도구")
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("read", "watch", "write", "probe"):
@@ -63,42 +63,67 @@ def main(argv=None):
             p.add_argument("--coil", action="store_true"); p.add_argument("-y", "--yes", action="store_true")
         if name == "probe": p.add_argument("--units", default="1-10"); p.add_argument("-a", "--addr", type=int, default=0)
     c = sub.add_parser("check"); c.add_argument("config")
-    a = ap.parse_args(argv)
+    return ap
+
+
+def _probe(a):
+    lo, _, hi = a.units.partition("-"); found = []
+    for u in range(int(lo), int(hi or lo) + 1):
+        a.unit = u; cl = _client(a); t0 = time.monotonic()
+        try:
+            cl.read(a.addr, 1, 3); found.append(u); print(f"  unit {u:>3}: 응답 ({(time.monotonic() - t0) * 1000:.1f}ms)")
+        except mb.ModbusError as e:
+            if "예외 응답" in str(e): found.append(u); print(f"  unit {u:>3}: 응답(예외: {e}) — 장치는 있음, 주소 {a.addr} 없음")      # 예외 응답도 장치가 살아 있다는 뜻
+            else: print(f"  unit {u:>3}: {e}")
+        finally:
+            cl.close()
+    print("응답 장치 번호:", found or "없음"); return 0 if found else 1
+
+
+def _write(a):
+    if a.value is not None:
+        if a.coil: print("--coil 에는 -v 0/1 을 쓰십시오", file=sys.stderr); return 2
+        a.values = mb.encode(a.value, a.type, a.scale, a.order)
+    if not a.coil and any(not 0 <= v <= 0xFFFF for v in a.values): print("레지스터 값은 0~65535 (0xFFFF)", file=sys.stderr); return 2
+    what = f"{a.host}:{a.port} unit {a.unit} {'coil' if a.coil else 'reg'} {a.addr} ← {a.values}"
+    if not a.yes and input(f"{what}\n실장치에 씁니다. 계속(y/N)? ").strip().lower() != "y": print("취소"); return 1
+    cl = _client(a)
+    try:
+        if a.coil: cl.write_coil(a.addr, bool(a.values[0]))
+        else: cl.write(a.addr, a.values, fc=16 if len(a.values) > 1 else None)
+    finally:
+        cl.close()
+    print("완료:", what); return 0
+
+
+def _show(a, regs, rtt):
+    if a.type:
+        n = mb.NREG[a.type]; vals = [mb.decode(regs[i:i + n], a.type, a.scale, a.order) for i in range(0, len(regs) - n + 1, n)]
+        print(time.strftime("%H:%M:%S"), f"({rtt:.1f}ms)", " ".join(f"{v:.6g}" for v in vals))
+    elif a.fc in (1, 2): print(time.strftime("%H:%M:%S"), "".join(str(b) for b in regs))
+    elif a.orders: _orders(a.addr, regs)
+    else: _table(a.addr, regs, a.order)
+
+
+def _read(a):
+    a.order = mb.norm_order(a.order); cl = _client(a)
+    try:
+        while True:
+            t0 = time.monotonic(); regs = cl.read_bits(a.addr, a.count, a.fc) if a.fc in (1, 2) else cl.read(a.addr, a.count, a.fc)
+            _show(a, regs, (time.monotonic() - t0) * 1000)
+            if a.cmd != "watch": return 0
+            time.sleep(max(0.0, a.interval - (time.monotonic() - t0)))
+    finally:
+        cl.close()
+
+
+def main(argv=None):
+    a = _parser().parse_args(argv)
     try:
         if a.cmd == "check":
             from .runtime import main as rtmain
             return rtmain([a.config, "--check"])
-        if a.cmd == "probe":
-            lo, _, hi = a.units.partition("-"); found = []
-            for u in range(int(lo), int(hi or lo) + 1):
-                a.unit = u; cl = _client(a); t0 = time.monotonic()
-                try:
-                    cl.read(a.addr, 1, 3); found.append(u); print(f"  unit {u:>3}: 응답 ({(time.monotonic() - t0) * 1000:.1f}ms)")
-                except mb.ModbusError as e:
-                    print(f"  unit {u:>3}: {e}")
-                finally:
-                    cl.close()
-            print("응답 장치 번호:", found or "없음"); return 0 if found else 1
-        cl = _client(a)
-        if a.cmd == "write":
-            if a.value is not None:
-                if a.coil: print("--coil 에는 -v 0/1 을 쓰십시오", file=sys.stderr); return 2
-                a.values = mb.encode(a.value, a.type, a.scale, a.order)
-            what = f"{a.host}:{a.port} unit {a.unit} {'coil' if a.coil else 'reg'} {a.addr} ← {a.values}"
-            if not a.yes and input(f"{what}\n실장치에 씁니다. 계속(y/N)? ").strip().lower() != "y": print("취소"); return 1
-            cl.write_coil(a.addr, bool(a.values[0])) if a.coil else cl.write(a.addr, a.values, fc=16 if len(a.values) > 1 else None); print("완료:", what); return 0
-        a.order = mb.norm_order(a.order)
-        while True:
-            t0 = time.monotonic(); regs = cl.read_bits(a.addr, a.count, a.fc) if a.fc in (1, 2) else cl.read(a.addr, a.count, a.fc)
-            rtt = (time.monotonic() - t0) * 1000
-            if a.type:
-                n = mb.NREG[a.type]; vals = [mb.decode(regs[i:i + n], a.type, a.scale, a.order) for i in range(0, len(regs) - n + 1, n)]
-                print(time.strftime("%H:%M:%S"), f"({rtt:.1f}ms)", " ".join(f"{v:.6g}" for v in vals))
-            elif a.fc in (1, 2): print(time.strftime("%H:%M:%S"), "".join(str(b) for b in regs))
-            elif a.orders: _orders(a.addr, regs)
-            else: _table(a.addr, regs, a.order)
-            if a.cmd != "watch": return 0
-            time.sleep(max(0.0, a.interval - (time.monotonic() - t0)))
+        return {"probe": _probe, "write": _write}.get(a.cmd, _read)(a)
     except mb.ModbusError as e:
         print("통신 오류:", e, file=sys.stderr); return 2
     except KeyboardInterrupt:

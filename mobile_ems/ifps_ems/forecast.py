@@ -44,6 +44,11 @@ class _Base:
         self.trained = bool(int(a["trained"][0])); self.q = a["q"]
         self.models = [Ridge().from_arrays(a, f"b{i}_") if f"b{i}_w" in a else None for i in range(len(BUCKET))]
 
+    # 하위 클래스가 정의한다
+    def target(self, d, o, h): raise NotImplementedError
+    def features(self, d, o, h): raise NotImplementedError
+    def _point(self, d, o, h, x): raise NotImplementedError
+
     def _samples(self, d, o_range):
         X = {i: [] for i in range(len(BUCKET))}; Y = {i: [] for i in range(len(BUCKET))}; O = {i: [] for i in range(len(BUCKET))}
         for o in o_range:

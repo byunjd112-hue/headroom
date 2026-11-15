@@ -1,6 +1,6 @@
 {
- "date": "2026-11-15 02:14",
- "unittest_s": 30.8,
+ "date": "2026-11-15 03:32",
+ "unittest_s": 77.3,
  "tests": [
   "test_h2_limit_blocks_fuel_cell | ok",
   "test_plan_is_finite_and_avoids_silent_hours | ok",
@@ -11,6 +11,23 @@
   "test_link_monitor_sequence | ok",
   "test_redundancy_needs_both_paths_lost | ok",
   "test_sync_and_watchdog | ok",
+  "test_audit_key_sources | ok",
+  "test_simulate_rule_policy_balances_energy | ok",
+  "test_time_sync_and_device_dict | ok",
+  "test_history_row_written_when_quarter_changes | ok",
+  "test_link_write_refuses_read_only_point_and_reports_dead_paths | ok",
+  "test_run_counts_overruns_and_saves_state | ok",
+  "test_remaining_routes | ok",
+  "test_session_expiry_and_purge | ok",
+  "test_all_devices_ok_and_report_saved | ok",
+  "test_command_handshake_ok_noack_manual | ok",
+  "test_heartbeat_freeze_detected | ok",
+  "test_hints_cover_common_errors | ok",
+  "test_main_demo_auto_and_bad_args | ok",
+  "test_one_path_down_is_degraded_not_failed | ok",
+  "test_refused_port_and_outside_allowlist_explained | ok",
+  "test_watch_scan_and_menu | ok",
+  "test_wrong_order_type_scale_are_suggested | ok",
   "test_10_security_lockout_hash_and_gate | ok",
   "test_11_all_units_load_shed_elz_pv | ok",
   "test_1_static_and_snapshot | ok",
@@ -22,11 +39,33 @@
   "test_7_forecast_accuracy_and_energy | ok",
   "test_8_breaker_trip_shown_and_deenergizes_feeder | ok",
   "test_9_layout_edit_persist_and_validate | ok",
+  "test_R15_repeated_event_alarms_are_counted_not_stacked | ok",
+  "test_R02_audit_write_failure_does_not_raise | ok",
+  "test_R02_rotation_keeps_chain_and_detects_tamper | ok",
+  "test_R07_torn_tail_is_quarantined_and_chain_continues | ok",
+  "test_R18_history_with_gap_and_torn_row_is_regridded | ok",
+  "test_R01_frozen_heartbeat_blocks_send_not_only_select | ok",
+  "test_R04_nan_and_out_of_range_values_never_reach_device_or_state | ok",
+  "test_R05_watchdog_is_kicked_while_waiting_for_ack | ok",
+  "test_R08_blocks_do_not_span_undefined_addresses | ok",
+  "test_R09a_slow_starting_device_needs_done_s | ok",
+  "test_R09b_seq_and_cmd_go_in_one_frame | ok",
+  "test_R06_malformed_frames_raise_modbus_error_only | ok",
+  "test_R03_negative_content_length_rejected | ok",
+  "test_R04_snapshot_is_strict_json_even_with_nan | ok",
+  "test_R10_time_step_back_does_not_corrupt_energy_or_sessions | ok",
+  "test_R11_mutating_and_sensitive_routes_need_login | ok",
+  "test_R13_set_only_setpoints_and_finite_values | ok",
+  "test_R19_wrong_json_shapes_are_400_not_500 | ok",
+  "장치마다 순서가 다른 현장을 모의: 32비트 점 3종 + 장치 기본 DCBA(16비트 지령까지 바이트 뒤집힘). | ok",
+  "test_known_vectors | ok",
+  "test_pointmap_order_column_and_device_default | ok",
   "test_allowlist_rejects_outside_addresses | ok",
   "test_pointmap_validation | ok",
   "test_roundtrip_and_types | ok",
   "test_plan_policy_decides_from_history_and_falls_back | ok",
   "test_command_ack | ok",
+  "통신은 정상인데 장치 hb가 멈추면 지령을 막고, 다시 올라가면 풀린다. | ok",
   "test_manual_mode_blocks_command | ok",
   "test_no_ack_falls_back_to_alternate_source | ok",
   "test_one_path_down_keeps_control_both_down_blocks | ok",
@@ -34,133 +73,764 @@
   "test_reserve_rule_starts_fuel_cell | ok",
   "test_run_loop_and_audit | ok",
   "test_scan_reads_values_within_period | ok",
-  "test_unverified_crypto_refused_in_operation_mode | ok"
+  "test_unverified_crypto_refused_in_operation_mode | ok",
+  "test_history_with_gaps_is_forward_filled | ok",
+  "test_ridge_and_quantiles | ok",
+  "test_verify_gen_sample_train_and_model_io | ok",
+  "test_pin_tool_hashes_and_rejects_mismatch | ok",
+  "test_start_failures_return_codes | ok",
+  "test_start_serve_and_stop_by_signal | ok",
+  "test_read_write_probe_check | ok",
+  "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
+  "test_check_scans_and_module_entry | ok"
  ],
- "n_tests": 33,
+ "n_tests": 81,
  "tests_ok": true,
- "coverage_pct": 81.1,
+ "coverage_pct": 94.2,
+ "stmt": {
+  "n": 2410,
+  "hit": 2336,
+  "pct": 96.9
+ },
+ "branch": {
+  "n": 836,
+  "hit": 722,
+  "pct": 86.4
+ },
  "coverage_files": [
   [
-   "ifps_ems_rt/__main__.py",
-   0.0,
-   2
-  ],
-  [
    "ifps_ems_rt/hmi/__main__.py",
-   0.0,
-   43
-  ],
-  [
-   "ifps_ems_rt/hmi/pin.py",
-   0.0,
-   6
-  ],
-  [
-   "ifps_ems_rt/mbtool.py",
-   0.0,
-   66
-  ],
-  [
-   "ifps_ems/__main__.py",
-   9.8,
-   41
-  ],
-  [
-   "ifps_ems/dataio.py",
-   55.0,
-   60
-  ],
-  [
-   "ifps_ems/models.py",
-   56.5,
-   23
-  ],
-  [
-   "ifps_ems/forecast.py",
-   73.4,
-   109
+   88.4,
+   43,
+   50.0,
+   4,
+   "27-28, 32-33, 55"
   ],
   [
    "ifps_ems_rt/hmi/server.py",
-   81.5,
-   151
+   92.9,
+   169,
+   91.5,
+   94,
+   "90-91, 162-163, 182-189"
   ],
   [
-   "ifps_ems/supervisor.py",
-   88.4,
-   95
+   "ifps_ems_rt/diag.py",
+   93.2,
+   293,
+   85.6,
+   118,
+   "74, 126-127, 260-261, 306, 318-319, 342, 355, 359, 361, 363, 388-393, 423"
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
-   89.5,
-   609
+   96.2,
+   629,
+   82.6,
+   242,
+   "42-43, 54-59, 80-81, 160-161, 273-274, 278, 287, 376-377, 451-452, 554-555, 737-738"
   ],
   [
-   "ifps_ems_rt/runtime.py",
-   89.9,
-   139
+   "ifps_ems/__main__.py",
+   97.6,
+   41,
+   75.0,
+   8,
+   "53"
   ],
   [
    "ifps_ems/security.py",
-   91.5,
-   71
+   97.7,
+   86,
+   93.3,
+   30,
+   "51-52"
   ],
   [
-   "ifps_ems/dispatch.py",
-   92.9,
-   112
-  ],
-  [
-   "ifps_ems_rt/modbus.py",
-   93.4,
-   91
-  ],
-  [
-   "ifps_ems/config.py",
-   96.9,
-   32
+   "ifps_ems_rt/runtime.py",
+   98.1,
+   161,
+   90.9,
+   44,
+   "198-200"
   ],
   [
    "ifps_ems_rt/simplant.py",
-   96.9,
-   98
+   98.3,
+   116,
+   93.2,
+   44,
+   "111-112"
+  ],
+  [
+   "ifps_ems_rt/modbus.py",
+   98.4,
+   124,
+   80.0,
+   50,
+   "110-111"
   ],
   [
    "ifps_ems_rt/hal.py",
-   97.3,
-   74
+   98.9,
+   91,
+   96.4,
+   28,
+   "97"
+  ],
+  [
+   "ifps_ems_rt/mbtool.py",
+   99.0,
+   96,
+   86.8,
+   38,
+   "134"
+  ],
+  [
+   "ifps_ems/forecast.py",
+   99.1,
+   112,
+   78.6,
+   42,
+   "23"
   ],
   [
    "ifps_ems/__init__.py",
    100.0,
-   1
+   1,
+   100.0,
+   0,
+   ""
+  ],
+  [
+   "ifps_ems/config.py",
+   100.0,
+   32,
+   100.0,
+   0,
+   ""
+  ],
+  [
+   "ifps_ems/dataio.py",
+   100.0,
+   71,
+   100.0,
+   20,
+   ""
+  ],
+  [
+   "ifps_ems/dispatch.py",
+   100.0,
+   112,
+   93.8,
+   16,
+   ""
+  ],
+  [
+   "ifps_ems/models.py",
+   100.0,
+   23,
+   100.0,
+   2,
+   ""
   ],
   [
    "ifps_ems/solar.py",
    100.0,
-   19
+   19,
+   100.0,
+   0,
+   ""
+  ],
+  [
+   "ifps_ems/supervisor.py",
+   100.0,
+   95,
+   83.3,
+   30,
+   ""
   ],
   [
    "ifps_ems_rt/__init__.py",
    100.0,
-   1
+   1,
+   100.0,
+   0,
+   ""
+  ],
+  [
+   "ifps_ems_rt/__main__.py",
+   100.0,
+   2,
+   100.0,
+   0,
+   ""
   ],
   [
    "ifps_ems_rt/hmi/__init__.py",
    100.0,
-   0
+   0,
+   100.0,
+   0,
+   ""
+  ],
+  [
+   "ifps_ems_rt/hmi/pin.py",
+   100.0,
+   6,
+   50.0,
+   2,
+   ""
   ],
   [
    "ifps_ems_rt/planlink.py",
    100.0,
-   33
+   42,
+   80.0,
+   10,
+   ""
   ],
   [
    "ifps_ems_rt/pointmap.py",
    100.0,
-   40
+   45,
+   100.0,
+   14,
+   ""
   ]
  ],
+ "pylint": {
+  "E": 0,
+  "W": 12,
+  "by_id": [
+   [
+    "W0718 broad-exception-caught",
+    9
+   ],
+   [
+    "W0613 unused-argument",
+    3
+   ]
+  ],
+  "items": [
+   [
+    "W0613",
+    "unused-argument",
+    "ifps_ems/dispatch.py",
+    39,
+    "rule_action",
+    "Unused argument 'hr'"
+   ],
+   [
+    "W0613",
+    "unused-argument",
+    "ifps_ems/dispatch.py",
+    59,
+    "Planner.step",
+    "Unused argument 'lclass'"
+   ],
+   [
+    "W0613",
+    "unused-argument",
+    "ifps_ems/supervisor.py",
+    49,
+    "Commander.send",
+    "Unused argument 'ttl'"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/planlink.py",
+    56,
+    "PlanPolicy.__call__",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/runtime.py",
+    72,
+    "Runtime._read_parallel",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/hmi/engine.py",
+    160,
+    "SimDriver.loop",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/hmi/engine.py",
+    273,
+    "Engine._scan_loop",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/hmi/engine.py",
+    358,
+    "Engine._compute_forecast",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/hmi/engine.py",
+    376,
+    "Engine._sup_loop",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/hmi/engine.py",
+    451,
+    "Engine._exec_loop",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/hmi/server.py",
+    90,
+    "make_handler.H.do_GET",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/hmi/server.py",
+    162,
+    "make_handler.H.do_POST",
+    "Catching too general exception Exception"
+   ]
+  ]
+ },
+ "metrics": {
+  "n_func": 282,
+  "limits": {
+   "cc": 20,
+   "len": 200,
+   "arg": 8,
+   "depth": 5,
+   "file": 1000
+  },
+  "cc_max": 20,
+  "len_max": 149,
+  "arg_max": 8,
+  "depth_max": 5,
+  "file_max": 789,
+  "over": {
+   "cc": [],
+   "len": [],
+   "arg": [],
+   "depth": [],
+   "file": []
+  },
+  "top_cc": [
+   [
+    "ifps_ems_rt/diag.py",
+    "menu",
+    351,
+    20,
+    32,
+    5,
+    5
+   ],
+   [
+    "ifps_ems_rt/pointmap.py",
+    "validate",
+    40,
+    20,
+    21,
+    2,
+    3
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "step",
+    127,
+    20,
+    29,
+    0,
+    2
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "_compute_forecast",
+    319,
+    20,
+    43,
+    0,
+    4
+   ],
+   [
+    "ifps_ems_rt/diag.py",
+    "check_path",
+    91,
+    19,
+    28,
+    7,
+    3
+   ],
+   [
+    "ifps_ems_rt/hal.py",
+    "send",
+    99,
+    19,
+    30,
+    5,
+    3
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "select",
+    497,
+    18,
+    20,
+    5,
+    2
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "snapshot",
+    619,
+    16,
+    19,
+    0,
+    1
+   ]
+  ],
+  "top_len": [
+   [
+    "ifps_ems_rt/hmi/server.py",
+    "make_handler",
+    17,
+    1,
+    149,
+    1,
+    0
+   ],
+   [
+    "ifps_ems_rt/hmi/server.py",
+    "do_POST",
+    102,
+    1,
+    62,
+    0,
+    3
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "_compute_forecast",
+    319,
+    20,
+    43,
+    0,
+    4
+   ],
+   [
+    "ifps_ems_rt/hmi/__main__.py",
+    "main",
+    11,
+    12,
+    41,
+    1,
+    2
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "__init__",
+    191,
+    11,
+    39,
+    4,
+    2
+   ],
+   [
+    "ifps_ems_rt/simplant.py",
+    "start",
+    89,
+    3,
+    36,
+    3,
+    1
+   ],
+   [
+    "ifps_ems_rt/hmi/server.py",
+    "do_GET",
+    58,
+    1,
+    34,
+    0,
+    3
+   ],
+   [
+    "ifps_ems_rt/diag.py",
+    "menu",
+    351,
+    20,
+    32,
+    5,
+    5
+   ]
+  ],
+  "top_arg": [
+   [
+    "ifps_ems/dispatch.py",
+    "rule_action",
+    39,
+    13,
+    10,
+    8,
+    1
+   ],
+   [
+    "ifps_ems/dispatch.py",
+    "simulate",
+    141,
+    5,
+    10,
+    8,
+    1
+   ],
+   [
+    "ifps_ems/dispatch.py",
+    "stage_cost",
+    77,
+    5,
+    7,
+    8,
+    0
+   ],
+   [
+    "ifps_ems/dispatch.py",
+    "act",
+    124,
+    10,
+    15,
+    8,
+    2
+   ],
+   [
+    "ifps_ems_rt/diag.py",
+    "watch",
+    247,
+    12,
+    18,
+    8,
+    3
+   ],
+   [
+    "ifps_ems_rt/diag.py",
+    "check_path",
+    91,
+    19,
+    28,
+    7,
+    3
+   ],
+   [
+    "ifps_ems_rt/diag.py",
+    "command_test",
+    310,
+    8,
+    12,
+    7,
+    1
+   ],
+   [
+    "ifps_ems_rt/hal.py",
+    "__init__",
+    24,
+    6,
+    4,
+    7,
+    0
+   ]
+  ],
+  "top_depth": [
+   [
+    "ifps_ems_rt/diag.py",
+    "menu",
+    351,
+    20,
+    32,
+    5,
+    5
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "_sup_loop",
+    363,
+    5,
+    15,
+    0,
+    5
+   ],
+   [
+    "ifps_ems/dataio.py",
+    "gen_sample",
+    75,
+    8,
+    24,
+    5,
+    4
+   ],
+   [
+    "ifps_ems_rt/diag.py",
+    "print_result",
+    191,
+    10,
+    15,
+    3,
+    4
+   ],
+   [
+    "ifps_ems_rt/runtime.py",
+    "_read_parallel",
+    62,
+    8,
+    14,
+    0,
+    4
+   ],
+   [
+    "ifps_ems_rt/simplant.py",
+    "handle",
+    93,
+    1,
+    20,
+    0,
+    4
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "ack",
+    96,
+    6,
+    10,
+    2,
+    4
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "_compute_forecast",
+    319,
+    20,
+    43,
+    0,
+    4
+   ]
+  ],
+  "files": [
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    789
+   ],
+   [
+    "ifps_ems_rt/diag.py",
+    424
+   ],
+   [
+    "ifps_ems_rt/runtime.py",
+    201
+   ],
+   [
+    "ifps_ems_rt/hmi/server.py",
+    200
+   ],
+   [
+    "ifps_ems_rt/modbus.py",
+    183
+   ],
+   [
+    "ifps_ems/forecast.py",
+    157
+   ],
+   [
+    "ifps_ems/supervisor.py",
+    154
+   ],
+   [
+    "ifps_ems/dispatch.py",
+    151
+   ],
+   [
+    "ifps_ems_rt/simplant.py",
+    146
+   ],
+   [
+    "ifps_ems_rt/mbtool.py",
+    135
+   ],
+   [
+    "ifps_ems_rt/hal.py",
+    129
+   ],
+   [
+    "ifps_ems/security.py",
+    123
+   ],
+   [
+    "ifps_ems/dataio.py",
+    99
+   ],
+   [
+    "ifps_ems_rt/pointmap.py",
+    78
+   ],
+   [
+    "ifps_ems_rt/planlink.py",
+    59
+   ],
+   [
+    "ifps_ems/config.py",
+    56
+   ],
+   [
+    "ifps_ems_rt/hmi/__main__.py",
+    56
+   ],
+   [
+    "ifps_ems/__main__.py",
+    54
+   ],
+   [
+    "ifps_ems/models.py",
+    34
+   ],
+   [
+    "ifps_ems/solar.py",
+    31
+   ],
+   [
+    "ifps_ems_rt/hmi/pin.py",
+    10
+   ],
+   [
+    "ifps_ems/__init__.py",
+    9
+   ],
+   [
+    "ifps_ems_rt/__init__.py",
+    7
+   ],
+   [
+    "ifps_ems_rt/__main__.py",
+    3
+   ],
+   [
+    "ifps_ems_rt/hmi/__init__.py",
+    3
+   ]
+  ]
+ },
  "pyflakes": [],
  "bandit": {
   "totals": {
@@ -172,7 +842,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 2284,
+   "loc": 2931,
    "nosec": 0,
    "skipped_tests": 5
   },
@@ -184,83 +854,64 @@
    "MEDIUM",
    "ifps_ems_rt/hmi/__main__.py",
    34,
-   "Possible binding to all interfaces."
+   "Possible binding to all interfaces.",
+   "CWE-605"
   ],
   [
    "B310",
    "MEDIUM",
    "tools/fetch_ai_photos.py",
    18,
-   "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected."
+   "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.",
+   "CWE-22"
   ],
   [
    "B310",
    "MEDIUM",
    "tools/measure.py",
    14,
-   "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected."
+   "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.",
+   "CWE-22"
   ],
   [
    "B404",
    "LOW",
    "tools/static_report.py",
    5,
-   "Consider possible security implications associated with the subprocess module."
+   "Consider possible security implications associated with the subprocess module.",
+   "CWE-78"
   ],
   [
    "B603",
    "LOW",
    "tools/static_report.py",
-   11,
-   "subprocess call - check for execution of untrusted input."
+   13,
+   "subprocess call - check for execution of untrusted input.",
+   "CWE-78"
   ]
  ],
- "cc_avg": 4.96,
- "cc_n": 219,
+ "cc_avg": 5.05,
+ "cc_n": 295,
  "cc_rank": {
-  "A": 156,
-  "B": 40,
-  "C": 17,
-  "D": 5,
-  "E": 1,
+  "A": 197,
+  "B": 63,
+  "C": 35,
+  "D": 0,
+  "E": 0,
   "F": 0
  },
  "cc_top": [
   [
-   "ifps_ems_rt/simplant.py",
-   "tick",
-   38,
-   "E"
+   "ifps_ems_rt/pointmap.py",
+   "validate",
+   20,
+   "C"
   ],
   [
-   "ifps_ems_rt/mbtool.py",
-   "main",
-   28,
-   "D"
-  ],
-  [
-   "ifps_ems_rt/runtime.py",
-   "scan",
-   27,
-   "D"
-  ],
-  [
-   "ifps_ems_rt/hmi/engine.py",
-   "sim_action",
-   24,
-   "D"
-  ],
-  [
-   "ifps_ems_rt/hmi/engine.py",
-   "snapshot",
-   22,
-   "D"
-  ],
-  [
-   "ifps_ems_rt/hmi/engine.py",
-   "_post_scan",
-   21,
-   "D"
+   "ifps_ems_rt/diag.py",
+   "menu",
+   20,
+   "C"
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
@@ -275,15 +926,39 @@
    "C"
   ],
   [
-   "ifps_ems_rt/pointmap.py",
-   "validate",
+   "ifps_ems_rt/diag.py",
+   "check_path",
+   19,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/hal.py",
+   "send",
    19,
    "C"
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
-   "_auto_control",
-   19,
+   "select",
+   18,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   "snapshot",
+   16,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/diag.py",
+   "_judge",
+   15,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/runtime.py",
+   "__init__",
+   15,
    "C"
   ]
  ],
@@ -294,27 +969,42 @@
    "C"
   ],
   [
+   "ifps_ems_rt/diag.py",
+   2.3,
+   "C"
+  ],
+  [
    "ifps_ems_rt/runtime.py",
-   35.4,
+   30.0,
    "A"
   ],
   [
    "ifps_ems/forecast.py",
-   35.7,
+   35.4,
    "A"
   ],
   [
-   "ifps_ems/dataio.py",
-   38.7,
+   "ifps_ems_rt/modbus.py",
+   38.0,
    "A"
   ],
   [
    "ifps_ems_rt/simplant.py",
-   39.7,
+   38.4,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/server.py",
+   40.3,
    "A"
   ],
   [
    "ifps_ems/dispatch.py",
+   40.8,
+   "A"
+  ],
+  [
+   "ifps_ems/dataio.py",
    40.8,
    "A"
   ],
@@ -324,28 +1014,18 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/server.py",
-   42.0,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/modbus.py",
-   42.7,
-   "A"
-  ],
-  [
    "ifps_ems_rt/mbtool.py",
-   50.7,
+   45.0,
    "A"
   ],
   [
    "ifps_ems_rt/hal.py",
-   52.7,
+   48.6,
    "A"
   ],
   [
    "ifps_ems/security.py",
-   53.2,
+   50.8,
    "A"
   ],
   [
@@ -359,18 +1039,18 @@
    "A"
   ],
   [
+   "ifps_ems_rt/pointmap.py",
+   61.5,
+   "A"
+  ],
+  [
    "ifps_ems/solar.py",
    62.0,
    "A"
   ],
   [
-   "ifps_ems_rt/pointmap.py",
-   63.4,
-   "A"
-  ],
-  [
    "ifps_ems_rt/planlink.py",
-   68.6,
+   62.1,
    "A"
   ],
   [
@@ -410,24 +1090,24 @@
   ]
  ],
  "loc_py": {
-  "files": 24,
-  "sloc": 1984,
-  "comments": 229
+  "files": 25,
+  "sloc": 2520,
+  "comments": 304
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   527,
+   515,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/core.js",
-   193,
+   203,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/energy.js",
-   128,
+   123,
    true
   ],
   [
@@ -437,7 +1117,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/site.js",
-   221,
+   223,
    true
   ],
   [

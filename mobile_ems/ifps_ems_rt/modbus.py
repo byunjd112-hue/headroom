@@ -4,7 +4,7 @@
 지원 기능 코드: 01 코일 읽기, 02 접점 입력 읽기, 03 보유 레지스터 읽기, 04 입력 레지스터 읽기, 05 코일 쓰기, 06 레지스터 1개 쓰기, 16 레지스터 여러 개 쓰기.
 접속은 허용 목록(allow)에 있는 주소로만 한다. 이름 풀이(DNS)는 하지 않는다.
 """
-import ipaddress, socket, struct, threading, time
+import ipaddress, math, socket, struct, threading, time
 
 
 class ModbusError(Exception):
@@ -64,11 +64,15 @@ class Client:
                 if tr: tr("TX", frame, None)
                 self.sock.sendall(frame)
                 head = self._recv(7); tid, proto, length, unit = struct.unpack(">HHHB", head)
+                if proto != 0: raise ModbusError(f"응답 프로토콜 식별자 오류 {proto}")
                 if not 2 <= length <= 254: raise ModbusError(f"응답 길이 필드 오류 {length}")
                 body = self._recv(length - 1)
                 if tr: tr("RX", head + body, time.monotonic() - t0)
                 if tid != self.tid or unit != self.unit: raise ModbusError("응답 식별 번호 불일치")
-                if body[0] & 0x80: raise ModbusError(f"장치 예외 응답 {body[1]} ({EXC.get(body[1], '알 수 없음')})")
+                if body[0] & 0x80:
+                    code = body[1] if len(body) > 1 else 0
+                    raise ModbusError(f"장치 예외 응답 {code} ({EXC.get(code, '알 수 없음')})")
+                if body[0] != pdu[0]: raise ModbusError(f"응답 기능 코드 불일치 {body[0]} (요청 {pdu[0]})")
                 self.n_ok += 1; self.last_rtt = time.monotonic() - t0; self.t_last_ok = time.time()
                 return body
             except (OSError, struct.error, ModbusError, IndexError) as e:
@@ -76,14 +80,20 @@ class Client:
                 err = e if isinstance(e, ModbusError) else ModbusError(f"{type(e).__name__}: {e}")
                 self.last_err = str(err)
                 if tr: tr("ERR", str(err), time.monotonic() - t0)
-                raise err
+                raise err from e
 
     def read(self, addr, count, fc=3):
         """레지스터 count개를 읽어 16비트 값 목록으로 돌려준다."""
         if fc not in (3, 4) or not 1 <= count <= 125: raise ModbusError("읽기 인자 오류")
         body = self._request(struct.pack(">BHH", fc, addr, count))
-        if body[1] != 2 * count: raise ModbusError("응답 길이 불일치")
+        if len(body) != 2 + 2 * count or body[1] != 2 * count: return self._bad("응답 길이 불일치")
         return list(struct.unpack(f">{count}H", body[2:2 + 2 * count]))
+
+    def _bad(self, text):
+        """형식이 틀린 응답: 연결을 닫고(뒤따르는 잔여 바이트 버림) ModbusError 를 낸다."""
+        self.n_err += 1; self.last_err = text; self.close()
+        if self.trace: self.trace("ERR", text, None)
+        raise ModbusError(text)
 
     def write(self, addr, values, fc=None):
         """레지스터 쓰기. 값이 1개면 06, 여러 개면 16을 쓴다(fc=16이면 1개도 16으로)."""
@@ -95,7 +105,9 @@ class Client:
     def read_bits(self, addr, count, fc=1):
         """코일(01)·접점 입력(02) 읽기. 반환: 0/1 목록."""
         if fc not in (1, 2) or not 1 <= count <= 2000: raise ModbusError("읽기 인자 오류")
-        body = self._request(struct.pack(">BHH", fc, addr, count)); data = body[2:2 + body[1]]
+        body = self._request(struct.pack(">BHH", fc, addr, count))
+        if len(body) < 2 or len(body) != 2 + body[1] or body[1] < (count + 7) // 8: return self._bad("응답 길이 불일치")
+        data = body[2:2 + body[1]]
         return [(data[i // 8] >> (i % 8)) & 1 for i in range(count)]
 
     def write_coil(self, addr, on):
@@ -157,8 +169,11 @@ def decode(regs, typ, scale=1.0, order="ABCD"):
 def encode(value, typ, scale=1.0, order="ABCD"):
     if typ not in NREG: raise ModbusError(f"자료형 미지원: {typ}")
     n = NREG[typ]; f = _FMT[typ]
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value): raise ModbusError(f"쓰기 값이 유한한 수가 아님: {value!r}")
     raw = value if scale == 1 else value / scale
-    if f in "fd": b = struct.pack(">" + f, float(raw))
+    if f in "fd":
+        try: b = struct.pack(">" + f, float(raw))
+        except (OverflowError, struct.error): raise ModbusError(f"값 {value}이(가) {typ} 범위 밖") from None
     else:
         r = int(round(raw)); bits = 16 * n
         lo, hi = (-(1 << (bits - 1)), (1 << (bits - 1)) - 1) if f.islower() else (0, (1 << bits) - 1)

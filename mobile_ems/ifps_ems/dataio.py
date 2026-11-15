@@ -15,12 +15,29 @@ def _f(x, d=np.nan):
         return d
 
 
+def _ts(t):
+    try: return datetime.strptime(t, "%Y-%m-%d %H:%M")
+    except (TypeError, ValueError): return None
+
+
+def _regrid(rows, step_min=15, max_rows=2 * 365 * 96):
+    """15분 격자로 다시 놓는다. 예측 특징은 줄 간격(96줄 전 = 전일 동시각)을 쓰므로 정지·두절로 빠진 구간이 있으면 어긋난다.
+    빠진 칸은 빈 줄로 채우고(값은 load_csv 가 앞 값으로 메움), 같은 시각이 겹치면 뒤 것을 쓴다."""
+    if len(rows) < 2: return rows
+    by = {_ts(r["ts"]): r for r in rows}; t0, t1 = min(by), max(by); n = int((t1 - t0).total_seconds() // (60 * step_min)) + 1
+    if n == len(rows) or n > max_rows: return [by[k] for k in sorted(by)]
+    out = []
+    for i in range(n):
+        t = t0 + timedelta(minutes=step_min * i); out.append(by.get(t) or {"ts": t.strftime("%Y-%m-%d %H:%M")})
+    return out
+
+
 def load_csv(path, site):
     """history.csv를 읽어 배열 사전으로 돌려준다. 빈 값은 앞 값으로 채운다."""
     with open(path, encoding="utf-8-sig") as f:
-        rows = list(csv.DictReader(f))
+        rows = _regrid([r for r in csv.DictReader(f) if _ts(r.get("ts")) is not None])       # 끝이 잘린 줄 등 시각을 못 읽는 줄은 버린다
     n = len(rows); ts = [r["ts"] for r in rows]
-    dt = [datetime.strptime(t, "%Y-%m-%d %H:%M") for t in ts]
+    dt = [_ts(t) for t in ts]
     col = lambda k: np.array([_f(r.get(k)) for r in rows], dtype=float)
     d = {"n": n, "ts": ts, "doy": np.array([x.timetuple().tm_yday for x in dt], dtype=float),
          "hour": np.array([x.hour + x.minute / 60 for x in dt], dtype=float), "dow": np.array([x.weekday() for x in dt], dtype=int),

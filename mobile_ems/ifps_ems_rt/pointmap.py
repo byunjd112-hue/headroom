@@ -60,16 +60,18 @@ def validate(pts, devices=None):
     return bad
 
 
-def blocks(pts, device, gap=4, maxlen=100):
-    """한 장치의 읽기 점들을 연속 주소 묶음으로 나눈다(통신 횟수를 줄인다). 반환: [(fc, 시작 주소, 개수, [점])]"""
+def blocks(pts, device, gap=0, maxlen=100):
+    """한 장치의 읽기 점들을 연속 주소 묶음으로 나눈다(통신 횟수를 줄인다). 반환: [(fc, 시작 주소, 개수, [점])]
+    gap: 묶음 안에 허용하는 빈 주소 수. 기본 0 — 정의되지 않은 주소를 함께 읽으면 예외 02 로 묶음 전체를 거부하는 장비가 많다.
+    빈 주소에 0 을 돌려주는 장비는 runtime.json devices.<장비>.gap 을 키워 통신 횟수를 줄일 수 있다."""
     out = []
     for fc in (3, 4):
         ps = sorted([p for p in pts if p["device"] == device and p["fc"] == fc and p["rw"] == "r"], key=lambda p: p["addr"])
-        cur = None
+        n0 = len(out)
         for p in ps:
             end = p["addr"] + NREG[p["type"]]
-            if cur and p["addr"] - cur[2] <= gap and end - cur[1] <= maxlen:
-                cur[2] = end; cur[3].append(p)
+            if len(out) > n0 and p["addr"] - out[-1][2] <= gap and end - out[-1][1] <= maxlen:
+                out[-1][2] = end; out[-1][3].append(p)
             else:
-                cur = [fc, p["addr"], end, [p]]; out.append(cur)
+                out.append([fc, p["addr"], end, [p]])
     return [(fc, a, e - a, ps) for fc, a, e, ps in out]

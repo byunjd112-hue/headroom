@@ -28,50 +28,73 @@ def _canon(rec):
 
 
 class AuditLog:
-    def __init__(self, path, crypto):
-        self.path = path; self.c = crypto; self.lock = threading.Lock(); self.seq = 0; self.prev = GENESIS
-        if os.path.exists(path):
-            last = None
-            with open(path, encoding="utf-8") as f:
-                for line in f:
-                    if line.strip(): last = line
-            if last:
-                try:
-                    r = json.loads(last); self.seq = r["seq"]; self.prev = r["mac"]
-                except (ValueError, KeyError):
-                    pass
+    """연쇄 해시(HMAC) 감사 기록. 한 줄이 한 건이고 각 건은 앞 건의 MAC 을 품는다.
+
+    전원 차단 대비: 쓸 때마다 디스크에 내려 쓰고(fsync), 기동 때 끝이 잘린 줄은 <파일>.torn 으로 옮긴 뒤 마지막 온전한 건에서 잇는다.
+    크기 관리: max_bytes 를 넘으면 <파일>.<시각> 으로 넘기고 새 파일을 '이어쓰기' 건으로 시작한다(연쇄는 끊기지 않는다)."""
+    ROTATE = "이어쓰기"
+
+    def __init__(self, path, crypto, max_bytes=8 * 1024 * 1024):
+        self.path = path; self.c = crypto; self.lock = threading.Lock(); self.seq = 0; self.prev = GENESIS; self.max_bytes = max_bytes; self.torn = 0
+        if os.path.exists(path): self._recover()
+
+    def _recover(self):
+        with open(self.path, "rb") as f: raw = f.read()
+        cut = raw.rfind(b"\n") + 1
+        if cut < len(raw):                                             # 줄바꿈 없이 끝남 = 쓰는 도중 끊김
+            with open(self.path + ".torn", "ab") as f: f.write(raw[cut:] + b"\n")
+            with open(self.path, "r+b") as f: f.truncate(cut)
+            raw = raw[:cut]; self.torn = 1
+        for line in reversed(raw.splitlines()):
+            try:
+                r = json.loads(line.decode("utf-8")); self.seq = int(r["seq"]); self.prev = r["mac"]; return
+            except (ValueError, KeyError, TypeError):
+                continue
+
+    def _write(self, actor, kind, data):
+        rec = {"seq": self.seq + 1, "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "actor": actor, "kind": kind, "data": data, "prev": self.prev}
+        rec["mac"] = self.c.mac(_canon(rec))
+        with open(self.path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush(); os.fsync(f.fileno())
+        self.seq = rec["seq"]; self.prev = rec["mac"]
+        return rec
 
     def append(self, actor, kind, data):
         with self.lock:
-            rec = {"seq": self.seq + 1, "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "actor": actor, "kind": kind, "data": data, "prev": self.prev}
-            rec["mac"] = self.c.mac(_canon(rec))
-            with open(self.path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-            self.seq = rec["seq"]; self.prev = rec["mac"]
-            return rec
+            if self.max_bytes and os.path.exists(self.path) and os.path.getsize(self.path) >= self.max_bytes:
+                old = f"{self.path}.{time.strftime('%Y%m%d_%H%M%S')}_{self.seq}"; os.replace(self.path, old)
+                self._write("ems", self.ROTATE, {"from": os.path.basename(old), "last_seq": self.seq})
+            return self._write(actor, kind, data)
 
-    def tail(self, n=200):
+    def tail(self, n=200, span=512 * 1024):
+        """마지막 n건. 파일 끝 span 바이트만 읽는다(큰 파일에서도 빠르게)."""
         if not os.path.exists(self.path): return []
-        with open(self.path, encoding="utf-8") as f: lines = f.readlines()[-n:]
+        n = max(1, min(int(n), 2000))
+        with open(self.path, "rb") as f:
+            f.seek(0, os.SEEK_END); size = f.tell(); f.seek(max(0, size - span)); chunk = f.read()
+        lines = chunk.splitlines()
+        if size > span: lines = lines[1:]                               # 첫 줄은 중간부터일 수 있다
         out = []
-        for ln in lines:
-            try: out.append(json.loads(ln))
+        for ln in lines[-n:]:
+            try: out.append(json.loads(ln.decode("utf-8")))
             except ValueError: pass
         return out
 
     def verify(self):
-        """반환: (정상 여부, 설명)."""
+        """현재 파일의 연쇄를 검증한다. 반환: (정상 여부, 설명)."""
         if not os.path.exists(self.path): return True, "기록 없음"
+        with self.lock:
+            with open(self.path, encoding="utf-8") as f: lines = f.readlines()           # 읽기만 잠금 안에서, 검산은 밖에서
         prev, n = GENESIS, 0
-        with self.lock, open(self.path, encoding="utf-8") as f:
-            for i, line in enumerate(f, 1):
-                if not line.strip(): continue
-                try: r = json.loads(line)
-                except ValueError: return False, f"{i}행: 형식 오류"
-                if r.get("prev") != prev: return False, f"{i}행: 연쇄 끊김(앞 줄 삭제·변경 의심)"
-                if not self.c.check(_canon(r), r.get("mac", "")): return False, f"{i}행: MAC 불일치(변조 의심)"
-                prev = r["mac"]; n += 1
-        return True, f"{n}건 무결"
+        for i, line in enumerate(lines, 1):
+            if not line.strip(): continue
+            try: r = json.loads(line)
+            except ValueError: return False, f"{i}행: 형식 오류"
+            if n == 0 and r.get("kind") == self.ROTATE and r.get("prev") != GENESIS: prev = r.get("prev")     # 넘긴 파일에서 이어짐(이 건 자체의 MAC 은 아래에서 검증)
+            if r.get("prev") != prev: return False, f"{i}행: 연쇄 끊김(앞 줄 삭제·변경 의심)"
+            if not self.c.check(_canon(r), r.get("mac", "")): return False, f"{i}행: MAC 불일치(변조 의심)"
+            prev = r["mac"]; n += 1
+        return True, f"{n}건 무결" + (" (기동 시 잘린 끝줄 1건 격리: .torn)" if self.torn else "")
 
 
 LEGACY_DEV_KEY = b"dev-key-change-me-in-closed-net!!"

@@ -8,6 +8,7 @@
 | 핵심 프로그램 `ifps_ems` v0.6.0 | `ifps_ems/` | 부하·PV 24h 예측, 동적계획법 운전계획, N-1 예비력, 통신 감시·지령 판단, 연쇄 HMAC 감사 기록 (통신 모듈 없음) |
 | 실장치 연동 계층 `ifps_ems_rt` v0.1.0 | `ifps_ems_rt/` | Modbus TCP(이중 경로 A/B), 대응표, SBO 지령·응답 확인·대체 전원, 1초 실행기 |
 | 제어화면(HMI) + 디버그 도구 | `ifps_ems_rt/hmi/` | 웹 제어화면(브라우저), 경보 관리, 추세, 통신 진단, 레지스터 탐색기, 프레임 추적, 고장 주입 |
+| 현장 간편 진단 도구 | `ifps_ems_rt/diag.py`, `diag.bat`, `diag.sh` | 번호 차림표. 장비·경로별 7단계 자동 진단(원인·조치 안내, 순서·자료형·배율 추정), 실시간 감시, 주소 탐색, 지령 규약 시험, HTML 보고서 |
 | 현장 점검 CLI | `ifps_ems_rt/mbtool.py` | probe / read / watch / write / check |
 
 ## 빠른 시작
@@ -21,7 +22,8 @@ python -m ifps_ems gen-sample results/sample_site_data.csv         # (실측 이
 python -m ifps_ems train results/sample_site_data.csv results      # 예측 모델 학습
 python -m ifps_ems_rt.hmi config/runtime.json --sim --plan results --open   # 가상 장치
 python -m ifps_ems_rt.hmi config/runtime.json --plan results --open         # 실장치
-python -m unittest discover -s tests                               # 시험 28건
+python -m unittest discover -s tests                               # 시험 81건
+diag.bat --demo                                                    # 현장 진단 도구 연습(가상 장치) · 실장비는 diag.bat
 ```
 제어화면: http://127.0.0.1:8080 · 기본 PIN 운용자 `1111`, 엔지니어 `2222`(개발 모드 전용). 운용 모드(`run_mode: "운용"`)는 평문·기본 PIN, 외부 바인드, 가상 장치를 기동 단계에서 거부한다 — `python -m ifps_ems_rt.hmi.pin`으로 해시를 만들어 `pin_operator_hash`/`pin_engineer_hash`에 넣는다
 
@@ -44,10 +46,12 @@ python -m unittest discover -s tests                               # 시험 28�
 ## 시험·보안 문서
 ```
 python tools/measure.py docs/test_results.json --soak 300   # 동적 시험(요구 시간·부하·내구) 측정
-python tools/static_report.py                               # 단위시험+커버리지, pyflakes, bandit, radon
+python tools/static_report.py                               # 시험+문장·분기 실행률, pyflakes, pylint, bandit, 소스코드 메트릭
 node docs/build_test_report.js                              # → docs/out/…SW시험결과보고서_Rev00.docx
 node docs/build_security_review.js                          # → docs/out/…보안성검토결과_Rev00.docx
-node docs/build_interface_guide.js                          # → docs/out/…실장치통신연동방안서_Rev00.docx
+node docs/build_interface_guide.js Rev01                    # → docs/out/…실장치통신연동방안서_Rev01.docx
+node docs/build_reliability_report.js                       # → docs/out/…SW신뢰성시험결과서_Rev00.docx (정적·동적 신뢰성)
+node docs/build_device_guides.js                            # → docs/out/장치별/ 제작사 전달용 연동·디버깅 안내서 6부
 python -m ifps_ems_rt.hmi.pin                               # PIN 해시 생성(운용 모드 필수)
 ```
 
@@ -56,6 +60,13 @@ python -m ifps_ems_rt.hmi.pin                               # PIN 해시 생성(
 - 모든 로그인·지령·레지스터 쓰기·고장 주입을 연쇄 HMAC 감사 기록에 남김. 운용 모드는 검증필 암호모듈이 아니면 기동 거부
 - 전 장치·경로 병렬 수집: 응답 없는 장치가 있어도 주기 초과 없음. 지령 응답 대기는 별도 스레드라 수집을 막지 않음
 - systemd `Type=notify` + `WatchdogSec`: 수집·제어가 모두 살아 있을 때만 감시 신호 (`service/ifps-ems.service`)
+
+## Rev16 보완 요약
+- **독립 검토 2회**(통신·서버, 화면)로 찾은 결함 42건 보완. 주요: 생존 계수 정지 장비로 자동 지령이 나가던 문제, 감사 기록 쓰기 실패 시 주기 스레드 종료, 형식이 틀린 응답에 전 장비 수집 중단, NaN 값에 화면 정지, 로그인 없이 가능한 변경 경로, 탭 화면 잘림. 목록은 `docs/out/…SW신뢰성시험결과서` 7장
+- **실장비에 맞춘 통신**: 정의되지 않은 주소를 건너뛰는 묶음 읽기(`devices.<장비>.gap`), 순번·지령 한 프레임 쓰기, 수용(seq_ack)·완료(status) 분리와 장비별 완료 한도(`devices.<장비>.done_s`). 가상 장치도 없는 주소에 예외 02를 낸다
+- **실측 이력 8일 미만이면 실장치는 규칙 운전**(합성 자료 계획은 `--sim` 시연에서만)
+- 감사 기록: 쓸 때마다 디스크 반영, 잘린 끝줄 격리, 8MB에서 파일 넘김(연쇄 유지)
+- 시험 81건, 문장·분기 실행률과 소스코드 메트릭은 `python tools/static_report.py`
 
 ## 받은 패키지(Rev00) 대비 변경
 - 누락된 핵심 프로그램 `ifps_ems`를 로직 설명서(식·상수) 기준으로 구현 — 원래 시험 13건 그대로 통과
