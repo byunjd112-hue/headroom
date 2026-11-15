@@ -10,7 +10,7 @@ import argparse, os, sys, tempfile, time
 def verify():
     import numpy as np
     from . import __version__, supervisor as sv, dispatch as dp, security
-    from .config import Site, SUP
+    from .config import Site
     site = Site(); bad = []
     lm = sv.LinkMonitor(["X"]); lm.heartbeat("X", 0.0, "A"); lm.heartbeat("X", 0.0, "B"); lm.heartbeat("X", 3.0, "A")
     if lm.check(3.0).get("X") != sv.DEGRADED: bad.append("LinkMonitor 경로 저하 판정")

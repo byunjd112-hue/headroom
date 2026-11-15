@@ -25,6 +25,24 @@ ROLES = {"viewer": 0, "operator": 1, "engineer": 2}
 FLAG_TXT = {0: "정상", 1: "급변", 2: "고착", 3: "갱신 지연", 5: "범위 밖"}
 
 
+def pin_hash(pin, iters=200_000):
+    """PIN 저장 형식: pbkdf2_sha256$반복$솔트hex$해시hex"""
+    import hashlib
+    salt = secrets.token_bytes(16); dk = hashlib.pbkdf2_hmac("sha256", pin.encode(), salt, iters)
+    return f"pbkdf2_sha256${iters}${salt.hex()}${dk.hex()}"
+
+
+def pin_verify(pin, stored):
+    import hashlib
+    try:
+        alg, iters, salt, h = stored.split("$")
+        if alg != "pbkdf2_sha256": return False
+        dk = hashlib.pbkdf2_hmac("sha256", pin.encode(), bytes.fromhex(salt), int(iters))
+        return secrets.compare_digest(dk.hex(), h)
+    except (ValueError, TypeError):
+        return False
+
+
 def wall_iso(ts=None):
     return datetime.fromtimestamp(time.time() if ts is None else ts).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -132,8 +150,8 @@ class SimDriver:
     def loop(self):
         while self.run:
             try: self.step()
-            except Exception:
-                pass
+            except Exception as e:                      # 가상 장치 구동 실패는 기록만 하고 계속(시험용 기능)
+                self.err = f"{type(e).__name__}: {e}"
             time.sleep(1.0)
 
     def trip(self, f, code):
@@ -195,7 +213,7 @@ class Engine:
         self.trend = collections.deque(maxlen=4 * 3600); self.scan_ms = collections.deque(maxlen=600)
         self.trace = collections.deque(maxlen=3000); self.trace_n = 0; self.trace_on = True; self.trace_lock = threading.Lock()
         self.tokens = {}; self.selects = {}; self.last_decision = None; self._ev_i = 0; self.t_start = time.time(); self.fc_set_written = None
-        self.ack_info = {}
+        self.ack_info = {}; self.fail = {}                                      # 로그인 실패 {출처: [횟수, 잠금 해제 시각]}
         self.plan_dir = plan_dir; self.fc_cache = None; self.fc_lock = threading.Lock()
         self.energy = self._energy_zero(); self._t_en = None
         for n, lk in self.rt.links.items():
@@ -223,6 +241,7 @@ class Engine:
         self.running = True
         threading.Thread(target=self._scan_loop, name="scan", daemon=True).start()
         threading.Thread(target=self._exec_loop, name="exec", daemon=True).start()
+        threading.Thread(target=self._sup_loop, name="sup", daemon=True).start()
         self.forecast()                                                          # 예측·정밀도 사전 계산(백그라운드)
         if self.simdrv:
             self.simdrv.step(); threading.Thread(target=self.simdrv.loop, name="sim", daemon=True).start()
@@ -333,6 +352,21 @@ class Engine:
             with self.fc_lock: self.fc_cache = {"ok": False, "why": f"예측 계산 실패: {type(e).__name__}: {e}", "_t": time.time()}
         finally:
             self._fc_busy = False
+
+    def _sup_loop(self):
+        """통신 감시 주기(0.5초): 수집 주기(1초)와 별도로 두절·경로 저하를 판정한다. 감지 한도 = 두절 판정 2.0초 + 0.5초."""
+        per = float(self.cfg.get("sup_s", 0.5))
+        while self.running:
+            time.sleep(per)
+            try:
+                with self.lock:
+                    rt = self.rt; ch = rt.lm.check(rt.now())
+                    for n, st in ch.items():
+                        rt.note("통신", f"{n} 통신 {st}")
+                        if n in rt.dev: rt.dev[n].online = rt.lm.controllable(n)
+                        self.alarms.set(f"link.{n}", st == "두절", 1, n, f"{n} 통신 두절 — 지령 차단, 직전 유효값 유지")
+            except Exception as e:
+                self.rt.note("오류", f"감시 주기 예외: {type(e).__name__}: {e}")
 
     def _post_scan(self):
         rt = self.rt; v = rt.val; g = lambda k, d=0.0: v.get(k, d); s = rt.site
@@ -463,12 +497,40 @@ class Engine:
         self.jobs.put({"kind": "auto", "who": who}); self.rt.note("운전", "제어 주기 즉시 실행 요청", actor=who); return {"ok": True}
 
     # ── 인증
-    def login(self, pin, name="운용자"):
-        role = None
-        if secrets.compare_digest(str(pin), str(self.hcfg["pin_engineer"])): role = "engineer"
-        elif secrets.compare_digest(str(pin), str(self.hcfg["pin_operator"])): role = "operator"
+    LOCK_N, LOCK_S = 5, 300
+
+    def _pin_ok(self, pin, role):
+        h = self.hcfg.get(f"pin_{role}_hash")
+        if h: return pin_verify(str(pin), h)
+        return secrets.compare_digest(str(pin), str(self.hcfg.get(f"pin_{role}", "")))
+
+    def security_check(self):
+        """기동 전 보안 점검. 반환: (치명 목록, 경고 목록). 운용 모드에서 치명 항목이 있으면 기동 거부."""
+        bad, warn = [], []
+        op = self.cfg.get("run_mode", "개발") == "운용"
+        for r in ("operator", "engineer"):
+            if not self.hcfg.get(f"pin_{r}_hash"):
+                (bad if op else warn).append(f"{r} PIN이 평문 설정(hmi.pin_{r}) — python -m ifps_ems_rt.hmi.pin 으로 해시 생성 후 pin_{r}_hash 사용")
+            if str(self.hcfg.get(f"pin_{r}", "")) in ("1111", "2222", "0000", "1234"):
+                (bad if op else warn).append(f"{r} 기본 PIN 사용 중")
+        if str(self.hcfg.get("bind", "127.0.0.1")) not in ("127.0.0.1", "localhost", "::1"):
+            if op and not self.hcfg.get("allow_remote"): bad.append(f"원격 접속 주소({self.hcfg['bind']})는 운용 모드에서 hmi.allow_remote=true와 TLS 종단(역방향 프록시)이 있어야 함")
+            else: warn.append(f"제어화면이 {self.hcfg['bind']}에 열림 — HTTP 평문, 폐쇄망 내부 단말에서만 사용")
+        if self.rt.key_note: warn.append("감사 키: " + self.rt.key_note)
+        if self.sim and op: bad.append("운용 모드에서 가상 장치(--sim) 사용 불가")
+        return bad, warn
+
+    def login(self, pin, name="운용자", src="local"):
+        now = time.time(); f = self.fail.get(src, [0, 0])
+        if f[1] > now:
+            return {"ok": False, "why": f"로그인 잠금 — {int(f[1] - now)}초 후 다시 시도"}
+        role = "engineer" if self._pin_ok(pin, "engineer") else "operator" if self._pin_ok(pin, "operator") else None
         if role is None:
-            self.rt.note("보안", "로그인 실패(PIN 불일치)", actor=name); return {"ok": False, "why": "PIN 불일치"}
+            f[0] += 1
+            if f[0] >= self.LOCK_N: f = [0, now + self.LOCK_S]; self.rt.note("보안", f"로그인 {self.LOCK_N}회 실패 — {src} {self.LOCK_S}초 잠금", actor=name); self.alarms.event(2, "EMS", f"로그인 반복 실패 — {src} 잠금")
+            else: self.rt.note("보안", f"로그인 실패(PIN 불일치) {f[0]}/{self.LOCK_N}", actor=name)
+            self.fail[src] = f; return {"ok": False, "why": "PIN 불일치"}
+        self.fail.pop(src, None)
         tok = secrets.token_urlsafe(24); self.tokens[tok] = {"role": role, "name": name, "exp": time.time() + 60 * float(self.hcfg["session_min"])}
         self.rt.note("보안", f"로그인 ({role})", actor=name); return {"ok": True, "token": tok, "role": role, "name": name}
 

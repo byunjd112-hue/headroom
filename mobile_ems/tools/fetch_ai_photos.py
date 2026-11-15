@@ -14,6 +14,8 @@ os.makedirs(out, exist_ok=True)
 for name, f in FILES.items():
     dst = os.path.join(out, name + ".jpg")
     try:
-        urllib.request.urlretrieve(BASE + f + ".jpeg", dst); print(f"{name}.jpg  {os.path.getsize(dst) // 1024} KB")
+        if not BASE.startswith("https://"): raise ValueError("https 주소만 허용")
+        urllib.request.urlretrieve(BASE + f + ".jpeg", dst)  # nosec B310 — 고정 https 주소만 사용
+        print(f"{name}.jpg  {os.path.getsize(dst) // 1024} KB")
     except Exception as e:
         print(f"{name}: 실패 {e}")

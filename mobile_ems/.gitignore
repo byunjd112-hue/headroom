@@ -4,3 +4,4 @@ config/state/
 config/state_sim/
 results/
 *.zip
+*.key

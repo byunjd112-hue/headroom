@@ -5,7 +5,7 @@
   python -m ifps_ems_rt.hmi config/runtime.json                실장치 연동(runtime.json의 devices 주소로 접속)
   python -m ifps_ems_rt.hmi config/runtime.json --plan results 예측 기반 운전계획 사용(모델 폴더)
 """
-import argparse, os, signal, sys, threading, time, webbrowser
+import argparse, signal, sys, threading, webbrowser
 
 
 def main(argv=None):
@@ -21,12 +21,17 @@ def main(argv=None):
         eng = Engine(a.config, sim=a.sim, plan_dir=a.plan, days_since_deploy=a.days)
     except (ValueError, RuntimeError, OSError) as e:
         print(f"[기동 실패] {e}", file=sys.stderr); return 2
+    bad, warn = eng.security_check()
+    for w in warn: print(f"[보안 경고] {w}", file=sys.stderr)
+    if bad:
+        for b in bad: print(f"[보안 기동 거부] {b}", file=sys.stderr)
+        eng.stop(); return 4
     eng.start()
     try:
         httpd = serve(eng, a.bind, a.port)
     except OSError as e:
         print(f"[기동 실패] 웹 서버 포트 사용 불가: {e}", file=sys.stderr); eng.stop(); return 3
-    host, port = httpd.server_address[:2]; url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '') else host}:{port}/"
+    host, port = httpd.server_address[:2]; url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '') else host}:{port}/"  # nosec B104 — 표시용 주소 변환(바인드 아님)
     print("=" * 64)
     print(" IFPS 이동형 전력체계 EMS 제어화면")
     print(f"  모드      : {'가상 장치(SIM)' if a.sim else '실장치 연동'}   운전 방식 {eng.rt.mode}   {eng.cfg.get('run_mode', '개발')}")

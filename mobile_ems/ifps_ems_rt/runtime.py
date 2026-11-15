@@ -21,7 +21,7 @@ HIST_COLS = ["ts", "load_kw", "load_p1", "load_p2", "load_p3", "pv_kw", "temp", 
 
 
 class Runtime:
-    def __init__(self, cfg_path, clock=time.monotonic, wall=datetime.now, key=b"dev-key-change-me-in-closed-net!!"):
+    def __init__(self, cfg_path, clock=time.monotonic, wall=datetime.now, key=None):
         with open(cfg_path, encoding="utf-8") as f: self.cfg = json.load(f)
         base = os.path.dirname(os.path.abspath(cfg_path))
         self.pts = pm.load(os.path.join(base, self.cfg["pointmap"]))
@@ -37,6 +37,8 @@ class Runtime:
         self.lm = sv.LinkMonitor(list(self.links)); self.wd = sv.Watchdog(["수집", "제어"])
         self.val = {}; self.flag = {}; self.t_upd = {}; self.t0 = clock(); self.events = []; self.n_scan = 0; self.n_over = 0; self.max_scan_s = 0.0
         self.state_dir = os.path.join(base, self.cfg.get("state_dir", "state")); os.makedirs(self.state_dir, exist_ok=True)
+        self.key_note = ""
+        if key is None: key, self.key_note = security.load_or_create_key(self.state_dir)
         self.audit = security.AuditLog(os.path.join(self.state_dir, "audit.log"), security.CryptoProvider(key))
         self.policy = None                       # 운전계획 연결 지점: policy(값 사전, 시각) → (디젤, 연료전지, 수전해) 기동 여부. 없으면 규칙 운전
         self.t_ctl = -1e9; self.acc = []; self.slot = None; self.mode = self.cfg.get("mode", "island"); self.plan = int(self.cfg.get("plan", 1))

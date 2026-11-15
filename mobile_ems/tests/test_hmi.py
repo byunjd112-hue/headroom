@@ -141,6 +141,24 @@ class TestHmi(unittest.TestCase):
         self.assertTrue(any("배치 변경" in e["data"].get("text", "") for e in self.req("/api/audit?n=50")[1]["rows"]))
         self.assertTrue(self.req("/api/layout/reset", {}, op)[1]["ok"]); self.assertIsNone(self.req("/api/layout")[1]["items"])
 
+    def test_10_security_lockout_hash_and_gate(self):
+        from ifps_ems_rt.hmi.engine import pin_hash, pin_verify
+        h = pin_hash("482915"); self.assertTrue(pin_verify("482915", h)); self.assertFalse(pin_verify("482916", h)); self.assertNotIn("482915", h)
+        eng = self.eng; src = "10.9.9.9"
+        for _ in range(eng.LOCK_N): self.assertFalse(eng.login("0000", "공격", src)["ok"])
+        r = eng.login("4321", "운용", src); self.assertFalse(r["ok"]); self.assertIn("잠금", r["why"])          # 잠금 중에는 맞는 PIN도 거부
+        self.assertTrue(eng.login("4321", "운용", "10.9.9.8")["ok"])                                            # 다른 출처는 영향 없음
+        eng.fail.clear()
+        kp = os.path.join(eng.rt.state_dir, "audit.key"); self.assertTrue(os.path.exists(kp))
+        if os.name == "posix": self.assertEqual(os.stat(kp).st_mode & 0o777, 0o600)
+        bad, warn = eng.security_check(); self.assertEqual(bad, []); self.assertTrue(any("평문" in w for w in warn))   # 개발 모드: 경고만
+        eng.cfg["run_mode"] = "운용"
+        try:
+            bad, _ = eng.security_check(); self.assertTrue(any("평문" in b for b in bad)); self.assertTrue(any("가상 장치" in b for b in bad))
+        finally:
+            eng.cfg["run_mode"] = "개발"
+        with urllib.request.urlopen(self.base + "/", timeout=5) as f: self.assertIn("camera=()", f.headers["Permissions-Policy"])
+
 
 if __name__ == "__main__":
     unittest.main()

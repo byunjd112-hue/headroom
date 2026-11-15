@@ -74,6 +74,24 @@ class AuditLog:
         return True, f"{n}건 무결"
 
 
+LEGACY_DEV_KEY = b"dev-key-change-me-in-closed-net!!"
+
+
+def load_or_create_key(state_dir, env="IFPS_AUDIT_KEY"):
+    """감사 기록 HMAC 키. 우선순위: 환경변수(hex) → state/audit.key → 새로 생성(32바이트, 권한 600).
+    키 파일 없이 기존 audit.log만 있으면(이전 판) 연쇄 검증을 위해 이전 개발 키를 쓰고 사유를 돌려준다. 반환: (키, 비고)."""
+    if os.environ.get(env):
+        return bytes.fromhex(os.environ[env]), "환경변수 키"
+    kp = os.path.join(state_dir, "audit.key")
+    if os.path.exists(kp):
+        with open(kp, "rb") as f: return f.read(), ""
+    if os.path.exists(os.path.join(state_dir, "audit.log")):
+        return LEGACY_DEV_KEY, "이전 판 감사 기록 유지를 위해 개발 키 사용 — audit.log 보관 후 삭제하면 새 키 생성"
+    key = os.urandom(32); fd = os.open(kp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as f: f.write(key)
+    return key, "새 감사 키 생성"
+
+
 def crypto_gate(crypto, run_mode):
     """운용 모드에서 미검증 암호 모듈이면 기동을 거부한다. 반환: (허용, 사유)."""
     if run_mode == "운용" and not crypto.verified:

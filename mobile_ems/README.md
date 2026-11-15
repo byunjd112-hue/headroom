@@ -23,7 +23,7 @@ python -m ifps_ems_rt.hmi config/runtime.json --sim --plan results --open   # �
 python -m ifps_ems_rt.hmi config/runtime.json --plan results --open         # 실장치
 python -m unittest discover -s tests                               # 시험 28건
 ```
-제어화면: http://127.0.0.1:8080 · 기본 PIN 운용자 `1111`, 엔지니어 `2222` (**배치 전 runtime.json → hmi 에서 반드시 변경**)
+제어화면: http://127.0.0.1:8080 · 기본 PIN 운용자 `1111`, 엔지니어 `2222`(개발 모드 전용). 운용 모드(`run_mode: "운용"`)는 평문·기본 PIN, 외부 바인드, 가상 장치를 기동 단계에서 거부한다 — `python -m ifps_ems_rt.hmi.pin`으로 해시를 만들어 `pin_operator_hash`/`pin_engineer_hash`에 넣는다
 
 ## 제어화면
 - **개요**: 발광 헥사곤 단선 결선도와 실시간 전력 흐름 애니메이션, 수급·SOC 눈금 게이지·ESS 상태, 연료/수소 잔량과 운전 가능 시간, N-1 예비력, 자동 제어 상태
@@ -39,6 +39,15 @@ python -m unittest discover -s tests                               # 시험 28�
 - 기본: 자체 등각 벡터 일러스트(질감·그림자, 운전 상태에 따라 변화). 오프라인 동작
 - 실사: `ifps_ems_rt/hmi/static/photos/`에 `ess/pv/fc/dg/dist/ems/l1/l2/l3/barrack/fsu.jpg`를 두면 장비 카드에 사진을 쓰고 상태 표시를 겹친다.
   AI 생성 실사본은 인터넷 PC에서 `python tools/fetch_ai_photos.py`로 받아 폴더째 옮긴다. 실물 사진이 생기면 같은 이름으로 교체
+
+## 시험·보안 문서
+```
+python tools/measure.py docs/test_results.json --soak 300   # 동적 시험(요구 시간·부하·내구) 측정
+python tools/static_report.py                               # 단위시험+커버리지, pyflakes, bandit, radon
+node docs/build_test_report.js                              # → docs/out/…SW시험결과보고서_Rev00.docx
+node docs/build_security_review.js                          # → docs/out/…보안성검토결과_Rev00.docx
+python -m ifps_ems_rt.hmi.pin                               # PIN 해시 생성(운용 모드 필수)
+```
 
 ## 보안·신뢰성
 - 접속은 사설·루프백 주소의 허용 목록만(공인 주소·DNS 이름 거부), HMI 기본 바인드 127.0.0.1, CSP·토큰 권한(조회/운용자/엔지니어)

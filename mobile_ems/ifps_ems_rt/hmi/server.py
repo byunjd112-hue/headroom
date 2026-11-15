@@ -16,7 +16,7 @@ MAX_BODY = 64 * 1024
 
 def make_handler(eng):
     class H(BaseHTTPRequestHandler):
-        server_version = "IFPS-EMS-HMI"; sys_version = ""
+        server_version = "IFPS-EMS-HMI"; sys_version = ""; timeout = 15        # 느린 연결(slowloris) 차단
 
         def log_message(self, fmt, *a):            # 접속 기록은 감사 기록에만(지령 계열) 남긴다
             pass
@@ -29,6 +29,7 @@ def make_handler(eng):
             self.send_header("Content-Type", ctype); self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY"); self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()"); self.send_header("Cross-Origin-Opener-Policy", "same-origin")
             self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'")
             for k, v in (extra or {}).items(): self.send_header(k, v)
             self.end_headers(); self.wfile.write(body)
@@ -94,7 +95,7 @@ def make_handler(eng):
             p = urlparse(self.path).path
             try:
                 b = self._body()
-                if p == "/api/login": return self._send(200, eng.login(b.get("pin", ""), (b.get("name") or "운용자")[:24]))
+                if p == "/api/login": return self._send(200, eng.login(b.get("pin", ""), (b.get("name") or "운용자")[:24], self.client_address[0]))
                 if p == "/api/logout": return self._send(200, eng.logout(self.headers.get("X-EMS-Token")))
                 if p == "/api/select":
                     s = self._sess("operator")
@@ -167,6 +168,9 @@ def _jdefault(o):
 
 def serve(eng, bind=None, port=None):
     bind = bind or eng.hcfg["bind"]; port = int(port or eng.hcfg["port"])
-    httpd = ThreadingHTTPServer((bind, port), make_handler(eng)); httpd.daemon_threads = True
+    class Srv(ThreadingHTTPServer):
+        request_queue_size = 64                 # 기본 5: 동시 접속이 몰리면 SYN 재전송(1초) 지연이 생긴다
+        daemon_threads = True
+    httpd = Srv((bind, port), make_handler(eng))
     th = threading.Thread(target=httpd.serve_forever, kwargs={"poll_interval": 0.2}, daemon=True); th.start()
     return httpd

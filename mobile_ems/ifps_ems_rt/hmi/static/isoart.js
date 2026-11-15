@@ -15,9 +15,9 @@ class Iso {
       `<polyline points="${this.pts([[x, y + d, z + h], [x + w, y + d, z + h], [x + w, y, z + h]])}" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="${Math.max(.6, this.S * .04).toFixed(2)}"/>` : "");
   }
   _box(x, y, z, w, d, h, c = OD, extra = "") {
-    return this.poly([[x, y, z + h], [x + w, y, z + h], [x + w, y + d, z + h], [x, y + d, z + h]], c.t, extra) +
-      this.poly([[x, y + d, z], [x + w, y + d, z], [x + w, y + d, z + h], [x, y + d, z + h]], c.l, extra) +
-      this.poly([[x + w, y, z], [x + w, y + d, z], [x + w, y + d, z + h], [x + w, y, z + h]], c.r, extra);
+    const T = [[x, y, z + h], [x + w, y, z + h], [x + w, y + d, z + h], [x, y + d, z + h]], Lf = [[x, y + d, z], [x + w, y + d, z], [x + w, y + d, z + h], [x, y + d, z + h]], R = [[x + w, y, z], [x + w, y + d, z], [x + w, y + d, z + h], [x + w, y, z + h]];
+    const ov = (a, g) => `<polygon points="${this.pts(a)}" fill="url(#${this.id}${g})" stroke="none"/>`;
+    return this.poly(T, c.t, extra) + ov(T, "fT") + this.poly(Lf, c.l, extra) + ov(Lf, "fL") + this.poly(R, c.r, extra) + ov(R, "fR");
   }
   // 왼쪽 면(y=y0 평면, x 방향 폭 w, 높이 h): 원점=왼쪽 위, u→x, v↓
   faceL(x, y, z, h, inner) { const [X, Y] = this.p(x, y, z + h), S = this.S; return `<g transform="matrix(${(ISO_C * S).toFixed(3)},${(ISO_S * S).toFixed(3)},0,${S},${X.toFixed(1)},${Y.toFixed(1)})">${inner}</g>`; }
@@ -25,7 +25,7 @@ class Iso {
   faceR(x, y, z, d, h, inner) { const [X, Y] = this.p(x, y + d, z + h), S = this.S; return `<g transform="matrix(${(ISO_C * S).toFixed(3)},${(-ISO_S * S).toFixed(3)},0,${S},${X.toFixed(1)},${Y.toFixed(1)})">${inner}</g>`; }
   // 윗면(z=z0 평면): 원점=(x,y), u→x, v→y
   faceT(x, y, z, inner) { const [X, Y] = this.p(x, y, z), S = this.S; return `<g transform="matrix(${(ISO_C * S).toFixed(3)},${(ISO_S * S).toFixed(3)},${(-ISO_C * S).toFixed(3)},${(ISO_S * S).toFixed(3)},${X.toFixed(1)},${Y.toFixed(1)})">${inner}</g>`; }
-  shadow(x, y, w, d, op = .38) { return this.poly([[x - .2, y - .1, 0], [x + w + .5, y - .1, 0], [x + w + .5, y + d + .6, 0], [x - .2, y + d + .6, 0]], "#000", `opacity="${op}" filter="url(#${this.id}b)"`); }
+  shadow(x, y, w, d, op = .38) { return this.poly([[x - .6, y - .4, 0], [x + w + 1.4, y - .4, 0], [x + w + 1.4, y + d + 1.6, 0], [x - .6, y + d + 1.6, 0]], "#000", `stroke="none" opacity="${op * .45}" filter="url(#${this.id}b)"`) + this.poly([[x - .2, y - .1, 0], [x + w + .5, y - .1, 0], [x + w + .5, y + d + .6, 0], [x - .2, y + d + .6, 0]], "#000", `opacity="${op}" filter="url(#${this.id}b)"`); }
   defs() { return `<defs><filter id="${this.id}b" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${(this.S * .18).toFixed(1)}"/></filter>
     <linearGradient id="${this.id}sh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".10"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></linearGradient>
     <linearGradient id="${this.id}gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9fb7c9"/><stop offset=".45" stop-color="#2a3b4a"/><stop offset="1" stop-color="#16202a"/></linearGradient>
@@ -38,6 +38,11 @@ class Iso {
     <filter id="${this.id}tx" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="${(2.2 / this.S).toFixed(3)} ${(1.1 / this.S).toFixed(3)}" numOctaves="3" seed="7" result="n"/>
       <feColorMatrix in="n" type="saturate" values="0" result="g"/><feComposite in="SourceGraphic" in2="g" operator="arithmetic" k1=".62" k2=".72" k3="0" k4="-.02" result="m"/>
       <feComposite in="m" in2="SourceAlpha" operator="in" result="t"/><feDropShadow dx="0" dy="${(this.S * .08).toFixed(1)}" stdDeviation="${(this.S * .12).toFixed(1)}" flood-color="#000" flood-opacity=".45"/></filter>
+    <linearGradient id="${this.id}fT" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e8f0ff" stop-opacity=".16"/><stop offset=".6" stop-color="#fff" stop-opacity=".03"/><stop offset="1" stop-color="#000" stop-opacity=".08"/></linearGradient>
+    <linearGradient id="${this.id}fL" x1="0" y1="0" x2=".25" y2="1"><stop offset="0" stop-color="#fff4dc" stop-opacity=".12"/><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></linearGradient>
+    <linearGradient id="${this.id}fR" x1="1" y1="0" x2=".7" y2="1"><stop offset="0" stop-color="#9fb4ff" stop-opacity=".07"/><stop offset=".5" stop-color="#000" stop-opacity=".05"/><stop offset="1" stop-color="#000" stop-opacity=".34"/></linearGradient>
+    <linearGradient id="${this.id}gs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".42" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".38"/><stop offset=".58" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="${this.id}tire" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#3a3d33"/><stop offset=".7" stop-color="#17190f"/><stop offset="1" stop-color="#0b0c08"/></radialGradient>
     <radialGradient id="${this.id}lamp"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="currentColor"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></radialGradient></defs>`;
   }
 }
@@ -61,18 +66,21 @@ function isoTruck(I, x, y, L, cargo, o = {}) {
   const Wd = 2.5, cabL = 2.3; let s = I.shadow(x, y, L, Wd);
   s += I.box(x + .2, y + .25, .7, L - .3, Wd - .5, .38, { t: OD.dk, l: OD.ln, r: OD.ln });
   const axles = o.axles || [1.2, 2.55, L - 2.6, L - 1.25];
-  s += I.faceL(x, y + Wd - .1, 0, 1.2, axles.map(u => `<circle cx="${u}" cy=".62" r=".6" fill="${OD.tire}"/><circle cx="${u}" cy=".62" r=".34" fill="${OD.rim}"/><circle cx="${u}" cy=".62" r=".12" fill="#2a2e22"/>
+  s += I.faceL(x, y + Wd - .1, 0, 1.2, axles.map(u => `<circle cx="${u}" cy=".62" r=".6" fill="url(#${I.id}tire)"/><circle cx="${u}" cy=".62" r=".56" fill="none" stroke="#000" stroke-width=".07" stroke-dasharray=".07 .06" opacity=".7"/>
+    <circle cx="${u}" cy=".62" r=".34" fill="${OD.rim}"/><circle cx="${u}" cy=".62" r=".34" fill="url(#${I.id}fT)"/>${[0, 72, 144, 216, 288].map(a => `<circle cx="${(u + .22 * Math.cos(a * Math.PI / 180)).toFixed(3)}" cy="${(.62 + .22 * Math.sin(a * Math.PI / 180)).toFixed(3)}" r=".035" fill="#23271a"/>`).join("")}<circle cx="${u}" cy=".62" r=".12" fill="#2a2e22"/>
     <path d="M${u - .6} .62 a.6 .6 0 0 1 1.2 0" fill="none" stroke="#000" stroke-opacity=".5" stroke-width=".05"/>`).join("") +
     `<rect x="${L - cabL - .35}" y=".05" width="1.0" height=".14" fill="${OD.dk}"/><rect x=".1" y=".05" width="1.2" height=".14" fill="${OD.dk}"/>`);
   s += cargo(I, x + .15, 1.08, L - cabL - .35);
   const cx = x + L - cabL; s += I.box(cx, y + .12, .95, cabL, Wd - .24, 2.15, { t: OD.t, l: OD.l, r: OD.r });
   s += I.box(cx + .1, y + .2, 3.1, cabL - .5, Wd - .4, .12, { t: OD.hi, l: OD.l, r: OD.r });
-  s += I.faceL(cx, y + Wd - .12, .95, 2.15, `<rect width="${cabL}" height="2.15" fill="url(#${I.id}camo)" opacity=".4"/><rect x=".95" y=".22" width="1.15" height=".72" rx=".06" fill="url(#${I.id}gl)"/><rect x=".5" y=".2" width=".05" height="1.75" fill="#000" opacity=".35"/>
+  s += I.faceL(cx, y + Wd - .12, .95, 2.15, `<rect width="${cabL}" height="2.15" fill="url(#${I.id}camo)" opacity=".4"/><rect x=".95" y=".22" width="1.15" height=".72" rx=".06" fill="url(#${I.id}gl)"/><rect x=".95" y=".22" width="1.15" height=".72" rx=".06" fill="url(#${I.id}gs)"/><rect x=".5" y=".2" width=".05" height="1.75" fill="#000" opacity=".35"/>
     <rect x=".7" y="1.15" width=".35" height=".06" fill="#1a1d14"/><rect x=".15" y="1.45" width="1.9" height=".08" fill="#000" opacity=".25"/>`);
-  s += I.faceR(cx + cabL, y + .12, .95, Wd - .24, 2.15, `<rect x=".12" y=".2" width="${Wd - .48}" height=".78" rx=".05" fill="url(#${I.id}gl)"/><rect x="${(Wd - .24) / 2 - .02}" y=".2" width=".04" height=".78" fill="${OD.r}"/>
+  s += I.faceR(cx + cabL, y + .12, .95, Wd - .24, 2.15, `<rect x=".12" y=".2" width="${Wd - .48}" height=".78" rx=".05" fill="url(#${I.id}gl)"/><rect x=".12" y=".2" width="${Wd - .48}" height=".78" rx=".05" fill="url(#${I.id}gs)"/>
+    <rect x="-.12" y=".3" width=".1" height=".35" fill="#1b1e15"/><rect x="${Wd - .26}" y=".3" width=".1" height=".35" fill="#1b1e15"/><rect x="${(Wd - .24) / 2 - .02}" y=".2" width=".04" height=".78" fill="${OD.r}"/>
     <rect x=".12" y="1.15" width="${Wd - .48}" height=".5" fill="#2a2f20"/>${[0, 1, 2, 3, 4, 5].map(i => `<rect x="${.25 + i * .32}" y="1.2" width=".18" height=".4" fill="#151810"/>`).join("")}
     <rect x=".1" y="1.75" width=".35" height=".22" rx=".04" fill="#f3e7b0" opacity="${o.lights ? .95 : .55}"/><rect x="${Wd - .69}" y="1.75" width=".35" height=".22" rx=".04" fill="#f3e7b0" opacity="${o.lights ? .95 : .55}"/>`);
   s += I.box(cx + cabL, y + .05, .55, .25, Wd - .1, .35, { t: OD.dk, l: OD.ln, r: "#1c1f15" });
+  { const [ax, ay] = I.p(cx + .35, y + .4, 3.22); s += `<line x1="${ax}" y1="${ay}" x2="${ax - I.S * .25}" y2="${ay - I.S * 1.6}" stroke="#2b2f22" stroke-width="${Math.max(1, I.S * .05)}"/>`; }
   return s;
 }
 function lamp(I, x, y, z, color, on) { const [X, Y] = I.p(x, y, z); return `<g style="color:${color}"><circle cx="${X}" cy="${Y}" r="${Math.min(14, I.S * .4)}" fill="url(#${I.id}lamp)" opacity="${on ? .9 : .25}" class="${on ? "eqpulse" : ""}"/><circle cx="${X}" cy="${Y}" r="${Math.min(3.5, I.S * .1)}" fill="${color}"/></g>`; }

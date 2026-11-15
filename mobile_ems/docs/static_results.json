@@ -1,0 +1,449 @@
+{
+ "date": "2026-11-15 01:34",
+ "unittest_s": 24.7,
+ "tests": [
+  "test_h2_limit_blocks_fuel_cell | ok",
+  "test_plan_is_finite_and_avoids_silent_hours | ok",
+  "test_rule_and_reserve | ok",
+  "test_accuracy_on_sample_site | ok",
+  "test_audit_detects_tampering | ok",
+  "test_commander_checks | ok",
+  "test_link_monitor_sequence | ok",
+  "test_redundancy_needs_both_paths_lost | ok",
+  "test_sync_and_watchdog | ok",
+  "test_10_security_lockout_hash_and_gate | ok",
+  "test_1_static_and_snapshot | ok",
+  "test_2_auth_and_roles | ok",
+  "test_3_sbo_command_with_ack | ok",
+  "test_4_fault_injection_alarms_and_parallel_scan | ok",
+  "test_5_register_explorer_and_audit | ok",
+  "test_6_auto_control_runs | ok",
+  "test_7_forecast_accuracy_and_energy | ok",
+  "test_8_breaker_trip_shown_and_deenergizes_feeder | ok",
+  "test_9_layout_edit_persist_and_validate | ok",
+  "test_allowlist_rejects_outside_addresses | ok",
+  "test_pointmap_validation | ok",
+  "test_roundtrip_and_types | ok",
+  "test_plan_policy_decides_from_history_and_falls_back | ok",
+  "test_command_ack | ok",
+  "test_manual_mode_blocks_command | ok",
+  "test_no_ack_falls_back_to_alternate_source | ok",
+  "test_one_path_down_keeps_control_both_down_blocks | ok",
+  "test_range_check_keeps_last_good_value | ok",
+  "test_reserve_rule_starts_fuel_cell | ok",
+  "test_run_loop_and_audit | ok",
+  "test_scan_reads_values_within_period | ok",
+  "test_unverified_crypto_refused_in_operation_mode | ok"
+ ],
+ "n_tests": 32,
+ "tests_ok": true,
+ "coverage_pct": 80.9,
+ "coverage_files": [
+  [
+   "ifps_ems_rt/__main__.py",
+   0.0,
+   2
+  ],
+  [
+   "ifps_ems_rt/hmi/__main__.py",
+   0.0,
+   43
+  ],
+  [
+   "ifps_ems_rt/hmi/pin.py",
+   0.0,
+   6
+  ],
+  [
+   "ifps_ems_rt/mbtool.py",
+   0.0,
+   66
+  ],
+  [
+   "ifps_ems/__main__.py",
+   9.8,
+   41
+  ],
+  [
+   "ifps_ems/dataio.py",
+   55.0,
+   60
+  ],
+  [
+   "ifps_ems/models.py",
+   56.5,
+   23
+  ],
+  [
+   "ifps_ems/forecast.py",
+   73.4,
+   109
+  ],
+  [
+   "ifps_ems_rt/hmi/server.py",
+   81.5,
+   151
+  ],
+  [
+   "ifps_ems/supervisor.py",
+   88.4,
+   95
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   89.5,
+   599
+  ],
+  [
+   "ifps_ems_rt/runtime.py",
+   89.9,
+   139
+  ],
+  [
+   "ifps_ems/security.py",
+   91.5,
+   71
+  ],
+  [
+   "ifps_ems/dispatch.py",
+   92.9,
+   112
+  ],
+  [
+   "ifps_ems_rt/modbus.py",
+   93.4,
+   91
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   96.7,
+   90
+  ],
+  [
+   "ifps_ems/config.py",
+   96.9,
+   32
+  ],
+  [
+   "ifps_ems_rt/hal.py",
+   97.3,
+   74
+  ],
+  [
+   "ifps_ems/__init__.py",
+   100.0,
+   1
+  ],
+  [
+   "ifps_ems/solar.py",
+   100.0,
+   19
+  ],
+  [
+   "ifps_ems_rt/__init__.py",
+   100.0,
+   1
+  ],
+  [
+   "ifps_ems_rt/hmi/__init__.py",
+   100.0,
+   0
+  ],
+  [
+   "ifps_ems_rt/planlink.py",
+   100.0,
+   33
+  ],
+  [
+   "ifps_ems_rt/pointmap.py",
+   100.0,
+   40
+  ]
+ ],
+ "pyflakes": [],
+ "bandit": {
+  "totals": {
+   "CONFIDENCE.HIGH": 0,
+   "CONFIDENCE.LOW": 0,
+   "CONFIDENCE.MEDIUM": 0,
+   "CONFIDENCE.UNDEFINED": 0,
+   "SEVERITY.HIGH": 0,
+   "SEVERITY.LOW": 0,
+   "SEVERITY.MEDIUM": 0,
+   "SEVERITY.UNDEFINED": 0,
+   "loc": 2266,
+   "nosec": 0,
+   "skipped_tests": 5
+  },
+  "results": []
+ },
+ "bandit_nosec": [
+  [
+   "B104",
+   "MEDIUM",
+   "ifps_ems_rt/hmi/__main__.py",
+   34,
+   "Possible binding to all interfaces."
+  ],
+  [
+   "B310",
+   "MEDIUM",
+   "tools/fetch_ai_photos.py",
+   18,
+   "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected."
+  ],
+  [
+   "B310",
+   "MEDIUM",
+   "tools/measure.py",
+   14,
+   "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected."
+  ],
+  [
+   "B404",
+   "LOW",
+   "tools/static_report.py",
+   5,
+   "Consider possible security implications associated with the subprocess module."
+  ],
+  [
+   "B603",
+   "LOW",
+   "tools/static_report.py",
+   11,
+   "subprocess call - check for execution of untrusted input."
+  ]
+ ],
+ "cc_avg": 4.87,
+ "cc_n": 219,
+ "cc_rank": {
+  "A": 156,
+  "B": 40,
+  "C": 17,
+  "D": 6,
+  "E": 0,
+  "F": 0
+ },
+ "cc_top": [
+  [
+   "ifps_ems_rt/simplant.py",
+   "tick",
+   30,
+   "D"
+  ],
+  [
+   "ifps_ems_rt/mbtool.py",
+   "main",
+   28,
+   "D"
+  ],
+  [
+   "ifps_ems_rt/runtime.py",
+   "scan",
+   27,
+   "D"
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   "sim_action",
+   24,
+   "D"
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   "snapshot",
+   22,
+   "D"
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   "_post_scan",
+   21,
+   "D"
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   "_compute_forecast",
+   20,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/pointmap.py",
+   "validate",
+   19,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   "_auto_control",
+   18,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/hal.py",
+   "send",
+   15,
+   "C"
+  ]
+ ],
+ "mi": [
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   0.0,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/runtime.py",
+   35.4,
+   "A"
+  ],
+  [
+   "ifps_ems/forecast.py",
+   35.7,
+   "A"
+  ],
+  [
+   "ifps_ems/dataio.py",
+   38.7,
+   "A"
+  ],
+  [
+   "ifps_ems/dispatch.py",
+   40.8,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   41.1,
+   "A"
+  ],
+  [
+   "ifps_ems/supervisor.py",
+   41.5,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/server.py",
+   42.0,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/modbus.py",
+   42.7,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/mbtool.py",
+   50.7,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hal.py",
+   52.7,
+   "A"
+  ],
+  [
+   "ifps_ems/security.py",
+   53.2,
+   "A"
+  ],
+  [
+   "ifps_ems/__main__.py",
+   60.8,
+   "A"
+  ],
+  [
+   "ifps_ems/models.py",
+   60.8,
+   "A"
+  ],
+  [
+   "ifps_ems/solar.py",
+   62.0,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/pointmap.py",
+   63.4,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/planlink.py",
+   68.6,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/__main__.py",
+   68.7,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/pin.py",
+   88.1,
+   "A"
+  ],
+  [
+   "ifps_ems/config.py",
+   100.0,
+   "A"
+  ],
+  [
+   "ifps_ems/__init__.py",
+   100.0,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/__init__.py",
+   100.0,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/__main__.py",
+   100.0,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/__init__.py",
+   100.0,
+   "A"
+  ]
+ ],
+ "loc_py": {
+  "files": 24,
+  "sloc": 1966,
+  "comments": 225
+ },
+ "js": [
+  [
+   "ifps_ems_rt/hmi/static/app.js",
+   477,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/core.js",
+   193,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/energy.js",
+   128,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/isoart.js",
+   205,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/site.js",
+   208,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/sld.js",
+   144,
+   true
+  ]
+ ],
+ "inline_handlers": 0
+}

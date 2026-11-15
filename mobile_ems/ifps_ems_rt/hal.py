@@ -95,6 +95,9 @@ class RtCommander(sv.Commander):
                 time.sleep(self.poll_s)
             if not sent: time.sleep(max(0.0, t_end - self.clock()))
             self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} {cmd} 무응답({SUP['ack_s']:.1f}초)"})
+        # 응답 없이 끝난 지령은 취소(cmd=0)해 둔다. 남겨 두면 장치가 늦게 회복될 때 잔류 지령이 뒤늦게 실행된다
+        cancelled = self.links[did].write(f"{did}.cmd", 0)
+        self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} {cmd} 지령 취소(cmd=0) {'완료' if cancelled else '실패 — 현장 확인 필요'}"})
         for alt in self.fallback.get(did, []) if _depth == 0 else []:
             self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} 지령 실패 → 대체 전원 {alt} 지령, 경보"})
             ok, _ = self.send(alt, cmd, _depth=1)

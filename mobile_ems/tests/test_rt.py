@@ -67,6 +67,8 @@ class TestRuntime(Base):
         self.plant.no_ack.add("DG"); self.rt.scan(); ok, dt = self.rt.cmd.send("DG", "start")
         self.assertTrue(ok); self.assertEqual(int(self.plant.get("FC.status")), 1); self.assertEqual(int(self.plant.get("DG.status")), 0)
         self.assertLess(dt, 5.0)                                                                           # 대체 전원 지령 완료 5초 이내
+        self.assertEqual(int(self.plant.get("DG.cmd")), 0)                                                 # 실패한 지령은 취소(cmd=0)
+        self.plant.no_ack.discard("DG"); time.sleep(0.6); self.assertEqual(int(self.plant.get("DG.status")), 0)   # 장치가 회복돼도 잔류 지령이 실행되지 않음
 
     def test_manual_mode_blocks_command(self):
         self.plant.set("DG.mode", 1); self.rt.scan()

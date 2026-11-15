@@ -6,7 +6,7 @@
 비용: 모든 항을 디젤 연료 L로 환산해 더한다.
 """
 import numpy as np
-from .config import HORIZON, DT_H
+from .config import DT_H
 
 SHED_COST = (100.0, 5.0, 0.5)      # 1·2·3등급 부하 차단 벌점(L/kWh)
 START_L = 1.5                      # 디젤 기동 손실(L/회)
