@@ -19,7 +19,7 @@ function renderHeader() {
     `<span class="chip ${s.run_mode === "운용" ? "ok" : "warn"}"><span class="dot"></span>${s.run_mode === "운용" ? (S.lang === "ko" ? "운용" : "OPERATIONAL") : (S.lang === "ko" ? "개발 모드" : "DEV MODE")}</span>`,
     s.sim ? `<span class="chip sim"><span class="dot"></span>SIM</span>` : "",
   ].join("");
-  const c = s.alarm_cnt; $("#almsum").innerHTML = [1, 2, 3, 4].map(p => { const n = c[p].unack, a = c[p].act; return `<div class="pc p${p} ${n || a ? "on" : ""} ${n && p <= 2 ? "blink" : ""}" title="${prioTxt(p)} — 미확인 ${n} / 발생 ${a}" onclick="location.hash='#alarms'">${n || a || 0}</div>`; }).join("");
+  const c = s.alarm_cnt; $("#almsum").innerHTML = [1, 2, 3, 4].map(p => { const n = c[p].unack, a = c[p].act; return `<div class="pc p${p} ${n || a ? "on" : ""} ${n && p <= 2 ? "blink" : ""}" title="${prioTxt(p)} — 미확인 ${n} / 발생 ${a}" data-act="goalm">${n || a || 0}</div>`; }).join("");
   const unack = s.alarms.filter(a => !a.acked); const nb = $("#nb-alm"); nb.hidden = !unack.length; nb.textContent = unack.length;
   const top = unack[0] || s.alarms[0];
   $("#topalm").innerHTML = top ? `<span class="pr p${top.prio}">${top.prio}</span><span class="mono muted">${F.time(top.t_on)}</span><span class="muted">${esc(top.src)}</span><span class="txt">${esc(top.text)}</span>${top.state === "RTN" ? `<span class="pill">복귀</span>` : ""}` : `<span class="okc">● ${S.lang === "ko" ? "발생 경보 없음" : "No active alarms"}</span>`;
@@ -28,8 +28,8 @@ function renderHeader() {
 }
 function renderUser() {
   const u = $("#user");
-  u.innerHTML = S.me.role === "viewer" ? `<button class="btn" onclick="loginDialog()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>${t("btn.login", "로그인")}</button>`
-    : `<span class="pill ${S.me.role === "engineer" ? "eng" : "ok"}">${S.me.role === "engineer" ? "ENGINEER" : "OPERATOR"}</span><span>${esc(S.me.name)}</span><button class="btn sm ghost" onclick="logout()">${t("btn.logout", "로그아웃")}</button>`;
+  u.innerHTML = S.me.role === "viewer" ? `<button class="btn" data-act="login"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>${t("btn.login", "로그인")}</button>`
+    : `<span class="pill ${S.me.role === "engineer" ? "eng" : "ok"}">${S.me.role === "engineer" ? "ENGINEER" : "OPERATOR"}</span><span>${esc(S.me.name)}</span><button class="btn sm ghost" data-act="logout">${t("btn.logout", "로그아웃")}</button>`;
 }
 setInterval(() => { const d = new Date(); $("#clk").textContent = d.toTimeString().slice(0, 8); $("#dtg").textContent = "DTG " + F.dtg(d); }, 250);
 async function ack(ids) { if (!can("operator")) return loginDialog(); const r = await api("/api/ack", { ids }); if (r.ok) toast(`경보 ${r.n}건 확인`, "ok"); poll(); }
@@ -86,7 +86,7 @@ const P_OV = {
     </div>
     <div class="grid ov">
       <div class="grid" style="align-content:start">
-        <div class="panel"><div class="hd"><h3>작전지 전개 현황</h3><span class="sub">배치도 위 실시간 상태 · 장비를 누르면 설비 제어로 이동</span><div class="spacer"></div><span class="pill" id="siteSum">—</span></div>
+        <div class="panel"><div class="hd"><h3>작전지 전개 현황</h3><span class="sub" id="layCnt"></span><div class="spacer"></div><span class="pill" id="siteSum">—</span><button class="btn sm" id="layEditBtn" data-act="layedit">배치 편집</button></div>
           <div class="bd" style="padding:8px 12px 12px">${siteHtml()}</div></div>
         <div class="panel"><div class="hd"><h3>${t("ov.sld", "단선 결선도 · 실시간 전력 흐름")}</h3><span class="sub mono" id="busbal"></span><div class="spacer"></div><div class="legend sldleg"><span><i class="l on"></i>통전</span><span><i class="l off"></i>무전압</span><span><i class="l flt"></i>고장</span><span><i class="c closed"></i>투입</span><span><i class="c open"></i>개방</span><span><i class="c trip"></i>트립</span></div></div>
           <div class="bd" style="padding:6px 10px 10px">${sldSvg()}</div></div>

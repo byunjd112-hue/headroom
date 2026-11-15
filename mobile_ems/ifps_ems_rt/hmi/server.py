@@ -64,6 +64,7 @@ def make_handler(eng):
                 if p == "/api/info": return self._send(200, eng.runtime_info())
                 if p == "/api/forecast": return self._send(200, {k: v for k, v in eng.forecast(q.get("force") == "1").items() if not k.startswith("_")})
                 if p == "/api/energy": return self._send(200, eng.energy_hours())
+                if p == "/api/layout": return self._send(200, eng.layout())
                 if p == "/api/mb/read":
                     if self._sess("operator") is None: return
                     return self._send(200, eng.mb_read(q))
@@ -128,6 +129,14 @@ def make_handler(eng):
                 if p == "/api/mb/write":
                     s = self._sess("engineer")
                     if s: self._send(200, eng.mb_write(b, s["name"]))
+                    return
+                if p == "/api/layout":
+                    s = self._sess("operator")
+                    if s: self._send(200, eng.save_layout(b, s["name"]))
+                    return
+                if p == "/api/layout/reset":
+                    s = self._sess("operator")
+                    if s: self._send(200, eng.reset_layout(s["name"]))
                     return
                 if p == "/api/sim":
                     s = self._sess("engineer")

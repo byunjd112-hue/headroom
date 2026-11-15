@@ -619,6 +619,47 @@ class Engine:
         self.rt.note("시뮬레이터", f"고장 주입 {a} {tgt or q.get('tag') or q.get('name') or ''} {q.get('on', '')}".strip(), actor=who)
         return {"ok": True, "sim": self.sim_state()}
 
+    # ── 작전지 배치(운용자 편집): state/layout.json. 장비 대수·막사 수량·위치·연결 급전선
+    LAYOUT_KINDS = {"DG", "ESS", "PV", "FC", "DIST", "EMS", "FSU", "L1", "L2", "L3", "BARRACK"}
+    LAYOUT_BINDS = {"", "G1", "ESS", "PV", "FC", "DIST", "EMS", "L1", "L2", "L3"}
+
+    def layout(self):
+        pth = os.path.join(self.rt.state_dir, "layout.json")
+        if os.path.exists(pth):
+            try:
+                with open(pth, encoding="utf-8") as f: return json.load(f)
+            except (OSError, ValueError):
+                pass
+        return {"rev": 0, "items": None}                                       # None → 화면 기본 배치
+
+    def save_layout(self, lay, who):
+        items = lay.get("items")
+        if not isinstance(items, list) or not 1 <= len(items) <= 120: raise ValueError("배치 항목 수 오류(1~120)")
+        clean, uids = [], set()
+        for it in items:
+            k, b = str(it.get("kind", "")), str(it.get("bind", ""))
+            if k not in self.LAYOUT_KINDS: raise ValueError(f"장비 종류 오류: {k}")
+            if b not in self.LAYOUT_BINDS: raise ValueError(f"연결 급전선 오류: {b}")
+            x, y = float(it["x"]), float(it["y"])
+            if not (0 <= x <= 1600 and 0 <= y <= 900): raise ValueError("배치 좌표 범위 밖")
+            uid = str(it.get("uid", ""))[:24] or f"u{len(clean)}"
+            if uid in uids: raise ValueError(f"중복 식별자 {uid}")
+            uids.add(uid); clean.append({"uid": uid, "kind": k, "bind": b, "name": str(it.get("name", ""))[:24], "x": round(x, 1), "y": round(y, 1)})
+        old = self.layout(); rev = int(old.get("rev", 0)) + 1
+        out = {"rev": rev, "items": clean, "by": who, "t": wall_iso()}
+        pth = os.path.join(self.rt.state_dir, "layout.json"); tmp = pth + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f: json.dump(out, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, pth)
+        cnt = {}
+        for it in clean: cnt[it["kind"]] = cnt.get(it["kind"], 0) + 1
+        self.rt.note("배치", f"작전지 배치 변경 rev{rev}: " + ", ".join(f"{k}×{v}" for k, v in sorted(cnt.items())), actor=who)
+        return {"ok": True, "rev": rev}
+
+    def reset_layout(self, who):
+        pth = os.path.join(self.rt.state_dir, "layout.json")
+        if os.path.exists(pth): os.replace(pth, pth + ".bak")
+        self.rt.note("배치", "작전지 배치 기본값 복원(이전 배치는 layout.json.bak)", actor=who); return {"ok": True}
+
     def energy_hours(self):
         return {"day": self.energy["day"], "cols": ["pv", "dg", "fc", "ess_dis", "load", "ess_chg"], "hours": [[round(x, 3) for x in r] for r in self.energy["hours"]]}
 

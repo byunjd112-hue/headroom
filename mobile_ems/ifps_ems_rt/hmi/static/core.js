@@ -73,7 +73,7 @@ function loginDialog() {
     <div class="muted" style="font-size:12px">운용자: 지령·경보 확인 · 엔지니어: + 레지스터 쓰기·고장 주입. 모든 인증과 지령은 감사 기록에 남습니다.</div>
     ${sim ? `<div class="engbox">가상 장치 모드 기본 PIN — 운용자 <b class="mono">1111</b>, 엔지니어 <b class="mono">2222</b> (runtime.json → hmi에서 변경)</div>` : ""}
     <div id="lgErr" class="badc"></div></div></div>
-  <div class="ft"><button class="btn" onclick="closeModal()">취소</button><button class="btn pri" id="lgGo">로그인</button></div>`, box => {
+  <div class="ft"><button class="btn" data-act="close">취소</button><button class="btn pri" id="lgGo">로그인</button></div>`, box => {
     const go = async () => {
       const r = await api("/api/login", { pin: $("#lgPin", box).value, name: $("#lgName", box).value.trim() || "운용자" });
       if (!r.ok) { $("#lgErr", box).textContent = r.why; return; }
@@ -94,7 +94,7 @@ async function sbo(dev, cmd, opts = {}) {
   if (!r.ok) {
     modal(`<div class="hd"><h3>지령 차단 — 연동 조건 불만족</h3></div><div class="bd"><div class="sbo-steps"><div class="done">① 선택</div><div>② 확인</div><div>③ 실행</div></div>
       <div class="kv"><span class="k">대상</span><span class="v">${esc(label)}</span><span class="k">사유</span><span class="v badc" style="font-family:var(--sans)">${esc(r.why)}</span></div></div>
-      <div class="ft"><button class="btn" onclick="closeModal()">닫기</button></div>`); return;
+      <div class="ft"><button class="btn" data-act="close">닫기</button></div>`); return;
   }
   S._sboSid = r.sid; const tEnd = Date.now() + r.exp_s * 1000;
   modal(`<div class="hd"><h3>${t("ctl.sbo", "선택-실행 지령")}</h3><span class="pill warn">${esc(dev)}</span></div>
@@ -183,3 +183,11 @@ function ring(pct, color, size = 132, marks = []) {
     <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="#18232f" stroke-width="10" ${arc(0, 1)} stroke-linecap="round"/>
     <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="10" ${arc(0, p)} stroke-linecap="round" style="transition:stroke-dasharray .6s"/></g>${mk}</svg>`;
 }
+
+/* CSP(script-src 'self')는 인라인 onclick을 막는다 → data-act 위임 처리 */
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-act]"); if (!el) return;
+  const a = el.dataset.act;
+  if (a === "login") loginDialog(); else if (a === "logout") logout(); else if (a === "close") closeModal();
+  else if (a === "goalm") location.hash = "#alarms"; else if (a === "goctl") location.hash = "#control"; else if (a === "layedit") layToggleEdit();
+});

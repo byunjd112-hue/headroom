@@ -128,6 +128,19 @@ class TestHmi(unittest.TestCase):
         self.assertFalse(any(x["key"] == "cb.trip.L3" for x in s["alarms"]))
         with urllib.request.urlopen(self.base + "/sld.js", timeout=5) as f: self.assertIn("sldUpdate", f.read().decode())
 
+    def test_9_layout_edit_persist_and_validate(self):
+        items = [{"uid": "a", "kind": "ESS", "bind": "ESS", "name": "ESS #1", "x": 500, "y": 300}, {"uid": "b", "kind": "BARRACK", "bind": "L2", "name": "막사 #1", "x": 900, "y": 780},
+                 {"uid": "c", "kind": "BARRACK", "bind": "L3", "name": "막사 #2", "x": 1000, "y": 800}, {"uid": "d", "kind": "FSU", "bind": "", "name": "FSU-1", "x": 700, "y": 600}]
+        self.assertEqual(self.req("/api/layout", {"items": items})[0], 403)                            # 조회 권한으로 배치 변경 불가
+        op = self.login("4321")
+        r = self.req("/api/layout", {"items": items}, op)[1]; self.assertTrue(r["ok"]); rev = r["rev"]
+        lay = self.req("/api/layout")[1]; self.assertEqual(lay["rev"], rev); self.assertEqual(sum(1 for i in lay["items"] if i["kind"] == "BARRACK"), 2)
+        self.assertEqual(self.req("/api/layout", {"items": items + [{"uid": "e", "kind": "TANK", "bind": "", "x": 1, "y": 1}]}, op)[0], 400)      # 정의되지 않은 종류
+        self.assertEqual(self.req("/api/layout", {"items": [dict(items[0], x=5000)]}, op)[0], 400)                                               # 좌표 범위
+        self.assertEqual(self.req("/api/layout", {"items": [items[0], dict(items[1], uid="a")]}, op)[0], 400)                                    # 식별자 중복
+        self.assertTrue(any("배치 변경" in e["data"].get("text", "") for e in self.req("/api/audit?n=50")[1]["rows"]))
+        self.assertTrue(self.req("/api/layout/reset", {}, op)[1]["ok"]); self.assertIsNone(self.req("/api/layout")[1]["items"])
+
 
 if __name__ == "__main__":
     unittest.main()

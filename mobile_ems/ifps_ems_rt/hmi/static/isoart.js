@@ -173,10 +173,11 @@ const ISO_MODELS = {
     return s + lamp(I, 3.9, 3.2, 1.1, st.lost ? "#ff5148" : st.on ? "#8fd36a" : "#f0b23a", true);
   },
   L1(I, st) { return ISO_MODELS.TENT(I, st, { mast: true }); },
+  BARRACK(I, st) { return ISO_MODELS.TENT(I, st, { w: 9, d: 4 }); },
   L2(I, st) { return ISO_MODELS.TENT(I, st, { cross: true, w: 6.5 }); },
   L3(I, st) { return ISO_MODELS.AMMO(I, st); },
 };
-const ISO_EXT = { ESS: [10.2, 2.6, 4.2], PV: [10.6, 10.9, 4.6], FC: [11, 2.6, 4.2], DG: [9.4, 2.6, 4.8], G1: [9.4, 2.6, 4.8], DIST: [9.6, 6.6, 3.5], MTR: [9.6, 6.6, 3.5], EMS: [9.4, 3.4, 5.4], FSU: [1.8, 1.6, 1.8], L1: [7, 4.5, 5.5], L2: [6.8, 4.2, 3.2], L3: [6.2, 4.6, 1.6] };
+const ISO_EXT = { ESS: [10.2, 2.6, 4.2], PV: [10.6, 10.9, 4.6], FC: [11, 2.6, 4.2], DG: [9.4, 2.6, 4.8], G1: [9.4, 2.6, 4.8], DIST: [9.6, 6.6, 3.5], MTR: [9.6, 6.6, 3.5], EMS: [9.4, 3.4, 5.4], FSU: [1.8, 1.6, 1.8], L1: [7, 4.5, 5.5], L2: [6.8, 4.2, 3.2], L3: [6.2, 4.6, 1.6], BARRACK: [9.4, 4.5, 3.2] };
 /* 단독 그림: 뷰박스에 맞춰 축척 자동 계산 */
 function isoArt(kind, st = {}, W = 400, H = 250, pad = 14) {
   const [Lx, Ly, Lz] = ISO_EXT[kind] || ISO_EXT.DIST, oy0 = 0;
