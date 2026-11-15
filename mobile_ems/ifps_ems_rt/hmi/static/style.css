@@ -512,3 +512,8 @@ canvas.tspark { display: block; width: calc(100% + 40px); margin: 8px -20px 0; h
 .laybar .grp { display: flex; gap: 8px; align-items: center; } .laybar .grp.end { margin-left: auto; } .laybar .lab { font-size: 11px; }
 .laybar select.in, .laybar input.in { height: 28px; }
 .seg button, .user, .user span { white-space: nowrap; }
+
+/* 실사 스프라이트 */
+.sitemap image { image-rendering: auto; }
+.sitemap .meq { filter: drop-shadow(0 6px 6px rgba(0,0,0,.45)); }
+.sld .hexbg { fill: #20241b; }

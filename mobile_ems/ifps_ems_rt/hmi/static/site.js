@@ -18,7 +18,16 @@ function siteState(s) {
   return out;
 }
 /* 장비 카드: photos/ 폴더에 실사 이미지가 있으면 사진, 없으면 자체 벡터 일러스트 + 상태 띠 */
-api("/api/photos").then(r => { S.photos = r.files || []; }).catch(() => { S.photos = []; });
+api("/api/photos").then(r => { S.photos = r.files || []; S.sprites = r.sprite_meta || {}; const b = $("#siteMap"); if (b) b.dataset.sig = ""; document.querySelectorAll("[id^=art-]").forEach(g => g.dataset.sig = ""); }).catch(() => { S.photos = []; S.sprites = {}; });
+const SPR_KEY = { DG: "dg", G1: "dg", ESS: "ess", PV: "pv", FC: "fc", DIST: "dist", MTR: "dist", EMS: "ems", FSU: "fsu", L1: "l1", L2: "l2", L3: "l3", BARRACK: "barrack" };
+/* 실사 스프라이트(투명 배경). 상태: 정지 → 채도·밝기 낮춤, 고장·두절 → 적색 착색 */
+function spriteSvg(kind, st, cx, by, w) {
+  const k = SPR_KEY[kind], m = S.sprites && S.sprites[k]; if (!m) return null;
+  const h = w * m.h / m.w, f = st.lost || st.fault ? "url(#spBad)" : st.on === false ? "url(#spOff)" : "";
+  return `<image href="sprites/${m.file}" x="${(cx - w / 2).toFixed(1)}" y="${(by - h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" preserveAspectRatio="xMidYMax meet" ${f ? `filter="${f}"` : ""}/>`;
+}
+const SPRITE_FILTERS = `<filter id="spOff"><feColorMatrix type="saturate" values=".25"/><feComponentTransfer><feFuncR type="linear" slope=".7"/><feFuncG type="linear" slope=".7"/><feFuncB type="linear" slope=".7"/></feComponentTransfer></filter>
+  <filter id="spBad"><feColorMatrix type="matrix" values=".6 .3 .1 0 .18  .15 .3 .05 0 0  .15 .2 .05 0 0  0 0 0 1 0"/></filter>`;
 function equipPhoto(kind, st = {}) {
   const cls = st.lost || st.fault ? "bad" : st.on ? "ok" : "idle";
   const tag = st.lost ? "COMM LOSS" : st.fault ? "FAULT" : st.on ? "RUNNING" : "STANDBY";
@@ -90,6 +99,10 @@ function layCables(items) {
 function mapEqSt(s, it) {
   const k = s.kpi, D = s.devices, lost = n => D[n] && D[n].link === "두절", b = it.bind;
   if (it.kind === "FSU") return { on: true };
+  const gw = D.MTR && D.MTR.link !== "두절", cbF = { G1: "G1", ESS: "ESS", PV: "PV", FC: "FC", L1: "L1", L2: "L2", L3: "L3" }[b];
+  const c = cbF && gw ? Math.round(val("CB." + cbF) ?? 1) : 1;
+  if (c === 2) return { on: false, fault: true };                      // 차단기 트립 → 고장 표시
+  if (c === 0) return { on: false };                                   // 차단기 개방 → 정지 표시
   return ({ G1: { on: D.DG.on, lost: lost("DG") }, ESS: { on: true, lost: lost("ESS"), soc: Math.round(k.soc / 5) * 5 }, PV: { on: k.pv > .5 }, FC: { on: D.FC.on, lost: lost("FC") },
     DIST: { on: true, lost: lost("MTR") }, EMS: { on: true } })[b] || { on: true };
 }
@@ -101,7 +114,7 @@ function siteMapSvg(s) {
     <radialGradient id="mGnd" cx="50%" cy="55%" r="70%"><stop offset="0" stop-color="#4a4b40"/><stop offset=".7" stop-color="#34362c"/><stop offset="1" stop-color="#22241c"/></radialGradient>
     <pattern id="mGv" patternUnits="userSpaceOnUse" width="22" height="16"><circle cx="3" cy="3" r="1.6" fill="#5c5d50"/><circle cx="14" cy="8" r="1.3" fill="#2b2c25"/><circle cx="8" cy="13" r="1.1" fill="#66675a"/><circle cx="19" cy="14" r="1" fill="#3a3b33"/></pattern>
     <pattern id="mTr" patternUnits="userSpaceOnUse" width="14" height="10"><circle cx="4" cy="5" r="4" fill="#253019"/><circle cx="11" cy="3" r="3.4" fill="#2e3a21"/></pattern>
-    <pattern id="mGrid" patternUnits="userSpaceOnUse" width="40" height="40"><path d="M40 0H0V40" fill="none" stroke="#b6d36b" stroke-opacity=".12" stroke-width="1"/></pattern></defs>
+    ${SPRITE_FILTERS}<pattern id="mGrid" patternUnits="userSpaceOnUse" width="40" height="40"><path d="M40 0H0V40" fill="none" stroke="#b6d36b" stroke-opacity=".12" stroke-width="1"/></pattern></defs>
     <rect width="${MAP_W}" height="${MAP_H}" fill="url(#mSky)"/>
     <path d="M0 150 L120 95 L260 130 L420 60 L560 115 L700 80 L860 120 L1010 55 L1180 105 L1320 70 L1480 110 L1600 80 L1600 260 L0 260Z" fill="url(#mM2)" opacity=".8"/>
     <path d="M0 210 L160 150 L330 200 L470 140 L640 205 L820 150 L980 210 L1150 150 L1330 205 L1480 160 L1600 190 L1600 330 L0 330Z" fill="url(#mM1)"/>
@@ -114,7 +127,7 @@ function siteMapSvg(s) {
   items.slice().sort((a, b) => a.y - b.y).forEach(it => {
     const kind = it.kind === "BARRACK" ? "BARRACK" : it.kind, [Lx, Ly] = ISO_EXT[kind] || ISO_EXT.FSU, [wx, wy] = mapWorld(it.x, it.y), [px, py] = I.p(wx - Lx / 2, wy - Ly / 2, 0);
     const sel = L.edit && L.sel === it.uid;
-    g += `<g class="meq ${L.edit ? "editable" : ""} ${sel ? "sel" : ""}" data-uid="${it.uid}">${sel ? `<ellipse cx="${it.x}" cy="${it.y}" rx="${(Lx + Ly) * ISO_C * MAP_S * .62}" ry="${(Lx + Ly) * ISO_S * MAP_S * .62}" class="msel"/>` : ""}${isoPlace(kind, mapEqSt(s, it), px, py, MAP_S)}</g>`;
+    g += `<g class="meq ${L.edit ? "editable" : ""} ${sel ? "sel" : ""}" data-uid="${it.uid}">${sel ? `<ellipse cx="${it.x}" cy="${it.y}" rx="${(Lx + Ly) * ISO_C * MAP_S * .62}" ry="${(Lx + Ly) * ISO_S * MAP_S * .62}" class="msel"/>` : ""}${spriteSvg(kind, mapEqSt(s, it), it.x, it.y + (Lx + Ly) * ISO_S * MAP_S / 2 + 6, (Lx + Ly) * ISO_C * MAP_S * (kind === "FSU" ? 1.5 : kind === "PV" ? .78 : 1.12)) || isoPlace(kind, mapEqSt(s, it), px, py, MAP_S)}</g>`;
   });
   cab.forEach(([a, b], i) => { const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 + Math.abs(b[0] - a[0]) * .03; g += `<g class="mflt" id="mx-${i}" style="display:none"><circle cx="${mx}" cy="${my}" r="13" fill="#ff5148"/><path d="M${mx - 5} ${my - 5}l10 10M${mx + 5} ${my - 5}l-10 10" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g>`; });
   return `<svg viewBox="0 0 ${MAP_W} ${MAP_H}" class="sitemap ${L.edit ? "editing" : ""}" preserveAspectRatio="xMidYMid slice">${g}</svg>`;

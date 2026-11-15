@@ -1,0 +1,57 @@
+{
+ "barrack": {
+  "file": "barrack.webp",
+  "w": 720,
+  "h": 480
+ },
+ "dg": {
+  "file": "dg.webp",
+  "w": 720,
+  "h": 502
+ },
+ "dist": {
+  "file": "dist.webp",
+  "w": 720,
+  "h": 482
+ },
+ "ems": {
+  "file": "ems.webp",
+  "w": 720,
+  "h": 530
+ },
+ "ess": {
+  "file": "ess.webp",
+  "w": 720,
+  "h": 482
+ },
+ "fc": {
+  "file": "fc.webp",
+  "w": 720,
+  "h": 480
+ },
+ "fsu": {
+  "file": "fsu.webp",
+  "w": 699,
+  "h": 720
+ },
+ "l1": {
+  "file": "l1.webp",
+  "w": 720,
+  "h": 479
+ },
+ "l2": {
+  "file": "l2.webp",
+  "w": 720,
+  "h": 467
+ },
+ "l3": {
+  "file": "l3.webp",
+  "w": 720,
+  "h": 486
+ },
+ "pv": {
+  "file": "pv.webp",
+  "w": 720,
+  "h": 453
+ }
+}

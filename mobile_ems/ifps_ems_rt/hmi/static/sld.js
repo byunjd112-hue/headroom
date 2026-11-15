@@ -79,7 +79,9 @@ function setFlow(id, kw, cap, on = true) {
 /* 상태 갱신 */
 function sldArt(id, st) {
   const g = document.getElementById("art-" + id); if (!g) return; const sig = JSON.stringify(st); if (g.dataset.sig === sig) return; g.dataset.sig = sig;
-  g.innerHTML = isoArt(EQ_KIND[id] || "DIST", st, 400, 250, 6).replace("<svg ", `<svg x="${g.dataset.x}" y="${g.dataset.y}" width="${g.dataset.w}" height="${g.dataset.h}" `);
+  const x = +g.dataset.x, y = +g.dataset.y, w = +g.dataset.w, h = +g.dataset.h;
+  const sp = spriteSvg(id, st, x + w / 2, y + h - 2, w * .96);
+  g.innerHTML = sp ? `<defs>${SPRITE_FILTERS.replace(/id="sp/g, `id="sp${id}`)}</defs>` + sp.replace(/url\(#sp/g, `url(#sp${id}`) : isoArt(EQ_KIND[id] || "DIST", st, 400, 250, 6).replace("<svg ", `<svg x="${x}" y="${y}" width="${w}" height="${h}" `);
 }
 function sldUpdate(s) {
   const k = s.kpi, D = s.devices, ko = S.lang === "ko", gw = D.MTR && D.MTR.link !== "두절";     // 보호 IED 게이트웨이(MTR) 통신

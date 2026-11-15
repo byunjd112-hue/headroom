@@ -723,8 +723,13 @@ class Engine:
         self.rt.note("배치", "작전지 배치 기본값 복원(이전 배치는 layout.json.bak)", actor=who); return {"ok": True}
 
     def photos(self):
-        d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "photos")
-        return {"files": sorted(f for f in os.listdir(d) if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))) if os.path.isdir(d) else []}
+        base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+        ls = lambda d: sorted(f for f in os.listdir(os.path.join(base, d)) if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))) if os.path.isdir(os.path.join(base, d)) else []
+        meta = {}
+        mp = os.path.join(base, "sprites", "sprites.json")
+        if os.path.exists(mp):
+            with open(mp, encoding="utf-8") as f: meta = json.load(f)
+        return {"files": ls("photos"), "sprites": ls("sprites"), "sprite_meta": meta}
 
     def energy_hours(self):
         return {"day": self.energy["day"], "cols": ["pv", "dg", "fc", "ess_dis", "load", "ess_chg"], "hours": [[round(x, 3) for x in r] for r in self.energy["hours"]]}
