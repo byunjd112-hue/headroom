@@ -79,10 +79,10 @@ const P_OV = {
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("ov.title", "운전 개요")}</h2><span class="sub" id="ovSub"></span></div>
     <div class="tiles">
-      <div class="panel tile"><div class="lab"><i style="background:var(--load)"></i>${t("k.load", "총 부하")}</div><div class="big" id="tLoad">—<small>kW</small></div><div class="foot"><span id="tL12"></span><span id="tL3"></span></div></div>
-      <div class="panel tile"><div class="lab"><i style="background:var(--pv)"></i>${t("k.pv", "태양광 발전")}</div><div class="big" id="tPv">—<small>kW</small></div><div class="foot"><span id="tRen"></span><span id="tPvCap"></span></div></div>
-      <div class="panel tile"><div class="lab"><i style="background:var(--ess)"></i>${t("k.soc", "ESS 충전율")}</div><div class="big" id="tSoc">—<small>%</small></div><div class="foot"><span id="tEssKw"></span><span id="tEssH"></span></div></div>
-      <div class="panel tile"><div class="lab"><i style="background:var(--g1)"></i>${t("ov.reserve", "N-1 순동 예비력")}</div><div class="big" id="tRes">—<small>kW</small></div><div class="foot"><span id="tResSt"></span><span id="tOnl"></span></div></div>
+      <div class="panel tile"><div class="lab"><i style="background:var(--load)"></i>${t("k.load", "총 부하")}</div><div class="big" id="tLoad">—<small>kW</small></div><div class="foot"><span id="tL12"></span><span id="tL3"></span></div><canvas class="tspark" id="tsp-load"></canvas></div>
+      <div class="panel tile"><div class="lab"><i style="background:var(--pv)"></i>${t("k.pv", "태양광 발전")}</div><div class="big" id="tPv">—<small>kW</small></div><div class="foot"><span id="tRen"></span><span id="tPvCap"></span></div><canvas class="tspark" id="tsp-pv"></canvas></div>
+      <div class="panel tile"><div class="lab"><i style="background:var(--ess)"></i>${t("k.soc", "ESS 충전율")}</div><div class="big" id="tSoc">—<small>%</small></div><div class="foot"><span id="tEssKw"></span><span id="tEssH"></span></div><canvas class="tspark" id="tsp-soc"></canvas></div>
+      <div class="panel tile"><div class="lab"><i style="background:var(--g1)"></i>${t("ov.reserve", "N-1 순동 예비력")}</div><div class="big" id="tRes">—<small>kW</small></div><div class="foot"><span id="tResSt"></span><span id="tOnl"></span></div><canvas class="tspark" id="tsp-res"></canvas></div>
     </div>
     <div class="grid ov">
       <div class="grid" style="align-content:start">
@@ -122,6 +122,8 @@ const P_OV = {
     $("#tEssKw").textContent = k.ess >= 0 ? `방전 ${F.kw(k.ess)}kW` : `충전 ${F.kw(-k.ess)}kW`; $("#tEssH").textContent = k.ess_h ? `자립 ${F.hrs(k.ess_h)}h` : "충전 중";
     $("#tRes").innerHTML = `${k.reserve_margin >= 0 ? "+" : ""}${F.n(k.reserve_margin, 0)}<small>kW</small>`; $("#tRes").className = "big " + (k.reserve_need ? "warnc" : "okc");
     $("#tResSt").textContent = k.reserve_need ? t("k.need", "예비력 부족 → FC 병렬") : t("k.ok", "N-1 만족"); $("#tOnl").textContent = `병렬 ${k.online_kw.length}대`;
+    const tw = S.trend.slice(-600);                                             // KPI 미니 추세(최근 10분)
+    [["load", 1, TV("--load")], ["pv", 2, TV("--pv")], ["soc", 6, TV("--ess")], ["res", 8, TV("--g1")]].forEach(([id, ci, col]) => { const c = $("#tsp-" + id); if (c) spark(c, tw.map(r => r[ci]), col, 34, id === "soc" ? 0 : null, id === "soc" ? 100 : null); });
     // 결선도
     sldUpdate(s);
     // 수급

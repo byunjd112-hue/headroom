@@ -36,8 +36,9 @@ function faultMark(id, x, y) {
 function sldSvg() {
   const ko = S.lang === "ko";
   const hex = (n, cy, r, color, icon, isLoad) => `<g class="node" id="n-${n.id}">
-    <polygon class="hexo" points="${hexPts(n.x, cy, r)}"/><polygon class="hexi" points="${hexPts(n.x, cy, r - 9)}"/>
-    <g class="ico" stroke="${color}" transform="translate(${n.x - 19.2},${cy - 19.2}) scale(1.6)">${icon}</g>
+    <rect class="hexo" x="${n.x - r * .86}" y="${cy - r * .86}" width="${r * 1.72}" height="${r * 1.72}" rx="${r * .42}"/>
+    <circle class="sdot" cx="${n.x + r * .62}" cy="${cy - r * .62}" r="5"/>
+    <g class="ico" stroke="${color}" transform="translate(${n.x - 16.8},${cy - 16.8}) scale(1.4)">${icon}</g>
     <text class="nm" x="${n.x}" y="${cy + r + 22}" text-anchor="middle">${ko ? n.name : n.en}</text>
     <text x="${n.x}" y="${cy + r + 47}" text-anchor="middle"><tspan class="kw" id="kw-${n.id}">—</tspan><tspan class="u" dx="4">kW</tspan></text>
     <text class="st" x="${n.x}" y="${cy + r + 64}" text-anchor="middle" id="st-${n.id}" fill="var(--muted)">—</text>
