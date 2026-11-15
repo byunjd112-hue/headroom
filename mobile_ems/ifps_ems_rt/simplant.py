@@ -12,7 +12,7 @@ class Plant:
     def __init__(self, pts, units, ack_delay=0.2):
         self.pts = pts; self.units = units; self.rev = {u: d for d, u in units.items()}
         self.reg = {d: {} for d in units}; self.lock = threading.Lock(); self.ack_delay = ack_delay
-        self.muted = set(); self.no_ack = set(); self.down = set(); self.pending = {}; self.srv = []; self.run = False
+        self.muted = set(); self.no_ack = set(); self.down = set(); self.pending = {}; self.srv = []; self.run = False; self._exp_t = None
         self.slow = {}             # {장치: 초} 지령 수용(seq_ack) 뒤 상태가 바뀌기까지 걸리는 시간(기동이 느린 장비 모사)
         self.later = {}            # {장치: (시각, 상태)} 예약된 상태 변화
         self.by_tag = {p["tag"]: p for p in pts}
@@ -73,14 +73,22 @@ class Plant:
         dg = 90.0 * g("DG.status") * cb("DG"); fc = (100.0 * g("FC.status") * 0.05 if g("FC.kw_set") == 0 else g("FC.kw_set") * g("FC.status")) * cb("FC")
         elz = 150.0 * g("ELZ.status")                                         # 수전해 소비(150kW, 30Nm³/h)
         self._put((("ELZ.kw", elz), ("ELZ.h2_rate", 30.0 * g("ELZ.status")), ("PV.lim", g("PV.lim_set") or 400.0)))
-        ess = (g("LOAD.kw") + elz - g("PV.kw") - dg - fc) * cb("ESS")
+        net = g("LOAD.kw") + elz - g("PV.kw") - dg - fc
+        tied = "CB.GRID" in self.by_tag and int(round(self.get("CB.GRID"))) == 1
+        if tied:                                                             # 상전 연계: ESS 는 EMS 지령대로(충전율 한계 안에서), 나머지는 상전이 메운다
+            soc = g("ESS.soc"); sp = g("ESS.kw_set"); ess = (min(sp, 500.0) if soc > 10.5 else min(sp, 0.0)) if sp >= 0 else (max(sp, -500.0) if soc < 89.5 else 0.0)
+            ess *= cb("ESS"); grid = net - ess
+            self._exp_t = self._exp_t if (grid < -20 and self._exp_t is not None) else now
+            if now - self._exp_t > 3.0: self.set("CB.GRID", 2); self.set("FLT.GRID", 32)        # 역송 3초 지속 → 역전력 보호(32) 트립
+        else: ess = net * cb("ESS"); grid = 0.0
         if "BUS.a_v" in self.by_tag: self._tick_bus(now)
-        self._put((("DG.kw", dg), ("FC.kw", fc), ("ESS.kw", ess)))
+        self._put((("DG.kw", dg), ("FC.kw", fc), ("ESS.kw", ess), ("GRID.kw", grid)))
         if "ESS.soc" in self.by_tag: self.set("ESS.soc", min(90.0, max(10.0, g("ESS.soc") - ess * dt / 3600 / 1000.0 * 100)))
 
     def _tick_bus(self, now):
         g, cb = self._g, self._cb
         src_a = (cb("DG") and g("DG.status") > 0.5) or (cb("FC") and g("FC.status") > 0.5)
+        src_a = src_a or ("CB.GRID" in self.by_tag and int(round(self.get("CB.GRID"))) == 1)
         a_live = src_a or (cb("TIE") and (cb("ESS") or cb("G1")))
         b_live = (cb("ESS") and g("ESS.status") > 0.5) or cb("G1") or (cb("TIE") and a_live)
         self.set("BUS.a_v", 440.0 + (abs(math.sin(now)) * 1.5) if a_live else 0.0); self.set("BUS.b_v", 440.0 + abs(math.cos(now)) * 1.5 if b_live else 0.0)

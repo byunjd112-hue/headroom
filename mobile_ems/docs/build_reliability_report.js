@@ -43,7 +43,7 @@ b.push(TBL(["기준 항목", "C/C++ 에서의 통상 수단", "본 측정의 대
 b.push(GAP()); b.push(P("제어화면의 브라우저 쪽 코드(JavaScript 6개 파일)는 문법 검사와 브라우저 자동 시험으로 확인했고 실행률 측정에는 넣지 않았다. 지령·판단·통신 논리는 모두 Python 쪽에 있다."));
 
 b.push(H1("3. 시험 대상과 환경"));
-b.push(TBL(["항목", "내용"], [["파일 수 / 실행문 / 분기", `${S.loc_py.files}개 / ${S.stmt.n}개 / ${S.branch.n}개`], ["소스 줄 수(SLOC) / 주석", `${S.loc_py.sloc} / ${S.loc_py.comments}`], ["함수·메서드 수", M.n_func], ["시험 건수", `${S.n_tests}건 (tests/ 7개 파일)`], ["시험 방식", "가상 장치(Modbus TCP 서버)를 로컬에 띄워 실제 소켓 통신으로 실행. 고장은 가상 장치에 주입"], ["측정 명령", "python tools/static_report.py → docs/static_results.json"]], [28, 72], { bold: [0] }));
+b.push(TBL(["항목", "내용"], [["파일 수 / 실행문 / 분기", `${S.loc_py.files}개 / ${S.stmt.n}개 / ${S.branch.n}개`], ["소스 줄 수(SLOC) / 주석", `${S.loc_py.sloc} / ${S.loc_py.comments}`], ["함수·메서드 수", M.n_func], ["시험 건수", `${S.n_tests}건 (tests/ 8개 파일)`], ["시험 방식", "가상 장치(Modbus TCP 서버)를 로컬에 띄워 실제 소켓 통신으로 실행. 고장은 가상 장치에 주입"], ["측정 명령", "python tools/static_report.py → docs/static_results.json"]], [28, 72], { bold: [0] }));
 
 b.push(H1("4. 정적 시험 결과")); b.push(H2("4.1 코딩 규칙 — 결함성 규칙"));
 b.push(P(`pyflakes: ${S.pyflakes.length}건. pylint 오류(E) ${S.pylint.E}건. 측정 범위는 ifps_ems, ifps_ems_rt, tools, tests 전체다.`));
@@ -68,7 +68,7 @@ b.push(TBL(["시험 파일", "대상", "주요 확인"], [["test_core.py", "핵�
   ["test_hmi.py", "제어화면·서버", "권한, 선택-실행 지령, 고장 주입 경보, 레지스터 탐색, 자동 제어, 예측·적산, 차단기 트립, 배치 편집, 잠금"],
   ["test_diag.py", "현장 진단 도구", "자동 진단, 접속 거부·허용 목록 안내, 경로 저하, 순서·자료형·배율 추정, 생존 계수 정지, 지령 규약 시험, 차림표"],
   ["test_tools.py", "명령줄·기동", "자가 점검, 합성 자료·학습, 점검 도구(mbtool), 실행기 명령, 제어화면 기동·종료, PIN 해시 도구"],
-  ["test_regress.py", "Rev16 결함 재발 방지", "7장 표의 R-01 ~ R-19 대응 시험 18건"], ["test_cover.py", "실행률 보완", "논리 모형, 시각 동기, 이력 기록, 주기 실행, 감사 키, 나머지 웹 경로, 세션 만료"]], [18, 18, 64], { mono: [0] }));
+  ["test_regress.py", "Rev16 결함 재발 방지", "7장 표의 R-01 ~ R-19 대응 시험 18건"], ["test_ops.py", "군 운용 논리", "주둔지(역송 없음·피크 억제·정전 전환·복전), 저소음·자립 태세, 부하 자동 차단·복구, 자립 지속시간"], ["test_cover.py", "실행률 보완", "논리 모형, 시각 동기, 이력 기록, 주기 실행, 감사 키, 나머지 웹 경로, 세션 만료"]], [18, 18, 64], { mono: [0] }));
 b.push(H2("5.2 실행률"));
 b.push(TBL(["파일", "실행문", "문장 %", "분기", "분기 %"], S.coverage_files.slice().sort((a, c) => a[0] < c[0] ? -1 : 1).map(f => [f[0], f[2], f[1].toFixed(1), f[4], f[4] ? f[3].toFixed(1) : "—"]).concat([[{ t: "합계", c: "000000" }, S.stmt.n, { t: S.stmt.pct.toFixed(1), c: "000000" }, S.branch.n, { t: S.branch.pct.toFixed(1), c: "000000" }]]), [40, 14, 14, 14, 18], { mono: [0], center: [1, 2, 3, 4] }));
 b.push(H2("5.3 실행하지 못한 문장과 사유"));

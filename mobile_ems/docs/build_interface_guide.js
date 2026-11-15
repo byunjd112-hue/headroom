@@ -15,7 +15,7 @@ const DESC = {
   soc: "충전율(%)", p1_kw: "1등급 부하 전력", p2_kw: "2등급 부하 전력", p3_kw: "3등급 부하 전력", temp: "쉘터 온도(°C)", press: "대기압(hPa)", rh: "상대 습도(%)", h2_rate: "수소 생산량(Nm³/h)", lim: "출력 제한 현재값(kW)", lim_set: "출력 제한 설정(kW)",
   a_v: "A 모선 전압(V)", b_v: "B 모선 전압(V)", hz: "모선 주파수(Hz)" };
 const DEVNM = { DG: "디젤 발전기 제어기", FC: "연료전지 제어기", ESS: "ESS PCS", MTR: "계측·보호 게이트웨이(계량기·IED·환경 센서)", ELZ: "수전해 장치 제어기", PV: "태양광 인버터" };
-const desc = tag => { const [d, k] = tag.split("."); if (d === "CB") return `차단기 CB-${k} 상태 0 개방 / 1 투입 / 2 보호 트립`; if (d === "FLT") return `CB-${k} 보호 동작 요소(ANSI 번호, 0 없음)`; if (d === "LDS") return `CB-${k} 부하 차단 지령 1 복구 / 2 차단 (장치가 처리 후 0으로 되돌림)`; if (tag === "PV.kw") return "태양광 발전 전력(계량)"; if (tag === "LOAD.kw") return "전체 부하 전력"; return DESC[k] || ""; };
+const desc = tag => { const [d, k] = tag.split("."); if (d === "CB") return `차단기 CB-${k} 상태 0 개방 / 1 투입 / 2 보호 트립`; if (d === "FLT") return `CB-${k} 보호 동작 요소(ANSI 번호, 0 없음)`; if (d === "LDS") return `CB-${k} 부하 차단 지령 1 복구 / 2 차단 (장치가 처리 후 0으로 되돌림)`; if (tag === "GRID.kw") return "상전 수전 전력(+수전, 주둔지 운전)"; if (tag === "CB.GRID") return "수전 차단기 0 개방 / 1 투입 / 2 보호 트립(정전 판정에 사용)"; if (tag === "ESS.kw_set") return "충·방전 지령(+방전/−충전). 상전 연계 중에만 적용"; if (tag === "PV.kw") return "태양광 발전 전력(계량)"; if (tag === "LOAD.kw") return "전체 부하 전력"; return DESC[k] || ""; };
 
 L.cover(b, "이동형 전력체계 EMS 실장치 통신 연동 방안서", "Modbus TCP 통신 규약 · 자료 대응표 · 16/32/64비트 자료형과 바이트 순서 · 지령 응답 규약 · 시운전 절차 · 고장 진단",
   [["문서번호", `HAES-IFPS-EMS-IF-001  ${REV} (초안)`], ["작성일", DATE], ["적용 대상", "EMS 실장치 연동 계층 ifps_ems_rt, 제어화면(HMI), 현장 점검 도구 mbtool"],

@@ -22,7 +22,7 @@ python -m ifps_ems gen-sample results/sample_site_data.csv         # (실측 이
 python -m ifps_ems train results/sample_site_data.csv results      # 예측 모델 학습
 python -m ifps_ems_rt.hmi config/runtime.json --sim --plan results --open   # 가상 장치
 python -m ifps_ems_rt.hmi config/runtime.json --plan results --open         # 실장치
-python -m unittest discover -s tests                               # 시험 81건
+python -m unittest discover -s tests                               # 시험 88건
 diag.bat --demo                                                    # 현장 진단 도구 연습(가상 장치) · 실장비는 diag.bat
 ```
 제어화면: http://127.0.0.1:8080 · 기본 PIN 운용자 `1111`, 엔지니어 `2222`(개발 모드 전용). 운용 모드(`run_mode: "운용"`)는 평문·기본 PIN, 외부 바인드, 가상 장치를 기동 단계에서 거부한다 — `python -m ifps_ems_rt.hmi.pin`으로 해시를 만들어 `pin_operator_hash`/`pin_engineer_hash`에 넣는다
@@ -60,6 +60,15 @@ python -m ifps_ems_rt.hmi.pin                               # PIN 해시 생성(
 - 모든 로그인·지령·레지스터 쓰기·고장 주입을 연쇄 HMAC 감사 기록에 남김. 운용 모드는 검증필 암호모듈이 아니면 기동 거부
 - 전 장치·경로 병렬 수집: 응답 없는 장치가 있어도 주기 초과 없음. 지령 응답 대기는 별도 스레드라 수집을 막지 않음
 - systemd `Type=notify` + `WatchdogSec`: 수집·제어가 모두 살아 있을 때만 감시 신호 (`service/ifps-ems.service`)
+
+## Rev18 군 운용 기능 (전개지·주둔지 겸용)
+- **운용 장소**: 전개지(자립 운전) / 주둔지(상전 연계). 설비 제어 화면에서 전환하며 재기동해도 유지된다(`state/ops.json`)
+- **주둔지 운전**: 상전 + ESS 로 운전하고 디젤·연료전지는 정지. **역송 없음**(최소 수전 유지, 남는 태양광은 ESS 충전 → 수전해 → PV 출력 제한 순), **요금 절감**(최대부하 시간대 ESS 방전, 경부하 시간대 충전, 피크 억제), **정전 대비**(충전율 하한 `reserve_soc` 아래로는 방전하지 않음). 수전 차단기가 열리면 곧바로 자립 운전 논리로 넘어가고, 복전 후 `restore_s` 초 안정하면 복귀. 설정은 `runtime.json` 의 `garrison`
+- **운용 태세**: 평시 / 저소음(디젤 금지·연료전지 허용·3등급 자동 차단) / 자립(목표 시간 `autonomy_target_h` 를 버티도록 부하 단계 관리)
+- **부하 우선순위 자동 차단·복구**: 자원 부족을 3초 지속 확인 후 3등급 → 2등급 순 차단, 해소 60초 뒤 역순 복구. 1등급은 차단하지 않음. EMS 가 끊은 급전선만 되살림
+- **자립 지속시간**: ESS·수소·연료와 하루 태양광 예상량으로 전 부하 / 3등급 차단 / 1등급만 기준 남은 시간 표시
+- 추가 점: `GRID.kw`, `CB.GRID`, `FLT.GRID`(계측·보호 게이트웨이), `ESS.kw_set`(PCS 충·방전 지령). 설비 정격을 체계 제안서 값으로 정렬(디젤 90kW, 수전해 150kW, 수소 저장 하한 30%)
+- 무정전 절체 자체는 ESS(계통 형성)와 STS 가 수행한다. EMS 는 판정·전원 투입·부하 관리를 맡는다. GFM 드룹 조정과 블랙스타트 절차는 PCS 인터페이스 확정 후 구현 대상
 
 ## Rev16 보완 요약
 - **독립 검토 2회**(통신·서버, 화면)로 찾은 결함 42건 보완. 주요: 생존 계수 정지 장비로 자동 지령이 나가던 문제, 감사 기록 쓰기 실패 시 주기 스레드 종료, 형식이 틀린 응답에 전 장비 수집 중단, NaN 값에 화면 정지, 로그인 없이 가능한 변경 경로, 탭 화면 잘림. 목록은 `docs/out/…SW신뢰성시험결과서` 7장

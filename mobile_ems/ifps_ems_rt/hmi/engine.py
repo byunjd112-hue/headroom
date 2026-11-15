@@ -269,7 +269,7 @@ class Engine:
             a = time.monotonic()
             try:
                 with self.lock:
-                    self.rt.scan(); self._post_scan()
+                    self.rt.scan(); self.rt.auto_enabled = self.auto; self.rt.fast_control(); self._post_scan()
             except Exception as e:                                               # 어떤 실패든 수집은 이어 간다
                 self.rt.note("오류", f"수집 주기 예외: {type(e).__name__}: {e}")
             dt = time.monotonic() - a; k += 1
@@ -292,7 +292,7 @@ class Engine:
     @staticmethod
     def _energy_zero():
         return {"day": datetime.now().strftime("%Y-%m-%d"), "pv": 0.0, "dg": 0.0, "fc": 0.0, "load": 0.0, "ess_chg": 0.0, "ess_dis": 0.0,
-                "fuel_l": 0.0, "h2_nm3": 0.0, "peak_load": 0.0, "peak_pv": 0.0, "hours": [[0.0] * 6 for _ in range(24)]}
+                "fuel_l": 0.0, "h2_nm3": 0.0, "peak_load": 0.0, "peak_pv": 0.0, "grid": 0.0, "grid_peak": 0.0, "grid_cost": 0.0, "peak_cut": 0.0, "hours": [[0.0] * 6 for _ in range(24)]}
 
     def _integrate(self, k):
         """전력량 적산(사다리꼴 대신 1초 직사각형). 자정에 초기화. hours: 시간대별 [PV, DG, FC, ESS방전, 부하, ESS충전] kWh."""
@@ -305,6 +305,9 @@ class Engine:
                 e[key] += parts[i] * h; e["hours"][hr][i] += parts[i] * h
             e["fuel_l"] += parts[1] * h * s.dg_l_per_kwh; e["h2_nm3"] += parts[2] * h * s.fc_nm3_per_kwh
             e["peak_load"] = max(e["peak_load"], k["load"]); e["peak_pv"] = max(e["peak_pv"], k["pv"])
+            gk = max(k.get("grid", 0.0), 0.0); hrf = datetime.now().hour + datetime.now().minute / 60          # 상전 수전량·최대 수전·요금(단가 설정 시)
+            e["grid"] += gk * h; e["grid_peak"] = max(e["grid_peak"], gk); e["grid_cost"] += gk * h * self.rt.gar.price(hrf)
+            if self.rt.tied() and self.rt.gar.band(hrf) == "peak": e["peak_cut"] += max(k["ess"], 0) * h           # 최대부하 시간대에 ESS 가 대신 공급한 전력량
         self._t_en = now
 
     # ── 예측·정밀도(백테스트). 무거우므로 10분마다 백그라운드 갱신
@@ -321,14 +324,7 @@ class Engine:
             import numpy as np
             from ifps_ems import dataio
             from ifps_ems.forecast import LoadForecaster, PVForecaster, BUCKET, bucket_of
-            site = self.rt.site; hist = os.path.join(self.rt.state_dir, "history.csv"); src = "현장 실측 이력(history.csv)"
-            rows = sum(1 for _ in open(hist, encoding="utf-8")) - 1 if os.path.exists(hist) else 0
-            md = self.plan_dir or os.path.join(os.path.dirname(self.cfg_path), "..", "results")
-            if rows < 8 * 96:
-                hist = os.path.join(md, "sample_site_data.csv"); src = "합성 현장 자료(실측 8일 미만)"
-                if not os.path.exists(hist):
-                    if not self.sim: raise ValueError(f"실측 이력이 {rows}줄(8일 = 768줄 필요)입니다. 이력이 쌓이면 자동으로 예측을 시작합니다")
-                    self._make_demo_data(md, site)                    # 시연 모드: 합성 자료와 모델이 없으면 만들어 쓴다
+            site = self.rt.site; hist, md, src = self._forecast_source(site)
             d = dataio.load_csv(hist, site); n = d["n"]
             fl, fp = LoadForecaster(site), PVForecaster(site); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp)
             o = n - 1; l50, llo, lhi, _ = fl.predict(d, o); p50, plo, phi, _ = fp.predict(d, o)
@@ -358,11 +354,25 @@ class Engine:
                            "load_day": round(float(np.mean(day_l)) * 100, 2), "pv_day": round(float(np.mean(day_p)) * 100, 2),
                            "buckets": list(BUCKET), "load_by_h": mk(el), "pv_by_h": mk(ep), "n_issue": len(day_l), "scatter": pts[:400], "limit": 15.0},
                    "daily": daily, "_t": time.time(), "calc_s": None}
+            self.rt.pv_day_kwh = float(np.sum(p50)) * 0.25                     # 자립 지속시간 계산에 쓰는 하루 태양광 예상량
             with self.fc_lock: self.fc_cache = out
         except Exception as e:
             with self.fc_lock: self.fc_cache = {"ok": False, "why": str(e) if isinstance(e, ValueError) else f"예측 계산 실패: {type(e).__name__}: {e}", "_t": time.time()}
         finally:
             self._fc_busy = False
+
+    def _forecast_source(self, site):
+        """예측에 쓸 이력 파일을 고른다. 반환: (이력 경로, 모델 폴더, 출처 설명)"""
+        hist = os.path.join(self.rt.state_dir, "history.csv"); md = self.plan_dir or os.path.join(os.path.dirname(self.cfg_path), "..", "results")
+        rows = 0
+        if os.path.exists(hist):
+            with open(hist, encoding="utf-8") as f: rows = sum(1 for _ in f) - 1
+        if rows >= 8 * 96: return hist, md, "현장 실측 이력(history.csv)"
+        hist = os.path.join(md, "sample_site_data.csv")
+        if not os.path.exists(hist):
+            if not self.sim: raise ValueError(f"실측 이력이 {rows}줄(8일 = 768줄 필요)입니다. 이력이 쌓이면 자동으로 예측을 시작합니다")
+            self._make_demo_data(md, site)                    # 시연 모드: 합성 자료와 모델이 없으면 만들어 쓴다
+        return hist, md, "합성 현장 자료(실측 8일 미만)"
 
     def _make_demo_data(self, md, site):
         """시연용 합성 현장 자료(120일)와 예측 모델을 만든다. 실행 파일(run_sim)을 거치지 않고 기동했거나 results 폴더가 비었을 때."""
@@ -394,7 +404,7 @@ class Engine:
         k = self.kpi(); self._integrate(k)
         self.trend.append([round(time.time() * 1000), round(k["load"], 2), round(k["pv"], 2), round(k["dg"], 2), round(k["fc"], 2), round(k["ess"], 2),
                            round(k["soc"], 2), round(k["h2"], 1), round(k["reserve_margin"], 1)])
-        self._alarms_comm(); self._alarms_process(k); self._alarms_grid(); self._alarms_events()
+        self._alarms_comm(); self._alarms_process(k); self._alarms_grid(); self._alarms_ops(); self._alarms_events()
 
     def _alarms_comm(self):
         """통신·품질 경보."""
@@ -436,8 +446,22 @@ class Engine:
             code = int(round(v.get(f"FLT.{f}", 0)))
             A.set(f"cb.trip.{f}", c > 1.5, 1 if f in ("L1", "DG", "ESS", "G1", "TIE") else 2, f"CB-{f}", f"CB-{f} {FEEDER_TXT[f]} 차단기 트립 — {ANSI.get(code, f'보호요소 {code}')}")
             A.set(f"cb.open.{f}", c < 0.5, 3 if f == "TIE" else 4, f"CB-{f}", f"CB-{f} {FEEDER_TXT[f]} 차단기 개방")
+        rt = self.rt; gc = v.get("CB.GRID")                                    # 주둔지: 수전 차단기·정전
+        if gc is not None:
+            code = int(round(v.get("FLT.GRID", 0))); grid = rt.mode == "grid"
+            A.set("grid.trip", grid and gc > 1.5, 1, "CB-GRID", f"수전 차단기 트립 — {ANSI.get(code, f'보호요소 {code}')}")
+            A.set("grid.out", grid and rt.grid_lost, 1, "GRID", "상전 정전 — 자립 운전으로 전환(무정전: ESS 계통 형성). 디젤·연료전지 자동 투입")
         if "BUS.a_v" in v:
             A.set("bus.a", v["BUS.a_v"] < 300, 1, "BUS-A", "모선 A 무전압(정전)"); A.set("bus.b", v.get("BUS.b_v", 440) < 300, 1, "BUS-B", "모선 B 무전압(정전)")
+
+    def _alarms_ops(self):
+        """군 운용 경보: 자동 부하 차단, 저소음 태세 자원 고갈, 자립 목표 미달."""
+        rt = self.rt; A = self.alarms; s = rt.site; soc = rt.val.get("ESS.soc", 60.0) / 100; h = rt.auto_h or {}
+        for f, nm in (("L3", "3등급"), ("L2", "2등급")):
+            A.set(f"shed.{f}", f in rt.shedder.mine, 2 if f == "L2" else 3, "EMS", f"{nm} 부하 자동 차단 중 — {rt.shedder.why.get(f, '')}")
+        A.set("quiet.low", rt.posture == "저소음" and soc < s.soc_min + 0.06, 1, "EMS", f"저소음 태세: ESS {soc * 100:.0f}% — 자원 고갈 임박. 디젤을 쓰려면 운용 태세를 바꾸십시오")
+        tgt = max(0.0, rt.auto_target_h - (rt.now() - rt.t_posture) / 3600.0)
+        A.set("auto.short", rt.posture == "자립" and bool(h) and h.get("p1", 999) < tgt, 1, "EMS", f"자립 태세: 1등급 부하만으로도 {h.get('p1', 0):.0f}시간 — 남은 목표 {tgt:.0f}시간 미달, 보급 필요")
 
     def _alarms_events(self):
         """사건(지령 실패·차단, 주기 초과, 내부 오류)을 경보로 옮긴다."""
@@ -541,6 +565,25 @@ class Engine:
         if s: self.rt.note("선택", f"{s['dev']} {s['cmd']} 선택 취소", actor=who)
         return {"ok": True}
 
+    def set_ops(self, q, who):
+        """운용 장소(전개지·주둔지)와 운용 태세(평시·저소음·자립) 변경."""
+        mode, posture = q.get("mode"), q.get("posture")
+        if mode is None and posture is None: raise ValueError("mode 또는 posture 가 필요합니다")
+        with self.lock:
+            self.rt.set_ops(mode=mode, posture=posture, who=who)
+            if self.sim and mode is not None and "CB.GRID" in self.plant.by_tag:      # 가상 장치: 주둔지로 바꾸면 수전 차단기를 투입한 상태로 모사
+                self.plant.set("CB.GRID", 1 if mode == "grid" else 0); self.plant.set("FLT.GRID", 0)
+                if mode != "grid": self.plant.set("ESS.kw_set", 0)
+        self.rt.t_ctl = -1e9                                                         # 다음 주기에 곧바로 다시 판단
+        return {"ok": True, "ops": self.ops()}
+
+    def ops(self):
+        rt = self.rt; g = rt.gar; hr = datetime.now().hour + datetime.now().minute / 60
+        return {"mode": rt.mode, "tied": rt.tied(), "outage": rt.mode == "grid" and not rt.tied(), "posture": rt.posture, "autonomy": rt.auto_h, "target_h": rt.auto_target_h,
+                "target_left_h": round(max(0.0, rt.auto_target_h - (rt.now() - rt.t_posture) / 3600.0), 1) if rt.posture == "자립" else None,
+                "shed": sorted(rt.shedder.mine), "shed_why": dict(rt.shedder.why), "garrison": rt.gar_last, "can_grid": any(p["tag"] == "GRID.kw" for p in rt.pts),
+                "gcfg": {"peak_kw": g.peak_kw, "import_min_kw": g.import_min_kw, "reserve_soc": g.reserve_soc, "band": g.band(hr), "priced": bool(g.price_peak or g.price_mid or g.price_off)}}
+
     def set_auto(self, on, who):
         self.auto = bool(on); self.rt.note("운전", f"자동 제어 {'설정' if on else '해제'}", actor=who); return {"ok": True, "auto": self.auto}
 
@@ -615,7 +658,7 @@ class Engine:
         return {"load": load, "pv": pv, "dg": dg, "fc": fc, "ess": ess, "soc": soc, "h2": h2, "fuel": fuel, "l1": g("LOAD.p1_kw"), "l2": g("LOAD.p2_kw"), "l3": g("LOAD.p3_kw"),
                 "gen": pv + dg + fc + max(ess, 0.0), "renew": (min(pv, load) / load * 100) if load > 1 else 0.0, "reserve_margin": margin, "reserve_need": margin < 0,
                 "online_kw": online, "ess_h": ess_h, "h2_h": h2 / (s.fc_kw * s.fc_nm3_per_kwh) if s.fc_kw else None, "fuel_h": fuel / (s.dg_kw * s.dg_l_per_kwh) if s.dg_kw else None,
-                "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "elz": elz, "g1_kw": float(self.cfg.get("g1_kw", 100.0))}
+                "grid": g("GRID.kw"), "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "elz": elz, "g1_kw": float(self.cfg.get("g1_kw", 100.0))}
 
     def _snap_values(self, now):
         rt = self.rt
@@ -648,7 +691,7 @@ class Engine:
                           "avg_ms": round(sum(sm) / len(sm), 1) if sm else None, "p95_ms": round(st[int(len(st) * 0.95) - 1], 1) if len(st) > 20 else None,
                           "scan_s": float(self.cfg.get("scan_s", 1.0)), "wd": {k: (None if t is None else round(now - t, 1)) for k, t in rt.wd.last.items()},
                           "trace_n": self.trace_n, "audit_seq": rt.audit.seq, "hist": hist, "hist_top": round(top, 1)},
-                "sim_state": self.sim_state() if self.sim else None, "energy": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in self.energy.items() if k != "hours"}}
+                "sim_state": self.sim_state() if self.sim else None, "ops": self.ops(), "energy": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in self.energy.items() if k != "hours"}}
 
     def sim_state(self):
         p = self.plant
@@ -733,6 +776,9 @@ class Engine:
         elif a == "manual": p.set(f"{tgt}.mode", 1 if on else 0)
         elif a == "set": self._sim_set(q)
         elif a == "release": self.simdrv.hold.pop(q["tag"], None)
+        elif a == "scenario" and q["name"] in ("grid_outage", "grid_restore"):
+            if "CB.GRID" not in p.by_tag: raise ValueError("수전점 계측이 없음")
+            out = q["name"] == "grid_outage"; p.set("CB.GRID", 0 if out else 1); p.set("FLT.GRID", 27 if out else 0)
         elif a == "scenario": self.simdrv.scenario(q["name"])
         elif a in ("fault", "cb"): self._sim_feeder(q)
         else: raise ValueError(f"동작 없음: {a}")

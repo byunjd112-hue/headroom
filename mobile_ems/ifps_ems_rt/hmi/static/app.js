@@ -1,5 +1,13 @@
 /* IFPS Mobile EMS HMI — 화면 */
 "use strict";
+/* 운용 장소(전개지·주둔지)와 운용 태세(평시·저소음·자립) 표시 */
+function opsChip(s) {
+  const o = s.ops || {}, ko = S.lang === "ko";
+  const place = o.mode === "grid" ? (o.outage ? [ko ? "주둔지 · 정전 자립" : "GARRISON · OUTAGE", "bad"] : [ko ? "주둔지 · 상전 연계" : "GARRISON · GRID", "ok"]) : [ko ? "전개지 · 자립 운전" : "FIELD · ISLAND", "info"];
+  const post = o.posture && o.posture !== "평시" ? `<span class="chip warn"><span class="dot"></span>${ko ? o.posture + " 태세" : (o.posture === "저소음" ? "LOW-NOISE" : "AUTONOMY")}</span>` : "";
+  const shed = (o.shed || []).length ? `<span class="chip bad"><span class="dot"></span>${ko ? "부하 차단 " : "SHED "}${o.shed.map(f => f === "L3" ? "3" : "2").join("·")}${ko ? "등급" : ""}</span>` : "";
+  return `<span class="chip ${place[1]}"><span class="dot"></span>${place[0]}</span>${post}${shed}`;
+}
 const MODE_TXT = { island: ["자립 운전", "ISLAND"], grid: ["계통 연계", "GRID-TIED"], direct: ["직결 운전", "DIRECT"] };
 const LINK_CLS = { "정상": "ok", "경로 저하": "warn", "두절": "bad", "재조회 대기": "info" };
 const LINK_EN = { "정상": "NORMAL", "경로 저하": "DEGRADED", "두절": "LOST", "재조회 대기": "RESYNC" };
@@ -13,7 +21,7 @@ function renderHeader() {
   $("#site").textContent = `${s.site} · ${s.sim ? "SIMULATION" : "LIVE PLANT"}`;
   const m = MODE_TXT[s.mode] || [s.mode, s.mode]; const devs = Object.values(s.devices); const nOk = devs.filter(d => d.link === "정상").length; const nLost = devs.filter(d => d.link === "두절").length;
   $("#chips").innerHTML = [
-    `<span class="chip info"><span class="dot"></span>${S.lang === "ko" ? m[0] : m[1]}</span>`,
+    opsChip(s),
     `<span class="chip ${s.auto ? "ok" : "warn"}"><span class="dot"></span>${s.auto ? (S.lang === "ko" ? "자동 제어" : "AUTO DISPATCH") : (S.lang === "ko" ? "수동 운전" : "MANUAL")}</span>`,
     `<span class="chip ${nLost ? "bad" : nOk === devs.length ? "ok" : "warn"}"><span class="dot"></span>${S.lang === "ko" ? "통신" : "COMMS"} ${devs.length - nLost}/${devs.length}${nLost || nOk === devs.length ? "" : (S.lang === "ko" ? " · 경로 저하" : " · DEGRADED")}</span>`,
     `<span class="chip ${s.run_mode === "운용" ? "ok" : "warn"}"><span class="dot"></span>${s.run_mode === "운용" ? (S.lang === "ko" ? "운용" : "OPERATIONAL") : (S.lang === "ko" ? "개발 모드" : "DEV MODE")}</span>`,
@@ -62,7 +70,7 @@ function ovRight(s) {
   });
   $("#balPill").className = "pill " + (k.ess < -0.5 ? "info" : "ok"); $("#balPill").textContent = k.ess < -0.5 ? `잉여 ${F.kw(-k.ess)}kW → ESS 충전` : k.ess > 0.5 ? `부족 ${F.kw(k.ess)}kW ← ESS` : "수급 균형";
 }
-const TILE = (id, col, lab) => `<div class="panel tile"><div class="lab"><i style="background:var(--${col})"></i>${lab}</div><div class="big" id="${id}">—</div><div class="foot"><span id="${id}a"></span><span id="${id}b"></span></div><canvas class="tspark" id="tsp-${id}"></canvas></div>`;
+const TILE = (id, col, lab) => `<div class="panel tile"><div class="lab"><i style="background:var(--${col})"></i><span id="${id}Lab">${lab}</span></div><div class="big" id="${id}">—</div><div class="foot"><span id="${id}a"></span><span id="${id}b"></span></div><canvas class="tspark" id="tsp-${id}"></canvas></div>`;
 const P_OV = {
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("ov.title", "운전 개요")}</h2><span class="sub" id="ovSub"></span></div>
@@ -85,7 +93,10 @@ const P_OV = {
     set("tPv", `${F.kw(k.pv)}<small>kW</small>`, `재생 비율 ${F.n(k.renew, 0)}%`, `${F.n(k.pv / 4, 0)}% of 400kWp`, bad("PV.kw") ? "stale" : "");
     set("tSoc", `${F.n(k.soc)}<small>%</small>`, k.ess >= 0 ? `방전 ${F.kw(k.ess)}kW` : `충전 ${F.kw(-k.ess)}kW`, k.ess_h ? `자립 ${F.hrs(k.ess_h)}h` : "충전 중", bad("ESS.soc") ? "stale" : k.soc < 19 ? "badc" : k.soc < 25 ? "warnc" : "");
     set("tFuel", `${F.n(k.fuel, 0)}<small>L</small> <span style="font-size:20px">${F.n(k.h2, 0)}<small>Nm³</small></span>`, `디젤 ${F.hrs(k.fuel_h)}h`, `연료전지 ${F.hrs(k.h2_h)}h`, k.h2 < 150 || k.fuel < 300 ? "warnc" : "");
-    set("tRes", `${k.reserve_margin >= 0 ? "+" : ""}${F.n(k.reserve_margin, 0)}<small>kW</small>`, k.reserve_need ? "예비력 부족 → FC 병렬" : "N-1 만족", `병렬 ${k.online_kw.length}대`, k.reserve_need ? "warnc" : "okc");
+    const o = s.ops || {}, au = o.autonomy, hh = x => x >= 999 ? "∞" : F.n(x, 0), tied = o.mode === "grid" && !o.outage;
+    const lab = $("#tResLab"); if (lab) lab.textContent = tied ? "상전 수전" : "N-1 순동 예비력";
+    if (tied) set("tRes", `${F.kw(k.grid)}<small>kW</small>`, `피크 목표 ${F.n(o.gcfg.peak_kw, 0)}kW`, { peak: "최대부하 시간대", off: "경부하 시간대", mid: "중간부하 시간대" }[o.gcfg.band], k.grid > o.gcfg.peak_kw + 2 ? "warnc" : "okc");
+    else set("tRes", `${k.reserve_margin >= 0 ? "+" : ""}${F.n(k.reserve_margin, 0)}<small>kW</small>`, k.reserve_need ? "예비력 부족 → FC 병렬" : "N-1 만족", au ? `자립 ${hh(au.full)}h` : `병렬 ${k.online_kw.length}대`, k.reserve_need ? "warnc" : "okc");
     const d = s.decision;
     set("tAuto", s.auto ? "AUTO" : "MANUAL", d ? `DG ${d.want.DG ? "ON" : "OFF"} · FC ${d.want.FC ? "ON" : "OFF"} · 수전해 ${d.want.ELZ ? "ON" : "OFF"}` : "결정 대기", s.auto ? `다음 ${F.n(s.next_ctrl_s, 0)}s` : "수동", s.auto ? "okc" : "warnc");
     const tw = S.trend.slice(-600);
@@ -93,7 +104,7 @@ const P_OV = {
     siteUpdate(s);
     const sst = siteState(s), nbad = Object.values(sst).filter(x => x.st === "bad").length;
     $("#siteSum").className = "pill " + (nbad ? "bad" : "ok"); $("#siteSum").textContent = nbad ? `이상 ${nbad}개소` : `전 장비 정상 · ${Object.keys(sst).length}개소`;
-    const mix = [["태양광", k.pv, TV("--pv")], ["디젤", k.dg, TV("--dg")], ["연료전지", k.fc, TV("--fc")], ["ESS 방전", Math.max(0, k.ess), TV("--ess")]], gsum = mix.reduce((x, mm) => x + mm[1], 0);
+    const mix = [["태양광", k.pv, TV("--pv")], ["디젤", k.dg, TV("--dg")], ["연료전지", k.fc, TV("--fc")], ["ESS 방전", Math.max(0, k.ess), TV("--ess")]].concat(o.mode === "grid" ? [["상전", Math.max(0, k.grid || 0), TV("--g1")]] : []), gsum = mix.reduce((x, mm) => x + mm[1], 0);
     $("#mixDn").innerHTML = mixDonut(mix, gsum, 132); $("#mixSub").textContent = `부하 ${F.kw(k.load)} kW`;
     $("#mixLeg").innerHTML = mix.map(([n, v, c]) => `<div><i style="background:${c}"></i><span>${n}</span><b class="mono">${F.kw(v)}</b><em>${gsum > 0 ? F.n(v / gsum * 100, 0) : 0}%</em></div>`).join("") + `<div class="ren"><span>재생에너지 비율</span><b>${F.n(k.renew, 0)}%</b></div>`;
     $("#almMtx").innerHTML = alarmMatrix(s.alarms);
@@ -150,11 +161,18 @@ const P_CTL = {
       <div class="col" style="grid-template-rows:auto auto 1fr">
         <div class="panel"><div class="hd"><h3>${t("ctl.auto", "자동 제어 (EMS 급전)")}</h3><div class="spacer"></div><span class="sub" title="① 통신 두절 지령 금지 ② 현장 수동 모드 차단 ③ 작업 잠금 차단 ④ 중복 지령 차단 ⑤ 응답 1.5s·재지령 1회 → 지령 취소·대체 전원 ⑥ 선택 후 10s 내 실행 ⑦ 1등급 부하 차단 금지">연동 조건 ⓘ</span></div><div class="bd">
           <div style="display:flex;gap:8px;align-items:center"><div class="seg" id="autoSeg"><button data-v="1">AUTO</button><button data-v="0">MANUAL</button></div><div class="spacer"></div><button class="btn sm" id="ctlNow">제어 즉시 실행</button></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><span class="lab" style="width:54px">운용 장소</span><div class="seg" id="placeSeg"><button data-v="island">전개지</button><button data-v="grid">주둔지</button></div></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px"><span class="lab" style="width:54px">운용 태세</span><div class="seg" id="postSeg"><button data-v="평시">평시</button><button data-v="저소음">저소음</button><button data-v="자립">자립</button></div></div>
           <div class="kv band" style="margin-top:10px" id="ctlKv"></div><div class="interlock" id="ctlNote"></div></div></div>
         <div class="panel"><div class="hd"><h3>⑥ 차단기 · 부하 관리</h3><div class="spacer"></div><span class="sub">보호 차단은 IED 수행</span></div>
           <div class="bd np"><table class="t tc"><tbody id="cbRows"></tbody></table></div></div>
         <div class="panel"><div class="hd"><h3>${t("ctl.log", "최근 지령")}</h3><div class="spacer"></div><span class="sub" id="qInfo"></span></div><div class="bd np fill-scroll"><table class="t tc"><tbody id="cmdlog"></tbody></table></div></div>
       </div></div>`;
+    const POST_MSG = { "평시": "평시 태세로 바꿉니까?", "저소음": "저소음 태세로 바꿉니까?\n· 디젤 발전기를 기동하지 않습니다(연료전지는 사용)\n· 3등급 부하를 자동으로 차단합니다", "자립": "자립 태세로 바꿉니까?\n· 외부 보급 없이 목표 시간을 버티도록 부하를 단계적으로 관리합니다" };
+    $$("#postSeg button").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); if (!confirm(POST_MSG[b.dataset.v])) return; const r = await api("/api/ops", { posture: b.dataset.v }); toast(r.ok ? `운용 태세: ${b.dataset.v}` : r.why, r.ok ? "ok" : "bad"); });
+    $$("#placeSeg button").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); const g = b.dataset.v === "grid";
+      if (!confirm(g ? "주둔지(상전 연계) 운전으로 바꿉니까?\n· 상전과 ESS 로 운전하고 디젤·연료전지는 정지합니다\n· 역송 없음, 최대부하 시간대 ESS 방전, 정전 시 자립 전환" : "전개지(자립 운전)로 바꿉니까?\n· 상전 없이 자체 전원으로 운전합니다")) return;
+      const r = await api("/api/ops", { mode: b.dataset.v }); toast(r.ok ? `운용 장소: ${g ? "주둔지" : "전개지"}` : r.why, r.ok ? "ok" : "bad"); });
     $$("#autoSeg button").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); const on = b.dataset.v === "1"; if (!on && !confirm("자동 제어를 해제하고 수동 운전으로 전환합니까?")) return; const r = await api("/api/auto", { on }); if (r.ok) toast(`자동 제어 ${on ? "설정" : "해제"}`, "ok"); poll(); });
     $("#ctlNow").onclick = async () => { if (!can("operator")) return loginDialog(); const r = await api("/api/control_now", {}); if (r.ok) toast("제어 주기 즉시 실행", "ok"); };
     if (!L.items) layoutLoad();
@@ -225,11 +243,15 @@ const P_CTL = {
       $("#ctlCnt").textContent = `설비 ${CTL_UNITS.length}종 · 배치 ${L.items.length}대`; $("#ctlCnt").title = q.map(([n, v]) => `${n} ${v}대`).join("\n");
     }
     $$("#autoSeg button").forEach(b => b.classList.toggle("on", (b.dataset.v === "1") === s.auto));
-    const d = s.decision;
-    $("#ctlKv").innerHTML = `<span class="k">운전 정책</span><span class="v" style="font-family:var(--sans)">${esc(s.policy)}</span><span class="k">제어 주기</span><span class="v">${F.n(s.ctrl_s, 0)} s</span>
-      <span class="k">다음 제어까지</span><span class="v">${s.auto ? F.n(s.next_ctrl_s, 0) + " s" : "수동"}</span><span class="k">최근 결정</span><span class="v">${d ? `DG ${d.want.DG ? "ON" : "OFF"} / FC ${d.want.FC ? "ON" : "OFF"} / 수전해 ${d.want.ELZ ? "ON" : "OFF"}` : "—"}</span>
-      <span class="k">계획 결정(DG,FC,ELZ)</span><span class="v">${d ? "(" + d.action.join(", ") + ")" : "—"}</span><span class="k">예비력 규칙</span><span class="v">${d ? (d.reserve ? "작동 → FC 병렬" : "미작동") : "—"}</span>
-      <span class="k">결정 시각 · 연산</span><span class="v">${d ? d.t.slice(11) + " · " + d.ms + "ms" : "—"}</span>`;
+    const d = s.decision, o = s.ops || {}, au = o.autonomy;
+    $("#ctlKv").innerHTML = `<span class="k">운전 정책</span><span class="v" style="font-family:var(--sans)">${esc(s.policy)}</span><span class="k">다음 제어까지</span><span class="v">${s.auto ? F.n(s.next_ctrl_s, 0) + " s" : "수동"}</span><span class="k">최근 결정</span><span class="v">${d ? `DG ${d.want.DG ? "ON" : "OFF"} / FC ${d.want.FC ? "ON" : "OFF"} / 수전해 ${d.want.ELZ ? "ON" : "OFF"}` : "—"}</span>
+      <span class="k">예비력 규칙</span><span class="v">${d ? (d.reserve ? "작동 → FC 병렬" : "미작동") : "—"}</span>
+      <span class="k" title="외부 보급 없이 버티는 시간: 전 부하 / 3등급 차단 / 1등급만">자립 지속(전·3차단·1등급)</span><span class="v">${au ? [au.full, au.shed3, au.p1].map(x => x >= 999 ? "∞" : F.n(x, 0)).join(" / ") + " h" : "—"}</span>
+      ${o.mode === "grid" ? `<span class="k">상전 수전 / 피크 목표</span><span class="v ${o.outage ? "badc" : ""}">${o.outage ? "정전 — 자립 운전" : F.kw(k.grid) + " / " + F.n(o.gcfg.peak_kw, 0) + " kW"}</span>
+      <span class="k">주둔지 제어</span><span class="v" style="font-family:var(--sans);font-size:11px">${o.garrison ? esc(o.garrison.why) : "—"}</span>` : ""}
+      ${(o.shed || []).length ? `<span class="k">부하 자동 차단</span><span class="v badc" style="font-family:var(--sans);font-size:11px">${o.shed.map(f => (f === "L3" ? "3등급" : "2등급")).join(", ")} — ${esc(o.shed_why[o.shed[0]] || "")}</span>` : ""}`;
+    $$("#placeSeg button").forEach(b => { b.classList.toggle("on", b.dataset.v === (o.mode || "island")); b.disabled = b.dataset.v === "grid" && !o.can_grid; });
+    $$("#postSeg button").forEach(b => b.classList.toggle("on", b.dataset.v === (o.posture || "평시")));
     $("#ctlNote").textContent = d && d.policy && d.policy.includes("실패") ? d.policy : "";
     $("#qInfo").textContent = s.busy ? `처리 중: ${s.busy} · 대기 ${s.queue}` : `대기 ${s.queue}`;
     $("#cmdlog").innerHTML = s.cmdlog.length ? s.cmdlog.slice(0, 20).map(e => `<tr title="${esc(e.text)}"><td class="mono">${esc((e.wall || "").slice(11))}</td><td>${esc(e.who || "EMS")}</td><td>${e.ok ? `<span class="pill ok">성공</span>` : `<span class="pill bad">실패</span>`}</td><td class="ell">${esc(e.text)}</td></tr>`).join("") : `<tr><td colspan="4" class="empty">지령 기록 없음</td></tr>`;
@@ -419,7 +441,7 @@ const P_ENG = {
         <div class="panel"><div class="hd"><h3>장치 고장 주입</h3></div><div class="bd np"><table class="t"><thead><tr><th>장치</th><th>무응답 (시간 초과)</th><th>지령 무시 (무응답)</th><th>현장 수동 모드</th></tr></thead><tbody id="simDev"></tbody></table></div>
           <div class="bd"><div class="lab" style="margin-bottom:8px">통신 경로 단절 (전 장치)</div><div style="display:flex;gap:8px" id="simPath"></div></div></div>
         <div class="panel"><div class="hd"><h3>운전 시나리오</h3></div><div class="bd" style="display:flex;flex-wrap:wrap;gap:8px" id="simScn">
-          ${[["load_surge", "부하 급증 +60kW"], ["cloud", "구름 통과 (PV −70%)"], ["night", "야간 (PV 0)"], ["soc_low", "ESS 충전율 22%"], ["soc_critical", "ESS 충전율 17%"], ["h2_low", "수소 잔량 130Nm³"], ["fault_l3", "3등급 급전선 과전류 트립"], ["fault_dg", "디젤 차동(87) 트립"], ["fault_ess", "ESS 지락(64) 트립"], ["tie_open", "모선 연계 개방"], ["normal", "▶ 정상 복귀 (전 고장 해제)"]].map(([k, v]) => `<button class="btn ${k === "normal" ? "go" : ""}" data-s="${k}">${v}</button>`).join("")}</div>
+          ${[["load_surge", "부하 급증 +60kW"], ["cloud", "구름 통과 (PV −70%)"], ["night", "야간 (PV 0)"], ["soc_low", "ESS 충전율 22%"], ["soc_critical", "ESS 충전율 17%"], ["h2_low", "수소 잔량 130Nm³"], ["fault_l3", "3등급 급전선 과전류 트립"], ["fault_dg", "디젤 차동(87) 트립"], ["fault_ess", "ESS 지락(64) 트립"], ["tie_open", "모선 연계 개방"], ["grid_outage", "상전 정전(주둔지)"], ["grid_restore", "상전 복전"], ["normal", "▶ 정상 복귀 (전 고장 해제)"]].map(([k, v]) => `<button class="btn ${k === "normal" ? "go" : ""}" data-s="${k}">${v}</button>`).join("")}</div>
           <div class="bd" style="border-top:1px solid var(--line)"><div class="lab" style="margin-bottom:8px">값 강제 (가상 장치 레지스터)</div><div class="form"><label>TAG<select class="in" id="svTag">${tags.map(x => `<option>${x}</option>`).join("")}</select></label><label>값<input class="in" id="svVal" type="number" step="any" style="width:100px"></label><label style="flex-direction:row;gap:6px;align-items:center;text-transform:none"><input type="checkbox" id="svHold" checked>유지</label><button class="btn eng" id="svGo">적용</button></div>
           <div id="simHold" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"></div></div></div></div>
       <div class="panel" style="margin-top:18px"><div class="hd"><h3>급전선 차단기 · 보호 동작 주입</h3><div class="spacer"></div><span class="sub">보호 IED가 차단기를 트립하고 ANSI 보호요소 코드를 게이트웨이로 보고하는 상황을 모사</span></div>

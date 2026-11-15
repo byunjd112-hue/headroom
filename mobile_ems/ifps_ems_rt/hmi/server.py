@@ -117,6 +117,10 @@ def make_handler(eng):
                     s = self._sess("operator")
                     if s: self._send(200, eng.cancel(b.get("sid", ""), s["name"]))
                     return
+                if p == "/api/ops":
+                    s = self._sess("operator")
+                    if s: self._send(200, eng.set_ops(b, s["name"]))
+                    return
                 if p == "/api/auto":
                     s = self._sess("operator")
                     if s: self._send(200, eng.set_auto(_flag(b.get("on", True)), s["name"]))

@@ -16,6 +16,8 @@ from ifps_ems import supervisor as sv, dispatch as dp, security
 from ifps_ems.config import Site, SUP
 from . import pointmap as pm, modbus as mb
 from .hal import DeviceLink, RtCommander
+from . import opsmode as om
+from ifps_ems.solar import clear_pv_kw
 
 HIST_COLS = ["ts", "load_kw", "load_p1", "load_p2", "load_p3", "pv_kw", "temp", "press", "rh", "plan", "mode"]
 
@@ -44,6 +46,11 @@ class Runtime:
         self.audit = security.AuditLog(os.path.join(self.state_dir, "audit.log"), security.CryptoProvider(key))
         self.policy = None                       # 운전계획 연결 지점: policy(값 사전, 시각) → (디젤, 연료전지, 수전해) 기동 여부. 없으면 규칙 운전
         self.t_ctl = -1e9; self.acc = []; self.slot = None; self.mode = self.cfg.get("mode", "island"); self.plan = int(self.cfg.get("plan", 1))
+        # 군 운용: 운용 장소(전개지 island / 주둔지 grid), 운용 태세(평시·저소음·자립), 자동 부하 차단, 주둔지 설정
+        self.gar = om.Garrison.from_cfg(self.cfg.get("garrison")); self.posture = "평시"; self.auto_enabled = True; self.shedder = om.LoadShedder()
+        self.auto_h = None; self.auto_target_h = float(self.cfg.get("autonomy_target_h", 72.0)); self.t_posture = self.now(); self.pv_day_kwh = None
+        self.grid_lost = False; self.t_grid_ok = None; self.gar_last = None; self._w = {}; self._pvday = (None, 0.0)
+        self._load_ops()
         ok, why = security.crypto_gate(self.audit.c, self.cfg.get("run_mode", "개발"))
         if not ok: raise RuntimeError(why)
 
@@ -123,12 +130,102 @@ class Runtime:
         return self.lm.controllable(n) and not self.hb_stop.get(n, False)
 
     # ── 4) 제어
+    # ── 군 운용 상태
+    def _ops_path(self): return os.path.join(self.state_dir, "ops.json")
+
+    def _load_ops(self):
+        """지난 기동 때의 운용 장소·태세를 이어 쓴다(재기동해도 저소음 태세가 풀리지 않게)."""
+        try:
+            with open(self._ops_path(), encoding="utf-8") as f: o = json.load(f)
+            if o.get("mode") in om.PLACES: self.mode = o["mode"]
+            if o.get("posture") in om.POSTURES: self.posture = o["posture"]
+        except (OSError, ValueError):
+            pass
+
+    def set_ops(self, mode=None, posture=None, who="ems"):
+        if mode is not None:
+            if mode not in om.PLACES: raise ValueError(f"운용 장소 오류: {mode}")
+            if mode == "grid" and "GRID.kw" not in self.val and not any(p["tag"] == "GRID.kw" for p in self.pts): raise ValueError("주둔지 운전에는 수전점 계측(GRID.kw, CB.GRID)이 필요합니다")
+            if mode != self.mode: self.mode = mode; self.grid_lost = False; self.t_grid_ok = None; self.note("운용", f"운용 장소 변경 → {'주둔지(상전 연계)' if mode == 'grid' else '전개지(자립 운전)'}", actor=who)
+        if posture is not None:
+            if posture not in om.POSTURES: raise ValueError(f"운용 태세 오류: {posture}")
+            if posture != self.posture: self.posture = posture; self.t_posture = self.now(); self.note("운용", f"운용 태세 변경 → {posture}", actor=who)
+        tmp = self._ops_path() + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f: json.dump({"mode": self.mode, "posture": self.posture}, f, ensure_ascii=False)
+        os.replace(tmp, self._ops_path())
+
+    def tied(self):
+        """상전에 연계되어 있는가(주둔지이고 수전 차단기 투입, 복전 뒤 안정 시간 경과)."""
+        return self.mode == "grid" and not self.grid_lost and int(round(self.val.get("CB.GRID", 0))) == 1
+
+    def _grid_watch(self, t):
+        """주둔지: 수전 차단기 상태로 정전·복전을 판정한다. 정전이면 곧바로 자립 운전 논리로 넘어간다."""
+        if self.mode != "grid": return
+        closed = int(round(self.val.get("CB.GRID", 0))) == 1
+        if not closed:
+            self.t_grid_ok = None
+            if not self.grid_lost: self.grid_lost = True; self.note("운용", "상전 정전(수전 차단기 개방) — 자립 운전으로 전환"); self._write("ESS", "ESS.kw_set", 0.0, 0.5); self._write("PV", "PV.lim_set", 0.0, 0.5)
+        elif self.grid_lost:
+            if self.t_grid_ok is None: self.t_grid_ok = t
+            if t - self.t_grid_ok >= self.gar.restore_s: self.grid_lost = False; self.note("운용", f"상전 복전 {self.gar.restore_s:.0f}초 안정 — 주둔지 운전 복귀")
+
+    def _write(self, dev, tag, value, tol):
+        """자동 설정값 쓰기. 직전에 쓴 값과 tol 이내면 다시 쓰지 않는다. 지령 가능 상태가 아니면 쓰지 않는다."""
+        lk = self.links.get(dev)
+        if lk is None or tag not in lk.by_tag or not self.lm.controllable(dev): return False
+        if tag in self._w and abs(self._w[tag] - value) <= tol: return True
+        ok = lk.write(tag, value)
+        if ok: self._w[tag] = value
+        return ok
+
+    def _pv_day(self):
+        """하루 태양광 발전량 추정(kWh). 예측이 있으면 그 값, 없으면 맑은 날 가능량의 60%."""
+        if self.pv_day_kwh is not None: return self.pv_day_kwh
+        doy = self.wall().timetuple().tm_yday
+        if self._pvday[0] != doy: self._pvday = (doy, 0.6 * 0.25 * sum(float(clear_pv_kw(self.site, doy, h / 4)) for h in range(96)))
+        return self._pvday[1]
+
+    def fast_control(self):
+        """매 수집 주기(1초)에 도는 빠른 제어: 주둔지 ESS·PV 설정값(역송 방지·피크 억제), 부하 자동 차단·복구, 자립 지속시간.
+        반환: 한 일 목록. 자동 제어가 꺼져 있으면 계산만 하고 쓰지 않는다."""
+        t = self.now(); g = lambda k, d=0.0: self.val.get(k, d); s = self.site; done = []; hr = self.wall().hour + self.wall().minute / 60
+        self._grid_watch(t); tied = self.tied(); soc = g("ESS.soc", 60.0) / 100; quiet = self.posture == "저소음"
+        self.auto_h = om.autonomy(s, soc, g("H2.nm3"), g("DG.fuel_l"), (g("LOAD.p1_kw"), g("LOAD.p2_kw"), g("LOAD.p3_kw")), self._pv_day(), quiet)
+        if tied:
+            r = om.garrison_step(s, self.gar, hr, g("LOAD.kw"), g("PV.kw"), g("ELZ.kw"), soc, g("H2.nm3")); self.gar_last = r
+            if self.auto_enabled:
+                if self._write("ESS", "ESS.kw_set", r["ess"], 1.0): done.append(("ESS.kw_set", r["ess"]))
+                self._write("PV", "PV.lim_set", r["pv_lim"], 1.0)
+        else:
+            self.gar_last = None
+            if self.mode != "grid": self._w.pop("ESS.kw_set", None)
+        # 부하 자동 차단·복구(상전 연계 중에는 공급 능력으로 끊지 않는다)
+        cb = {f: (int(round(self.val[f"CB.{f}"])) if f"CB.{f}" in self.val else None) for f in ("L2", "L3")}
+        if tied: want = {"L3": "", "L2": ""}
+        else:
+            ess_ok = g("ESS.status", 1) > 0.5 and soc > s.soc_min + 0.02
+            avail = (s.ess_kw if ess_ok else 0.0) + float(self.cfg.get("g1_kw", 100.0)) * (g("CB.G1", 1) == 1) + s.dg_kw * (g("DG.status") > 0.5) + s.fc_kw * (g("FC.status") > 0.5) + max(0.0, g("PV.kw"))
+            target = max(0.0, self.auto_target_h - (t - self.t_posture) / 3600.0) if self.posture == "자립" else self.auto_target_h
+            want = om.LoadShedder.want(s, self.posture, soc, avail, g("LOAD.p1_kw") + g("LOAD.p2_kw"), g("LOAD.kw"), self.auto_h, target)
+        mtr = self.links.get("MTR")
+        if self.auto_enabled and mtr is not None and "LDS.L3" in mtr.by_tag and self.lm.controllable("MTR"):
+            for f, act, why in self.shedder.step(t, want, cb, soc, s.soc_min):
+                ok = self.links["MTR"].write(f"LDS.{f}", 2 if act == "shed" else 1); nm = "2등급" if f == "L2" else "3등급"
+                self.note("지령", f"부하 자동 {'차단' if act == 'shed' else '복구'}: {nm}({f}) — {why}{'' if ok else ' (쓰기 실패)'}"); done.append((f, act))
+        return done
+
     def decide(self):
         g = lambda k, d=0.0: self.val.get(k, d); hr = self.wall().hour + self.wall().minute / 60
+        if self.tied():                                               # 주둔지 상전 연계: 디젤·연료전지는 쉬고 상전과 ESS 로 운전(수전해는 남는 전력이 있을 때만)
+            r = self.gar_last or {}; return {"DG": False, "FC": False, "_policy": (0, 0, int(bool(r.get("elz")))), "_garrison": True}
         if self.policy: a = self.policy(dict(self.val), hr)
         else: a = dp.rule_action(self.site, g("ESS.soc", 60.0) / 100, g("H2.nm3", self.site.h2_nm3 * 0.7), int(g("DG.status")), int(g("FC.status")), g("LOAD.kw"), g("PV.kw"), hr)
+        if self.posture == "저소음" and a[0]:                         # 저소음 태세: 디젤 금지. 연료전지로 대신하고(수소가 있으면) 3등급 부하는 자동 차단
+            h2_ok = g("H2.nm3") > self.site.h2_nm3 * self.site.h2_min * 1.2
+            a = (0, 1 if h2_ok else int(a[1]), 0)
         want = {"DG": bool(a[0]), "FC": bool(a[1]), "_policy": tuple(int(x) for x in a)}
-        if self.mode == "island":                                     # 자립 운전 N-1 순동 예비력
+        if self.posture == "저소음": want["_quiet"] = True
+        if self.mode in ("island", "grid"):                           # 자립 운전(전개지, 또는 주둔지 정전 중) N-1 순동 예비력
             online = [self.site.ess_kw] * int(g("ESS.status", 1)) + [self.cfg.get("g1_kw", 100.0)] + [self.site.dg_kw] * int(want["DG"]) + [self.site.fc_kw] * int(want["FC"])
             if dp.reserve_need(g("LOAD.p1_kw") + g("LOAD.p2_kw"), online): want["FC"] = True; want["_reserve"] = True
         return want
@@ -173,7 +270,7 @@ class Runtime:
     def run(self, n=None, sleep=time.sleep):
         period = self.cfg.get("scan_s", 1.0); k = 0; nxt = self.clock()
         while n is None or k < n:
-            a = self.clock(); self.scan(); self.control(); k += 1
+            a = self.clock(); self.scan(); self.fast_control(); self.control(); k += 1
             dt = self.clock() - a; self.max_scan_s = max(self.max_scan_s, dt)
             if dt > period: self.n_over += 1; self.note("주기", f"주기 초과 {dt:.2f}초")
             stuck = self.wd.check(self.now())

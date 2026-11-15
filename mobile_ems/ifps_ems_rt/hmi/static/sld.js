@@ -3,9 +3,10 @@
 "use strict";
 const BUS_Y = 316, SY = 78, SR = 48, LY = 474, LR = 42;
 const SRC = [
-  { id: "PV", name: "태양광 PV", en: "SOLAR PV", x: 100, col: "pv", kw: "PV.kw", sub: "80kWp × 5", bus: "A" },
-  { id: "DG", name: "디젤 발전기", en: "DIESEL GEN", x: 255, col: "dg", kw: "DG.kw", sub: "100kW", bus: "A" },
-  { id: "FC", name: "수소 연료전지", en: "FUEL CELL", x: 405, col: "fc", kw: "FC.kw", sub: "100kW", bus: "A" },
+  { id: "GRID", name: "상전 수전", en: "UTILITY GRID", x: 70, col: "g1", kw: "GRID.kw", sub: "22.9kV 수전", bus: "A" },
+  { id: "PV", name: "태양광 PV", en: "SOLAR PV", x: 195, col: "pv", kw: "PV.kw", sub: "80kWp × 5", bus: "A" },
+  { id: "DG", name: "디젤 발전기", en: "DIESEL GEN", x: 320, col: "dg", kw: "DG.kw", sub: "90kW", bus: "A" },
+  { id: "FC", name: "수소 연료전지", en: "FUEL CELL", x: 440, col: "fc", kw: "FC.kw", sub: "100kW", bus: "A" },
   { id: "ESS", name: "ESS (PCS)", en: "ESS (PCS)", x: 690, col: "ess", kw: "ESS.kw", sub: "1MWh / 500kW", bus: "B" },
   { id: "G1", name: "복합전력 G1", en: "HYBRID G1", x: 880, col: "g1", kw: null, sub: "100kW 계통 형성", bus: "B" },
 ];
@@ -21,6 +22,7 @@ const ICON = {
   FC: '<circle cx="7.5" cy="12" r="3.2"/><circle cx="16.5" cy="12" r="3.2"/><path d="M10.7 12h2.6M5.5 4.5v3M18.5 16.5v3"/>',
   ESS: '<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M19 10.5h2v3h-2M11.5 9 9 12.5h3.5L10 15.5"/>',
   G1: '<path d="M12 3 7.5 21M12 3l4.5 18M8.8 15.5h6.4M10 10.5h4M5 7.5h14M9 21h6"/>',
+  GRID: '<path d="M12 3 7.5 21M12 3l4.5 18M8.8 15.5h6.4M10 10.5h4M5 7.5h14M9 21h6"/>',
   L: '<path d="M4 21V9l6-3.5V21M10 21v-9.5h10V21M13 14.5h1.5M16.5 14.5H18M13 17.5h1.5M16.5 17.5H18M2.5 21h19"/>',
 };
 const hexPts = (cx, cy, r) => Array.from({ length: 6 }, (_, k) => { const a = Math.PI / 180 * (60 * k - 90); return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`; }).join(" ");
@@ -88,8 +90,9 @@ function sldUpdate(s) {
   const cbv = f => { const v = val("CB." + f); return (!gw || v === null || v === undefined) ? null : Math.round(v); };   // 1 투입, 0 개방, 2 트립, null 미상
   const closed = f => cbv(f) === null ? true : cbv(f) === 1;
   const code = f => Math.round(val("FLT." + f) || 0);
-  const devLost = id => id === "PV" || id === "G1" ? !gw : (D[id] ? D[id].link === "두절" : false);
-  const running = { PV: k.pv > 0.5, DG: !!(D.DG && D.DG.on), FC: !!(D.FC && D.FC.on), ESS: val("ESS.status") > 0.5, G1: true };
+  const devLost = id => id === "PV" || id === "G1" || id === "GRID" ? !gw : (D[id] ? D[id].link === "두절" : false);
+  const ops = s.ops || {}, garr = ops.mode === "grid";
+  const running = { PV: k.pv > 0.5, DG: !!(D.DG && D.DG.on), FC: !!(D.FC && D.FC.on), ESS: val("ESS.status") > 0.5, G1: true, GRID: garr && cbv("GRID") === 1 };
   // 모선 통전: 실측 전압 우선
   const est = bus => SRC.some(n => n.bus === bus && n.id !== "PV" && running[n.id] && closed(n.id));
   let aLive = est("A"), bLive = est("B"); if (closed("TIE")) { const x = aLive || bLive; aLive = bLive = x; }
@@ -102,7 +105,7 @@ function sldUpdate(s) {
     const fm = $("#fm-" + f); if (fm) { fm.style.display = c === 2 ? "" : "none"; $("#fmt-" + f).textContent = "⚡ " + (ANSI_TXT[code(f)] || (ko ? "보호 동작 " : "PROT ") + code(f)); }
   };
   const st = (id, txt, col) => { const e = $("#st-" + id); if (e) { e.textContent = txt; e.setAttribute("fill", col); } };
-  const pk = { PV: k.pv, DG: k.dg, FC: k.fc, ESS: k.ess, G1: 0 };
+  const pk = { PV: k.pv, DG: k.dg, FC: k.fc, ESS: k.ess, G1: 0, GRID: k.grid || 0 };
   SRC.forEach(n => {
     const lost = devLost(n.id), c = cbv(n.id), trip = c === 2, on = running[n.id] && !lost, g = $("#n-" + n.id);
     g.setAttribute("class", "node " + (trip ? "flt" : lost ? "lost" : on ? "on" : "off"));
@@ -110,10 +113,11 @@ function sldUpdate(s) {
     sldArt(n.id, { on: n.id === "G1" ? !!(D.DG && D.DG.on) : on, lost, soc: n.id === "ESS" ? Math.round(k.soc / 5) * 5 : undefined });
     cbDraw(n.id);
     setCls("lu-" + n.id, "ln " + (trip ? "flt" : on ? "on" : "off")); setCls("ld-" + n.id, "ln " + (live[n.bus] ? "on" : "off"));
-    const flowing = closed(n.id) && on && n.kw; setFlow(n.id, flowing ? pk[n.id] : 0, n.id === "PV" ? 400 : n.id === "ESS" ? 300 : 100);
+    const flowing = closed(n.id) && on && n.kw; setFlow(n.id, flowing ? pk[n.id] : 0, n.id === "PV" ? 400 : n.id === "ESS" || n.id === "GRID" ? 300 : 100);
     $("#fv-" + n.id).textContent = flowing && Math.abs(pk[n.id]) > 0.5 ? `${pk[n.id] < 0 ? "▲" : "▼"} ${F.kw(Math.abs(pk[n.id]))}` : "";
     if (trip) st(n.id, (ko ? "차단기 트립 · " : "CB TRIP · ") + (ANSI_TXT[code(n.id)] || code(n.id)), "var(--alarm)");
     else if (lost) st(n.id, ko ? "통신 두절" : "COMM LOSS", "var(--alarm)");
+    else if (n.id === "GRID") st(n.id, !garr ? (ko ? "미연계(전개지)" : "NOT CONNECTED") : c === 1 ? (ops.outage ? (ko ? "복전 확인 중" : "RESTORING") : (ko ? "수전 중" : "IMPORTING")) : (ko ? "정전 · 자립 전환" : "OUTAGE"), !garr ? "var(--muted)" : c === 1 && !ops.outage ? "var(--ok)" : "var(--alarm)");
     else if (c === 0) st(n.id, ko ? "차단기 개방 · 분리" : "CB OPEN · ISOLATED", "var(--warn)");
     else if (n.id === "PV") st(n.id, k.pv > 0.5 ? (ko ? "발전 중" : "GENERATING") : (ko ? "발전 없음" : "IDLE"), k.pv > 0.5 ? "var(--pv)" : "var(--muted)");
     else if (n.id === "ESS") st(n.id, k.ess > 0.5 ? (ko ? "방전" : "DISCHARGING") : k.ess < -0.5 ? (ko ? "충전" : "CHARGING") : (ko ? "대기" : "STANDBY"), "var(--ess)");

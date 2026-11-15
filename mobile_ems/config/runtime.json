@@ -10,6 +10,37 @@
  "run_mode": "개발",
  "plan": 1,
  "g1_kw": 100.0,
+ "autonomy_target_h": 72,
+ "garrison": {
+  "peak_kw": 150,
+  "import_min_kw": 5,
+  "reserve_soc": 0.5,
+  "charge_kw": 150,
+  "peak_hours": [
+   [
+    10,
+    12
+   ],
+   [
+    13,
+    17
+   ]
+  ],
+  "offpeak_hours": [
+   [
+    23,
+    24
+   ],
+   [
+    0,
+    9
+   ]
+  ],
+  "price_peak": 0,
+  "price_mid": 0,
+  "price_off": 0,
+  "restore_s": 30
+ },
  "pointmap": "pointmap.csv",
  "state_dir": "state",
  "devices": {
@@ -102,7 +133,10 @@
  "site": {
   "name": "IFPS-FOB-01",
   "lat": 37.5,
-  "lon": 127.0
+  "lon": 127.0,
+  "dg_kw": 90.0,
+  "elz_kw": 150.0,
+  "h2_min": 0.3
  },
  "hmi": {
   "bind": "127.0.0.1",
