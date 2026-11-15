@@ -38,7 +38,7 @@ function sldSvg() {
   const hex = (n, cy, r, color, icon, isLoad) => `<g class="node" id="n-${n.id}">
     <clipPath id="cp-${n.id}"><rect x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" rx="12"/></clipPath>
     <rect class="hexbg" x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" rx="12"/>
-    <image href="${EQ_IMG[n.id] || EQ_IMG.DIST}" x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" preserveAspectRatio="xMidYMid slice" clip-path="url(#cp-${n.id})" class="eqimg"/>
+    <g clip-path="url(#cp-${n.id})"><g id="art-${n.id}" data-x="${n.x - r * 1.18}" data-y="${cy - r * .8}" data-w="${r * 2.36}" data-h="${r * 1.6}" class="eqimg"></g></g>
     <rect class="hexo" x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" rx="12" style="fill:none"/>
     <circle class="sdot" cx="${n.x + r * 1.18 - 10}" cy="${cy - r * .8 + 10}" r="5"/>
     <g class="ico" style="display:none" stroke="${color}" transform="translate(${n.x - 16.8},${cy - 16.8}) scale(1.4)">${icon}</g>
@@ -77,6 +77,10 @@ function setFlow(id, kw, cap, on = true) {
 }
 
 /* 상태 갱신 */
+function sldArt(id, st) {
+  const g = document.getElementById("art-" + id); if (!g) return; const sig = JSON.stringify(st); if (g.dataset.sig === sig) return; g.dataset.sig = sig;
+  g.innerHTML = isoArt(EQ_KIND[id] || "DIST", st, 400, 250, 6).replace("<svg ", `<svg x="${g.dataset.x}" y="${g.dataset.y}" width="${g.dataset.w}" height="${g.dataset.h}" `);
+}
 function sldUpdate(s) {
   const k = s.kpi, D = s.devices, ko = S.lang === "ko", gw = D.MTR && D.MTR.link !== "두절";     // 보호 IED 게이트웨이(MTR) 통신
   const cbv = f => { const v = val("CB." + f); return (!gw || v === null || v === undefined) ? null : Math.round(v); };   // 1 투입, 0 개방, 2 트립, null 미상
@@ -101,6 +105,7 @@ function sldUpdate(s) {
     const lost = devLost(n.id), c = cbv(n.id), trip = c === 2, on = running[n.id] && !lost, g = $("#n-" + n.id);
     g.setAttribute("class", "node " + (trip ? "flt" : lost ? "lost" : on ? "on" : "off"));
     if (n.kw) $("#kw-" + n.id).textContent = lost ? "####" : F.kw(pk[n.id]);
+    sldArt(n.id, { on: n.id === "G1" ? !!(D.DG && D.DG.on) : on, lost, soc: n.id === "ESS" ? Math.round(k.soc / 5) * 5 : undefined });
     cbDraw(n.id);
     setCls("lu-" + n.id, "ln " + (trip ? "flt" : on ? "on" : "off")); setCls("ld-" + n.id, "ln " + (live[n.bus] ? "on" : "off"));
     const flowing = closed(n.id) && on && n.kw; setFlow(n.id, flowing ? pk[n.id] : 0, n.id === "PV" ? 400 : n.id === "ESS" ? 300 : 100);
@@ -121,6 +126,7 @@ function sldUpdate(s) {
     cbDraw(n.id); setCls("lu-" + n.id, "ln " + (live[n.bus] ? "on" : "off")); setCls("ld-" + n.id, "ln " + (trip ? "flt" : fed ? "on" : "off"));
     $("#n-" + n.id).setAttribute("class", "node " + (trip ? "flt" : fed ? "on" : "off"));
     $("#kw-" + n.id).textContent = gw ? F.kw(kw) : "####"; setFlow(n.id, fed ? kw : 0, 150);
+    sldArt(n.id, { on: fed, lost: trip });
     $("#fv-" + n.id).textContent = fed && kw > 0.5 ? `▼ ${F.kw(kw)}` : "";
     if (trip) st(n.id, (ko ? "트립 · " : "TRIP · ") + (ANSI_TXT[code(n.id)] || code(n.id)), "var(--alarm)");
     else if (!fed) st(n.id, c === 0 ? (ko ? "차단기 개방 · 정전" : "CB OPEN · DE-ENERGIZED") : (ko ? "무전압 · 정전" : "DE-ENERGIZED"), "var(--warn)");
