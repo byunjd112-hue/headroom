@@ -65,6 +65,7 @@ def make_handler(eng):
                 if p == "/api/forecast": return self._send(200, {k: v for k, v in eng.forecast(q.get("force") == "1").items() if not k.startswith("_")})
                 if p == "/api/energy": return self._send(200, eng.energy_hours())
                 if p == "/api/layout": return self._send(200, eng.layout())
+                if p == "/api/photos": return self._send(200, eng.photos())
                 if p == "/api/mb/read":
                     if self._sess("operator") is None: return
                     return self._send(200, eng.mb_read(q))

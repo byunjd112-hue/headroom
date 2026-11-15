@@ -660,6 +660,10 @@ class Engine:
         if os.path.exists(pth): os.replace(pth, pth + ".bak")
         self.rt.note("배치", "작전지 배치 기본값 복원(이전 배치는 layout.json.bak)", actor=who); return {"ok": True}
 
+    def photos(self):
+        d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "photos")
+        return {"files": sorted(f for f in os.listdir(d) if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))) if os.path.isdir(d) else []}
+
     def energy_hours(self):
         return {"day": self.energy["day"], "cols": ["pv", "dg", "fc", "ess_dis", "load", "ess_chg"], "hours": [[round(x, 3) for x in r] for r in self.energy["hours"]]}
 

@@ -17,11 +17,13 @@ function siteState(s) {
   ["L1", "L2", "L3"].forEach((f, i) => { const kw = [k.l1, k.l2, k.l3][i], c = cb(f); out[f] = c === 2 ? r("bad", "0 kW", "트립 · 정전") : c === 0 ? r("idle", "0 kW", "개방") : r("ok", `${F.kw(kw)} kW`, "급전 중"); });
   return out;
 }
-/* 장비 카드: 자체 벡터 일러스트 + 상태 띠 */
+/* 장비 카드: photos/ 폴더에 실사 이미지가 있으면 사진, 없으면 자체 벡터 일러스트 + 상태 띠 */
+api("/api/photos").then(r => { S.photos = r.files || []; }).catch(() => { S.photos = []; });
 function equipPhoto(kind, st = {}) {
   const cls = st.lost || st.fault ? "bad" : st.on ? "ok" : "idle";
   const tag = st.lost ? "COMM LOSS" : st.fault ? "FAULT" : st.on ? "RUNNING" : "STANDBY";
-  return `<div class="eqph ${cls}">${isoArt(EQ_KIND[kind] || "DIST", st, 400, 250)}<span class="eqtag"><i></i>${tag}</span>${st.value !== undefined && st.value !== null && st.value !== "" ? `<span class="eqval mono">${st.value}</span>` : ""}</div>`;
+  const pk = { G1: "dg", DG: "dg", MTR: "dist", FC: "fc" }[kind] || String(kind).toLowerCase(), ph = (S.photos || []).find(f => f.split(".")[0] === pk);
+  return `<div class="eqph ${cls} ${ph ? "photo" : ""}">${ph ? `<img src="photos/${ph}" alt="${kind}" loading="lazy">` : isoArt(EQ_KIND[kind] || "DIST", st, 400, 250)}<span class="eqtag"><i></i>${tag}</span>${st.value !== undefined && st.value !== null && st.value !== "" ? `<span class="eqval mono">${st.value}</span>` : ""}</div>`;
 }
 /* 도넛(발전원 구성) */
 function mixDonut(parts, total, size = 148) {

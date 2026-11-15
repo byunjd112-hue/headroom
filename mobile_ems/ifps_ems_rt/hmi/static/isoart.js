@@ -11,6 +11,10 @@ class Iso {
   poly(a, fill, extra = "") { return `<polygon points="${this.pts(a)}" fill="${fill}" stroke="#0b0d08" stroke-opacity=".38" stroke-width="${Math.max(.5, this.S * .035).toFixed(2)}" stroke-linejoin="round" ${extra}/>`; }
   ground(x0, y0, x1, y1) { return `<polygon points="${this.pts([[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]])}" fill="url(#${this.id}gr)"/><polygon points="${this.pts([[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]])}" fill="url(#${this.id}gv)" opacity=".3"/>`; }
   box(x, y, z, w, d, h, c = OD, extra = "") {
+    return this._box(x, y, z, w, d, h, c, extra) + (h > .5 ? this.poly([[x, y + d, z], [x + w, y + d, z], [x + w, y + d, z + Math.min(.6, h * .35)], [x, y + d, z + Math.min(.6, h * .35)]], "#000", 'stroke="none" opacity=".16"') +
+      `<polyline points="${this.pts([[x, y + d, z + h], [x + w, y + d, z + h], [x + w, y, z + h]])}" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="${Math.max(.6, this.S * .04).toFixed(2)}"/>` : "");
+  }
+  _box(x, y, z, w, d, h, c = OD, extra = "") {
     return this.poly([[x, y, z + h], [x + w, y, z + h], [x + w, y + d, z + h], [x, y + d, z + h]], c.t, extra) +
       this.poly([[x, y + d, z], [x + w, y + d, z], [x + w, y + d, z + h], [x, y + d, z + h]], c.l, extra) +
       this.poly([[x + w, y, z], [x + w, y + d, z], [x + w, y + d, z + h], [x + w, y, z + h]], c.r, extra);
@@ -31,6 +35,9 @@ class Iso {
       <path d="M1.9 1.1 C2.6 .9 3.2 1.4 2.8 1.9 C2.4 2.3 1.7 1.8 1.9 1.1Z" fill="#3a2f22"/><path d="M.4 1.4 C1.0 1.2 1.5 1.6 1.2 2.0 C.9 2.3 .3 2.0 .4 1.4Z" fill="#6c7448"/></pattern>
     <radialGradient id="${this.id}gr" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#3a3d31" stop-opacity=".9"/><stop offset="1" stop-color="#3a3d31" stop-opacity="0"/></radialGradient>
     <pattern id="${this.id}gv" patternUnits="userSpaceOnUse" width="7" height="5"><circle cx="1" cy="1" r=".7" fill="#6b6b5c"/><circle cx="4.5" cy="2.4" r=".6" fill="#55554a"/><circle cx="2.6" cy="4" r=".5" fill="#77776a"/><circle cx="6" cy="4.4" r=".45" fill="#4a4a40"/></pattern>
+    <filter id="${this.id}tx" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="${(2.2 / this.S).toFixed(3)} ${(1.1 / this.S).toFixed(3)}" numOctaves="3" seed="7" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0" result="g"/><feComposite in="SourceGraphic" in2="g" operator="arithmetic" k1=".62" k2=".72" k3="0" k4="-.02" result="m"/>
+      <feComposite in="m" in2="SourceAlpha" operator="in" result="t"/><feDropShadow dx="0" dy="${(this.S * .08).toFixed(1)}" stdDeviation="${(this.S * .12).toFixed(1)}" flood-color="#000" flood-opacity=".45"/></filter>
     <radialGradient id="${this.id}lamp"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="currentColor"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></radialGradient></defs>`;
   }
 }
@@ -184,7 +191,7 @@ function isoArt(kind, st = {}, W = 400, H = 250, pad = 14) {
   const S = Math.min((W - 2 * pad) / ((Lx + Ly) * ISO_C), (H - 2 * pad) / ((Lx + Ly) * ISO_S + Lz));
   const ox = (W - (Lx + Ly) * ISO_C * S) / 2 + (Ly + oy0) * ISO_C * S, oy = (H - ((Lx + Ly) * ISO_S + Lz) * S) / 2 + Lz * S - oy0 * ISO_S * S;
   const I = new Iso(ox, oy, S);
-  return `<svg viewBox="0 0 ${W} ${H}" class="isoart" preserveAspectRatio="xMidYMid meet">${I.defs()}${I.ground(-1.5, -1.2, Lx + 1, Ly + 1)}${ISO_MODELS[kind] ? ISO_MODELS[kind](I, st) : ""}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="isoart" preserveAspectRatio="xMidYMid meet">${I.defs()}${I.ground(-1.5, -1.2, Lx + 1, Ly + 1)}<g filter="url(#${I.id}tx)">${ISO_MODELS[kind] ? ISO_MODELS[kind](I, st) : ""}</g></svg>`;
 }
 /* 다른 SVG 안에 넣는 그룹(배치도용): 기준점(px,py)에 축척 S로 */
-function isoPlace(kind, st, px, py, S) { const I = new Iso(px, py, S); return `<g>${I.defs()}${ISO_MODELS[kind](I, st)}</g>`; }
+function isoPlace(kind, st, px, py, S) { const I = new Iso(px, py, S); return `<g>${I.defs()}<g filter="url(#${I.id}tx)">${ISO_MODELS[kind](I, st)}</g></g>`; }
