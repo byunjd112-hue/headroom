@@ -166,6 +166,7 @@ function siteUpdate(s, force) {
       const x = document.getElementById("mx-" + i); if (x) x.style.display = c === 2 ? "" : "none";
     });
   }
+  const mk = $("#siteMk"); if (mk && !L.edit && !mk.children.length) siteMarkers();
   $$("#siteMk .spt").forEach(e => { const it = L.items.find(i => i.uid === e.dataset.uid); if (!it) return; const x = st[it.bind] || { st: "ok", v: "", t: "" };
     e.className = `spt ${e.classList.contains("mini") ? "mini" : ""} ${x.st}`; e.querySelector(".sv .mono").textContent = x.v; e.querySelector(".ss").textContent = x.t; });
   const sum = $("#layCnt"); if (sum) { const c = k => L.items.filter(i => i.kind === k).length; sum.textContent = `장비 ${L.items.filter(i => !["FSU", "BARRACK", "L1", "L2", "L3"].includes(i.kind)).length} · 막사 ${c("BARRACK")} · 시설 ${c("L1") + c("L2") + c("L3")} · FSU ${c("FSU")}`; }

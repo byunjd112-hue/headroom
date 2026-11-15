@@ -37,7 +37,7 @@ async function ack(ids) { if (!can("operator")) return loginDialog(); const r = 
 /* ════════════════ 1. 개요 */
 /* 개요 오른쪽: 발전원·부하 현황, 금일 시간대별 발전량, ESS */
 function spark(c, ys, color, H = 30, lo = null, hi = null) {
-  const dpr = window.devicePixelRatio || 1, W = c.clientWidth; if (!W) return; c.style.height = H + "px";
+  const dpr = DPR(), W = c.clientWidth; if (!W) return; c.style.height = H + "px";
   if (c.width !== Math.round(W * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
   const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); if (ys.length < 2) return;
   const mn = lo ?? Math.min(0, ...ys), mx = hi ?? Math.max(1, ...ys) * 1.1, X = i => i / (ys.length - 1) * W, Y = v => H - 2 - (v - mn) / (mx - mn || 1) * (H - 4);
@@ -48,7 +48,7 @@ function ovRight(s) {
   const k = s.kpi, D = s.devices, devOk = n => D[n] && D[n].link !== "두절";
   const rows = [["PV", "태양광", k.pv, 400, TV("--pv"), 2, true], ["DG", "디젤", k.dg, 100, TV("--dg"), 3, D.DG && D.DG.on], ["FC", "연료전지", k.fc, 100, TV("--fc"), 4, D.FC && D.FC.on],
     ["ESS", "ESS", k.ess, 500, TV("--ess"), 5, true], ["LOAD", "총 부하", k.load, 400, TV("--load"), 1, true]];
-  const box = $("#srcRows");
+  const box = $("#srcRows"); if (!box) return;
   if (!box.dataset.built) { box.dataset.built = 1; box.innerHTML = rows.map(r => `<div class="srow"><span class="nm"><i style="background:${r[4]}"></i>${r[1]}</span><span class="v mono" id="sv-${r[0]}">—</span>
       <span class="sb"><i id="sb-${r[0]}" style="background:${r[4]}"></i></span><canvas class="sp" id="sp-${r[0]}"></canvas><span class="ss" id="ss-${r[0]}"></span></div>`).join(""); }
   const win = S.trend.slice(-900);
@@ -58,98 +58,72 @@ function ovRight(s) {
     $("#sb-" + id).style.width = Math.min(100, Math.abs(v) / cap * 100) + "%";
     const ss = $("#ss-" + id); ss.textContent = lost ? "두절" : id === "ESS" ? (v < -0.5 ? "충전" : v > 0.5 ? "방전" : "대기") : id === "LOAD" ? "급전" : on && Math.abs(v) > 0.5 ? "운전" : "정지";
     ss.className = "ss " + (lost ? "bad" : ss.textContent === "정지" || ss.textContent === "대기" ? "" : "on");
-    spark($("#sp-" + id), win.map(r => r[ci]), col);
+    spark($("#sp-" + id), win.map(r => r[ci]), col, 26);
   });
-  const gen = k.pv + k.dg + k.fc + Math.max(0, k.ess);
-  $("#bGen").textContent = F.kw(gen) + " kW"; $("#bLoad").textContent = F.kw(k.load) + " kW"; $("#bEss").textContent = (k.ess < -0.5 ? "충전 " : k.ess > 0.5 ? "방전 " : "") + F.kw(Math.abs(k.ess)) + " kW";
   $("#balPill").className = "pill " + (k.ess < -0.5 ? "info" : "ok"); $("#balPill").textContent = k.ess < -0.5 ? `잉여 ${F.kw(-k.ess)}kW → ESS 충전` : k.ess > 0.5 ? `부족 ${F.kw(k.ess)}kW ← ESS` : "수급 균형";
-  // ESS
-  $("#socBig").innerHTML = `${F.n(k.soc, 1)}<small>%</small>`; $("#socBig").className = "big " + (k.soc < 19 ? "badc" : k.soc < 25 ? "warnc" : "");
-  $("#socDir").textContent = k.ess < -0.5 ? `▲ 충전 ${F.kw(-k.ess)} kW` : k.ess > 0.5 ? `▼ 방전 ${F.kw(k.ess)} kW` : "대기";
-  $("#socFill").style.width = Math.max(0, Math.min(100, k.soc)) + "%"; $("#socFill").style.background = k.soc < 19 ? "#ff4d64" : k.soc < 25 ? "#ffb547" : "linear-gradient(90deg,#7c5cff,var(--ess))";
-  spark($("#socSpark"), win.map(r => r[6]), TV("--ess"), 54, 0, 100);
-  $("#eKw").textContent = `${k.ess >= 0 ? "+" : ""}${F.kw(k.ess)} kW`; $("#eKwh").textContent = `${F.n(Math.max(0, (k.soc / 100 - 0.15) * 1000), 0)} kWh`; $("#eH").textContent = k.ess_h ? `${F.hrs(k.ess_h)} h` : "—";
-  $("#essPill").className = "pill " + (devOk("ESS") ? (k.soc < 25 ? "warn" : "ok") : "bad"); $("#essPill").textContent = devOk("ESS") ? (k.ess < -0.5 ? "충전" : k.ess > 0.5 ? "방전" : "대기") : "두절";
-  // 금일 시간대별 (15초마다)
-  const e = s.energy; $("#dayTot").textContent = `발전 ${F.n(e.pv + e.dg + e.fc, 1)} · 부하 ${F.n(e.load, 1)} kWh`;
-  if (!P_OV._hrT || Date.now() - P_OV._hrT > 15000 || !P_OV._hrs) { P_OV._hrT = Date.now(); api("/api/energy").then(r => { P_OV._hrs = r.hours; if ($("#ovHr")) drawHourly($("#ovHr"), r.hours, 170); }); }
-  else if ($("#ovHr")) drawHourly($("#ovHr"), P_OV._hrs, 170);
 }
+const TILE = (id, col, lab) => `<div class="panel tile"><div class="lab"><i style="background:var(--${col})"></i>${lab}</div><div class="big" id="${id}">—</div><div class="foot"><span id="${id}a"></span><span id="${id}b"></span></div><canvas class="tspark" id="tsp-${id}"></canvas></div>`;
 const P_OV = {
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("ov.title", "운전 개요")}</h2><span class="sub" id="ovSub"></span></div>
-    <div class="tiles">
-      <div class="panel tile"><div class="lab"><i style="background:var(--load)"></i>${t("k.load", "총 부하")}</div><div class="big" id="tLoad">—<small>kW</small></div><div class="foot"><span id="tL12"></span><span id="tL3"></span></div><canvas class="tspark" id="tsp-load"></canvas></div>
-      <div class="panel tile"><div class="lab"><i style="background:var(--pv)"></i>${t("k.pv", "태양광 발전")}</div><div class="big" id="tPv">—<small>kW</small></div><div class="foot"><span id="tRen"></span><span id="tPvCap"></span></div><canvas class="tspark" id="tsp-pv"></canvas></div>
-      <div class="panel tile"><div class="lab"><i style="background:var(--ess)"></i>${t("k.soc", "ESS 충전율")}</div><div class="big" id="tSoc">—<small>%</small></div><div class="foot"><span id="tEssKw"></span><span id="tEssH"></span></div><canvas class="tspark" id="tsp-soc"></canvas></div>
-      <div class="panel tile"><div class="lab"><i style="background:var(--g1)"></i>${t("ov.reserve", "N-1 순동 예비력")}</div><div class="big" id="tRes">—<small>kW</small></div><div class="foot"><span id="tResSt"></span><span id="tOnl"></span></div><canvas class="tspark" id="tsp-res"></canvas></div>
-    </div>
-    <div class="grid ov">
-      <div class="grid" style="align-content:start">
+    <div class="pg" style="grid-template-rows:118px 1fr">
+      <div class="tiles6">${TILE("tLoad", "load", "총 부하")}${TILE("tPv", "pv", "태양광 발전")}${TILE("tSoc", "ess", "ESS 충전율")}${TILE("tFuel", "dg", "연료 · 수소")}${TILE("tRes", "g1", "N-1 순동 예비력")}${TILE("tAuto", "accent", "자동 제어")}</div>
+      <div class="pg" style="grid-template-columns:1fr 440px">
         <div class="panel"><div class="hd"><h3>작전지 전개 현황</h3><span class="sub" id="layCnt"></span><div class="spacer"></div><span class="pill" id="siteSum">—</span><button class="btn sm" id="layEditBtn" data-act="layedit">배치 편집</button></div>
-          <div class="bd" style="padding:8px 12px 12px">${siteHtml()}</div></div>
-        <div class="panel"><div class="hd"><h3>${t("ov.sld", "단선 결선도 · 실시간 전력 흐름")}</h3><span class="sub mono" id="busbal"></span><div class="spacer"></div><div class="legend sldleg"><span><i class="l on"></i>통전</span><span><i class="l off"></i>무전압</span><span><i class="l flt"></i>고장</span><span><i class="c closed"></i>투입</span><span><i class="c open"></i>개방</span><span><i class="c trip"></i>트립</span></div></div>
-          <div class="bd" style="padding:6px 10px 10px">${sldSvg()}</div></div>
-        <div class="panel"><div class="hd"><h3>${t("ov.trend", "전력 추세 · 15분")}</h3><div class="spacer"></div><div class="legend" id="ovLeg"></div></div><div class="bd"><canvas class="chart" id="ovChart"></canvas></div></div>
-      </div>
-      <div class="right">
-        <div class="panel"><div class="hd"><h3>발전원 구성</h3><div class="spacer"></div><span class="sub" id="mixSub"></span></div><div class="bd mixbd"><div id="mixDn"></div><div class="mixleg" id="mixLeg"></div></div></div>
-        <div class="panel"><div class="hd"><h3>경보 매트릭스</h3><div class="spacer"></div><a class="sub" href="#alarms" style="color:var(--accent);text-decoration:none">경보 관리 →</a></div><div class="bd" id="almMtx"></div></div>
-        <div class="panel"><div class="hd"><h3>발전 · 부하 현황</h3><div class="spacer"></div><span class="pill" id="balPill">—</span></div><div class="bd">
-          <div class="sumrow"><div><div class="lab">총 발전</div><div class="mid" id="bGen">—</div></div><div><div class="lab">총 부하</div><div class="mid" id="bLoad">—</div></div><div><div class="lab">ESS</div><div class="mid" id="bEss">—</div></div></div>
-          <div class="srcrows" id="srcRows"></div><div class="muted" style="font-size:11px;margin-top:6px">막대: 정격 대비 · 그래프: 최근 15분</div></div></div>
-        <div class="panel"><div class="hd"><h3>금일 발전량 · 부하량</h3><div class="spacer"></div><span class="sub" id="dayTot"></span></div><div class="bd"><canvas id="ovHr" style="width:100%;display:block"></canvas>
-          <div class="legend" style="margin-top:8px"><span><i style="background:var(--pv)"></i>PV</span><span><i style="background:var(--dg)"></i>DG</span><span><i style="background:var(--fc)"></i>FC</span><span><i style="background:var(--ess)"></i>ESS 방전</span><span><i style="background:var(--load)"></i>부하</span></div></div></div>
-        <div class="panel"><div class="hd"><h3>${t("ov.ess", "ESS 충전 상태")}</h3><div class="spacer"></div><span class="pill" id="essPill">—</span></div><div class="bd">
-          <div style="display:flex;align-items:baseline;gap:10px"><div class="big" id="socBig">—</div><span class="muted" id="socDir"></span></div>
-          <div class="socbar"><i id="socFill"></i><b style="left:15%"></b><b style="left:90%"></b></div><div class="socax"><span>0</span><span>하한 15</span><span>상한 90</span><span>100%</span></div>
-          <div class="lab" style="margin-top:12px">최근 15분 충전율 추이</div><canvas id="socSpark" style="width:100%;display:block;margin-top:4px"></canvas>
-          <div class="kv band" style="margin-top:10px"><span class="k">출력</span><span class="v" id="eKw">—</span><span class="k">가용 에너지</span><span class="v" id="eKwh">—</span><span class="k">자립 시간</span><span class="v" id="eH">—</span></div></div></div>
-        <div class="panel"><div class="hd"><h3>${t("ov.fuel", "연료 · 수소")}</h3></div><div class="bd" style="display:grid;gap:12px">
-          <div><div style="display:flex;justify-content:space-between"><span class="lab">${t("k.fuel", "디젤 연료")}</span><span class="mono" id="fuelV">—</span></div><div class="bar" style="margin-top:6px"><i id="fuelB" style="background:var(--dg)"></i></div><div class="muted" style="font-size:12px;margin-top:4px" id="fuelH"></div></div>
-          <div><div style="display:flex;justify-content:space-between"><span class="lab">${t("k.h2", "수소 저장")}</span><span class="mono" id="h2V">—</span></div><div class="bar" style="margin-top:6px"><i id="h2B" style="background:var(--fc)"></i></div><div class="muted" style="font-size:12px;margin-top:4px" id="h2H"></div></div></div></div>
-        <div class="panel"><div class="hd"><h3>${t("ov.auto", "자동 제어")}</h3><div class="spacer"></div><span class="pill" id="autoPill">—</span></div><div class="bd"><div class="kv band" id="autoKv"></div></div></div>
-        <div class="panel"><div class="hd"><h3>${t("ov.env", "쉘터 환경")}</h3></div><div class="bd" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
-          <div><div class="lab">기온</div><div class="mid" id="enT">—</div></div><div><div class="lab">기압</div><div class="mid" id="enP">—</div></div><div><div class="lab">습도</div><div class="mid" id="enH">—</div></div></div></div>
-      </div></div>`;
-    this.chart = new Chart($("#ovChart"), { height: 210, window: 900, series: [{ key: "load", label: "부하", color: COLORS.load, w: 2.2 }, { key: "pv", label: "PV", color: COLORS.pv, fill: true }, { key: "dg", label: "DG", color: COLORS.dg, fill: true }, { key: "fc", label: "FC", color: COLORS.fc, fill: true }, { key: "ess", label: "ESS", color: COLORS.ess }] });
-    $("#ovLeg").innerHTML = this.chart.o.series.map(s => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join("");
+          <div class="bd sitebd">${siteHtml()}</div></div>
+        <div class="col" style="grid-template-rows:auto auto 1fr">
+          <div class="panel"><div class="hd"><h3>발전원 구성</h3><div class="spacer"></div><span class="sub" id="mixSub"></span></div><div class="bd mixbd"><div id="mixDn"></div><div class="mixleg" id="mixLeg"></div></div></div>
+          <div class="panel"><div class="hd"><h3>발전 · 부하 현황</h3><div class="spacer"></div><span class="pill" id="balPill">—</span></div><div class="bd"><div class="srcrows" id="srcRows"></div></div></div>
+          <div class="panel"><div class="hd"><h3>경보 매트릭스</h3><div class="spacer"></div><a class="sub" href="#alarms" style="color:var(--accent);text-decoration:none">경보 관리 →</a></div><div class="bd" id="almMtx"></div></div>
+        </div></div></div>`;
   },
   update(s) {
-    const k = s.kpi, D = s.devices, site = {}; const devOk = n => D[n] && D[n].link !== "두절";
+    const k = s.kpi, bad = tag => !!(s.values[tag] && s.values[tag].f);
+    const set = (id, big, a, b, cls = "") => { const e = $("#" + id); e.innerHTML = big; e.className = "big " + cls; $("#" + id + "a").textContent = a; $("#" + id + "b").textContent = b; };
     $("#ovSub").textContent = `${s.policy} · ${S.lang === "ko" ? "수집" : "scan"} ${F.n(s.stats.last_ms, 0)}ms`;
-    $("#tLoad").innerHTML = `${F.kw(k.load)}<small>kW</small>`; $("#tL12").textContent = `1+2등급 ${F.kw(k.l1 + k.l2)}kW`; $("#tL3").textContent = `3등급 ${F.kw(k.l3)}kW`;
-    $("#tPv").innerHTML = `${F.kw(k.pv)}<small>kW</small>`; $("#tRen").textContent = `${t("k.renew", "재생 비율")} ${F.n(k.renew, 0)}%`; $("#tPvCap").textContent = `${F.n(k.pv / 4, 0)}% of 400kWp`;
-    const bad = tag => !!(s.values[tag] && s.values[tag].f);                    // 품질 이상(범위 밖·갱신 지연) → 흐리게 표시
-    $("#tSoc").innerHTML = `${F.n(k.soc)}<small>%</small>`; $("#tSoc").className = "big " + (bad("ESS.soc") ? "stale" : k.soc < 19 ? "badc" : k.soc < 25 ? "warnc" : "");
-    $("#tLoad").classList.toggle("stale", bad("LOAD.kw")); $("#tPv").classList.toggle("stale", bad("PV.kw"));
-    $("#tEssKw").textContent = k.ess >= 0 ? `방전 ${F.kw(k.ess)}kW` : `충전 ${F.kw(-k.ess)}kW`; $("#tEssH").textContent = k.ess_h ? `자립 ${F.hrs(k.ess_h)}h` : "충전 중";
-    $("#tRes").innerHTML = `${k.reserve_margin >= 0 ? "+" : ""}${F.n(k.reserve_margin, 0)}<small>kW</small>`; $("#tRes").className = "big " + (k.reserve_need ? "warnc" : "okc");
-    $("#tResSt").textContent = k.reserve_need ? t("k.need", "예비력 부족 → FC 병렬") : t("k.ok", "N-1 만족"); $("#tOnl").textContent = `병렬 ${k.online_kw.length}대`;
-    const tw = S.trend.slice(-600);                                             // KPI 미니 추세(최근 10분)
-    [["load", 1, TV("--load")], ["pv", 2, TV("--pv")], ["soc", 6, TV("--ess")], ["res", 8, TV("--g1")]].forEach(([id, ci, col]) => { const c = $("#tsp-" + id); if (c) spark(c, tw.map(r => r[ci]), col, 34, id === "soc" ? 0 : null, id === "soc" ? 100 : null); });
-    // 작전지 전개 현황 · 발전원 구성 · 경보 매트릭스
+    set("tLoad", `${F.kw(k.load)}<small>kW</small>`, `1+2등급 ${F.kw(k.l1 + k.l2)}kW`, `3등급 ${F.kw(k.l3)}kW`, bad("LOAD.kw") ? "stale" : "");
+    set("tPv", `${F.kw(k.pv)}<small>kW</small>`, `재생 비율 ${F.n(k.renew, 0)}%`, `${F.n(k.pv / 4, 0)}% of 400kWp`, bad("PV.kw") ? "stale" : "");
+    set("tSoc", `${F.n(k.soc)}<small>%</small>`, k.ess >= 0 ? `방전 ${F.kw(k.ess)}kW` : `충전 ${F.kw(-k.ess)}kW`, k.ess_h ? `자립 ${F.hrs(k.ess_h)}h` : "충전 중", bad("ESS.soc") ? "stale" : k.soc < 19 ? "badc" : k.soc < 25 ? "warnc" : "");
+    set("tFuel", `${F.n(k.fuel, 0)}<small>L</small> <span style="font-size:20px">${F.n(k.h2, 0)}<small>Nm³</small></span>`, `디젤 ${F.hrs(k.fuel_h)}h`, `연료전지 ${F.hrs(k.h2_h)}h`, k.h2 < 150 || k.fuel < 300 ? "warnc" : "");
+    set("tRes", `${k.reserve_margin >= 0 ? "+" : ""}${F.n(k.reserve_margin, 0)}<small>kW</small>`, k.reserve_need ? "예비력 부족 → FC 병렬" : "N-1 만족", `병렬 ${k.online_kw.length}대`, k.reserve_need ? "warnc" : "okc");
+    const d = s.decision;
+    set("tAuto", s.auto ? "AUTO" : "MANUAL", d ? `DG ${d.want.DG ? "ON" : "OFF"} · FC ${d.want.FC ? "ON" : "OFF"} · 수전해 ${d.want.ELZ ? "ON" : "OFF"}` : "결정 대기", s.auto ? `다음 ${F.n(s.next_ctrl_s, 0)}s` : "수동", s.auto ? "okc" : "warnc");
+    const tw = S.trend.slice(-600);
+    [["tLoad", 1, TV("--load")], ["tPv", 2, TV("--pv")], ["tSoc", 6, TV("--ess")], ["tFuel", 7, TV("--fc")], ["tRes", 8, TV("--g1")], ["tAuto", 3, TV("--dg")]].forEach(([id, ci, col]) => { const c = $("#tsp-" + id); if (c) spark(c, tw.map(r => r[ci]), col, 30, id === "tSoc" ? 0 : null, id === "tSoc" ? 100 : null); });
     siteUpdate(s);
     const sst = siteState(s), nbad = Object.values(sst).filter(x => x.st === "bad").length;
     $("#siteSum").className = "pill " + (nbad ? "bad" : "ok"); $("#siteSum").textContent = nbad ? `이상 ${nbad}개소` : `전 장비 정상 · ${Object.keys(sst).length}개소`;
-    const mix = [["태양광", k.pv, TV("--pv")], ["디젤", k.dg, TV("--dg")], ["연료전지", k.fc, TV("--fc")], ["ESS 방전", Math.max(0, k.ess), TV("--ess")]], gsum = mix.reduce((x, m) => x + m[1], 0);
-    $("#mixDn").innerHTML = mixDonut(mix, gsum); $("#mixSub").textContent = `부하 ${F.kw(k.load)} kW`;
+    const mix = [["태양광", k.pv, TV("--pv")], ["디젤", k.dg, TV("--dg")], ["연료전지", k.fc, TV("--fc")], ["ESS 방전", Math.max(0, k.ess), TV("--ess")]], gsum = mix.reduce((x, mm) => x + mm[1], 0);
+    $("#mixDn").innerHTML = mixDonut(mix, gsum, 132); $("#mixSub").textContent = `부하 ${F.kw(k.load)} kW`;
     $("#mixLeg").innerHTML = mix.map(([n, v, c]) => `<div><i style="background:${c}"></i><span>${n}</span><b class="mono">${F.kw(v)}</b><em>${gsum > 0 ? F.n(v / gsum * 100, 0) : 0}%</em></div>`).join("") + `<div class="ren"><span>재생에너지 비율</span><b>${F.n(k.renew, 0)}%</b></div>`;
     $("#almMtx").innerHTML = alarmMatrix(s.alarms);
-    // 결선도
-    sldUpdate(s);
-    // 수급
     ovRight(s);
-    // 연료·수소
-    $("#fuelV").textContent = `${F.n(k.fuel, 0)} / 2,000 L`; $("#fuelB").style.width = Math.min(100, k.fuel / 20) + "%"; $("#fuelH").textContent = `정격 운전 시 ${F.hrs(k.fuel_h)}시간`;
-    $("#h2V").textContent = `${F.n(k.h2, 0)} / 1,000 Nm³`; $("#h2B").style.width = Math.min(100, k.h2 / 10) + "%"; $("#h2H").textContent = `연료전지 정격 ${F.hrs(k.h2_h)}시간 · 하한 100Nm³`;
-    // 자동 제어
-    const d = s.decision; $("#autoPill").className = "pill " + (s.auto ? "ok" : "warn"); $("#autoPill").textContent = s.auto ? "AUTO" : "MANUAL";
-    $("#autoKv").innerHTML = `<span class="k">정책</span><span class="v" style="font-family:var(--sans)">${esc(s.policy)}</span>
-      <span class="k">다음 제어</span><span class="v">${s.auto ? F.n(s.next_ctrl_s, 0) + " s" : "—"} / ${F.n(s.ctrl_s, 0)} s</span>
-      <span class="k">최근 결정</span><span class="v">${d ? `DG ${d.want.DG ? "ON" : "OFF"} · FC ${d.want.FC ? "ON" : "OFF"}${d.reserve ? " (예비력)" : ""}` : "—"}</span>
-      <span class="k">결정 시각</span><span class="v">${d ? d.t.slice(11) : "—"}</span>`;
-    $("#enT").textContent = F.n(k.temp) + "°C"; $("#enP").textContent = F.n(k.press, 0) + " hPa"; $("#enH").textContent = F.n(k.rh, 0) + "%";
+  },
+};
+
+/* ════════════════ 1-2. 단선결선도 */
+const P_SLD = {
+  mount(m) {
+    m.innerHTML = `<div class="pagehd"><h2>단선결선도</h2><span class="sub">모선 A/B · 연계 차단기 · 급전선별 통전·무전압·고장 · 전력 흐름</span></div>
+    <div class="pg" style="grid-template-columns:1fr 420px">
+      <div class="panel"><div class="hd"><h3>${t("ov.sld", "단선 결선도 · 실시간 전력 흐름")}</h3><span class="sub mono" id="busbal"></span><div class="spacer"></div><div class="legend sldleg"><span><i class="l on"></i>통전</span><span><i class="l off"></i>무전압</span><span><i class="l flt"></i>고장</span><span><i class="c closed"></i>투입</span><span><i class="c open"></i>개방</span><span><i class="c trip"></i>트립</span></div></div>
+        <div class="bd sldbox">${sldSvg()}</div></div>
+      <div class="col" style="grid-template-rows:auto auto 1fr">
+        <div class="panel"><div class="hd"><h3>모선 상태</h3></div><div class="bd"><div class="kv band" id="busKv"></div></div></div>
+        <div class="panel"><div class="hd"><h3>차단기</h3><div class="spacer"></div><a class="sub" href="#control" style="color:var(--accent);text-decoration:none">부하 관리 →</a></div><div class="bd np"><table class="t tc"><tbody id="sldCb"></tbody></table></div></div>
+        <div class="panel"><div class="hd"><h3>전력 추세 · 15분</h3><div class="spacer"></div><div class="legend" id="sldLeg"></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="sldChart"></canvas></div></div></div>
+      </div></div>`;
+    this.chart = new Chart($("#sldChart"), { fill: true, window: 900, series: [{ key: "load", label: "부하", color: COLORS.load, w: 2.2 }, { key: "pv", label: "PV", color: COLORS.pv, fill: true }, { key: "dg", label: "DG", color: COLORS.dg, fill: true }, { key: "fc", label: "FC", color: COLORS.fc, fill: true }, { key: "ess", label: "ESS", color: COLORS.ess }] });
+    $("#sldLeg").innerHTML = this.chart.o.series.map(x => `<span><i style="background:${x.color}"></i>${x.label}</span>`).join("");
+  },
+  update(s) {
+    sldUpdate(s);
+    const k = s.kpi, gw = s.devices.MTR && s.devices.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? -1) : -1;
+    $("#busKv").innerHTML = `<span class="k">모선 A 전압</span><span class="v">${F.n(val("BUS.a_v"), 1)} V</span><span class="k">모선 B 전압</span><span class="v">${F.n(val("BUS.b_v"), 1)} V</span>
+      <span class="k">주파수</span><span class="v">${F.n(val("BUS.hz"), 2)} Hz</span><span class="k">연계 차단기</span><span class="v">${cb("TIE") === 1 ? "투입" : cb("TIE") === 0 ? "개방" : cb("TIE") === 2 ? "트립" : "미상"}</span>
+      <span class="k">Σ 발전 / Σ 부하</span><span class="v">${F.kw(k.gen)} / ${F.kw(k.load)} kW</span><span class="k">ESS</span><span class="v">${k.ess < -.5 ? "충전 " + F.kw(-k.ess) : k.ess > .5 ? "방전 " + F.kw(k.ess) : "대기"} kW</span>`;
+    $("#sldCb").innerHTML = CB_ROWS.map(([f, nm]) => { const c = cb(f), code = Math.round(val("FLT." + f) || 0);
+      return `<tr><td class="mono"><b>CB-${f}</b></td><td>${nm}</td><td>${c === 1 ? `<span class="pill ok">투입</span>` : c === 2 ? `<span class="pill bad">트립</span>` : c === 0 ? `<span class="pill warn">개방</span>` : `<span class="pill">미상</span>`}</td><td class="mono muted">${code ? (ANSI_TXT[code] || code) : ""}</td></tr>`; }).join("");
     this.chart.set(["t", "load", "pv", "dg", "fc", "ess", "soc", "h2", "reserve"], S.trend);
   },
 };
@@ -170,22 +144,16 @@ const CB_ROWS = [["PV", "③ PV 인입"], ["DG", "① 디젤 인입"], ["FC", "�
 const CTL_PHOTO = { ELZ: "FC", EMS: "EMS", G1: "G1" };
 const P_CTL = {
   mount(m) {
-    m.innerHTML = `<div class="pagehd"><h2>${t("ctl.title", "설비 제어")}</h2><span class="sub">IFPS 6개 서브시스템 · 모든 지령은 선택-실행(SBO) 2단계 · 연동 조건 · 응답 확인 · 감사 기록</span><div class="spacer"></div><span class="pill" id="ctlCnt">—</span></div>
-    <div class="grid ctl"><div class="grid" style="align-content:start"><div class="devs" id="devs"></div>
-      <div class="panel"><div class="hd"><h3>⑥ 배전 차단기 · 부하 관리</h3><div class="spacer"></div><span class="sub">보호 차단·우회 복구는 보호 IED 수행 · EMS는 2·3등급 부하 차단/복구만 지령</span></div>
-        <div class="bd np"><table class="t"><thead><tr><th>차단기</th><th>급전선</th><th>상태</th><th>보호요소</th><th class="n">부하 kW</th><th>부하 관리</th></tr></thead><tbody id="cbRows"></tbody></table></div></div>
-      <div class="panel"><div class="hd"><h3>${t("ctl.log", "지령 기록")}</h3><div class="spacer"></div><span class="sub" id="qInfo"></span></div><div class="bd np scroll h420"><table class="t"><thead><tr><th>시각</th><th>운용자</th><th>장치</th><th>지령</th><th>결과</th><th>내용</th></tr></thead><tbody id="cmdlog"></tbody></table></div></div></div>
-      <div class="grid" style="align-content:start">
-        <div class="panel"><div class="hd"><h3>${t("ctl.auto", "자동 제어 (EMS 급전)")}</h3></div><div class="bd">
-          <div style="display:flex;gap:8px;align-items:center"><div class="seg" id="autoSeg"><button data-v="1">AUTO</button><button data-v="0">MANUAL</button></div><div class="spacer"></div><button class="btn" id="ctlNow">제어 즉시 실행</button></div>
-          <div class="kv band" style="margin-top:14px" id="ctlKv"></div><div class="interlock" id="ctlNote"></div></div></div>
-        <div class="panel"><div class="hd"><h3>배치 기준 설비 수량</h3><div class="spacer"></div><a class="sub" href="#overview" style="color:var(--accent);text-decoration:none">배치 편집 →</a></div><div class="bd np"><table class="t"><tbody id="layQty"></tbody></table></div></div>
-        <div class="panel"><div class="hd"><h3>지령 연동 조건</h3></div><div class="bd" style="font-size:12.5px;color:var(--text2);line-height:1.7">
-          ① 통신 두절 장치 지령 금지 &nbsp;② 현장 수동 모드 차단 &nbsp;③ 작업 잠금 차단 &nbsp;④ 중복 지령(운전 중 기동 등) 차단<br>
-          ⑤ 응답 한도 <b class="mono">1.5 s</b>, 재지령 <b class="mono">1</b>회 → 실패 시 지령 취소(cmd=0)·대체 전원(DG↔FC) 지령·경보<br>⑥ 선택 후 <b class="mono">10 s</b> 안에 실행하지 않으면 선택 해제<br>⑦ 1등급 부하는 EMS가 차단하지 않음</div></div>
-        <div class="panel"><div class="hd"><h3>현장 실행 보호 계층</h3></div><div class="bd np"><table class="t"><tbody>
-          <tr><td>디젤 강제 기동</td><td class="muted">충전율 &lt; 하한 + 4%p</td></tr><tr><td>N-1 순동 예비력</td><td class="muted">(Σ병렬 − 최대 1대) &lt; 1·2등급 부하 → FC 병렬</td></tr>
-          <tr><td>보호 차단·우회 복구</td><td class="muted">보호 IED·절체기 수행(EMS 지령 없음)</td></tr><tr><td>수소 한계</td><td class="muted">하한 10% 미만 → FC·수전해 정지</td></tr></tbody></table></div></div>
+    m.innerHTML = `<div class="pagehd"><h2>${t("ctl.title", "설비 제어")}</h2><span class="sub">IFPS 6개 서브시스템 · 선택-실행(SBO) 2단계 · 연동 조건 · 응답 확인 · 감사 기록</span><div class="spacer"></div><span class="pill" id="ctlCnt">—</span></div>
+    <div class="pg" style="grid-template-columns:1fr 410px">
+      <div class="devs devs4" id="devs"></div>
+      <div class="col" style="grid-template-rows:auto auto 1fr">
+        <div class="panel"><div class="hd"><h3>${t("ctl.auto", "자동 제어 (EMS 급전)")}</h3><div class="spacer"></div><span class="sub" title="① 통신 두절 지령 금지 ② 현장 수동 모드 차단 ③ 작업 잠금 차단 ④ 중복 지령 차단 ⑤ 응답 1.5s·재지령 1회 → 지령 취소·대체 전원 ⑥ 선택 후 10s 내 실행 ⑦ 1등급 부하 차단 금지">연동 조건 ⓘ</span></div><div class="bd">
+          <div style="display:flex;gap:8px;align-items:center"><div class="seg" id="autoSeg"><button data-v="1">AUTO</button><button data-v="0">MANUAL</button></div><div class="spacer"></div><button class="btn sm" id="ctlNow">제어 즉시 실행</button></div>
+          <div class="kv band" style="margin-top:10px" id="ctlKv"></div><div class="interlock" id="ctlNote"></div></div></div>
+        <div class="panel"><div class="hd"><h3>⑥ 차단기 · 부하 관리</h3><div class="spacer"></div><span class="sub">보호 차단은 IED 수행</span></div>
+          <div class="bd np"><table class="t tc"><tbody id="cbRows"></tbody></table></div></div>
+        <div class="panel"><div class="hd"><h3>${t("ctl.log", "최근 지령")}</h3><div class="spacer"></div><span class="sub" id="qInfo"></span></div><div class="bd np fill-scroll"><table class="t tc"><tbody id="cmdlog"></tbody></table></div></div>
       </div></div>`;
     $$("#autoSeg button").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); const on = b.dataset.v === "1"; if (!on && !confirm("자동 제어를 해제하고 수동 운전으로 전환합니까?")) return; const r = await api("/api/auto", { on }); if (r.ok) toast(`자동 제어 ${on ? "설정" : "해제"}`, "ok"); poll(); });
     $("#ctlNow").onclick = async () => { if (!can("operator")) return loginDialog(); const r = await api("/api/control_now", {}); if (r.ok) toast("제어 주기 즉시 실행", "ok"); };
@@ -202,8 +170,8 @@ const P_CTL = {
         : `<div class="interlock muted" style="color:var(--muted)">${u.id === "EMS" ? "EMS 자체 상태 — 자동 제어는 오른쪽 패널에서 전환" : u.id === "G1" ? "국기연 관급 체계 — 계통 형성 전원, EMS는 감시만 수행(차단기 상태로 확인)" : "감시 전용 — EMS는 지령하지 않음"}</div>`}</div></div>`).join("");
     $$("#devs [data-c]").forEach(b => b.onclick = () => { const u = CTL_UNITS.find(x => x.dev === b.dataset.d); sbo(b.dataset.d, b.dataset.c, { label: `${u.no} ${u.nm.split(" · ").pop()} ${b.dataset.c === "start" ? (u.on || "기동") : (u.off || "정지")}` }); });
     $$("#devs [data-sp]").forEach(b => b.onclick = () => { const u = CTL_UNITS.find(x => x.id === b.dataset.sp), v = parseFloat($("#sp-" + u.id).value); if (!(v >= 0)) return toast("설정값을 입력하세요", "bad"); sbo(u.dev, "set", { tag: u.sp[0], value: v, label: `${u.no} ${u.sp[1]} ${v} kW` }); });
-    $("#cbRows").innerHTML = CB_ROWS.map(([f, nm]) => `<tr><td class="mono"><b>CB-${f}</b></td><td>${nm}</td><td id="cbs2-${f}"></td><td class="mono" id="cbf-${f}"></td><td class="n" id="cbk-${f}"></td>
-      <td>${["L2", "L3"].includes(f) ? `<button class="btn sm stop" data-shed="${f}" data-v="2">부하 차단</button> <button class="btn sm go" data-shed="${f}" data-v="1">복구</button>` : `<span class="muted" style="font-size:12px">${f === "L1" ? "차단 대상 아님" : "IED 수행"}</span>`}</td></tr>`).join("");
+    $("#cbRows").innerHTML = CB_ROWS.map(([f, nm]) => `<tr title="${nm}"><td class="mono"><b>CB-${f}</b></td><td id="cbs2-${f}"></td><td class="mono muted" id="cbf-${f}"></td><td class="n" id="cbk-${f}"></td>
+      <td style="text-align:right">${["L2", "L3"].includes(f) ? `<button class="btn sm stop" data-shed="${f}" data-v="2">차단</button> <button class="btn sm go" data-shed="${f}" data-v="1">복구</button>` : `<span class="muted" style="font-size:11px">${f === "L1" ? "차단 금지" : ""}</span>`}</td></tr>`).join("");
     $$("#cbRows [data-shed]").forEach(b => b.onclick = () => sbo("MTR", "set", { tag: "LDS." + b.dataset.shed, value: +b.dataset.v, label: `${b.dataset.shed === "L2" ? "2등급" : "3등급"} 부하 ${b.dataset.v === "2" ? "차단" : "복구"}` }));
     this.built = true;
   },
@@ -254,8 +222,7 @@ const P_CTL = {
     if (L.items) {
       const cnt = kk => L.items.filter(i => i.kind === kk).length;
       const q = [["① 기동형 복합전력", cnt("DG")], ["② 이동형 ESS", cnt("ESS")], ["③ 이동형 PV", cnt("PV")], ["④ 수소생성·발전", cnt("FC")], ["⑤ EMS 쉘터", cnt("EMS")], ["⑥ 배전·변압", cnt("DIST")], ["⑥ 구간분전함(FSU)", cnt("FSU")], ["막사", cnt("BARRACK")], ["지휘통제·의무·탄약 시설", cnt("L1") + cnt("L2") + cnt("L3")]];
-      $("#layQty").innerHTML = q.map(([n, v]) => `<tr><td>${n}</td><td class="n"><b>${v}</b> 대</td></tr>`).join("");
-      $("#ctlCnt").textContent = `설비 ${CTL_UNITS.length}종 · 배치 ${L.items.length}대`;
+      $("#ctlCnt").textContent = `설비 ${CTL_UNITS.length}종 · 배치 ${L.items.length}대`; $("#ctlCnt").title = q.map(([n, v]) => `${n} ${v}대`).join("\n");
     }
     $$("#autoSeg button").forEach(b => b.classList.toggle("on", (b.dataset.v === "1") === s.auto));
     const d = s.decision;
@@ -265,7 +232,7 @@ const P_CTL = {
       <span class="k">결정 시각 · 연산</span><span class="v">${d ? d.t.slice(11) + " · " + d.ms + "ms" : "—"}</span>`;
     $("#ctlNote").textContent = d && d.policy && d.policy.includes("실패") ? d.policy : "";
     $("#qInfo").textContent = s.busy ? `처리 중: ${s.busy} · 대기 ${s.queue}` : `대기 ${s.queue}`;
-    $("#cmdlog").innerHTML = s.cmdlog.length ? s.cmdlog.map(e => `<tr><td class="mono">${esc((e.wall || "").slice(11))}</td><td>${esc(e.who || "EMS")}</td><td>${esc(e.dev)}</td><td class="mono">${esc(e.cmd)}</td><td>${e.ok ? `<span class="pill ok">성공</span>` : `<span class="pill bad">실패</span>`}</td><td>${esc(e.text)}</td></tr>`).join("") : `<tr><td colspan="6" class="empty">지령 기록 없음</td></tr>`;
+    $("#cmdlog").innerHTML = s.cmdlog.length ? s.cmdlog.slice(0, 20).map(e => `<tr title="${esc(e.text)}"><td class="mono">${esc((e.wall || "").slice(11))}</td><td>${esc(e.who || "EMS")}</td><td>${e.ok ? `<span class="pill ok">성공</span>` : `<span class="pill bad">실패</span>`}</td><td class="ell">${esc(e.text)}</td></tr>`).join("") : `<tr><td colspan="4" class="empty">지령 기록 없음</td></tr>`;
   },
 };
 
@@ -316,10 +283,10 @@ const P_TR = {
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("tr.title", "추세")}</h2><span class="sub">1초 표본 · 최대 4시간 보관 · 그래프 위에 마우스를 올리면 값 표시</span><div class="spacer"></div>
       <div class="seg" id="trWin"><button data-w="300">5분</button><button data-w="900" class="on">15분</button><button data-w="3600">1시간</button><button data-w="14400">4시간</button></div><a class="btn" href="/api/export/trend.csv">CSV 내보내기</a></div>
-    <div class="grid"><div class="panel"><div class="hd"><h3>전력 (kW)</h3><div class="spacer"></div><div class="legend" id="trLeg"></div></div><div class="bd"><canvas class="chart" id="trA"></canvas></div></div>
-      <div class="panel"><div class="hd"><h3>ESS 충전율 (%) · N-1 예비력 여유 (kW)</h3></div><div class="bd"><canvas class="chart" id="trB"></canvas></div></div></div>`;
-    this.a = new Chart($("#trA"), { height: 320, window: this.win, series: [{ key: "load", label: "부하", color: COLORS.load, w: 2.2 }, { key: "pv", label: "PV", color: COLORS.pv, fill: true }, { key: "dg", label: "DG", color: COLORS.dg, fill: true }, { key: "fc", label: "FC", color: COLORS.fc, fill: true }, { key: "ess", label: "ESS", color: COLORS.ess }] });
-    this.b = new Chart($("#trB"), { height: 220, window: this.win, yl: "kW", series: [{ key: "reserve", label: "예비력 여유", color: COLORS.reserve }, { key: "soc", label: "SOC", color: COLORS.soc, axis: "r", w: 2.2 }] });
+    <div class="pg" style="grid-template-rows:3fr 2fr"><div class="panel"><div class="hd"><h3>전력 (kW)</h3><div class="spacer"></div><div class="legend" id="trLeg"></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="trA"></canvas></div></div></div>
+      <div class="panel"><div class="hd"><h3>ESS 충전율 (%) · N-1 예비력 여유 (kW)</h3></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="trB"></canvas></div></div></div></div>`;
+    this.a = new Chart($("#trA"), { fill: true, window: this.win, series: [{ key: "load", label: "부하", color: COLORS.load, w: 2.2 }, { key: "pv", label: "PV", color: COLORS.pv, fill: true }, { key: "dg", label: "DG", color: COLORS.dg, fill: true }, { key: "fc", label: "FC", color: COLORS.fc, fill: true }, { key: "ess", label: "ESS", color: COLORS.ess }] });
+    this.b = new Chart($("#trB"), { fill: true, window: this.win, yl: "kW", series: [{ key: "reserve", label: "예비력 여유", color: COLORS.reserve }, { key: "soc", label: "SOC", color: COLORS.soc, axis: "r", w: 2.2 }] });
     const leg = () => { $("#trLeg").innerHTML = this.a.o.series.map((s, i) => `<span style="cursor:pointer;opacity:${s.hidden ? .35 : 1}" data-i="${i}"><i style="background:${s.color}"></i>${s.label}</span>`).join(""); $$("#trLeg span").forEach(e => e.onclick = () => { const s = this.a.o.series[+e.dataset.i]; s.hidden = !s.hidden; leg(); this.a.draw(); }); }; leg();
     $$("#trWin button").forEach(b => b.onclick = () => { this.win = +b.dataset.w; $$("#trWin button").forEach(x => x.classList.toggle("on", x === b)); this.a.o.window = this.b.o.window = this.win; this.update(); });
   },
@@ -487,6 +454,7 @@ const P_ENG = {
 /* ════════════════ 라우팅·주기 갱신 */
 const PAGE_META = {
   overview: ["mon", "계측", "MONITOR", "SYSTEM OVERVIEW", "전원·부하·모선 상태를 한 화면에서 감시"],
+  sld: ["mon", "계측", "MONITOR", "SINGLE-LINE DIAGRAM", "모선·차단기·급전선 상태"],
   energy: ["mon", "계측", "MONITOR", "ENERGY & FORECAST", "발전량·부하량 적산과 24시간 예측 정밀도"],
   trends: ["mon", "계측", "MONITOR", "HISTORICAL TRENDS", "1초 표본 4시간 추세"],
   control: ["ctl", "제어", "CONTROL", "EQUIPMENT CONTROL", "선택-실행(SBO) 지령 · 자동 급전"],
@@ -499,7 +467,7 @@ function decoratePage(p) {
   hd.insertAdjacentHTML("afterbegin", `<span class="pcat ${m[0]}"><b>${S.lang === "ko" ? m[1] : m[2]}</b>${m[3]}</span>`);
   const sub = hd.querySelector(".sub"); if (sub && !sub.textContent.trim()) sub.textContent = m[4];
 }
-const PAGES = { overview: P_OV, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG };
+const PAGES = { overview: P_OV, sld: P_SLD, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG };
 let mounted = null;
 function render() {
   if (!S.snap) return; const p = PAGES[S.page] ? S.page : "overview";
@@ -523,5 +491,5 @@ async function pollTrend() {
 setInterval(() => { const stale = Date.now() - S.lastOk > 3500; $("#stale").classList.toggle("on", stale && S.lastOk > 0); const c = $("#conn"); c.className = "conn" + (stale ? " bad" : ""); c.textContent = stale ? "● SERVER LOST" : "● LINK " + (S.snap ? F.n(S.snap.stats.last_ms, 0) + "ms" : ""); }, 500);
 $$("#lang button").forEach(x => x.classList.toggle("on", x.dataset.l === S.lang));
 $$("#themeSeg button").forEach(b => { b.classList.toggle("on", b.dataset.th === S.theme); b.onclick = () => { S.theme = b.dataset.th; document.documentElement.dataset.theme = S.theme; try { localStorage.setItem("ems.theme", S.theme); } catch (e) { } $$("#themeSeg button").forEach(x => x.classList.toggle("on", x === b)); mounted = null; render(); if (S.page === "energy") P_EN.draw(); }; });
-S.page = location.hash.slice(1) || "overview"; renderUser(); applyI18n();
+S.page = location.hash.slice(1) || "overview"; renderUser(); applyI18n(); fitCanvas();
 poll(); pollTrend(); setInterval(poll, 1000); setInterval(pollTrend, 2000); setInterval(() => P_ENG.pollTrace(), 700);

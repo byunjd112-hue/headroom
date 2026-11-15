@@ -6,12 +6,22 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const h = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 
 /* 테마 변수 읽기: TV("--pv") → "#e8c547", TA("--edge", .12) → "rgba(150,160,110,.12)" */
+/* 고정 화면판: 1920×1080 기준으로 그린 뒤 창 크기에 맞춰 전체를 같은 비율로 확대·축소(글·그림이 함께 변함, 스크롤 없음) */
+const CANVAS_W = 1920, CANVAS_H = 1080;
+function fitCanvas() {
+  const app = document.getElementById("app"); if (!app) return;
+  const s = Math.min(innerWidth / CANVAS_W, innerHeight / CANVAS_H); S.scale = s;
+  app.style.transform = `translate(${((innerWidth - CANVAS_W * s) / 2).toFixed(1)}px, ${((innerHeight - CANVAS_H * s) / 2).toFixed(1)}px) scale(${s})`;
+  ["modal", "toast", "stale"].forEach(id => { const e = document.getElementById(id); if (e && e.parentElement !== app) app.appendChild(e); });
+}
+const DPR = () => (window.devicePixelRatio || 1) * Math.max(1, (window.S && S.scale) || 1);
 const TV = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const TA = (n, a) => `rgba(${TV(n)},${a})`;
 const S = { snap: null, token: null, me: { role: "viewer", name: "조회" }, lang: "ko", page: "overview", trend: [], trendT: 0, ok: true, lastOk: 0 };
 S.theme = "olive";
 try { S.token = sessionStorage.getItem("ems.token"); S.lang = localStorage.getItem("ems.lang") || "ko"; S.theme = localStorage.getItem("ems.theme") || "olive"; } catch (e) { }
 document.documentElement.dataset.theme = S.theme;
+addEventListener("resize", () => { fitCanvas(); }); document.addEventListener("DOMContentLoaded", fitCanvas);
 
 /* ── 다국어 */
 const I18N = {
@@ -114,14 +124,14 @@ async function sbo(dev, cmd, opts = {}) {
 class Chart {
   constructor(canvas, opt) {
     this.c = canvas; this.o = Object.assign({ height: 220, yl: "kW", yr: "%", window: 900, rmax: 100, rmin: 0 }, opt); this.rows = []; this.cols = []; this.hover = null;
-    canvas.style.height = this.o.height + "px";
-    canvas.addEventListener("mousemove", e => { const r = canvas.getBoundingClientRect(); this.hover = e.clientX - r.left; this.draw(); });
+    if (!this.o.fill) canvas.style.height = this.o.height + "px"; else { canvas.style.height = "100%"; }
+    canvas.addEventListener("mousemove", e => { const r = canvas.getBoundingClientRect(); this.hover = (e.clientX - r.left) / (S.scale || 1); this.draw(); });
     canvas.addEventListener("mouseleave", () => { this.hover = null; this.draw(); });
     this._ro = new ResizeObserver(() => this.draw()); this._ro.observe(canvas);
   }
   set(cols, rows) { this.cols = cols; this.rows = rows; this.draw(); }
   draw() {
-    const c = this.c, o = this.o, dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = o.height; if (!W) return;
+    const c = this.c, o = this.o, dpr = DPR(), W = c.clientWidth, H = o.fill ? Math.max(80, c.parentElement.clientHeight) : o.height; if (!W) return;
     if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
     const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
     const L = 48, R = o.series.some(s => s.axis === "r") ? 44 : 14, T = 12, B = 24, pw = W - L - R, ph = H - T - B;
