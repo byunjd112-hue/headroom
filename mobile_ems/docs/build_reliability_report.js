@@ -5,7 +5,7 @@ const S = JSON.parse(fs.readFileSync(__dirname + "/static_results.json", "utf8")
 const REV = process.argv[2] || "Rev00", DATE = process.argv[3] || "2026. 11. 15.", OUT = process.argv[4] || __dirname + `/out/이동형전력체계EMS_SW신뢰성시험결과서_${REV}.docx`;
 const ok = c => c ? { t: "충족", c: "000000" } : { t: "미충족", c: "C00000" }; const part = { t: "부분 충족", c: "9C5700" };
 const b = [];
-L.cover(b, "이동형 전력체계 EMS 소프트웨어 신뢰성 시험 결과서", "정적 시험(코딩 규칙 · 취약점 점검 · 소스코드 메트릭) 및 동적 시험(코드 실행률) — 최종 소스 Rev16 기준",
+L.cover(b, "이동형 전력체계 EMS 소프트웨어 신뢰성 시험 결과서", `정적 시험(코딩 규칙 · 취약점 점검 · 소스코드 메트릭) 및 동적 시험(코드 실행률) — 최종 소스 ${REV} 기준`,
   [["문서번호", `HAES-IFPS-EMS-RL-001  ${REV} (초안)`], ["작성일", DATE], ["측정 일시", S.date + " (자동 측정)"], ["시험 대상", `핵심 프로그램 ifps_ems, 실장치 연동 계층 ifps_ems_rt(제어화면·현장 진단 도구 포함) — Python ${S.loc_py.files}개 파일, 실행문 ${S.stmt.n}개`],
    ["적용 기준", "방위사업청 「무기체계 소프트웨어 개발 및 관리 매뉴얼」의 신뢰성 시험 항목 구조(정적 시험·동적 시험)"],
    ["관련 문서", "HAES-IFPS-EMS-TR-001 SW 시험결과 보고서, HAES-IFPS-EMS-SR-001 보안성 검토결과, HAES-IFPS-EMS-IF-001 실장치 통신 연동 방안서"],

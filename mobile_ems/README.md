@@ -43,6 +43,14 @@ diag.bat --demo                                                    # 현장 진�
 - **실사 사진**(`static/photos/*.jpg`, 11종): 설비 제어·발전·예측의 장비 카드에 사용
 - 두 이미지는 AI(Higgsfield)로 장비 묘사 텍스트만 입력해 생성(제안서 이미지 미사용). 파일이 없으면 자체 벡터 일러스트로 자동 대체. 실물 사진이 생기면 같은 이름으로 교체
 
+## 리비전 관리
+패키지·문서·보고자료는 **모두 같은 리비전**을 쓴다. 번호는 `VERSION` 파일 하나에만 있다.
+```
+python docs/build_all.py --measure     # 측정부터 다시 하고 전체 문서(Word)·장치별 안내서·보고자료(PPT)를 VERSION 의 리비전으로 생성
+python docs/build_all.py --zip         # (커밋 후) 실행 패키지 IFPS_Mobile_EMS_<Rev>.zip
+```
+`docs/out` 에는 현재 리비전 산출물만 남는다. 개발 PC 준비: `npm install docx pptxgenjs`, `pip install coverage bandit pyflakes radon pylint`.
+
 ## 시험·보안 문서
 ```
 python tools/measure.py docs/test_results.json --soak 300   # 동적 시험(요구 시간·부하·내구) 측정

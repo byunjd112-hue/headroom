@@ -18,6 +18,15 @@ from ..runtime import Runtime
 from ..simplant import Plant
 
 PRIO_TXT = {1: "긴급", 2: "높음", 3: "보통", 4: "낮음"}
+def _pkg_rev():
+    """패키지 리비전(VERSION 파일). 소프트웨어·문서·보고자료가 같은 번호를 쓴다."""
+    try:
+        with open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "VERSION"), encoding="utf-8") as f: return f.read().strip()
+    except OSError:
+        return "?"
+
+
+PKG_REV = _pkg_rev()
 FEEDERS = ("PV", "DG", "FC", "ESS", "G1", "TIE", "L1", "L2", "L3")
 FEEDER_TXT = {"PV": "태양광", "DG": "디젤", "FC": "연료전지", "ESS": "ESS", "G1": "복합전력", "TIE": "모선 연계", "L1": "1등급 부하", "L2": "2등급 부하", "L3": "3등급 부하"}
 ANSI = {0: "", 27: "27 저전압", 32: "32 역전력", 50: "50 순시 과전류", 51: "51 한시 과전류", 59: "59 과전압", 64: "64 지락", 81: "81 주파수 이상", 87: "87 차동"}
@@ -683,7 +692,7 @@ class Engine:
         for x in sm: hist[min(nb - 1, int(x / top * nb))] += 1
         return {"t": time.time(), "wall": wall_iso(), "utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "uptime": round(time.time() - self.t_start),
                 "site": rt.site.name, "mode": rt.mode, "run_mode": self.cfg.get("run_mode", "개발"), "sim": self.sim, "auto": self.auto,
-                "policy": (getattr(self.rt.policy, "note", "") or self.plan_note) if self.rt.policy else self.plan_note, "version": {"rt": RT_VERSION, "core": CORE_VERSION}, "values": vals, "devices": devs, "kpi": self.kpi(),
+                "policy": (getattr(self.rt.policy, "note", "") or self.plan_note) if self.rt.policy else self.plan_note, "version": {"rt": RT_VERSION, "core": CORE_VERSION, "pkg": PKG_REV}, "values": vals, "devices": devs, "kpi": self.kpi(),
                 "alarms": alarms[:200], "alarm_cnt": cnt, "cmdlog": rt.cmd.log[-60:][::-1], "events": rt.events[-150:][::-1],
                 "decision": self.last_decision, "busy": (self.busy or {}).get("kind"), "queue": self.jobs.qsize(),
                 "next_ctrl_s": max(0.0, round(float(self.cfg.get("ctrl_s", 60.0)) - (now - rt.t_ctl), 1)), "ctrl_s": float(self.cfg.get("ctrl_s", 60.0)),
@@ -844,5 +853,5 @@ class Engine:
     def runtime_info(self):
         c = copy.deepcopy(self.cfg); c.pop("hmi", None)
         return {"config": c, "site": self.rt.site.to_dict(), "cfg_path": self.cfg_path, "state_dir": self.rt.state_dir, "sim": self.sim,
-                "version": {"rt": RT_VERSION, "core": CORE_VERSION}, "crypto": {"module": self.rt.audit.c.module, "verified": self.rt.audit.c.verified},
+                "version": {"rt": RT_VERSION, "core": CORE_VERSION, "pkg": PKG_REV}, "crypto": {"module": self.rt.audit.c.module, "verified": self.rt.audit.c.verified},
                 "sup": SUP, "policy": self.plan_note}

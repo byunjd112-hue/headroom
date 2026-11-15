@@ -32,7 +32,7 @@ function renderHeader() {
   const top = unack[0] || s.alarms[0];
   $("#topalm").innerHTML = top ? `<span class="pr p${top.prio}">${top.prio}</span><span class="mono muted">${F.time(top.t_on)}</span><span class="muted">${esc(top.src)}</span><span class="txt">${esc(top.text)}</span>${top.state === "RTN" ? `<span class="pill">복귀</span>` : ""}` : `<span class="okc">● ${S.lang === "ko" ? "발생 경보 없음" : "No active alarms"}</span>`;
   $("#ackTop").disabled = !(top && !top.acked); $("#ackTop").onclick = () => ack([top.id]);
-  $("#ver").textContent = `RT ${s.version.rt} · CORE ${s.version.core}`;
+  $("#ver").textContent = `${s.version.pkg || ""} · RT ${s.version.rt} · CORE ${s.version.core}`;
 }
 function renderUser() {
   const u = $("#user");
@@ -472,7 +472,7 @@ const P_ENG = {
     const r = await api("/api/info"); const v = await api("/api/audit/verify");
     if (this.tab !== "info" || S.page !== "eng" || !$("#engBody") || !r.version) return;
     $("#engBody").innerHTML = `<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div class="panel"><div class="hd"><h3>실행 정보</h3></div><div class="bd"><div class="kv band">
-      <span class="k">EMS 연동 계층</span><span class="v">v${r.version.rt}</span><span class="k">핵심 프로그램</span><span class="v">v${r.version.core}</span><span class="k">운전 정책</span><span class="v" style="font-family:var(--sans)">${esc(r.policy)}</span>
+      <span class="k">패키지 리비전</span><span class="v">${esc(r.version.pkg || "")}</span><span class="k">EMS 연동 계층</span><span class="v">v${r.version.rt}</span><span class="k">핵심 프로그램</span><span class="v">v${r.version.core}</span><span class="k">운전 정책</span><span class="v" style="font-family:var(--sans)">${esc(r.policy)}</span>
       <span class="k">설정 파일</span><span class="v">${esc(r.cfg_path)}</span><span class="k">상태 폴더</span><span class="v">${esc(r.state_dir)}</span><span class="k">모드</span><span class="v">${r.sim ? "가상 장치" : "실장치"}</span>
       <span class="k">암호 모듈</span><span class="v">${esc(r.crypto.module)} ${r.crypto.verified ? `<span class="okc">검증필</span>` : `<span class="warnc">미검증(개발 모드 한정)</span>`}</span>
       <span class="k">감사 기록</span><span class="v ${v.ok ? "okc" : "badc"}">${v.ok ? "✔" : "✖"} ${esc(v.msg)}</span></div></div>

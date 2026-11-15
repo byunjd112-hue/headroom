@@ -1,10 +1,9 @@
 // IFPS 이동형 전력체계 EMS SW — 화면 구성·사용 설명 보고자료 (참고 PPT「작전지 종합전력공급체계」디자인 준용)
-// node build_deck.js [출력.pptx]
+// node build_deck.js [Rev] [작성 연월] [출력.pptx]   — 보통은 docs/build_all.py 가 부른다
 const fs = require("fs"), path = require("path"); const pptxgen = require("pptxgenjs");
-const SK = "/root/.claude/skills/synced/ca38a43b-775e-4980-8b37-0c0b9fa2b3e3_9b233e85-c88b-4a96-bd77-60378cb2da90/pptx";
-const { applyTheme } = require(SK + "/scripts/apply_theme.js");
-const EMS = "/home/user/headroom/mobile_ems"; const ST = JSON.parse(fs.readFileSync(EMS + "/docs/static_results.json", "utf8")), DY = JSON.parse(fs.readFileSync(EMS + "/docs/test_results.json", "utf8"));
-const OUT = process.argv[2] || __dirname + "/IFPS_EMS_SW_화면구성_사용설명_보고자료_Rev00.pptx"; const IMG = n => path.join(__dirname, "img", n + ".jpg");
+const { applyTheme } = require("./apply_theme.js");
+const EMS = path.join(__dirname, "..", ".."); const REV = process.argv[2] || "Rev00", YM = process.argv[3] || "2026. 11."; const ST = JSON.parse(fs.readFileSync(EMS + "/docs/static_results.json", "utf8")), DY = JSON.parse(fs.readFileSync(EMS + "/docs/test_results.json", "utf8"));
+const OUT = process.argv[4] || path.join(EMS, "docs", "out", `IFPS_EMS_SW_화면구성_사용설명_보고자료_${REV}.pptx`); const IMG = n => path.join(__dirname, "img", n + ".jpg");
 const THEME = { name: "IFPS 제안 발표", headFontFace: "맑은 고딕", bodyFontFace: "맑은 고딕",
   colors: { dk1: "2B2723", lt1: "FFFFFF", dk2: "35302A", lt2: "F9F1E6", accent1: "B59F76", accent2: "7B674F", accent3: "8A7449", accent4: "E0D7C8", accent5: "6F6B68", accent6: "B0392B", hlink: "8A7449", folHlink: "6F6B68" } };
 const pres = new pptxgen(); pres.layout = "LAYOUT_WIDE"; pres.theme = { headFontFace: THEME.headFontFace, bodyFontFace: THEME.bodyFontFace };
@@ -108,12 +107,12 @@ function steps(s, x, y, w, h, items) {                                // 가로 
 pres.addSection({ title: "표지·목차" });
 { const s = pres.addSlide({ masterName: "COVER", sectionTitle: "표지·목차" });
   s.addText("작전지 종합전력공급체계(IFPS) ⑤ 이동형 전력체계 EMS", { placeholder: "kicker" }); s.addText("EMS SW 화면 구성 및 사용 설명", { placeholder: "title" });
-  s.addText("Mobile EMS Software — Screens, Operation, Debugging, Integration, Reliability", { placeholder: "en" }); s.addText("오프라인 학습 AI 예측  ·  제어화면 8종  ·  현장 디버깅 도구  ·  실장비 연결 방법  ·  신뢰성 시험 결과", { placeholder: "tag" });
-  [["대상 판", "Rev16"], ["제어화면", "8개 화면"], ["자동 시험", `${ST.n_tests}건 통과`]].forEach(([l, v], i) => { const x = 1.2 + i * 3.0;
+  s.addText("Mobile EMS Software — Screens, Operation, Debugging, Integration, Reliability", { placeholder: "en" }); s.addText("오프라인 학습 AI 예측  ·  전개지·주둔지 겸용  ·  제어화면 8종  ·  현장 디버깅 도구  ·  실장비 연결 방법  ·  신뢰성 시험 결과", { placeholder: "tag" });
+  [["대상 판", REV], ["제어화면", "8개 화면"], ["자동 시험", `${ST.n_tests}건 통과`]].forEach(([l, v], i) => { const x = 1.2 + i * 3.0;
     s.addShape(pres.ShapeType.rect, { x, y: 4.75, w: 2.75, h: 0.85, fill: { color: "FFFFFF", transparency: 88 }, line: { color: "FFFFFF", width: 0.75, transparency: 60 }, objectName: "표지 수치 " + l });
     T(s, l, { x, y: 4.83, w: 2.75, h: 0.26, fontSize: 9.5, color: "D8CBB4", align: "center", valign: "middle" }); T(s, v, { x, y: 5.09, w: 2.75, h: 0.42, fontSize: 16, bold: true, color: WHITE, align: "center", valign: "middle" }); });
-  s.addText("2026. 11.   한화에어로스페이스㈜  에너지솔루션사업센터", { placeholder: "org" });
-  s.addNotes("이동형 전력체계 EMS 소프트웨어 Rev16의 화면 구성, 사용 방법, 디버깅 도구, 장치 연결 방법, 신뢰성 시험 결과를 보고합니다."); }
+  s.addText(YM + "   한화에어로스페이스㈜  에너지솔루션사업센터", { placeholder: "org" });
+  s.addNotes("이동형 전력체계 EMS 소프트웨어 " + REV + "의 화면 구성, 사용 방법, 디버깅 도구, 장치 연결 방법, 신뢰성 시험 결과를 보고합니다."); }
 { const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "표지·목차" });
   s.addText("", { placeholder: "secno" }); s.addText("목 차", { placeholder: "sec" }); s.addText("CONTENTS", { placeholder: "secen" }); s.addText("보고 순서", { placeholder: "title" }); s.addText("개요 → 오프라인 학습 AI → 화면 → 사용 → 디버깅 → 장치 연결 → 신뢰성 순으로 설명", { placeholder: "sub" });
   const D2 = ["EMS SW 구성과 특징", "현장 센서만으로 학습하는 24시간 예측과 정확도", "제어화면 8종의 구성과 보는 법", "설치·실행, 권한, 지령 절차", "화면 내 디버그 도구와 현장 간편 진단 도구", "설정 파일 2개, 지령·응답 규약, 시운전 절차", "정적·동적 시험 결과, 결함 보완, 후속 계획"];
@@ -261,7 +260,7 @@ const chartOpt = (title, o = {}) => Object.assign({ barDir: "col", barGapWidthPc
 // ═══ 3. 사용 방법
 { const s = page(3, "설치와 실행", "압축을 풀고 실행 파일을 더블클릭 — 가상 장치 모드로 먼저 익힌 뒤 실장비 모드로",
     "설치는 압축을 푸는 것이 전부입니다. 먼저 가상 장치 모드로 화면을 익히기를 권합니다.");
-  steps(s, 0.5, 1.75, 12.33, 1.55, [["준비", "Windows 10 이상 노트북, Python 3.10 이상 설치(설치 때 'Add to PATH' 선택)"], ["압축 풀기", "IFPS_Mobile_EMS_Rev16.zip 을 한글·공백 없는 폴더에 풀기 (예: C:\\IFPS_EMS)"], ["시연 실행", "run_sim.bat 더블클릭 → 브라우저가 열리고 가상 장치로 전 기능 동작"], ["실장비 설정", "runtime.json 에 장비 IP, pointmap.csv 에 레지스터 주소 (5장)"], ["실장비 실행", "diag.bat 로 통신 확인 → run_live.bat"]]);
+  steps(s, 0.5, 1.75, 12.33, 1.55, [["준비", "Windows 10 이상 노트북, Python 3.10 이상 설치(설치 때 'Add to PATH' 선택)"], ["압축 풀기", "IFPS_Mobile_EMS_" + REV + ".zip 을 한글·공백 없는 폴더에 풀기 (예: C:\\IFPS_EMS)"], ["시연 실행", "run_sim.bat 더블클릭 → 브라우저가 열리고 가상 장치로 전 기능 동작"], ["실장비 설정", "runtime.json 에 장비 IP, pointmap.csv 에 레지스터 주소 (5장)"], ["실장비 실행", "diag.bat 로 통신 확인 → run_live.bat"]]);
   table(s, 0.5, 3.55, 7.3, ["실행 파일", "하는 일"], [["run_sim.bat", "가상 장치 + 제어화면. 장비 없이 시연·교육·시험"], ["run_live.bat", "자가 점검 → 장비 접속 확인 → 제어화면(실장비)"], ["diag.bat", "현장 간편 진단 도구(번호 차림표)"], ["diag.bat --demo", "진단 도구 연습(내장 가상 장치)"]], [28, 72], { bold: [0], rowH: 0.36 });
   note(s, 8.05, 3.55, 4.78, 1.82, "접속", ["제어화면: http://127.0.0.1:8080", "다른 단말에서 보려면 runtime.json 의 hmi.bind 를 EMS 의 망 주소로 (운용 모드는 별도 허용 설정 필요)", "끝낼 때: 실행 창에서 Ctrl+C (마지막 상태 저장)"]);
   card(s, 0.5, 5.55, 12.33, 1.2, "개발 모드와 운용 모드", "개발 모드는 기본 PIN(운용자 1111, 엔지니어 2222)과 가상 장치를 허용한다. 운용 모드(run_mode: \"운용\")는 기동 때 보안 점검을 해서 기본·평문 PIN, 가상 장치, 허용하지 않은 원격 접속, 검증되지 않은 암호 모듈이면 기동을 거부한다. PIN 은 python -m ifps_ems_rt.hmi.pin 으로 해시를 만들어 설정한다.", { bs: 11 }); }
@@ -289,6 +288,22 @@ const chartOpt = (title, o = {}) => Object.assign({ barDir: "col", barGapWidthPc
   table(s, 6.95, 3.62, 5.88, ["EMS 가 자동으로 하는 일", "조건"], [["디젤·연료전지 기동·정지", "계획 또는 충전율 규칙"], ["연료전지 병렬(순동 예비 대기)", "N-1 예비력 부족"], ["수전해 기동", "잉여 전력이 있고 디젤 정지 중"], ["대체 전원 지령", "지령 무응답"]], [56, 44], { rowH: 0.33, fs: 10.5 });
   note(s, 6.95, 5.5, 5.88, 1.25, "주의", ["현장 수동 모드인 장비에는 자동 지령이 나가지 않는다", "[제어 즉시 실행] 은 60초를 기다리지 않고 지금 한 번 판단"]);
   T(s, "야간 정숙 시간대에는 디젤 기동을 피하도록 계획한다.", { x: 0.5, y: 5.7, w: 6.2, h: 0.3, fontSize: 10.5, color: GRAY, valign: "middle" }); }
+
+{ const s = page(3, "운용 장소와 운용 태세", "전개지와 주둔지를 같은 EMS 로 — 상황에 따라 평시 · 저소음 · 자립 태세를 운용자가 선택",
+    "군 이동형 EMS 고유 기능입니다. 운용 장소와 태세는 설비 제어 화면에서 바꾸고 재기동해도 유지됩니다.");
+  shot(s, "r18_ctl_quiet", 0.5, 1.72, 6.2, [[1, 300, 28], [2, 1690, 250], [3, 1690, 470], [4, 1690, 880]]);
+  T(s, "① 머리줄: 운용 장소·태세·부하 차단   ② 운용 장소·태세 전환   ③ 자립 지속시간·자동 차단 사유   ④ 차단기 상태", { x: 0.5, y: 5.3, w: 6.2, h: 0.5, fontSize: 10.5 });
+  table(s, 6.95, 1.72, 5.88, ["운용 태세", "EMS 동작"], [["평시", "예측 계획 또는 규칙으로 연료 소모 최소화"], ["저소음", "디젤 금지(연료전지 사용), 3등급 부하 자동 차단"], ["자립", "보급 없이 목표 시간(기본 72시간)을 버티도록 부하 관리"]], [18, 82], { bold: [0], rowH: 0.4, fs: 10.5 });
+  card(s, 6.95, 3.5, 5.88, 1.3, "부하 우선순위 자동 차단·복구", "자원 부족이 3초 이어지면 3등급 → 2등급 순으로 차단하고, 해소된 뒤 60초가 지나면 역순으로 복구한다. 1등급은 끊지 않는다. EMS 가 끊은 급전선만 되살린다.", { bs: 10.5 });
+  card(s, 6.95, 4.98, 5.88, 1.0, "자립 지속시간", "ESS·수소·연료와 하루 태양광 예상량으로 '전 부하 / 3등급 차단 / 1등급만' 기준 남은 시간을 항상 표시한다.", { bs: 10.5 });
+  note(s, 6.95, 6.1, 5.88, 0.66, "저소음 태세에서 자원이 바닥나면", ["디젤을 스스로 켜지 않고 1등급 경보로 알린다(태세 변경은 운용자 판단)"]);
+  T(s, "그림은 전개지에서 저소음 태세로 바꿔 3등급 부하가 자동 차단된 상태다.", { x: 0.5, y: 5.85, w: 6.2, h: 0.3, fontSize: 10.5, color: GRAY, valign: "middle" }); }
+{ const s = page(3, "주둔지 운전 (상전 연계)", "역송 없이 군 전력으로 사용 — 전기료 절감과 정전 시 무정전 운영을 함께",
+    "주둔지에서는 상전과 ESS로 운전합니다. 정전이 나면 EMS가 곧바로 자립 운전 논리로 넘어갑니다.");
+  shot(s, "r18_sld_garrison", 0.5, 1.72, 6.07, [[1, 110, 250], [2, 1540, 250]]); shot(s, "r18_sld_outage", 6.76, 1.72, 6.07, [[3, 110, 250], [4, 1160, 28]]);
+  const it = [[1, "상전 수전", "수전 전력과 수전 차단기 상태. 디젤·연료전지는 정지"], [2, "ESS 충·방전", "EMS 가 지령. 경부하 시간대 충전, 최대부하 시간대 방전"], [3, "정전", "수전 차단기 개방 → '정전 · 자립 전환', ESS 가 계통 유지"], [4, "정전 경보", "1등급 경보. 디젤·연료전지를 자동 투입하고 부하를 관리"]];
+  it.forEach((x, i) => legend(s, 0.5 + (i % 2) * 6.26, 5.25 + Math.floor(i / 2) * 0.7, 6.07, [x], { rh: 0.6 }));
+  T(s, "역송 방지: 최소 수전 유지 → 남는 태양광은 ESS 충전 → 수전해 → PV 출력 제한 순.  정전 대비: ESS 충전율 하한(기본 50%) 아래로는 요금 절감 방전을 하지 않음.  복전: 30초 안정 뒤 복귀.  순간 절체 자체는 ESS(계통 형성)·STS 가 수행.", { x: 0.5, y: 6.62, w: 12.33, h: 0.4, fontSize: 9.5, color: GRAY }); }
 
 // ═══ 4. 디버깅
 { const s = page(4, "디버깅 수단 한눈에", "화면 안의 디버그 도구 + 화면 없이 쓰는 현장 진단 도구 — 같은 통신 코드로 동작",
@@ -361,7 +376,7 @@ const chartOpt = (title, o = {}) => Object.assign({ barDir: "col", barGapWidthPc
   note(s, 8.15, 4.33, 4.68, 2.42, "안내서에 담긴 것", ["접속 정보·레지스터 요구사항(회신 칸)", "지령·응답 규약과 실제 바이트 예시", "진단 도구로 하는 자체 점검 절차", "증상별 조치, 회신 항목, 점검 기록지", "주소·배율은 EMS 표준안 — 제작사가 다른 값을 회신하면 설정 파일만 고침"]); }
 
 // ═══ 6. 신뢰성 결과
-{ const s = page(6, "신뢰성 시험 결과 요약", `최종 소스(Rev16) 자동 측정 — 시험 ${ST.n_tests}건 전부 통과, 정적 시험 기준 초과 0건`,
+{ const s = page(6, "신뢰성 시험 결과 요약", `최종 소스(${REV}) 자동 측정 — 시험 ${ST.n_tests}건 전부 통과, 정적 시험 기준 초과 0건`,
     "군 소프트웨어 신뢰성 시험의 항목 구조인 정적 시험과 동적 시험에 맞춰 측정했습니다. 등급별 목표 수치는 원문으로 확정해야 합니다.");
   [["자동 시험", String(ST.n_tests), "건 통과"], ["문장 실행률", f1(ST.stmt.pct), "%"], ["분기 실행률", f1(ST.branch.pct), "%"], ["취약점 미조치", String(ST.bandit.results.length), "건"]].forEach(([l, v, u], i) => stat(s, 0.5 + i * 3.1, 1.72, 2.95, 1.05, l, v, u));
   const M = ST.metrics, L = M.limits;
@@ -403,6 +418,6 @@ const chartOpt = (title, o = {}) => Object.assign({ barDir: "col", barGapWidthPc
 pres.addSection({ title: "맺음" });
 { const s = pres.addSlide({ masterName: "CLOSING", sectionTitle: "맺음" });
   s.addText("한 화면에서 보고, 두 단계로 지령하고,\n모든 조작을 기록합니다", { placeholder: "title" }); s.addText("오프라인 학습 AI 예측 · 제어화면 8종 · 현장 진단 도구 · 설정 파일 2개로 장비 연결 · 자동 시험 " + ST.n_tests + "건", { placeholder: "sub" });
-  s.addText("한화에어로스페이스㈜  에너지솔루션사업센터", { placeholder: "org" }); s.addText("2026. 11.", { placeholder: "date" }); }
+  s.addText("한화에어로스페이스㈜  에너지솔루션사업센터", { placeholder: "org" }); s.addText(YM, { placeholder: "date" }); }
 
 pres.writeFile({ fileName: OUT }).then(async () => { await applyTheme(OUT, THEME); console.log("saved", OUT); });

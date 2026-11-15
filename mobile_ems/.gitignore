@@ -5,3 +5,6 @@ config/state_sim/
 results/
 *.zip
 *.key
+node_modules/
+package-lock.json
+package.json
