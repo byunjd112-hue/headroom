@@ -129,6 +129,8 @@ class SimDriver:
         p2 = 22 + 18 * day + random.gauss(0, 0.8)
         p3 = 9 + 16 * day * (0.6 + 0.4 * math.sin(math.pi * max(0.0, min(1.0, (hr - 7) / 12)))) + random.gauss(0, 0.8) + self.extra_load
         clear = float(clear_pv_kw(self.site, doy, hr)); pv = max(0.0, clear * self.cloud * (1 + random.gauss(0, 0.01)))
+        if "PV.status" in self.p.by_tag:                                    # 인버터 분리 → 0, 출력 제한 적용
+            pv = 0.0 if self.p.get("PV.status") < .5 else min(pv, self.p.get("PV.lim_set") or 400.0)
         temp = 16 + 7 * math.sin(2 * math.pi * (hr - 9) / 24) + random.gauss(0, 0.05)
         vals = {"LOAD.p1_kw": p1, "LOAD.p2_kw": p2, "LOAD.p3_kw": max(0.0, p3), "PV.kw": pv, "ENV.temp": temp,
                 "ENV.press": 1012.5 + random.gauss(0, 0.05), "ENV.rh": 55 + random.gauss(0, 0.3)}
@@ -143,6 +145,8 @@ class SimDriver:
         dg_on = self.p.get("DG.status") > 0.5                                  # 디젤 연료 소비
         if dg_on and "DG.fuel_l" not in self.hold:
             self.p.set("DG.fuel_l", max(0.0, self.p.get("DG.fuel_l") - 90 * 0.28 / 3600))
+        if "ELZ.h2_rate" in self.p.by_tag and "H2.nm3" not in self.hold and self.p.get("ELZ.status") > .5:
+            self.p.set("H2.nm3", min(1000.0, self.p.get("H2.nm3") + self.p.get("ELZ.h2_rate") / 3600))
         fc_kw = self.p.get("FC.kw")
         if fc_kw > 0 and "H2.nm3" not in self.hold:
             self.p.set("H2.nm3", max(0.0, self.p.get("H2.nm3") - fc_kw * 0.75 / 3600))
@@ -174,7 +178,7 @@ class SimDriver:
             for f in FEEDERS:
                 if f"CB.{f}" in self.p.by_tag: self.p.set(f"CB.{f}", 1); self.p.set(f"FLT.{f}", 0)
             self.p.muted.clear(); self.p.no_ack.clear(); self.p.down.clear()
-            for d in ("DG", "FC"):
+            for d in ("DG", "FC", "ELZ", "PV"):
                 if f"{d}.mode" in self.p.by_tag: self.p.set(f"{d}.mode", 0)
         else: raise ValueError(f"시나리오 없음: {name}")
 
@@ -434,8 +438,9 @@ class Engine:
     def _auto_control(self, who):
         rt = self.rt; rt.t_ctl = rt.now(); t0 = time.monotonic()
         want = rt.decide(); note = getattr(rt.policy, "note", "") if rt.policy else "규칙 운전"
+        want["ELZ"] = bool(want["_policy"][2]) and not want.get("DG")      # 수전해: 계획이 고르고 디젤 운전 중이 아닐 때만
         done = []
-        for n in ("DG", "FC"):
+        for n in ("DG", "FC", "ELZ"):
             if n not in rt.dev: continue
             if want[n] != rt.dev[n].on:
                 ok, dt = self._send(n, "start" if want[n] else "stop", who); done.append({"dev": n, "on": want[n], "ok": ok, "dt": round(dt, 2)})
@@ -549,7 +554,7 @@ class Engine:
     def kpi(self):
         rt = self.rt; v = rt.val; g = lambda k, d=0.0: v.get(k, d); s = rt.site
         on = lambda n: rt.dev[n].on if n in rt.dev else g(f"{n}.status") > 0.5
-        load, pv, dg, fc, ess = g("LOAD.kw"), g("PV.kw"), g("DG.kw"), g("FC.kw"), g("ESS.kw")
+        load, pv, dg, fc, ess = g("LOAD.kw"), g("PV.kw"), g("DG.kw"), g("FC.kw"), g("ESS.kw"); elz = g("ELZ.kw")
         online = [s.ess_kw] * int(g("ESS.status", 1) > 0.5) + [float(self.cfg.get("g1_kw", 100.0))] + [s.dg_kw] * int(on("DG")) + [s.fc_kw] * int(on("FC"))
         l12 = g("LOAD.p1_kw") + g("LOAD.p2_kw"); margin = (sum(online) - max(online)) - l12 if online else -l12
         soc = g("ESS.soc", 0.0); h2 = g("H2.nm3", 0.0); fuel = g("DG.fuel_l", 0.0)
@@ -557,7 +562,7 @@ class Engine:
         return {"load": load, "pv": pv, "dg": dg, "fc": fc, "ess": ess, "soc": soc, "h2": h2, "fuel": fuel, "l1": g("LOAD.p1_kw"), "l2": g("LOAD.p2_kw"), "l3": g("LOAD.p3_kw"),
                 "gen": pv + dg + fc + max(ess, 0.0), "renew": (min(pv, load) / load * 100) if load > 1 else 0.0, "reserve_margin": margin, "reserve_need": margin < 0,
                 "online_kw": online, "ess_h": ess_h, "h2_h": h2 / (s.fc_kw * s.fc_nm3_per_kwh) if s.fc_kw else None, "fuel_h": fuel / (s.dg_kw * s.dg_l_per_kwh) if s.dg_kw else None,
-                "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "g1_kw": float(self.cfg.get("g1_kw", 100.0))}
+                "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "elz": elz, "g1_kw": float(self.cfg.get("g1_kw", 100.0))}
 
     def snapshot(self):
         rt = self.rt; now = rt.now()
@@ -598,7 +603,7 @@ class Engine:
     def sim_state(self):
         p = self.plant
         return {"muted": sorted(p.muted), "noack": sorted(p.no_ack), "down": sorted(p.down), "hold": dict(self.simdrv.hold), "scenario": self.simdrv.scn,
-                "ports": list(self.sim_ports), "manual": [d for d in ("DG", "FC") if f"{d}.mode" in p.by_tag and p.get(f"{d}.mode") > 0.5]}
+                "ports": list(self.sim_ports), "manual": [d for d in ("DG", "FC", "ELZ", "PV") if f"{d}.mode" in p.by_tag and p.get(f"{d}.mode") > 0.5]}
 
     def trend_since(self, since_ms=0):
         return [r for r in list(self.trend) if r[0] > since_ms]

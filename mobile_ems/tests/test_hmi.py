@@ -47,7 +47,7 @@ class TestHmi(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/", timeout=5) as f:
             html = f.read().decode(); self.assertIn("IFPS", html); self.assertIn("default-src 'self'", f.headers["Content-Security-Policy"])
         s = self.req("/api/snapshot")[1]
-        self.assertEqual(set(s["devices"]), {"DG", "FC", "ESS", "MTR"}); self.assertTrue(all(d["link"] == "정상" for d in s["devices"].values()))
+        self.assertEqual(set(s["devices"]), {"DG", "FC", "ESS", "MTR", "ELZ", "PV"}); self.assertTrue(all(d["link"] == "정상" for d in s["devices"].values()))
         self.assertGreater(s["kpi"]["load"], 30); self.assertEqual(s["me"]["role"], "viewer")
         self.assertGreater(len(self.req("/api/trend")[1]["rows"]), 0); self.assertGreater(len(self.req("/api/trace")[1]["rows"]), 0)
         self.assertEqual(self.req("/static/../../runtime.py")[0], 404)                                # 경로 이탈 차단
@@ -158,6 +158,22 @@ class TestHmi(unittest.TestCase):
         finally:
             eng.cfg["run_mode"] = "개발"
         with urllib.request.urlopen(self.base + "/", timeout=5) as f: self.assertIn("camera=()", f.headers["Permissions-Policy"])
+
+    def test_11_all_units_load_shed_elz_pv(self):
+        op = self.login("4321"); s = self.req("/api/snapshot")[1]
+        self.assertTrue(s["devices"]["ELZ"]["ctl"]); self.assertTrue(s["devices"]["PV"]["ctl"])               # 수전해·PV 인버터도 지령 대상
+        def run(body):
+            r = self.req("/api/select", body, op)[1]; self.assertTrue(r.get("ok"), r); self.assertTrue(self.req("/api/operate", {"sid": r["sid"]}, op)[1]["ok"])
+        r = self.req("/api/select", {"dev": "MTR", "cmd": "set", "tag": "LDS.L1", "value": 2}, op)[1]
+        self.assertFalse(r["ok"])                                                                             # 1등급 부하는 차단 지령 점이 없음
+        run({"dev": "MTR", "cmd": "set", "tag": "LDS.L3", "value": 2})
+        s, _ = self.wait(lambda s: s["values"]["CB.L3"]["v"] == 0.0 and s["values"]["LOAD.p3_kw"]["v"] == 0.0)
+        run({"dev": "MTR", "cmd": "set", "tag": "LDS.L3", "value": 1}); self.wait(lambda s: s["values"]["CB.L3"]["v"] == 1.0)
+        if not s["devices"]["ELZ"]["on"]:
+            run({"dev": "ELZ", "cmd": "start"}); s, _ = self.wait(lambda s: s["devices"]["ELZ"]["on"] and (s["values"]["ELZ.kw"]["v"] or 0) > 100)
+        run({"dev": "ELZ", "cmd": "stop"}); self.wait(lambda s: not s["devices"]["ELZ"]["on"])
+        run({"dev": "PV", "cmd": "stop"}); self.wait(lambda s: not s["devices"]["PV"]["on"])
+        run({"dev": "PV", "cmd": "start"}); self.wait(lambda s: s["devices"]["PV"]["on"])
 
 
 if __name__ == "__main__":

@@ -517,3 +517,6 @@ canvas.tspark { display: block; width: calc(100% + 40px); margin: 8px -20px 0; h
 .sitemap image { image-rendering: auto; }
 .sitemap .meq { filter: drop-shadow(0 6px 6px rgba(0,0,0,.45)); }
 .sld .hexbg { fill: #20241b; }
+
+.dev .hd h3 .dno { display: inline-grid; place-items: center; min-width: 22px; height: 22px; margin-right: 8px; border-radius: 6px; background: rgba(var(--acc),.15); color: var(--accent); font-size: 13px; }
+.dev .hd h3 { font-size: 13.5px; }

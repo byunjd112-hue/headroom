@@ -1,6 +1,6 @@
 /* 작전지 전개 현황(배치도 위 실시간 상태), 장비 사진 카드, 발전원 구성 도넛, 경보 매트릭스 */
 "use strict";
-const EQ_KIND = { PV: "PV", DG: "DG", G1: "DG", FC: "FC", ESS: "ESS", MTR: "DIST", DIST: "DIST", EMS: "EMS", L1: "L1", L2: "L2", L3: "L3" };
+const EQ_KIND = { ELZ: "FC", PV: "PV", DG: "DG", G1: "DG", FC: "FC", ESS: "ESS", MTR: "DIST", DIST: "DIST", EMS: "EMS", L1: "L1", L2: "L2", L3: "L3" };
 function siteState(s) {
   const k = s.kpi, D = s.devices, gw = D.MTR && D.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? 1) : 1;
   const lost = n => D[n] && D[n].link === "두절";

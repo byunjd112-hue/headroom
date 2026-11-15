@@ -59,7 +59,7 @@ b.push(TBL(["요청 수", "오류", "처리량(회/초)", "p50(ms)", "p95(ms)", 
 b.push(GAP()); b.push(P("20개 클라이언트가 동시에 /api/snapshot을 100회씩 요청했다. 실제 운용은 노트북 1~3대 접속, 1초 주기 조회로 이보다 훨씬 가볍다."));
 b.push(H2("3.5 내구 시험(연속 운전)"));
 b.push(TBL(["운전 시간(초)", "수집 횟수", "주기 초과", "평균(ms)", "p95(ms)", "최대(ms)", "메모리(MB)"], [[D.soak.seconds, D.soak.scans, D.soak.overruns, D.soak.avg_ms, D.soak.p95_ms, D.soak.max_ms, `${D.soak.rss_mb_start} → ${D.soak.rss_mb_end}`]], [14, 13, 12, 12, 12, 12, 25], { center: [0, 1, 2, 3, 4, 5, 6] }));
-b.push(GAP()); b.push(P("전 장치·경로(4대 × 2경로)를 병렬로 읽으므로 1초 주기 대비 사용률은 1% 미만이다. 72시간 내구 시험은 FAT에서 수행한다."));
+b.push(GAP()); b.push(P("전 장치·경로(6대 × 2경로)를 병렬로 읽으므로 1초 주기 대비 사용률은 1% 미만이다. 72시간 내구 시험은 FAT에서 수행한다."));
 b.push(H2("3.6 감사 기록 무결성"));
 b.push(P(`시험 중 생성된 감사 기록 ${D.audit.seq}건의 연쇄 HMAC 검증 결과: ${D.audit.verify[1]}. 중간 행 변조·삭제 검출은 단위 시험 test_audit_detects_tampering으로 확인했다.`));
 

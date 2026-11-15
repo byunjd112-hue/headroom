@@ -19,7 +19,7 @@ def ensure_sample(res):
 class Base(unittest.TestCase):
     def setUp(self):
         self.td = tempfile.mkdtemp(); shutil.copy(os.path.join(ROOT, "config", "pointmap.csv"), self.td)
-        self.pts = pm.load(os.path.join(self.td, "pointmap.csv")); self.units = {"DG": 1, "FC": 2, "ESS": 3, "MTR": 4}
+        self.pts = pm.load(os.path.join(self.td, "pointmap.csv")); self.units = {n: d["unit"] for n, d in json.load(open(os.path.join(ROOT, "config", "runtime.json"), encoding="utf-8"))["devices"].items()}
         self.plant = simplant.Plant(self.pts, self.units); self.pa, self.pb = self.plant.start([0, 0])
         cfg = json.load(open(os.path.join(ROOT, "config", "runtime.json"), encoding="utf-8"))
         cfg["allow"] = ["127.0.0.0/8"]; cfg["timeout_s"] = 0.3

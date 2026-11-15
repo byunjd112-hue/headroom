@@ -155,62 +155,112 @@ const P_OV = {
 };
 
 /* ════════════════ 2. 설비 제어 */
-const DEVINFO = { DG: ["디젤 발전기", "Diesel generator · 100kW", "dg"], FC: ["수소 연료전지", "PEM fuel cell · 100kW", "fc"], ESS: ["ESS 전력변환장치", "Battery PCS · 1,000kWh / 500kW", "ess"], MTR: ["계측기 · 환경 센서", "Power meter & shelter sensors", "load"] };
+/* 설비 목록: IFPS 체계 구성(①~⑥) 기준. dev = 통신 장치(runtime.json devices), 없으면 감시 전용 */
+const CTL_UNITS = [
+  { id: "DG", no: "①", nm: "기동형 복합전력공급체계 · 디젤발전기", en: "Hybrid power unit · diesel generator", col: "dg", dev: "DG", kw: "DG.kw", ctl: true },
+  { id: "G1", no: "①", nm: "기동형 복합전력공급체계 · ESS 200kWh (계통 형성)", en: "Grid-forming hybrid ESS · 100kW", col: "g1", dev: null },
+  { id: "ESS", no: "②", nm: "이동형 ESS(GFM) · 1.0MWh / PCS 500kW", en: "Mobile grid-forming BESS", col: "ess", dev: "ESS", kw: "ESS.kw" },
+  { id: "PV", no: "③", nm: "이동형 PV 발전체계 · 400kW급 (80kWp × 5식)", en: "Rollable thin-film PV · inverter", col: "pv", dev: "PV", kw: "PV.kw", ctl: true, on: "계통 연결", off: "분리", sp: ["PV.lim_set", "출력 제한", 400, 10] },
+  { id: "FC", no: "④", nm: "수소생성·발전체계 · 연료전지 100kW", en: "PEM fuel cell", col: "fc", dev: "FC", kw: "FC.kw", ctl: true, sp: ["FC.kw_set", "출력 설정", 100, 5] },
+  { id: "ELZ", no: "④", nm: "수소생성·발전체계 · 수전해 30Nm³/h", en: "Electrolyzer · 150kW", col: "fc", dev: "ELZ", kw: "ELZ.kw", ctl: true },
+  { id: "EMS", no: "⑤", nm: "이동형 전력체계 EMS · 중앙제어기", en: "Energy management system", col: "accent", dev: null },
+  { id: "MTR", no: "⑥", nm: "이동형 배전·변압체계 · 계측/보호 게이트웨이", en: "22.9/6.6kV/380V · metering & IED gateway", col: "load", dev: "MTR", kw: "LOAD.kw" },
+];
+const CB_ROWS = [["PV", "③ PV 인입"], ["DG", "① 디젤 인입"], ["FC", "④ 연료전지 인입"], ["ESS", "② ESS 인입"], ["G1", "① 복합전력 인입"], ["TIE", "모선 A·B 연계"], ["L1", "1등급 부하 (지휘통제·의무)"], ["L2", "2등급 부하 (막사·정비)"], ["L3", "3등급 부하 (일반·탄약)"]];
+const CTL_PHOTO = { ELZ: "FC", EMS: "EMS", G1: "G1" };
 const P_CTL = {
   mount(m) {
-    m.innerHTML = `<div class="pagehd"><h2>${t("ctl.title", "설비 제어")}</h2><span class="sub">모든 지령은 선택-실행(SBO) 2단계 · 연동 조건 확인 · 응답(순번 되돌림) 확인 · 감사 기록</span></div>
+    m.innerHTML = `<div class="pagehd"><h2>${t("ctl.title", "설비 제어")}</h2><span class="sub">IFPS 6개 서브시스템 · 모든 지령은 선택-실행(SBO) 2단계 · 연동 조건 · 응답 확인 · 감사 기록</span><div class="spacer"></div><span class="pill" id="ctlCnt">—</span></div>
     <div class="grid ctl"><div class="grid" style="align-content:start"><div class="devs" id="devs"></div>
+      <div class="panel"><div class="hd"><h3>⑥ 배전 차단기 · 부하 관리</h3><div class="spacer"></div><span class="sub">보호 차단·우회 복구는 보호 IED 수행 · EMS는 2·3등급 부하 차단/복구만 지령</span></div>
+        <div class="bd np"><table class="t"><thead><tr><th>차단기</th><th>급전선</th><th>상태</th><th>보호요소</th><th class="n">부하 kW</th><th>부하 관리</th></tr></thead><tbody id="cbRows"></tbody></table></div></div>
       <div class="panel"><div class="hd"><h3>${t("ctl.log", "지령 기록")}</h3><div class="spacer"></div><span class="sub" id="qInfo"></span></div><div class="bd np scroll h420"><table class="t"><thead><tr><th>시각</th><th>운용자</th><th>장치</th><th>지령</th><th>결과</th><th>내용</th></tr></thead><tbody id="cmdlog"></tbody></table></div></div></div>
       <div class="grid" style="align-content:start">
         <div class="panel"><div class="hd"><h3>${t("ctl.auto", "자동 제어 (EMS 급전)")}</h3></div><div class="bd">
           <div style="display:flex;gap:8px;align-items:center"><div class="seg" id="autoSeg"><button data-v="1">AUTO</button><button data-v="0">MANUAL</button></div><div class="spacer"></div><button class="btn" id="ctlNow">제어 즉시 실행</button></div>
           <div class="kv band" style="margin-top:14px" id="ctlKv"></div><div class="interlock" id="ctlNote"></div></div></div>
+        <div class="panel"><div class="hd"><h3>배치 기준 설비 수량</h3><div class="spacer"></div><a class="sub" href="#overview" style="color:var(--accent);text-decoration:none">배치 편집 →</a></div><div class="bd np"><table class="t"><tbody id="layQty"></tbody></table></div></div>
         <div class="panel"><div class="hd"><h3>지령 연동 조건</h3></div><div class="bd" style="font-size:12.5px;color:var(--text2);line-height:1.7">
           ① 통신 두절 장치 지령 금지 &nbsp;② 현장 수동 모드 차단 &nbsp;③ 작업 잠금 차단 &nbsp;④ 중복 지령(운전 중 기동 등) 차단<br>
-          ⑤ 응답 한도 <b class="mono">1.5 s</b>, 재지령 <b class="mono">1</b>회 → 실패 시 대체 전원(DG↔FC) 자동 지령·경보<br>⑥ 선택 후 <b class="mono">10 s</b> 안에 실행하지 않으면 선택 해제</div></div>
+          ⑤ 응답 한도 <b class="mono">1.5 s</b>, 재지령 <b class="mono">1</b>회 → 실패 시 지령 취소(cmd=0)·대체 전원(DG↔FC) 지령·경보<br>⑥ 선택 후 <b class="mono">10 s</b> 안에 실행하지 않으면 선택 해제<br>⑦ 1등급 부하는 EMS가 차단하지 않음</div></div>
         <div class="panel"><div class="hd"><h3>현장 실행 보호 계층</h3></div><div class="bd np"><table class="t"><tbody>
           <tr><td>디젤 강제 기동</td><td class="muted">충전율 &lt; 하한 + 4%p</td></tr><tr><td>N-1 순동 예비력</td><td class="muted">(Σ병렬 − 최대 1대) &lt; 1·2등급 부하 → FC 병렬</td></tr>
           <tr><td>보호 차단·우회 복구</td><td class="muted">보호 IED·절체기 수행(EMS 지령 없음)</td></tr><tr><td>수소 한계</td><td class="muted">하한 10% 미만 → FC·수전해 정지</td></tr></tbody></table></div></div>
       </div></div>`;
     $$("#autoSeg button").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); const on = b.dataset.v === "1"; if (!on && !confirm("자동 제어를 해제하고 수동 운전으로 전환합니까?")) return; const r = await api("/api/auto", { on }); if (r.ok) toast(`자동 제어 ${on ? "설정" : "해제"}`, "ok"); poll(); });
     $("#ctlNow").onclick = async () => { if (!can("operator")) return loginDialog(); const r = await api("/api/control_now", {}); if (r.ok) toast("제어 주기 즉시 실행", "ok"); };
+    if (!L.items) layoutLoad();
     this.built = false;
   },
   build(s) {
-    $("#devs").innerHTML = Object.keys(s.devices).map(n => {
-      const [ko, en, col] = DEVINFO[n] || [n, "", "load"]; const ctl = s.devices[n].ctl;
-      return `<div class="panel dev" id="dv-${n}"><div class="hd"><span class="lamp" id="lp-${n}"></span><h3 style="color:var(--text)">${n} · ${ko}</h3><div class="spacer"></div><span class="pill" id="lk-${n}">—</span></div>
-      <div class="bd"><div class="toprow"><div style="flex:1;min-width:0"><div class="muted" style="font-size:12px;margin:-4px 0 8px">${en}</div><div class="row"><div><div class="lab">출력</div><div class="big" id="kw2-${n}" style="color:var(--${col})">—</div></div><div class="spacer"></div><div style="text-align:right"><div class="lab">상태</div><div class="mid" id="sx-${n}">—</div></div></div></div><div class="eqimg" id="eq-${n}"></div></div>
-      <div class="meta" id="mt-${n}"></div>
-      ${ctl ? `<div class="acts"><button class="btn go" data-c="start" data-d="${n}">▶ ${t("btn.start", "기동")}</button><button class="btn stop" data-c="stop" data-d="${n}">■ ${t("btn.stop", "정지")}</button>
-        ${n === "FC" ? `<div class="spacer"></div><input class="in" id="fcSp" type="number" min="0" max="100" step="5" style="width:80px" placeholder="kW"><button class="btn" id="fcSet">출력 설정</button>` : ""}</div><div class="interlock" id="il-${n}"></div>` : `<div class="interlock muted" style="color:var(--muted)">감시 전용 — EMS는 지령하지 않음</div>`}</div></div>`;
-    }).join("");
-    $$("#devs [data-c]").forEach(b => b.onclick = () => sbo(b.dataset.d, b.dataset.c));
-    const fs = $("#fcSet"); if (fs) fs.onclick = () => { const v = parseFloat($("#fcSp").value); if (!(v >= 0)) return toast("설정값을 입력하세요", "bad"); sbo("FC", "set", { tag: "FC.kw_set", value: v, label: `FC 출력 설정 ${v} kW` }); };
+    const units = CTL_UNITS.filter(u => !u.dev || s.devices[u.dev]);
+    $("#devs").innerHTML = units.map(u => `<div class="panel dev" id="dv-${u.id}"><div class="hd"><span class="lamp" id="lp-${u.id}"></span><h3 style="color:var(--text)"><span class="dno">${u.no}</span>${u.nm}</h3><div class="spacer"></div><span class="pill" id="lk-${u.id}">—</span></div>
+      <div class="bd"><div class="toprow"><div style="flex:1;min-width:0"><div class="muted" style="font-size:12px;margin:-4px 0 8px">${u.en}${u.dev ? ` · <span class="mono">${u.dev}</span>` : ""}</div><div class="row"><div><div class="lab">${u.id === "EMS" ? "수집 주기" : u.id === "MTR" ? "총 부하" : u.id === "ELZ" ? "소비" : "출력"}</div><div class="big" id="kw2-${u.id}" style="color:var(--${u.col})">—</div></div><div class="spacer"></div><div style="text-align:right"><div class="lab">상태</div><div class="mid" id="sx-${u.id}">—</div></div></div></div><div class="eqimg" id="eq-${u.id}"></div></div>
+      <div class="meta" id="mt-${u.id}"></div>
+      ${u.ctl ? `<div class="acts"><button class="btn go" data-c="start" data-d="${u.dev}">▶ ${u.on || t("btn.start", "기동")}</button><button class="btn stop" data-c="stop" data-d="${u.dev}">■ ${u.off || t("btn.stop", "정지")}</button>
+        ${u.sp ? `<div class="spacer"></div><input class="in" id="sp-${u.id}" type="number" min="0" max="${u.sp[2]}" step="${u.sp[3]}" style="width:80px" placeholder="kW"><button class="btn" data-sp="${u.id}">${u.sp[1]}</button>` : ""}</div><div class="interlock" id="il-${u.id}"></div>`
+        : `<div class="interlock muted" style="color:var(--muted)">${u.id === "EMS" ? "EMS 자체 상태 — 자동 제어는 오른쪽 패널에서 전환" : u.id === "G1" ? "국기연 관급 체계 — 계통 형성 전원, EMS는 감시만 수행(차단기 상태로 확인)" : "감시 전용 — EMS는 지령하지 않음"}</div>`}</div></div>`).join("");
+    $$("#devs [data-c]").forEach(b => b.onclick = () => { const u = CTL_UNITS.find(x => x.dev === b.dataset.d); sbo(b.dataset.d, b.dataset.c, { label: `${u.no} ${u.nm.split(" · ").pop()} ${b.dataset.c === "start" ? (u.on || "기동") : (u.off || "정지")}` }); });
+    $$("#devs [data-sp]").forEach(b => b.onclick = () => { const u = CTL_UNITS.find(x => x.id === b.dataset.sp), v = parseFloat($("#sp-" + u.id).value); if (!(v >= 0)) return toast("설정값을 입력하세요", "bad"); sbo(u.dev, "set", { tag: u.sp[0], value: v, label: `${u.no} ${u.sp[1]} ${v} kW` }); });
+    $("#cbRows").innerHTML = CB_ROWS.map(([f, nm]) => `<tr><td class="mono"><b>CB-${f}</b></td><td>${nm}</td><td id="cbs2-${f}"></td><td class="mono" id="cbf-${f}"></td><td class="n" id="cbk-${f}"></td>
+      <td>${["L2", "L3"].includes(f) ? `<button class="btn sm stop" data-shed="${f}" data-v="2">부하 차단</button> <button class="btn sm go" data-shed="${f}" data-v="1">복구</button>` : `<span class="muted" style="font-size:12px">${f === "L1" ? "차단 대상 아님" : "IED 수행"}</span>`}</td></tr>`).join("");
+    $$("#cbRows [data-shed]").forEach(b => b.onclick = () => sbo("MTR", "set", { tag: "LDS." + b.dataset.shed, value: +b.dataset.v, label: `${b.dataset.shed === "L2" ? "2등급" : "3등급"} 부하 ${b.dataset.v === "2" ? "차단" : "복구"}` }));
     this.built = true;
   },
   update(s) {
     if (!this.built) this.build(s);
-    for (const [n, d] of Object.entries(s.devices)) {
-      const lost = d.link === "두절"; $("#lp-" + n).className = "lamp " + (lost ? "lost" : d.on ? "on" : "");
-      const lk = $("#lk-" + n); lk.className = "pill " + LINK_CLS[d.link]; lk.textContent = linkTxt(d.link);
-      const kwTag = { DG: "DG.kw", FC: "FC.kw", ESS: "ESS.kw", MTR: "LOAD.kw" }[n]; $("#kw2-" + n).innerHTML = `${lost ? "####" : F.kw(val(kwTag))}<small>kW</small>`;
-      $("#sx-" + n).innerHTML = lost ? `<span class="badc">통신 두절</span>` : n === "MTR" ? `<span class="okc">계측 중</span>` : d.on ? `<span class="okc">${n === "ESS" ? "운전" : "운전 중"}</span>` : `<span class="muted">정지</span>`;
-      const meta = n === "DG" ? [["모드", d.manual ? "수동" : "자동"], ["연료", F.n(val("DG.fuel_l"), 0) + " L"], ["순번 ACK", F.n(d.seq_ack, 0)], ["생존 HB", F.n(d.hb, 0)]]
-        : n === "FC" ? [["모드", d.manual ? "수동" : "자동"], ["수소", F.n(val("H2.nm3"), 0) + " Nm³"], ["순번 ACK", F.n(d.seq_ack, 0)], ["생존 HB", F.n(d.hb, 0)]]
-          : n === "ESS" ? [["SOC", F.n(val("ESS.soc")) + " %"], ["방향", val("ESS.kw") < 0 ? "충전" : "방전"], ["생존 HB", F.n(d.hb, 0)], ["경로", Object.entries(d.paths).map(([k, p]) => k + (p.alive ? "●" : "○")).join(" ")]]
-            : [["PV", F.kw(val("PV.kw")) + " kW"], ["기온", F.n(val("ENV.temp")) + " °C"], ["습도", F.n(val("ENV.rh"), 0) + " %"], ["경로", Object.entries(d.paths).map(([k, p]) => k + (p.alive ? "●" : "○")).join(" ")]];
-      $("#mt-" + n).innerHTML = meta.map(([a, b]) => `<div><div class="lab">${a}</div><div class="v">${b}</div></div>`).join("");
-      const eqs = { on: n === "MTR" ? !lost : d.on, lost, value: n === "ESS" ? F.n(val("ESS.soc"), 0) + "% SOC" : n === "FC" ? F.n(val("FC.kw"), 0) + " kW" : n === "MTR" ? F.n(val("LOAD.kw"), 0) + " kW" : n === "DG" && d.on ? F.n(val("DG.kw"), 0) + " kW" : undefined };
-      const sig = JSON.stringify([eqs.on, eqs.lost, eqs.value]); const eqb = $("#eq-" + n);
-      if (eqb && eqb.dataset.sig !== sig) { eqb.dataset.sig = sig; eqb.innerHTML = equipPhoto(n, eqs); }
-      const il = $("#il-" + n); if (il) { il.textContent = lost ? "⚠ 통신 두절 — 지령 차단" : d.manual ? "⚠ 현장 수동 모드 — EMS 지령 차단" : (s.busy ? "지령 처리 중…" : ""); }
-      $$(`#devs [data-d="${n}"]`).forEach(b => { b.disabled = !can("operator") || lost || d.manual || (b.dataset.c === "start" ? d.on : !d.on); });
+    const k = s.kpi, D = s.devices, gw = D.MTR && D.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? -1) : -1;
+    const paths = d => Object.entries(d.paths).map(([a, p]) => a + (p.alive ? "●" : "○")).join(" ");
+    for (const u of CTL_UNITS) {
+      const lp = $("#lp-" + u.id); if (!lp) continue;
+      const d = u.dev ? D[u.dev] : null, lost = d ? d.link === "두절" : (u.id === "G1" && !gw);
+      const on = u.id === "EMS" ? true : u.id === "G1" ? cb("G1") === 1 : u.id === "MTR" ? !lost : !!(d && d.on);
+      lp.className = "lamp " + (lost ? "lost" : on ? "on" : "");
+      const lk = $("#lk-" + u.id);
+      if (d) { lk.className = "pill " + LINK_CLS[d.link]; lk.textContent = linkTxt(d.link); }
+      else if (u.id === "EMS") { lk.className = "pill " + (s.alarm_cnt[1].act ? "bad" : "ok"); lk.textContent = s.alarm_cnt[1].act ? `긴급 ${s.alarm_cnt[1].act}` : "정상"; }
+      else { lk.className = "pill " + (lost ? "bad" : "info"); lk.textContent = lost ? "게이트웨이 두절" : "미계측"; }
+      const big = u.id === "EMS" ? `${F.n(s.stats.last_ms, 0)}<small>ms</small>` : u.id === "G1" ? `100<small>kW 형성</small>` : `${lost ? "####" : F.kw(val(u.kw))}<small>kW</small>`;
+      $("#kw2-" + u.id).innerHTML = big;
+      const c = { G1: cb("G1"), PV: cb("PV"), DG: cb("DG"), FC: cb("FC"), ESS: cb("ESS") }[u.id];
+      $("#sx-" + u.id).innerHTML = lost ? `<span class="badc">통신 두절</span>` : c === 2 ? `<span class="badc">차단기 트립</span>`
+        : u.id === "MTR" ? `<span class="okc">계측 중</span>` : u.id === "EMS" ? `<span class="okc">${s.auto ? "자동 제어" : "수동 운전"}</span>`
+        : u.id === "ESS" ? `<span class="okc">${k.ess < -.5 ? "충전" : k.ess > .5 ? "방전" : "대기"}</span>` : u.id === "PV" ? (on ? `<span class="okc">계통 연결</span>` : `<span class="muted">분리</span>`)
+        : on ? `<span class="okc">운전 중</span>` : `<span class="muted">정지</span>`;
+      const mode = d ? ["모드", d.manual ? "수동" : "자동"] : null, hb = d ? ["생존 HB", F.n(d.hb, 0)] : null;
+      const meta = { DG: [mode, ["연료", F.n(val("DG.fuel_l"), 0) + " L"], ["순번 ACK", F.n(d && d.seq_ack, 0)], hb],
+        G1: [["CB-G1", c === 1 ? "투입" : c === 0 ? "개방" : c === 2 ? "트립" : "미상"], ["모선 B", F.n(val("BUS.b_v"), 0) + " V"], ["주파수", F.n(val("BUS.hz"), 2) + " Hz"], ["형성 용량", "100 kW"]],
+        ESS: [["SOC", F.n(k.soc) + " %"], ["가용", F.n(Math.max(0, (k.soc / 100 - .15) * 1000), 0) + " kWh"], ["자립", k.ess_h ? F.hrs(k.ess_h) + " h" : "—"], ["경로", d ? paths(d) : "—"]],
+        PV: [mode, ["출력 제한", F.n(val("PV.lim"), 0) + " kW"], ["금일 발전", F.n(s.energy.pv, 1) + " kWh"], hb],
+        FC: [mode, ["수소", F.n(val("H2.nm3"), 0) + " Nm³"], ["순번 ACK", F.n(d && d.seq_ack, 0)], hb],
+        ELZ: [mode, ["생산", F.n(val("ELZ.h2_rate"), 1) + " Nm³/h"], ["저장", F.n(val("H2.nm3"), 0) + " Nm³"], hb],
+        EMS: [["정책", s.policy.includes("예측") ? "예측 계획" : "규칙"], ["주기 초과", s.stats.n_over + "회"], ["감사 기록", s.stats.audit_seq + "건"], ["가동", F.dur(s.uptime)]],
+        MTR: [["모선 A", F.n(val("BUS.a_v"), 0) + " V"], ["기온", F.n(val("ENV.temp")) + " °C"], ["습도", F.n(val("ENV.rh"), 0) + " %"], ["경로", d ? paths(d) : "—"]] }[u.id];
+      $("#mt-" + u.id).innerHTML = meta.map(([a, b]) => `<div><div class="lab">${a}</div><div class="v">${b}</div></div>`).join("");
+      const eqs = { on, lost, fault: c === 2, value: u.id === "ESS" ? F.n(k.soc, 0) + "% SOC" : u.id === "EMS" || u.id === "G1" ? undefined : on && u.kw ? F.n(val(u.kw), 0) + " kW" : undefined };
+      const sig = JSON.stringify(eqs), eqb = $("#eq-" + u.id);
+      if (eqb && eqb.dataset.sig !== sig) { eqb.dataset.sig = sig; eqb.innerHTML = equipPhoto(CTL_PHOTO[u.id] || u.id, eqs); }
+      const il = $("#il-" + u.id); if (il && d) il.textContent = lost ? "⚠ 통신 두절 — 지령 차단" : d.manual ? "⚠ 현장 수동 모드 — EMS 지령 차단" : c === 2 ? "⚠ 인입 차단기 트립 — 보호 IED 복구 후 지령" : (s.busy ? "지령 처리 중…" : "");
+      if (d) $$(`#devs [data-d="${u.dev}"]`).forEach(b => { b.disabled = !can("operator") || lost || d.manual || (b.dataset.c === "start" ? d.on : !d.on); });
+      const spb = $(`#devs [data-sp="${u.id}"]`); if (spb) spb.disabled = !can("operator") || lost;
+    }
+    const ld = { L1: k.l1, L2: k.l2, L3: k.l3 };
+    for (const [f] of CB_ROWS) {
+      const c = cb(f), code = Math.round(val("FLT." + f) || 0);
+      $("#cbs2-" + f).innerHTML = c === 1 ? `<span class="pill ok">투입</span>` : c === 2 ? `<span class="pill bad">트립</span>` : c === 0 ? `<span class="pill warn">개방</span>` : `<span class="pill">미상</span>`;
+      $("#cbf-" + f).textContent = code ? (ANSI_TXT[code] || code) : "—"; $("#cbk-" + f).textContent = ld[f] !== undefined ? F.kw(ld[f]) : "";
+      $$(`#cbRows [data-shed="${f}"]`).forEach(b => { b.disabled = !can("operator") || !gw || (b.dataset.v === "2" ? c !== 1 : c === 1); });
+    }
+    if (L.items) {
+      const cnt = kk => L.items.filter(i => i.kind === kk).length;
+      const q = [["① 기동형 복합전력", cnt("DG")], ["② 이동형 ESS", cnt("ESS")], ["③ 이동형 PV", cnt("PV")], ["④ 수소생성·발전", cnt("FC")], ["⑤ EMS 쉘터", cnt("EMS")], ["⑥ 배전·변압", cnt("DIST")], ["⑥ 구간분전함(FSU)", cnt("FSU")], ["막사", cnt("BARRACK")], ["지휘통제·의무·탄약 시설", cnt("L1") + cnt("L2") + cnt("L3")]];
+      $("#layQty").innerHTML = q.map(([n, v]) => `<tr><td>${n}</td><td class="n"><b>${v}</b> 대</td></tr>`).join("");
+      $("#ctlCnt").textContent = `설비 ${CTL_UNITS.length}종 · 배치 ${L.items.length}대`;
     }
     $$("#autoSeg button").forEach(b => b.classList.toggle("on", (b.dataset.v === "1") === s.auto));
     const d = s.decision;
     $("#ctlKv").innerHTML = `<span class="k">운전 정책</span><span class="v" style="font-family:var(--sans)">${esc(s.policy)}</span><span class="k">제어 주기</span><span class="v">${F.n(s.ctrl_s, 0)} s</span>
-      <span class="k">다음 제어까지</span><span class="v">${s.auto ? F.n(s.next_ctrl_s, 0) + " s" : "수동"}</span><span class="k">최근 결정</span><span class="v">${d ? `DG ${d.want.DG ? "ON" : "OFF"} / FC ${d.want.FC ? "ON" : "OFF"}` : "—"}</span>
+      <span class="k">다음 제어까지</span><span class="v">${s.auto ? F.n(s.next_ctrl_s, 0) + " s" : "수동"}</span><span class="k">최근 결정</span><span class="v">${d ? `DG ${d.want.DG ? "ON" : "OFF"} / FC ${d.want.FC ? "ON" : "OFF"} / 수전해 ${d.want.ELZ ? "ON" : "OFF"}` : "—"}</span>
       <span class="k">계획 결정(DG,FC,ELZ)</span><span class="v">${d ? "(" + d.action.join(", ") + ")" : "—"}</span><span class="k">예비력 규칙</span><span class="v">${d ? (d.reserve ? "작동 → FC 병렬" : "미작동") : "—"}</span>
       <span class="k">결정 시각 · 연산</span><span class="v">${d ? d.t.slice(11) + " · " + d.ms + "ms" : "—"}</span>`;
     $("#ctlNote").textContent = d && d.policy && d.policy.includes("실패") ? d.policy : "";

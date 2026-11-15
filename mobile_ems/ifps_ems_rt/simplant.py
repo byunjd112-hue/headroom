@@ -16,7 +16,7 @@ class Plant:
         self.by_tag = {p["tag"]: p for p in pts}
         for tag, v in {"LOAD.kw": 80.0, "LOAD.p1_kw": 30.0, "LOAD.p2_kw": 30.0, "LOAD.p3_kw": 20.0, "PV.kw": 40.0, "ESS.soc": 60.0, "ESS.status": 1,
                        "H2.nm3": 700.0, "DG.fuel_l": 900.0, "ENV.temp": 20.0, "ENV.press": 1013.0, "ENV.rh": 50.0, "BUS.hz": 60.0,
-                       **{f"CB.{f}": 1 for f in ("PV", "DG", "FC", "ESS", "G1", "TIE", "L1", "L2", "L3")}}.items():
+                       "PV.status": 1, **{f"CB.{f}": 1 for f in ("PV", "DG", "FC", "ESS", "G1", "TIE", "L1", "L2", "L3")}}.items():
             if tag in self.by_tag: self.set(tag, v)
 
     # 공학값 접근
@@ -45,7 +45,15 @@ class Plant:
         g = lambda t: self.get(t) if t in self.by_tag else 0.0
         cb = lambda f: (int(round(self.get(f"CB.{f}"))) == 1) if f"CB.{f}" in self.by_tag else True     # 차단기 투입(1)일 때만 모선과 연결
         dg = 90.0 * g("DG.status") * cb("DG"); fc = (100.0 * g("FC.status") * 0.05 if g("FC.kw_set") == 0 else g("FC.kw_set") * g("FC.status")) * cb("FC")
-        ess = (g("LOAD.kw") - g("PV.kw") - dg - fc) * cb("ESS")
+        elz = 150.0 * g("ELZ.status")                                         # 수전해 소비(150kW, 30Nm³/h)
+        for tag, v in (("ELZ.kw", elz), ("ELZ.h2_rate", 30.0 * g("ELZ.status"))):
+            if tag in self.by_tag: self.set(tag, v)
+        for f in ("L2", "L3"):                                               # EMS 부하 차단(2)·복구(1) 지령 → 보호 IED가 차단기 조작
+            t = f"LDS.{f}"
+            if t in self.by_tag and int(round(self.get(t))) in (1, 2):
+                self.set(f"CB.{f}", 1 if int(round(self.get(t))) == 1 else 0); self.set(f"FLT.{f}", 0); self.set(t, 0)
+        if "PV.lim" in self.by_tag: self.set("PV.lim", g("PV.lim_set") or 400.0)
+        ess = (g("LOAD.kw") + elz - g("PV.kw") - dg - fc) * cb("ESS")
         if "BUS.a_v" in self.by_tag:
             a_live = cb("DG") and g("DG.status") > 0.5 or cb("FC") and g("FC.status") > 0.5 or (cb("TIE") and (cb("ESS") or cb("G1")))
             b_live = (cb("ESS") and g("ESS.status") > 0.5) or cb("G1") or (cb("TIE") and a_live)

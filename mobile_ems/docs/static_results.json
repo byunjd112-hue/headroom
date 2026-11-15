@@ -1,6 +1,6 @@
 {
- "date": "2026-11-15 01:34",
- "unittest_s": 24.7,
+ "date": "2026-11-15 02:14",
+ "unittest_s": 30.8,
  "tests": [
   "test_h2_limit_blocks_fuel_cell | ok",
   "test_plan_is_finite_and_avoids_silent_hours | ok",
@@ -12,6 +12,7 @@
   "test_redundancy_needs_both_paths_lost | ok",
   "test_sync_and_watchdog | ok",
   "test_10_security_lockout_hash_and_gate | ok",
+  "test_11_all_units_load_shed_elz_pv | ok",
   "test_1_static_and_snapshot | ok",
   "test_2_auth_and_roles | ok",
   "test_3_sbo_command_with_ack | ok",
@@ -35,9 +36,9 @@
   "test_scan_reads_values_within_period | ok",
   "test_unverified_crypto_refused_in_operation_mode | ok"
  ],
- "n_tests": 32,
+ "n_tests": 33,
  "tests_ok": true,
- "coverage_pct": 80.9,
+ "coverage_pct": 81.1,
  "coverage_files": [
   [
    "ifps_ems_rt/__main__.py",
@@ -92,7 +93,7 @@
   [
    "ifps_ems_rt/hmi/engine.py",
    89.5,
-   599
+   609
   ],
   [
    "ifps_ems_rt/runtime.py",
@@ -115,14 +116,14 @@
    91
   ],
   [
-   "ifps_ems_rt/simplant.py",
-   96.7,
-   90
-  ],
-  [
    "ifps_ems/config.py",
    96.9,
    32
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   96.9,
+   98
   ],
   [
    "ifps_ems_rt/hal.py",
@@ -171,7 +172,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 2266,
+   "loc": 2284,
    "nosec": 0,
    "skipped_tests": 5
   },
@@ -214,22 +215,22 @@
    "subprocess call - check for execution of untrusted input."
   ]
  ],
- "cc_avg": 4.87,
+ "cc_avg": 4.96,
  "cc_n": 219,
  "cc_rank": {
   "A": 156,
   "B": 40,
   "C": 17,
-  "D": 6,
-  "E": 0,
+  "D": 5,
+  "E": 1,
   "F": 0
  },
  "cc_top": [
   [
    "ifps_ems_rt/simplant.py",
    "tick",
-   30,
-   "D"
+   38,
+   "E"
   ],
   [
    "ifps_ems_rt/mbtool.py",
@@ -263,6 +264,12 @@
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
+   "step",
+   20,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
    "_compute_forecast",
    20,
    "C"
@@ -276,13 +283,7 @@
   [
    "ifps_ems_rt/hmi/engine.py",
    "_auto_control",
-   18,
-   "C"
-  ],
-  [
-   "ifps_ems_rt/hal.py",
-   "send",
-   15,
+   19,
    "C"
   ]
  ],
@@ -308,13 +309,13 @@
    "A"
   ],
   [
-   "ifps_ems/dispatch.py",
-   40.8,
+   "ifps_ems_rt/simplant.py",
+   39.7,
    "A"
   ],
   [
-   "ifps_ems_rt/simplant.py",
-   41.1,
+   "ifps_ems/dispatch.py",
+   40.8,
    "A"
   ],
   [
@@ -410,13 +411,13 @@
  ],
  "loc_py": {
   "files": 24,
-  "sloc": 1966,
-  "comments": 225
+  "sloc": 1984,
+  "comments": 229
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   477,
+   527,
    true
   ],
   [
@@ -436,12 +437,12 @@
   ],
   [
    "ifps_ems_rt/hmi/static/site.js",
-   208,
+   221,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/sld.js",
-   144,
+   146,
    true
   ]
  ],
