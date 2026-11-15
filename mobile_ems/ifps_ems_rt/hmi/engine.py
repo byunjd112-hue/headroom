@@ -311,7 +311,7 @@ class Engine:
     def forecast(self, force=False):
         with self.fc_lock:
             c = self.fc_cache
-            if c is None or force or time.time() - c["_t"] > 600:
+            if c is None or force or time.time() - c["_t"] > (600 if c.get("ok") else 20):       # 실패는 20초 뒤 다시 시도
                 if not self._fc_busy:
                     self._fc_busy = True; threading.Thread(target=self._compute_forecast, daemon=True).start()
             return c or {"ok": False, "why": "예측 계산 중…"}
@@ -322,11 +322,15 @@ class Engine:
             from ifps_ems import dataio
             from ifps_ems.forecast import LoadForecaster, PVForecaster, BUCKET, bucket_of
             site = self.rt.site; hist = os.path.join(self.rt.state_dir, "history.csv"); src = "현장 실측 이력(history.csv)"
-            if not os.path.exists(hist) or sum(1 for _ in open(hist, encoding="utf-8")) < 8 * 96 + 1:
-                hist = os.path.join(self.plan_dir or os.path.join(os.path.dirname(self.cfg_path), "..", "results"), "sample_site_data.csv"); src = "합성 현장 자료(실측 8일 미만)"
+            rows = sum(1 for _ in open(hist, encoding="utf-8")) - 1 if os.path.exists(hist) else 0
+            md = self.plan_dir or os.path.join(os.path.dirname(self.cfg_path), "..", "results")
+            if rows < 8 * 96:
+                hist = os.path.join(md, "sample_site_data.csv"); src = "합성 현장 자료(실측 8일 미만)"
+                if not os.path.exists(hist):
+                    if not self.sim: raise ValueError(f"실측 이력이 {rows}줄(8일 = 768줄 필요)입니다. 이력이 쌓이면 자동으로 예측을 시작합니다")
+                    self._make_demo_data(md, site)                    # 시연 모드: 합성 자료와 모델이 없으면 만들어 쓴다
             d = dataio.load_csv(hist, site); n = d["n"]
-            fl, fp = LoadForecaster(site), PVForecaster(site)
-            md = self.plan_dir or os.path.dirname(hist); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp)
+            fl, fp = LoadForecaster(site), PVForecaster(site); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp)
             o = n - 1; l50, llo, lhi, _ = fl.predict(d, o); p50, plo, phi, _ = fp.predict(d, o)
             # 백테스트: 마지막 7일, 6시간 간격 발행
             el = {b: [] for b in range(len(BUCKET))}; ep = {b: [] for b in range(len(BUCKET))}; cl = []; cp = []; mean_l = float(np.mean(d["load"][-7 * 96:]))
@@ -356,9 +360,19 @@ class Engine:
                    "daily": daily, "_t": time.time(), "calc_s": None}
             with self.fc_lock: self.fc_cache = out
         except Exception as e:
-            with self.fc_lock: self.fc_cache = {"ok": False, "why": f"예측 계산 실패: {type(e).__name__}: {e}", "_t": time.time()}
+            with self.fc_lock: self.fc_cache = {"ok": False, "why": str(e) if isinstance(e, ValueError) else f"예측 계산 실패: {type(e).__name__}: {e}", "_t": time.time()}
         finally:
             self._fc_busy = False
+
+    def _make_demo_data(self, md, site):
+        """시연용 합성 현장 자료(120일)와 예측 모델을 만든다. 실행 파일(run_sim)을 거치지 않고 기동했거나 results 폴더가 비었을 때."""
+        from ifps_ems import dataio
+        from ifps_ems.forecast import LoadForecaster, PVForecaster
+        os.makedirs(md, exist_ok=True); csvp = os.path.join(md, "sample_site_data.csv"); tmp = csvp + ".tmp"
+        dataio.gen_sample(site, tmp); os.replace(tmp, csvp); d = dataio.load_csv(csvp, site)
+        for name, cls in (("model_load.npz", LoadForecaster), ("model_pv.npz", PVForecaster)):
+            if not os.path.exists(os.path.join(md, name)): dataio.save_model(os.path.join(md, name), cls(site).fit(d))
+        self.rt.note("예측", f"시연용 합성 현장 자료와 예측 모델 생성: {md}")
 
     def _sup_loop(self):
         """통신 감시 주기(0.5초): 수집 주기(1초)와 별도로 두절·경로 저하를 판정한다. 감지 한도 = 두절 판정 2.0초 + 0.5초."""

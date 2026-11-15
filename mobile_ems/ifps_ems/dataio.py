@@ -75,6 +75,7 @@ def load_model(path, model):
 def gen_sample(site, path, days=120, start="2026-07-01 00:00", seed=7):
     """합성 현장 자료(15분)를 만든다. 실측이 쌓이기 전 학습·시험용."""
     rng = np.random.default_rng(seed); t0 = datetime.strptime(start, "%Y-%m-%d %H:%M"); n = days * 96
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)           # 폴더가 없으면 만든다(받은 패키지에는 results 폴더가 없다)
     press = 1013.0; cloud = 0.9; wx = 0; plan = 1
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f); w.writerow(HIST_COLS)

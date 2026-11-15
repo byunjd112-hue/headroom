@@ -113,6 +113,26 @@ class TestAuditDurability(Base):
         d = dataio.load_csv(p, Site()); self.assertEqual(d["n"], 5); self.assertEqual(list(d["load"]), [10.0, 20.0, 20.0, 20.0, 50.0]); self.assertEqual(d["ts"][2], "2026-07-01 00:30")
 
 
+class TestForecastWithoutSampleFiles(unittest.TestCase):
+    def test_R23_sim_generates_demo_data_and_live_explains(self):
+        """results 폴더가 비어 있어도(실행 파일을 거치지 않고 기동) 시연 모드의 발전·예측 화면이 동작한다."""
+        import shutil, tempfile
+        from ifps_ems_rt.hmi.engine import Engine
+        td = tempfile.mkdtemp()
+        try:
+            for f in ("runtime.json", "pointmap.csv"): shutil.copy(os.path.join(ROOT, "config", f), td)
+            empty = os.path.join(td, "results"); eng = Engine(os.path.join(td, "runtime.json"), sim=True, plan_dir=empty)
+            try:
+                eng._compute_forecast(); fc = eng.fc_cache; self.assertTrue(fc["ok"], fc.get("why")); self.assertEqual(len(fc["load"]), 96); self.assertIn("합성", fc["source"])
+                self.assertTrue(all(os.path.exists(os.path.join(empty, n)) for n in ("sample_site_data.csv", "model_load.npz", "model_pv.npz")))
+                eng.sim = False; shutil.rmtree(empty); eng._compute_forecast()                       # 실장치: 이력이 모자라면 이유를 알려 준다
+                self.assertFalse(eng.fc_cache["ok"]); self.assertIn("8일", eng.fc_cache["why"]); self.assertNotIn("FileNotFound", eng.fc_cache["why"])
+            finally:
+                eng.sim = True; eng.stop()
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+
 class TestAlarmDedupe(unittest.TestCase):
     def test_R15_repeated_event_alarms_are_counted_not_stacked(self):
         A = AlarmManager()
