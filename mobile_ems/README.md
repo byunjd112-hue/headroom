@@ -12,7 +12,7 @@
 
 ## 빠른 시작
 **Windows 노트북**: `run_sim.bat` 더블클릭 → 브라우저가 열리고 가상 장치로 전체 기능 시연.
-**실장치**: `config/runtime.json`의 장치 IP(경로 A·B)·unit과 `config/pointmap.csv`의 레지스터 주소를 제작사 자료로 맞춘 뒤 `run_live.bat`.
+**실장치**: `config/runtime.json`의 장치 IP(경로 A·B)·unit과 `config/pointmap.csv`의 레지스터 주소를 제작사 자료로 맞춘 뒤 `run_live.bat`. 자료형은 16비트(u16·i16)·32비트(u32·i32·f32)·64비트(u64·i64·f64), 바이트 순서는 `pointmap.csv`의 `order` 열 또는 `runtime.json`의 `devices.<장비>.order`에 ABCD/CDAB/BADC/DCBA로 적는다. 순서 판별은 `python -m ifps_ems_rt.mbtool read <IP> -a <주소> -n 4 --orders`. 상세는 `docs/out/이동형전력체계EMS_실장치통신연동방안서_Rev00.pdf`.
 
 ```
 pip install -r requirements.txt
@@ -47,6 +47,7 @@ python tools/measure.py docs/test_results.json --soak 300   # 동적 시험(요�
 python tools/static_report.py                               # 단위시험+커버리지, pyflakes, bandit, radon
 node docs/build_test_report.js                              # → docs/out/…SW시험결과보고서_Rev00.docx
 node docs/build_security_review.js                          # → docs/out/…보안성검토결과_Rev00.docx
+node docs/build_interface_guide.js                          # → docs/out/…실장치통신연동방안서_Rev00.docx
 python -m ifps_ems_rt.hmi.pin                               # PIN 해시 생성(운용 모드 필수)
 ```
 

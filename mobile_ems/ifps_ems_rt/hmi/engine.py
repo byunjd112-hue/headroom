@@ -193,7 +193,7 @@ class Engine:
         base = os.path.dirname(self.cfg_path); self.sim = sim; self.plant = None; self.simdrv = None
         run_path = self.cfg_path
         if sim:
-            pts = pm.load(os.path.join(base, cfg["pointmap"]))
+            pts = pm.load(os.path.join(base, cfg["pointmap"]), cfg["devices"])
             units = {n: d["unit"] for n, d in cfg["devices"].items()}
             self.plant = Plant(pts, units); pa, pb = self.plant.start(self.hcfg.get("sim_ports", [0, 0]))
             c2 = copy.deepcopy(cfg); c2["allow"] = ["127.0.0.0/8"]
@@ -367,7 +367,7 @@ class Engine:
                     rt = self.rt; ch = rt.lm.check(rt.now())
                     for n, st in ch.items():
                         rt.note("통신", f"{n} 통신 {st}")
-                        if n in rt.dev: rt.dev[n].online = rt.lm.controllable(n)
+                        if n in rt.dev: rt.dev[n].online = rt.controllable(n)
                         self.alarms.set(f"link.{n}", st == "두절", 1, n, f"{n} 통신 두절 — 지령 차단, 직전 유효값 유지")
             except Exception as e:
                 self.rt.note("오류", f"감시 주기 예외: {type(e).__name__}: {e}")
@@ -382,6 +382,7 @@ class Engine:
             A.set(f"link.{n}", st == "두절", 1, n, f"{n} 통신 두절 — 지령 차단, 직전 유효값 유지")
             dead = [p for p, a in rt.links[n].alive.items() if not a]
             A.set(f"deg.{n}", st == "경로 저하", 3, n, f"{n} 통신 경로 저하 — 경로 {','.join(dead) or '?'} 무응답")
+            A.set(f"hb.{n}", rt.hb_stop.get(n, False) and st != "두절", 1, n, f"{n} 생존 계수(hb) {SUP['stale_s']:.0f}초 이상 정지 — 장치 제어기 이상, 지령 차단")
         for tag, f in rt.flag.items():
             dev = tag.split(".")[0]
             A.set(f"q5.{tag}", f == 5, 3, dev, f"{tag} 측정값 범위 밖 — 직전 유효값 유지")
@@ -473,7 +474,7 @@ class Engine:
             try: value = float(value)
             except (TypeError, ValueError): return {"ok": False, "why": "설정값 오류"}
             if (p["lo"] is not None and value < p["lo"]) or (p["hi"] is not None and value > p["hi"]): return {"ok": False, "why": f"설정 범위 {p['lo']}~{p['hi']} 밖"}
-            if not rt.lm.controllable(dev): return {"ok": False, "why": "통신 두절"}
+            if not rt.controllable(dev): return {"ok": False, "why": "통신 두절" if not rt.lm.controllable(dev) else "장치 생존 계수(hb) 정지"}
             why = ""
         else:
             if dev not in rt.dev: return {"ok": False, "why": "지령 대상 아님(감시 전용 장치)"}
@@ -581,7 +582,7 @@ class Engine:
                                 "age": round(now - rt.lm.last[n][k], 1)}
                 d = rt.dev.get(n)
                 devs[n] = {"link": rt.lm.state[n], "since": round(now - rt.lm.since[n], 1), "ctl": n in rt.dev, "paths": paths,
-                           "on": (d.on if d else rt.val.get(f"{n}.status", 0) > 0.5), "manual": d.manual if d else False, "online": rt.lm.controllable(n),
+                           "on": (d.on if d else rt.val.get(f"{n}.status", 0) > 0.5), "manual": d.manual if d else False, "online": rt.controllable(n), "hb_stop": rt.hb_stop.get(n, False),
                            "seq_ack": rt.val.get(f"{n}.seq_ack"), "hb": rt.val.get(f"{n}.hb")}
             sm = list(self.scan_ms)
         alarms, cnt = self.alarms.snapshot()

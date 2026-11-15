@@ -23,13 +23,13 @@ class Plant:
     def set(self, tag, value):
         p = self.by_tag[tag]
         with self.lock:
-            for i, r in enumerate(mb.encode(value, p["type"], p["scale"])): self.reg[p["device"]][(p["fc"], p["addr"] + i)] = r
+            for i, r in enumerate(mb.encode(value, p["type"], p["scale"], p.get("order", "ABCD"))): self.reg[p["device"]][(p["fc"], p["addr"] + i)] = r
 
     def get(self, tag):
         p = self.by_tag[tag]
         with self.lock:
             regs = [self.reg[p["device"]].get((p["fc"], p["addr"] + i), 0) for i in range(mb.NREG[p["type"]])]
-        return mb.decode(regs, p["type"], p["scale"])
+        return mb.decode(regs, p["type"], p["scale"], p.get("order", "ABCD"))
 
     # 장치 거동
     def tick(self, dt):

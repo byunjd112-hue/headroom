@@ -335,23 +335,27 @@ const P_ENG = {
         <span id="exCustom" style="display:none"><label>IP<input class="in" id="exHost" value="192.168.10.11" style="width:130px"></label><label>포트<input class="in" id="exPort" value="502" style="width:70px"></label><label>Unit<input class="in" id="exUnit" value="1" style="width:56px"></label></span>
         <label>기능 코드<select class="in" id="exFc"><option value="3">03 보유 레지스터</option><option value="4">04 입력 레지스터</option><option value="1">01 코일</option><option value="2">02 접점 입력</option></select></label>
         <label>시작 주소<input class="in" id="exAddr" type="number" value="0" min="0" max="65535" style="width:90px"></label><label>개수<input class="in" id="exCnt" type="number" value="16" min="1" max="125" style="width:70px"></label>
+        <label title="32비트 해석 순서. 정격값에 맞게 나오는 순서가 그 장치의 순서">32비트 순서<select class="in" id="exOrd"><option>ABCD</option><option>CDAB</option><option>BADC</option><option>DCBA</option></select></label>
         <button class="btn pri" id="exRead">${t("btn.read", "읽기")}</button><label style="flex-direction:row;align-items:center;gap:6px;text-transform:none"><input type="checkbox" id="exAuto"> 1초 자동 갱신</label></div>
-      <div class="scroll h560" style="margin-top:12px"><table class="t"><thead><tr><th class="n">주소</th><th>HEX</th><th class="n">UINT16</th><th class="n">INT16</th><th class="n">UINT32 (이 + 다음)</th><th class="n">FLOAT32 (이 + 다음)</th><th>대응 TAG</th></tr></thead><tbody id="exRows"><tr><td colspan="7" class="empty">대상과 주소를 정하고 읽기를 누르세요</td></tr></tbody></table></div></div></div>
+      <div class="scroll h560" style="margin-top:12px"><table class="t"><thead><tr><th class="n">주소</th><th>HEX</th><th class="n">UINT16</th><th class="n">INT16</th><th class="n">UINT32</th><th class="n">INT32</th><th class="n">FLOAT32 (이 + 다음)</th><th>대응 TAG</th></tr></thead><tbody id="exRows"><tr><td colspan="8" class="empty">대상과 주소를 정하고 읽기를 누르세요</td></tr></tbody></table></div></div></div>
       <div class="grid" style="align-content:start"><div class="panel"><div class="hd"><h3>레지스터 쓰기</h3><span class="pill eng">ENGINEER</span></div><div class="bd">
         <div class="warnbox" style="margin-bottom:12px">실장치에 직접 값을 씁니다. 지령 연동 조건(SBO·응답 확인)을 거치지 않으므로 시운전·정비 중에만 사용하십시오.</div>
         <div class="form"><label>기능 코드<select class="in" id="wrFc"><option value="6">06 단일 레지스터</option><option value="16">16 다중 레지스터</option><option value="5">05 단일 코일</option></select></label><label>주소<input class="in" id="wrAddr" type="number" value="40" style="width:90px"></label>
         <label style="flex:1">값(쉼표 구분, 0x 가능)<input class="in" id="wrVals" value="1234" style="width:100%"></label><button class="btn eng" id="wrGo">${t("btn.write", "쓰기")}</button></div><div id="wrRes" class="muted" style="margin-top:8px"></div></div></div>
-        <div class="panel"><div class="hd"><h3>사용 안내</h3></div><div class="bd" style="color:var(--text2);font-size:12.5px;line-height:1.7">· 주소는 0부터(제작사 문서의 40001 = 보유 레지스터 0)<br>· 32비트 값은 상위 워드가 앞(Big-endian word order)<br>· 응답 없음 = 연결 거부/시간 초과 → 통신 진단 화면의 경로 상태 확인<br>· 직접 입력은 runtime.json의 <span class="mono">allow</span> 대역 안의 사설 주소만 허용<br>· 모든 프레임은 [프레임 추적] 탭에 HEX로 기록</div></div></div></div>`;
+        <div class="panel"><div class="hd"><h3>사용 안내</h3></div><div class="bd" style="color:var(--text2);font-size:12.5px;line-height:1.7">· 주소는 0부터(제작사 문서의 40001 = 보유 레지스터 0)<br>· 32비트 순서: ABCD 표준 · CDAB 워드 뒤집힘 · BADC 바이트 뒤집힘 · DCBA 완전 역순 — [32비트 순서]를 바꿔 정격값이 맞게 나오는 것을 찾고 pointmap.csv의 order 열에 적음<br>· 응답 없음 = 연결 거부/시간 초과 → 통신 진단 화면의 경로 상태 확인<br>· 직접 입력은 runtime.json의 <span class="mono">allow</span> 대역 안의 사설 주소만 허용<br>· 모든 프레임은 [프레임 추적] 탭에 HEX로 기록</div></div></div></div>`;
     const tg = $("#exTgt"); tg.onchange = () => { $("#exCustom").style.display = tg.value === "custom" ? "contents" : "none"; };
     const q = () => { const v = tg.value; const base = v === "custom" ? { host: $("#exHost").value.trim(), port: $("#exPort").value, unit: $("#exUnit").value } : { dev: v.split("|")[0], path: v.split("|")[1] }; return Object.assign(base, { fc: $("#exFc").value, addr: $("#exAddr").value, count: $("#exCnt").value }); };
     const read = async () => {
       if (!can("operator")) { $("#exAuto").checked = false; return loginDialog(); }
-      const r = await api("/api/mb/read?" + new URLSearchParams(q())); if (!r.ok) { $("#exRows").innerHTML = `<tr><td colspan="7" class="empty badc">${esc(r.why)}</td></tr>`; $("#exInfo").textContent = ""; return; }
+      const r = await api("/api/mb/read?" + new URLSearchParams(q())); if (!r.ok) { $("#exRows").innerHTML = `<tr><td colspan="8" class="empty badc">${esc(r.why)}</td></tr>`; $("#exInfo").textContent = ""; return; }
       $("#exInfo").textContent = `${r.regs.length}개 · 왕복 ${r.rtt} ms`; const bits = r.fc <= 2;
-      $("#exRows").innerHTML = r.regs.map((v, i) => { const a = r.addr + i, nx = r.regs[i + 1]; const u32 = nx !== undefined ? (v * 65536 + nx) : null; let f32 = null; if (nx !== undefined) { const dv = new DataView(new ArrayBuffer(4)); dv.setUint16(0, v); dv.setUint16(2, nx); f32 = dv.getFloat32(0); }
-        return `<tr><td class="n">${a}</td><td class="mono accc">${bits ? v : "0x" + v.toString(16).toUpperCase().padStart(4, "0")}</td><td class="n">${v}</td><td class="n">${bits ? "" : (v > 32767 ? v - 65536 : v)}</td><td class="n">${bits || u32 === null ? "" : u32}</td><td class="n">${bits || f32 === null ? "" : (Math.abs(f32) < 1e7 && Math.abs(f32) > 1e-4 || f32 === 0 ? f32.toPrecision(6) : f32.toExponential(3))}</td><td class="mono">${esc(r.tags[a] || "")}</td></tr>`; }).join("");
+      const ord = $("#exOrd").value; this._exLast = r;
+      $("#exRows").innerHTML = r.regs.map((v, i) => { const a = r.addr + i, nx = r.regs[i + 1]; let u32 = null, i32 = null, f32 = null;
+        if (nx !== undefined) { const dv = regsView([v, nx], ord); u32 = dv.getUint32(0); i32 = dv.getInt32(0); f32 = dv.getFloat32(0); }
+        const w16 = regsView([v], ord);
+        return `<tr><td class="n">${a}</td><td class="mono accc">${bits ? v : "0x" + v.toString(16).toUpperCase().padStart(4, "0")}</td><td class="n">${bits ? v : w16.getUint16(0)}</td><td class="n">${bits ? "" : w16.getInt16(0)}</td><td class="n">${bits || u32 === null ? "" : u32}</td><td class="n">${bits || i32 === null ? "" : i32}</td><td class="n">${bits || f32 === null ? "" : (Math.abs(f32) < 1e7 && Math.abs(f32) > 1e-4 || f32 === 0 ? f32.toPrecision(6) : f32.toExponential(3))}</td><td class="mono">${esc(r.tags[a] || "")}</td></tr>`; }).join("");
     };
-    $("#exRead").onclick = read; $("#exAuto").onchange = e => { clearInterval(this._ex); this._ex = e.target.checked ? setInterval(read, 1000) : null; };
+    $("#exRead").onclick = read; $("#exOrd").onchange = () => { if (this._exLast) read(); }; $("#exAuto").onchange = e => { clearInterval(this._ex); this._ex = e.target.checked ? setInterval(read, 1000) : null; };
     $("#wrGo").onclick = async () => {
       if (!can("engineer")) { toast("엔지니어 권한 필요", "bad"); return loginDialog(); }
       const vals = $("#wrVals").value.split(",").map(x => x.trim()).filter(Boolean).map(x => parseInt(x, x.startsWith("0x") ? 16 : 10)); if (!vals.length || vals.some(Number.isNaN)) return toast("값 형식 오류", "bad");
@@ -466,6 +470,13 @@ function decoratePage(p) {
   const hd = $("#main .pagehd"), m = PAGE_META[p]; if (!hd || !m || hd.querySelector(".pcat")) return;
   hd.insertAdjacentHTML("afterbegin", `<span class="pcat ${m[0]}"><b>${S.lang === "ko" ? m[1] : m[2]}</b>${m[3]}</span>`);
   const sub = hd.querySelector(".sub"); if (sub && !sub.textContent.trim()) sub.textContent = m[4];
+}
+/* 레지스터 → 표준(ABCD) 순서 DataView. modbus.py to_std와 같은 규칙 */
+function regsView(regs, ord) {
+  let w = regs.map(x => x & 0xFFFF);
+  if (ord === "BADC" || ord === "DCBA") w = w.map(x => ((x & 0xFF) << 8) | (x >> 8));
+  if (ord === "CDAB" || ord === "DCBA") w = w.slice().reverse();
+  const dv = new DataView(new ArrayBuffer(2 * w.length)); w.forEach((x, k) => dv.setUint16(2 * k, x)); return dv;
 }
 const PAGES = { overview: P_OV, sld: P_SLD, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG };
 let mounted = null;

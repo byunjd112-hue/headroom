@@ -31,7 +31,7 @@ class DeviceLink:
         for fc, addr, n, ps in self.blk:
             regs = cl.read(addr, n, fc)
             for p in ps:
-                o = p["addr"] - addr; vals[p["tag"]] = mb.decode(regs[o:o + NREG[p["type"]]], p["type"], p["scale"])
+                o = p["addr"] - addr; vals[p["tag"]] = mb.decode(regs[o:o + NREG[p["type"]]], p["type"], p["scale"], p.get("order", "ABCD"))
         return vals
 
     def read_all(self):
@@ -49,9 +49,11 @@ class DeviceLink:
         """지령 쓰기. 살아 있는 경로로 보낸다. 반환: 성공 여부."""
         p = self.by_tag[tag]
         if p["rw"] != "w": raise mb.ModbusError(f"쓰기 금지 점: {tag}")
+        try: regs = mb.encode(value, p["type"], p["scale"], p.get("order", "ABCD"))
+        except mb.ModbusError as e: self.err = f"{tag}: {e}"; return False     # 범위 밖 값은 보내지 않는다(경로는 정상)
         for k, cl in self.cl.items():
             try:
-                cl.write(p["addr"], mb.encode(value, p["type"], p["scale"])); self.alive[k] = True; return True
+                cl.write(p["addr"], regs, fc=16 if len(regs) > 1 else None); self.alive[k] = True; return True
             except mb.ModbusError as e:
                 self.alive[k] = False; self.err = str(e)
         return False
@@ -83,7 +85,7 @@ class RtCommander(sv.Commander):
             self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} {cmd} 차단: {why}"}); return False, self.clock() - t0
         d = self.dev[did]; want = cmd in ("start", "close")
         for n in range(1 + SUP["retry"]):
-            self.seq = max(self.seq, d.last_seq) + 1
+            self.seq = max(self.seq, d.last_seq) % 65535 + 1     # 1~65535 순환(u16)
             sent = self.links[did].write(f"{did}.seq", self.seq) and self.links[did].write(f"{did}.cmd", CMD[cmd])
             t_end = self.clock() + SUP["ack_s"]
             while sent and self.clock() < t_end:

@@ -103,24 +103,65 @@ class Client:
 
 
 # ── 자료형 변환(레지스터 ↔ 공학값)
-NREG = {"u16": 1, "i16": 1, "u32": 2, "i32": 2, "f32": 2}
+# 16비트: u16 i16 / 32비트: u32 i32 f32 / 64비트: u64 i64 f64
+NREG = {"u16": 1, "i16": 1, "u32": 2, "i32": 2, "f32": 2, "u64": 4, "i64": 4, "f64": 4}
+_FMT = {"u16": "H", "i16": "h", "u32": "I", "i32": "i", "f32": "f", "u64": "Q", "i64": "q", "f64": "d"}
+# 바이트·워드 순서. A가 최상위 바이트. 32비트 값 0x11223344 를 예로
+#   ABCD  [0x1122, 0x3344]  상위 워드 먼저, 워드 안은 상위 바이트 먼저(Modbus 표준, Big-endian)
+#   CDAB  [0x3344, 0x1122]  하위 워드 먼저(Word swap, Little-endian word order)
+#   BADC  [0x2211, 0x4433]  워드 순서는 표준, 워드 안 바이트만 뒤집힘(Byte swap)
+#   DCBA  [0x4433, 0x2211]  완전 역순(Little-endian)
+# 16비트 값은 워드가 하나라 AB(=ABCD·CDAB) 또는 BA(=BADC·DCBA, 바이트 뒤집힘) 두 가지다.
+# 64비트 값의 CDAB·DCBA는 네 워드 전체를 역순으로 둔다.
+ORDERS = ("ABCD", "CDAB", "BADC", "DCBA")
+ORDER_ALIAS = {"": "ABCD", "AB": "ABCD", "BA": "BADC", "BE": "ABCD", "LE": "DCBA", "BIG": "ABCD", "LITTLE": "DCBA",
+               "WORDSWAP": "CDAB", "SWAP": "CDAB", "BYTESWAP": "BADC", "1234": "ABCD", "3412": "CDAB", "2143": "BADC", "4321": "DCBA"}
 
 
-def decode(regs, typ, scale=1.0):
-    if typ == "u16": v = regs[0]
-    elif typ == "i16": v = struct.unpack(">h", struct.pack(">H", regs[0]))[0]
-    elif typ == "u32": v = (regs[0] << 16) | regs[1]
-    elif typ == "i32": v = struct.unpack(">i", struct.pack(">HH", *regs[:2]))[0]
-    elif typ == "f32": v = struct.unpack(">f", struct.pack(">HH", *regs[:2]))[0]
-    else: raise ModbusError(f"자료형 미지원: {typ}")
-    return v * scale
+def norm_order(order):
+    """순서 표기를 ABCD/CDAB/BADC/DCBA 중 하나로 바꾼다. 모르는 표기는 ModbusError."""
+    o = str(order or "").strip().upper().replace("-", "").replace("_", "").replace(" ", "")
+    o = ORDER_ALIAS.get(o, o)
+    if o not in ORDERS: raise ModbusError(f"바이트 순서 표기 오류: {order} (ABCD/CDAB/BADC/DCBA)")
+    return o
 
 
-def encode(value, typ, scale=1.0):
-    raw = value / scale
-    if typ == "u16": return [int(round(raw)) & 0xFFFF]
-    if typ == "i16": return list(struct.unpack(">H", struct.pack(">h", int(round(raw)))))
-    if typ == "u32": r = int(round(raw)); return [(r >> 16) & 0xFFFF, r & 0xFFFF]
-    if typ == "i32": return list(struct.unpack(">HH", struct.pack(">i", int(round(raw)))))
-    if typ == "f32": return list(struct.unpack(">HH", struct.pack(">f", float(raw))))
-    raise ModbusError(f"자료형 미지원: {typ}")
+def _swap16(w): return ((w & 0xFF) << 8) | ((w >> 8) & 0xFF)
+
+
+def to_std(regs, order="ABCD"):
+    """장치가 보낸 워드들을 표준(ABCD) 순서로 바꾼다."""
+    o = norm_order(order); w = [r & 0xFFFF for r in regs]
+    if o in ("BADC", "DCBA"): w = [_swap16(x) for x in w]
+    if o in ("CDAB", "DCBA"): w = w[::-1]
+    return w
+
+
+def from_std(regs, order="ABCD"):
+    """표준(ABCD) 워드들을 장치 순서로 바꾼다(to_std의 역)."""
+    o = norm_order(order); w = [r & 0xFFFF for r in regs]
+    if o in ("CDAB", "DCBA"): w = w[::-1]
+    if o in ("BADC", "DCBA"): w = [_swap16(x) for x in w]
+    return w
+
+
+def decode(regs, typ, scale=1.0, order="ABCD"):
+    if typ not in NREG: raise ModbusError(f"자료형 미지원: {typ}")
+    n = NREG[typ]
+    if len(regs) < n: raise ModbusError(f"{typ}에 레지스터 {n}개 필요, {len(regs)}개 받음")
+    w = to_std(regs[:n], order)
+    v = struct.unpack(">" + _FMT[typ], struct.pack(f">{n}H", *w))[0]
+    return v if scale == 1 else v * scale          # 배율 1이면 64비트 정수도 정밀도 손실 없이
+
+
+def encode(value, typ, scale=1.0, order="ABCD"):
+    if typ not in NREG: raise ModbusError(f"자료형 미지원: {typ}")
+    n = NREG[typ]; f = _FMT[typ]
+    raw = value if scale == 1 else value / scale
+    if f in "fd": b = struct.pack(">" + f, float(raw))
+    else:
+        r = int(round(raw)); bits = 16 * n
+        lo, hi = (-(1 << (bits - 1)), (1 << (bits - 1)) - 1) if f.islower() else (0, (1 << bits) - 1)
+        if not lo <= r <= hi: raise ModbusError(f"값 {value}이(가) {typ} 범위({lo}~{hi}, 배율 {scale}) 밖")
+        b = struct.pack(">" + f, r)
+    return from_std(list(struct.unpack(f">{n}H", b)), order)

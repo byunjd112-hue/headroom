@@ -48,6 +48,57 @@ class TestModbus(Base):
         self.assertGreaterEqual(len(pm.validate(bad, self.units)), 3)
 
 
+class TestByteOrder(Base):
+    """16·32·64비트 자료형과 바이트·워드 순서(ABCD/CDAB/BADC/DCBA)."""
+    def test_known_vectors(self):
+        exp = {"ABCD": [0x1122, 0x3344], "CDAB": [0x3344, 0x1122], "BADC": [0x2211, 0x4433], "DCBA": [0x4433, 0x2211]}
+        for o, regs in exp.items():
+            self.assertEqual(mb.encode(0x11223344, "u32", 1, o), regs, o); self.assertEqual(mb.decode(regs, "u32", 1, o), 0x11223344, o)
+        self.assertEqual(mb.encode(1.0, "f32", 1, "ABCD"), [0x3F80, 0x0000]); self.assertEqual(mb.encode(1.0, "f32", 1, "CDAB"), [0x0000, 0x3F80])
+        self.assertEqual(mb.encode(0x1234, "u16", 1, "BADC"), [0x3412]); self.assertEqual(mb.encode(0x1234, "u16", 1, "CDAB"), [0x1234])   # 16비트는 바이트만 영향
+        self.assertEqual(mb.encode(0x0102030405060708, "u64", 1, "CDAB"), [0x0708, 0x0506, 0x0304, 0x0102])
+        for o in mb.ORDERS:
+            for typ, v in (("i16", -123), ("u16", 65535), ("i32", -2_000_000_000), ("u32", 4_000_000_000), ("f32", -12.5), ("i64", -9_000_000_000_000), ("f64", 1234.5678)):
+                self.assertAlmostEqual(mb.decode(mb.encode(v, typ, 1, o), typ, 1, o), v, places=3, msg=f"{typ} {o}")
+        self.assertAlmostEqual(mb.decode(mb.encode(-48.7, "i32", 0.1, "CDAB"), "i32", 0.1, "CDAB"), -48.7, places=6)
+        self.assertEqual(mb.norm_order("word swap"), "CDAB"); self.assertEqual(mb.norm_order("3412"), "CDAB"); self.assertEqual(mb.norm_order(""), "ABCD")
+        with self.assertRaises(mb.ModbusError): mb.norm_order("ACBD")
+        with self.assertRaises(mb.ModbusError): mb.encode(70000, "u16")              # 범위 밖은 잘라 보내지 않고 거부
+        with self.assertRaises(mb.ModbusError): mb.encode(-1, "u32")
+
+    def _write(self, rows, dev_order=None):
+        src = open(os.path.join(ROOT, "config", "pointmap.csv"), encoding="utf-8").read().rstrip("\n").split("\n")
+        open(os.path.join(self.td, "pointmap.csv"), "w", encoding="utf-8").write("\n".join(src + rows) + "\n")
+        cfg = json.load(open(self.cfgp, encoding="utf-8"))
+        for d, o in (dev_order or {}).items(): cfg["devices"][d]["order"] = o
+        json.dump(cfg, open(self.cfgp, "w", encoding="utf-8"), ensure_ascii=False); return cfg
+
+    def test_pointmap_order_column_and_device_default(self):
+        cfg = self._write(["ESS.kwh,ESS,3,30,u32,0.1,kWh,,,r,CDAB", "ESS.p32,ESS,3,32,f32,1,kW,,,r,"], {"ESS": "DCBA"})
+        pts = {p["tag"]: p for p in pm.load(os.path.join(self.td, "pointmap.csv"), cfg["devices"])}
+        self.assertEqual(pts["ESS.kwh"]["order"], "CDAB"); self.assertEqual(pts["ESS.p32"]["order"], "DCBA"); self.assertEqual(pts["DG.kw"]["order"], "ABCD")
+        self.assertEqual(pm.validate(list(pts.values()), cfg["devices"]), [])
+        self._write(["ESS.bad,ESS,3,30,u32,1,,,,r,XYZW"])
+        bad = pm.validate(pm.load(os.path.join(self.td, "pointmap.csv")), self.units); self.assertTrue(any("바이트 순서" in b for b in bad), bad)
+
+    def test_end_to_end_mixed_orders_with_simulator(self):
+        """장치마다 순서가 다른 현장을 모의: 32비트 점 3종 + 장치 기본 DCBA(16비트 지령까지 바이트 뒤집힘)."""
+        cfg = self._write(["ESS.kwh,ESS,3,30,u32,0.1,kWh,,,r,CDAB", "ESS.p32,ESS,3,32,f32,1,kW,,,r,BADC", "ESS.i32,ESS,4,34,i32,0.01,kW,,,r,DCBA"], {"DG": "DCBA"})
+        self.rt.close(); self.plant.stop()
+        pts = pm.load(os.path.join(self.td, "pointmap.csv"), cfg["devices"])
+        self.plant = simplant.Plant(pts, self.units); pa, pb = self.plant.start([0, 0])
+        for n in cfg["devices"]: cfg["devices"][n]["paths"] = [["127.0.0.1", pa], ["127.0.0.1", pb]]
+        json.dump(cfg, open(self.cfgp, "w", encoding="utf-8"), ensure_ascii=False)
+        self.rt = runtime.Runtime(self.cfgp)
+        self.plant.set("ESS.kwh", 123456.7); self.plant.set("ESS.p32", -12.5); self.plant.set("ESS.i32", -48.25)
+        r = self.rt.scan(); self.assertEqual(r["link"], {})
+        self.assertAlmostEqual(self.rt.val["ESS.kwh"], 123456.7, places=1); self.assertAlmostEqual(self.rt.val["ESS.p32"], -12.5, places=4)
+        self.assertAlmostEqual(self.rt.val["ESS.i32"], -48.25, places=4); self.assertAlmostEqual(self.rt.val["LOAD.kw"], 80.0, places=1)
+        c = mb.Client("127.0.0.1", pa, self.units["ESS"], 0.3); raw = c.read(30, 2); c.close()
+        self.assertNotAlmostEqual(mb.decode(raw, "u32", 0.1, "ABCD"), 123456.7, places=0)          # 순서를 틀리면 값이 틀린다
+        ok, _ = self.rt.cmd.send("DG", "start"); self.assertTrue(ok); self.assertEqual(int(self.plant.get("DG.status")), 1)   # DCBA 장치 지령·응답 확인
+
+
 class TestRuntime(Base):
     def test_scan_reads_values_within_period(self):
         t0 = time.monotonic(); r = self.rt.scan(); dt = time.monotonic() - t0
@@ -84,6 +135,18 @@ class TestRuntime(Base):
         self.assertFalse(self.rt.cmd.send("DG", "stop")[0])
         self.plant.down.clear(); self.rt.scan(); self.rt.scan()
         self.assertEqual(self.rt.lm.state["DG"], "정상")                                                   # 복구 뒤 재조회하고 제어 재개
+
+    def test_heartbeat_freeze_blocks_command(self):
+        """통신은 정상인데 장치 hb가 멈추면 지령을 막고, 다시 올라가면 풀린다."""
+        clk = [1000.0]; self.rt.now = lambda: clk[0]
+        self.rt.scan(); self.assertTrue(self.rt.controllable("DG"))
+        orig = self.plant.tick; self.plant.tick = lambda dt: None            # 장치 제어기 정지(hb·상태 갱신 멈춤)
+        try:
+            for _ in range(7): clk[0] += 1.0; self.rt.scan()
+            self.assertFalse(self.rt.controllable("DG")); self.assertEqual(self.rt.lm.state["DG"], "정상")
+            self.assertTrue(any("생존 계수 정지" in e["text"] for e in self.rt.events))
+        finally: self.plant.tick = orig
+        time.sleep(0.3); clk[0] += 1.0; self.rt.scan(); self.assertTrue(self.rt.controllable("DG"))
 
     def test_reserve_rule_starts_fuel_cell(self):
         self.plant.set("LOAD.p1_kw", 70.0); self.plant.set("LOAD.p2_kw", 60.0); self.plant.set("LOAD.kw", 150.0); self.rt.scan()

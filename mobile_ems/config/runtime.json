@@ -24,7 +24,8 @@
      502
     ]
    ],
-   "unit": 1
+   "unit": 1,
+   "order": "ABCD"
   },
   "FC": {
    "paths": [
@@ -37,7 +38,8 @@
      502
     ]
    ],
-   "unit": 2
+   "unit": 2,
+   "order": "ABCD"
   },
   "ESS": {
    "paths": [
@@ -50,7 +52,8 @@
      502
     ]
    ],
-   "unit": 3
+   "unit": 3,
+   "order": "ABCD"
   },
   "MTR": {
    "paths": [
@@ -63,7 +66,8 @@
      502
     ]
    ],
-   "unit": 4
+   "unit": 4,
+   "order": "ABCD"
   },
   "ELZ": {
    "paths": [
@@ -76,7 +80,8 @@
      502
     ]
    ],
-   "unit": 5
+   "unit": 5,
+   "order": "ABCD"
   },
   "PV": {
    "paths": [
@@ -89,7 +94,8 @@
      502
     ]
    ],
-   "unit": 6
+   "unit": 6,
+   "order": "ABCD"
   }
  },
  "auto": true,

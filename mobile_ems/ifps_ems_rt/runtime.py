@@ -24,7 +24,7 @@ class Runtime:
     def __init__(self, cfg_path, clock=time.monotonic, wall=datetime.now, key=None):
         with open(cfg_path, encoding="utf-8") as f: self.cfg = json.load(f)
         base = os.path.dirname(os.path.abspath(cfg_path))
-        self.pts = pm.load(os.path.join(base, self.cfg["pointmap"]))
+        self.pts = pm.load(os.path.join(base, self.cfg["pointmap"]), self.cfg["devices"])
         bad = pm.validate(self.pts, self.cfg["devices"])
         if bad: raise ValueError("대응표 오류: " + "; ".join(bad))
         self.clock, self.wall = clock, wall; self._nlock = threading.Lock()
@@ -35,7 +35,7 @@ class Runtime:
         self.dev = {n: sv.Device(n) for n in self.ctl}
         self.cmd = RtCommander({n: self.links[n] for n in self.ctl}, self.dev, clock=clock)
         self.lm = sv.LinkMonitor(list(self.links)); self.wd = sv.Watchdog(["수집", "제어"])
-        self.val = {}; self.flag = {}; self.t_upd = {}; self.t0 = clock(); self.events = []; self.n_scan = 0; self.n_over = 0; self.max_scan_s = 0.0
+        self.val = {}; self.flag = {}; self.t_upd = {}; self.hb_seen = {}; self.hb_stop = {}; self.t0 = clock(); self.events = []; self.n_scan = 0; self.n_over = 0; self.max_scan_s = 0.0
         self.state_dir = os.path.join(base, self.cfg.get("state_dir", "state")); os.makedirs(self.state_dir, exist_ok=True)
         self.key_note = ""
         if key is None: key, self.key_note = security.load_or_create_key(self.state_dir)
@@ -85,15 +85,27 @@ class Runtime:
                 self.flag[tag] = f
         for n, st in self.lm.check(t).items():
             if not any(e["text"].startswith(f"{n} 통신") and e["text"].endswith(st) for e in self.events[-20:]): self.note("통신", f"{n} 통신 {st}")
+        for n in self.links:                                          # 생존 계수(hb) 정지: 통신은 되는데 장치 제어기가 멈춘 경우
+            hb = self.val.get(f"{n}.hb")
+            if hb is None: continue
+            last = self.hb_seen.get(n)
+            if last is None or last[0] != hb: self.hb_seen[n] = (hb, t)
+            stop = t - self.hb_seen[n][1] > SUP["stale_s"]
+            if stop != self.hb_stop.get(n, False): self.note("통신", f"{n} 생존 계수 {'정지 — 지령 차단' if stop else '재개'}")
+            self.hb_stop[n] = stop
         for tag, tu in self.t_upd.items():
             if t - tu > SUP["stale_s"] and self.flag.get(tag) == 0: self.flag[tag] = 3      # 갱신 지연
         for n in self.ctl:
-            self.dev[n].online = self.lm.controllable(n)
+            self.dev[n].online = self.controllable(n)
             if f"{n}.status" in self.val: self.dev[n].on = int(round(self.val[f"{n}.status"])) == 1
             if f"{n}.mode" in self.val: self.dev[n].manual = int(round(self.val[f"{n}.mode"])) == 1
         self.wd.kick("수집", t); self.n_scan += 1
         self._accumulate()
         return {"t": t, "bad": {k: f for k, f in self.flag.items() if f}, "link": {n: s for n, s in self.lm.state.items() if s != "정상"}}
+
+    def controllable(self, n):
+        """지령 가능: 통신 경로가 살아 있고 장치 생존 계수(hb)가 멈추지 않았다."""
+        return self.lm.controllable(n) and not self.hb_stop.get(n, False)
 
     # ── 4) 제어
     def decide(self):
