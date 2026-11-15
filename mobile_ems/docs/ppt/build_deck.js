@@ -38,9 +38,12 @@ pres.defineSlideMaster({ title: "CONTENT", background: { color: "FFFFFF" }, marg
   slideNumber: { x: 11.83, y: 7.05, w: 1.05, h: 0.3, fontSize: 9.5, bold: true, color: GRAY, align: "right" } });
 
 // ── 구성 요소
-const SECS = [["개요", "OVERVIEW"], ["화면 구성", "SCREEN COMPOSITION"], ["사용 방법", "OPERATION"], ["디버깅", "DEBUGGING TOOLS"], ["장치 연결", "DEVICE INTEGRATION"], ["신뢰성 결과", "RELIABILITY RESULTS"]];
+const AI = JSON.parse(fs.readFileSync(__dirname + "/ai_eval.json", "utf8"));
+const REMAP = { 1: 1, ai: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7 };
+const SECS = [["개요", "OVERVIEW"], ["오프라인 학습 AI", "OFFLINE-TRAINED AI FORECAST"], ["화면 구성", "SCREEN COMPOSITION"], ["사용 방법", "OPERATION"], ["디버깅", "DEBUGGING TOOLS"], ["장치 연결", "DEVICE INTEGRATION"], ["신뢰성 결과", "RELIABILITY RESULTS"]];
 let curSec = 0, sub = 0;
 function page(sec, title, subtitle, notes) {
+  sec = REMAP[sec];
   if (sec !== curSec) { curSec = sec; sub = 0; pres.addSection({ title: `${sec}. ${SECS[sec - 1][0]}` }); } sub++;
   const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: `${sec}. ${SECS[sec - 1][0]}` });
   s.addText(String(sec), { placeholder: "secno" }); s.addText(SECS[sec - 1][0], { placeholder: "sec" }); s.addText(SECS[sec - 1][1], { placeholder: "secen" });
@@ -105,20 +108,20 @@ function steps(s, x, y, w, h, items) {                                // 가로 
 pres.addSection({ title: "표지·목차" });
 { const s = pres.addSlide({ masterName: "COVER", sectionTitle: "표지·목차" });
   s.addText("작전지 종합전력공급체계(IFPS) ⑤ 이동형 전력체계 EMS", { placeholder: "kicker" }); s.addText("EMS SW 화면 구성 및 사용 설명", { placeholder: "title" });
-  s.addText("Mobile EMS Software — Screens, Operation, Debugging, Integration, Reliability", { placeholder: "en" }); s.addText("제어화면 8종  ·  현장 디버깅 도구  ·  실장비 연결 방법  ·  신뢰성 시험 결과", { placeholder: "tag" });
+  s.addText("Mobile EMS Software — Screens, Operation, Debugging, Integration, Reliability", { placeholder: "en" }); s.addText("오프라인 학습 AI 예측  ·  제어화면 8종  ·  현장 디버깅 도구  ·  실장비 연결 방법  ·  신뢰성 시험 결과", { placeholder: "tag" });
   [["대상 판", "Rev16"], ["제어화면", "8개 화면"], ["자동 시험", `${ST.n_tests}건 통과`]].forEach(([l, v], i) => { const x = 1.2 + i * 3.0;
     s.addShape(pres.ShapeType.rect, { x, y: 4.75, w: 2.75, h: 0.85, fill: { color: "FFFFFF", transparency: 88 }, line: { color: "FFFFFF", width: 0.75, transparency: 60 }, objectName: "표지 수치 " + l });
     T(s, l, { x, y: 4.83, w: 2.75, h: 0.26, fontSize: 9.5, color: "D8CBB4", align: "center", valign: "middle" }); T(s, v, { x, y: 5.09, w: 2.75, h: 0.42, fontSize: 16, bold: true, color: WHITE, align: "center", valign: "middle" }); });
   s.addText("2026. 11.   한화에어로스페이스㈜  에너지솔루션사업센터", { placeholder: "org" });
   s.addNotes("이동형 전력체계 EMS 소프트웨어 Rev16의 화면 구성, 사용 방법, 디버깅 도구, 장치 연결 방법, 신뢰성 시험 결과를 보고합니다."); }
 { const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "표지·목차" });
-  s.addText("", { placeholder: "secno" }); s.addText("목 차", { placeholder: "sec" }); s.addText("CONTENTS", { placeholder: "secen" }); s.addText("보고 순서", { placeholder: "title" }); s.addText("화면 → 사용 → 디버깅 → 장치 연결 → 신뢰성 순으로 설명", { placeholder: "sub" });
-  const D2 = ["EMS SW 구성과 특징", "제어화면 8종의 구성과 보는 법", "설치·실행, 권한, 지령 절차", "화면 내 디버그 도구와 현장 간편 진단 도구", "설정 파일 2개, 지령·응답 규약, 시운전 절차", "정적·동적 시험 결과, 결함 보완, 후속 계획"];
-  SECS.forEach(([nm], i) => { const cx = i % 2, r = Math.floor(i / 2), x = 0.75 + cx * 6.1, y = 1.85 + r * 1.6;
-    s.addShape(pres.ShapeType.rect, { x, y, w: 0.72, h: 1.25, fill: { color: BROWN }, line: { color: BROWN, width: 1 }, objectName: "목차 번호 " + (i + 1) });
-    T(s, String(i + 1), { x, y, w: 0.72, h: 1.25, fontSize: 28, bold: true, color: WHITE, align: "center", valign: "middle" });
-    s.addShape(pres.ShapeType.rect, { x: x + 0.72, y, w: 4.98, h: 1.25, fill: { color: CREAM }, line: { color: LINE, width: 1 }, objectName: "목차 " + nm });
-    T(s, nm, { x: x + 0.95, y: y + 0.24, w: 4.6, h: 0.36, fontSize: 18, bold: true, valign: "middle" }); T(s, D2[i], { x: x + 0.95, y: y + 0.66, w: 4.6, h: 0.3, fontSize: 11.5, color: GRAY, valign: "middle" }); }); }
+  s.addText("", { placeholder: "secno" }); s.addText("목 차", { placeholder: "sec" }); s.addText("CONTENTS", { placeholder: "secen" }); s.addText("보고 순서", { placeholder: "title" }); s.addText("개요 → 오프라인 학습 AI → 화면 → 사용 → 디버깅 → 장치 연결 → 신뢰성 순으로 설명", { placeholder: "sub" });
+  const D2 = ["EMS SW 구성과 특징", "현장 센서만으로 학습하는 24시간 예측과 정확도", "제어화면 8종의 구성과 보는 법", "설치·실행, 권한, 지령 절차", "화면 내 디버그 도구와 현장 간편 진단 도구", "설정 파일 2개, 지령·응답 규약, 시운전 절차", "정적·동적 시험 결과, 결함 보완, 후속 계획"];
+  SECS.forEach(([nm], i) => { const cx = i % 2, r = Math.floor(i / 2), x = 0.75 + cx * 6.1, y = 1.78 + r * 1.22, hh = 1.02;
+    s.addShape(pres.ShapeType.rect, { x, y, w: 0.72, h: hh, fill: { color: BROWN }, line: { color: BROWN, width: 1 }, objectName: "목차 번호 " + (i + 1) });
+    T(s, String(i + 1), { x, y, w: 0.72, h: hh, fontSize: 26, bold: true, color: WHITE, align: "center", valign: "middle" });
+    s.addShape(pres.ShapeType.rect, { x: x + 0.72, y, w: 4.98, h: hh, fill: { color: CREAM }, line: { color: LINE, width: 1 }, objectName: "목차 " + nm });
+    T(s, nm, { x: x + 0.95, y: y + 0.16, w: 4.6, h: 0.36, fontSize: 17, bold: true, valign: "middle" }); T(s, D2[i], { x: x + 0.95, y: y + 0.55, w: 4.6, h: 0.3, fontSize: 11.5, color: GRAY, valign: "middle" }); }); }
 
 // ═══ 1. 개요
 { const s = page(1, "EMS SW 한눈에 보기", "노트북 한 대로 실장비를 Modbus TCP 로 감시·제어 — 폐쇄망 단독 동작, 추가 설치는 Python 과 numpy 뿐",
@@ -147,7 +150,52 @@ pres.addSection({ title: "표지·목차" });
   note(s, 8.4, 4.8, 4.43, 1.5, "설계 원칙", ["① 통신 실패는 직전 값 유지와 지령 중지로", "② 계획 실패는 규칙 운전으로", "③ 어떤 내부 오류에도 감시 주기는 계속"]);
   T(s, "보호 차단·무순단 절체는 보호 IED 와 절체기가 수행한다. EMS 는 결과를 읽고 운전 지령만 낸다.", { x: 0.5, y: 6.5, w: 12.33, h: 0.3, fontSize: 10.5, color: GRAY, valign: "middle" }); }
 
-// ═══ 2. 화면 구성
+
+// ═══ 2. 오프라인 학습 AI
+const HL = ["1시간 이내", "1~2시간", "2~4시간", "4~8시간", "8~16시간", "16~24시간"]; const imp = (m, b) => Math.round((1 - m / b) * 100);
+const chartOpt = (title, o = {}) => Object.assign({ barDir: "col", barGapWidthPct: 55, chartColors: [HX.accent2, HX.accent4], showTitle: true, title, titleFontSize: 12, titleColor: HX.dk1, titleFontFace: "+mn-lt",
+  showValue: true, dataLabelPosition: "outEnd", dataLabelFontSize: 9, dataLabelColor: HX.dk1, dataLabelFontFace: "+mn-lt", dataLabelFormatCode: "0.0", catAxisLabelColor: HX.accent5, valAxisLabelColor: HX.accent5, catAxisLabelFontSize: 9.5, valAxisLabelFontSize: 9.5,
+  catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", valGridLine: { color: HX.accent4, size: 0.75 }, catGridLine: { style: "none" }, showLegend: true, legendPos: "b", legendFontSize: 10, legendColor: HX.accent5, legendFontFace: "+mn-lt" }, o);
+{ const s = page("ai", "오프라인 학습 AI 한눈에", "외부 기상 예보·클라우드 없이 현장 센서 자료만으로 학습 — 24시간 앞의 부하와 태양광 발전을 15분 단위로 예측",
+    "이 EMS의 예측 기능은 현장에서 쌓인 자료만으로 학습합니다. 외부망이 필요 없어 폐쇄망 작전 환경에 맞습니다.");
+  [["예측 범위", "24", "시간 · 96구간"], ["부하 예측 오차", f1(AI.load.nmae), "% (24시간 평균)"], ["태양광 예측 오차", f1(AI.pv.nmae), "% (설비용량 대비)"], ["모델 크기", f1(AI.model_kb[0]), "KB × 2개"]].forEach(([l, v, u], i) => stat(s, 0.5 + i * 3.1, 1.72, 2.95, 1.05, l, v, u));
+  card(s, 0.5, 3.0, 4.0, 2.0, "왜 '오프라인' 인가", "작전지는 폐쇄망이다. 기상청 예보도, 클라우드 연산도 쓸 수 없다. 그래서 학습과 예측을 모두 EMS 노트북 안에서 한다. 입력은 현장 계측값(부하, 태양광, 기온, 기압, 습도)뿐이다.", { bs: 11.5 });
+  card(s, 4.67, 3.0, 4.0, 2.0, "무엇을 학습하나", "그 부대의 생활 주기(주간·야간, 요일, 작전 계획 단계)에 따른 부하 변화와, 그 지역 날씨 흐름(기압·습도 변화)에 따른 태양광 출력 변화. 현장마다 다시 학습해 그 현장에 맞춘다.", { bs: 11.5 });
+  card(s, 8.83, 3.0, 4.0, 2.0, "어디에 쓰나", "예측값은 운전계획의 입력이다. 디젤·연료전지·수전해를 언제 넣고 뺄지를 24시간 앞까지 계산해 연료 소모와 야간 디젤 운전을 줄인다. 예측은 지령을 직접 내지 않는다.", { bs: 11.5 });
+  table(s, 0.5, 5.22, 7.6, ["항목", "값", "뜻"], [["학습 시간", `${f1(AI.t_train_s)}초`, `${AI.train_days}일치(${AI.n_train_rows.toLocaleString()}줄) 기준, 노트북 CPU`], ["예측 1회 계산", `${Math.round(AI.t_pred_ms)} ms`, "부하·태양광 96구간, GPU 불필요"], ["필요 이력", "8일 이상", "그 전에는 전일 동시각 기준과 규칙 운전"]], [22, 18, 60], { bold: [0], center: [1], rowH: 0.36 });
+  note(s, 8.35, 5.22, 4.48, 1.5, "기술 성격", ["기계학습(선형 회귀 계열) 기반 경량 모델", "심층 신경망이 아니어서 작고 빠르며 판단 근거를 설명할 수 있다", "수치는 합성 현장 자료 기준(2-3 참조)"]); }
+{ const s = page("ai", "기술 구조", "15분 이력 → 특징 추출 → 선행시간 구간별 회귀 모델 → 전일 동시각과 결합 → 예측 구간 → 운전계획",
+    "선행시간을 여섯 구간으로 나눠 구간마다 모델을 따로 학습합니다. 한 시간 뒤와 하루 뒤는 중요한 정보가 다르기 때문입니다.");
+  steps(s, 0.5, 1.72, 12.33, 1.62, [["이력 수집", "1초 계측값을 15분 평균으로 쌓음(history.csv). 빈 구간은 15분 격자로 채움"], ["특징 추출", `부하 ${AI.n_feat.load}개 · 태양광 ${AI.n_feat.pv}개. 시각 주기, 최근 추이, 전일·전주 동시각, 기상 변화량`], ["구간별 회귀", "선행시간 6구간(1·2·4·8·16·24시간)마다 릿지 회귀 모델 1개씩"], ["결합", "모델 예측 80% + 전일 동시각 20% — 모델이 틀려도 크게 벗어나지 않게"], ["예측 구간", "최근 7일 오차의 10%~90% 분위수로 상·하한(분포 가정 없음)"]]);
+  table(s, 0.5, 3.55, 6.07, ["부하 모델의 입력", "예"], [["시각 주기", "하루 주기의 sin·cos(3개 주파수), 일요일 여부"], ["최근 추이", "현재 부하, 최근 1시간·24시간 평균, 전일 대비 변화"], ["같은 시각", "전일·전주 동시각 부하"], ["외부 요인", "기온(현재·예상), 작전 계획 단계, 일사 가능량"]], [26, 74], { bold: [0], rowH: 0.36, fs: 10.5 });
+  table(s, 6.76, 3.55, 6.07, ["태양광 모델의 입력", "예"], [["맑은 날 가능량", "위도·날짜·시각으로 계산한 출력(물리 모형)"], ["청천 지수", "실제 출력 ÷ 맑은 날 가능량. 최근 1·3시간·하루 평균과 변동"], ["기압 변화", "3·12·24시간 기압 변화 — 날씨가 바뀌는 조짐"], ["습도 · 기온", "현재값과 변화량"]], [26, 74], { bold: [0], rowH: 0.36, fs: 10.5 });
+  card(s, 0.5, 5.55, 6.07, 1.2, "부하: 비율로 학습", "'기준 부하 대비 몇 배인가'를 학습한다. 부대 규모가 달라도 같은 구조를 쓰고, 현장 자료로 기준만 다시 잡는다.", { bs: 11 });
+  card(s, 6.76, 5.55, 6.07, 1.2, "태양광: 물리 모형 × 학습", "해의 위치로 정해지는 부분은 계산하고, 구름·날씨로 달라지는 부분(청천 지수)만 학습한다. 적은 자료로도 안정적이다.", { bs: 11 }); }
+{ const s = page("ai", "예측 정확도", `학습에 쓰지 않은 ${Math.round(AI.test_days)}일로 시험 — 6시간마다 ${AI.n_issue}회 발행한 24시간 예측을 실제값과 비교`,
+    "정확도는 학습에 쓰지 않은 기간으로 평가했습니다. 비교 기준은 '어제 같은 시각과 같다'고 보는 단순 방법입니다.");
+  s.addChart(pres.charts.BAR, [{ name: "학습 모델", labels: HL, values: AI.load.by_h }, { name: "전일 동시각(기준)", labels: HL, values: AI.load.base_by_h }], Object.assign({ x: 0.5, y: 1.72, w: 6.07, h: 3.0, objectName: "부하 오차 차트" }, chartOpt("부하 예측 오차 (평균 부하 대비 %)")));
+  s.addChart(pres.charts.BAR, [{ name: "학습 모델", labels: HL, values: AI.pv.by_h }, { name: "전일 동시각(기준)", labels: HL, values: AI.pv.base_by_h }], Object.assign({ x: 6.76, y: 1.72, w: 6.07, h: 3.0, objectName: "태양광 오차 차트" }, chartOpt("태양광 예측 오차 (설비용량 대비 %, 주간)")));
+  table(s, 0.5, 4.9, 7.9, ["지표", "부하", "태양광", "뜻"], [["24시간 평균 오차", `${AI.load.nmae}% (기준 ${AI.load.base}%)`, `${AI.pv.nmae}% (기준 ${AI.pv.base}%)`, "작을수록 정확"], ["기준 대비 개선", `${imp(AI.load.nmae, AI.load.base)}%`, `${imp(AI.pv.nmae, AI.pv.base)}% (1시간 이내 ${imp(AI.pv.by_h[0], AI.pv.base_by_h[0])}%)`, "전일 동시각 방법보다 줄어든 비율"],
+    ["하루 전력량 오차", `${AI.load.day}% (기준 ${AI.load.day_base}%)`, `${AI.pv.day}% (기준 ${AI.pv.day_base}%)`, "24시간 합계의 오차"], ["예측 구간 포함률", `${AI.load.cov}%`, `${AI.pv.cov}%`, "실제값이 상·하한 안에 든 비율(목표 80%)"]], [22, 26, 28, 24], { bold: [0], center: [1, 2], rowH: 0.37, fs: 10.5 });
+  note(s, 8.65, 4.9, 4.18, 1.86, "읽는 법과 한계", ["부하는 전 구간에서 기준보다 정확", "태양광은 가까운 시간일수록 이득이 크다. 하루 합계는 기준과 비슷한 수준", "합성 현장 자료(120일) 기준이다. 실제 현장 이력으로 다시 평가해야 한다"]); }
+{ const s = page("ai", "예측이 운전에 주는 효과", `같은 ${AI.sim.rule.days}일을 규칙 운전과 예측 계획 운전으로 모의 — 연료 ${imp(AI.sim.plan.fuel_l, AI.sim.rule.fuel_l)}% 절감, 야간 디젤 운전 0시간`,
+    "예측이 있으면 미리 충전해 두고 야간에는 디젤을 돌리지 않는 계획을 세울 수 있습니다.");
+  const SM = AI.sim;
+  s.addChart(pres.charts.BAR, [{ name: "디젤 연료 (L/일)", labels: ["규칙 운전", "예측 계획 운전", "완전 예측(참고 상한)"], values: [SM.rule.fuel_l_day, SM.plan.fuel_l_day, SM.perfect.fuel_l_day] }], Object.assign({ x: 0.5, y: 1.72, w: 5.6, h: 3.3, objectName: "연료 비교 차트" }, chartOpt("하루 평균 디젤 연료 소모 (L)", { chartColors: [HX.accent2], showLegend: false, dataLabelFormatCode: "0.0", valAxisMinVal: 0 })));
+  table(s, 6.35, 1.72, 6.48, ["지표", "규칙 운전", "예측 계획", "완전 예측"], [["디젤 연료 합계", `${SM.rule.fuel_l.toLocaleString()} L`, `${SM.plan.fuel_l.toLocaleString()} L`, `${SM.perfect.fuel_l.toLocaleString()} L`], ["야간(20~06시) 디젤 운전", `${SM.rule.dg_silent_h} 시간`, `${SM.plan.dg_silent_h} 시간`, `${SM.perfect.dg_silent_h} 시간`], ["디젤 기동 횟수", `${SM.rule.dg_starts}회`, `${SM.plan.dg_starts}회`, `${SM.perfect.dg_starts}회`],
+    ["부하 차단", `${SM.rule.shed_kwh} kWh`, `${SM.plan.shed_kwh} kWh`, `${SM.perfect.shed_kwh} kWh`], ["끝 시점 ESS 충전율", `${Math.round(SM.rule.soc_end * 100)}%`, `${Math.round(SM.plan.soc_end * 100)}%`, `${Math.round(SM.perfect.soc_end * 100)}%`]], [34, 22, 22, 22], { bold: [0], center: [1, 2, 3], rowH: 0.4, fs: 10.5 });
+  card(s, 6.35, 4.3, 6.48, 0.98, "왜 줄어드나", "낮에 태양광이 남을 것을 알면 그 전에 디젤을 돌리지 않고, 밤 부하를 알면 해 지기 전에 충전해 둔다. 규칙 운전은 충전율이 떨어진 뒤에야 반응한다.", { bs: 10.5 });
+  note(s, 0.5, 5.25, 5.6, 1.5, "예측 품질의 값어치", [`완전 예측 대비 연료 ${imp(SM.perfect.fuel_l, SM.plan.fuel_l) === 0 ? "차이 없음" : "+" + Math.round((SM.plan.fuel_l / SM.perfect.fuel_l - 1) * 100) + "%"} — 예측 오차가 운전에 주는 손실이 작다`, "예측 구간 상한(부하)·하한(태양광) 쪽으로 보수적으로 계획"]);
+  note(s, 6.35, 5.45, 6.48, 1.3, "조건과 한계", ["논리 모형 모의(장비 동특성 없음), 합성 현장 자료, 계획은 1시간마다 재계산", `디젤 기동 횟수는 늘었다(${SM.rule.dg_starts} → ${SM.plan.dg_starts}회). 기동 손실은 비용에 반영했으나 정비 주기 영향은 별도 검토 필요`]); }
+{ const s = page("ai", "학습·갱신 절차와 안전장치", "현장에서 명령 한 줄로 다시 학습 — 모델이 없거나 틀려도 운전은 계속되도록 여러 겹으로 보호",
+    "학습은 현장에서 명령 한 줄로 합니다. 예측이 실패해도 규칙 운전으로 넘어가므로 운전은 멈추지 않습니다.");
+  steps(s, 0.5, 1.72, 12.33, 1.5, [["이력 축적", "EMS 가 운전 중 15분 평균을 자동 저장. 8일부터 사용 가능"], ["학습", "python -m ifps_ems train <이력> <모델 폴더>  — 수 초"], ["모델 교체", "model_load.npz · model_pv.npz 두 파일. 다음 기동부터 적용"], ["확인", "발전·예측 화면의 예측 정밀도, 예측 vs 실측 그림"], ["주기적 갱신", "계절·부대 규모·작전 단계가 바뀌면 다시 학습"]]);
+  table(s, 0.5, 3.45, 7.6, ["상황", "EMS 동작"], [["실측 이력 8일 미만(전개 직후)", "실장비는 규칙 운전. 예측 계획은 쓰지 않음"], ["모델 파일 없음", "전일 동시각 값으로 예측"], ["예측·계획 계산 실패", "그 주기는 규칙 운전으로 넘어가고 사건 기록"], ["예측이 크게 빗나감", "매 15분 실측 상태로 다시 판단, 충전율 하한 근처면 디젤 강제 기동"], ["전개 첫 7일", "보수 계수를 높여 부하는 더 높게, 태양광은 더 낮게 잡음"], ["이력에 빈 구간·깨진 줄", "15분 격자로 다시 놓고 읽을 수 없는 줄은 버림"]], [36, 64], { bold: [0], rowH: 0.37, fs: 10.5 });
+  note(s, 8.35, 3.45, 4.48, 1.55, "보안·검증 관점", ["모델 파일은 숫자 배열만 담는다(실행 코드 없음)", "선형 모델이라 어떤 입력이 예측을 올렸는지 계수로 확인 가능", "예측은 운전계획의 입력일 뿐, 지령 전 검사·보호는 그대로 적용"]);
+  note(s, 8.35, 5.15, 4.48, 1.6, "앞으로", ["현장 실측 이력으로 재학습·재평가", "태양광 하루 합계 정확도 개선(구름량 계측 추가 검토)", "예측 정확도 저하 시 자동 경보"]);
+  T(s, "예측 정확도는 제어화면 [발전·예측] 에서 최근 7일 기준으로 항상 다시 계산해 보여 준다.", { x: 0.5, y: 6.25, w: 7.6, h: 0.3, fontSize: 10.5, color: GRAY, valign: "middle" }); }
+
+// ═══ 3. 화면 구성
 { const s = page(2, "화면 체계", "계측 · 제어 · 관리 3묶음 8개 화면 — 모든 화면이 스크롤 없이 한 화면, 창을 줄이면 글과 그림이 같은 비율로 축소",
     "왼쪽 메뉴는 계측, 제어, 관리로 묶여 있습니다. 머리줄에는 운전 상태와 경보 수가 항상 보입니다.");
   shot(s, "overview", 0.5, 1.72, 6.9, [[1, 38, 300], [2, 640, 28], [3, 1175, 28], [4, 1500, 28], [5, 1640, 28], [6, 900, 1062]]);
@@ -354,7 +402,7 @@ pres.addSection({ title: "표지·목차" });
 // ═══ 맺음
 pres.addSection({ title: "맺음" });
 { const s = pres.addSlide({ masterName: "CLOSING", sectionTitle: "맺음" });
-  s.addText("한 화면에서 보고, 두 단계로 지령하고,\n모든 조작을 기록합니다", { placeholder: "title" }); s.addText("제어화면 8종 · 현장 진단 도구 · 설정 파일 2개로 장비 연결 · 자동 시험 " + ST.n_tests + "건", { placeholder: "sub" });
+  s.addText("한 화면에서 보고, 두 단계로 지령하고,\n모든 조작을 기록합니다", { placeholder: "title" }); s.addText("오프라인 학습 AI 예측 · 제어화면 8종 · 현장 진단 도구 · 설정 파일 2개로 장비 연결 · 자동 시험 " + ST.n_tests + "건", { placeholder: "sub" });
   s.addText("한화에어로스페이스㈜  에너지솔루션사업센터", { placeholder: "org" }); s.addText("2026. 11.", { placeholder: "date" }); }
 
 pres.writeFile({ fileName: OUT }).then(async () => { await applyTheme(OUT, THEME); console.log("saved", OUT); });

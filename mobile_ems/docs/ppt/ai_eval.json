@@ -1,0 +1,106 @@
+{
+ "train_days": 98,
+ "test_days": 22.0,
+ "n_issue": 84,
+ "n_train_rows": 9408,
+ "t_train_s": 4.17,
+ "t_pred_ms": 9.8,
+ "model_kb": [
+  7.4,
+  7.4
+ ],
+ "n_feat": {
+  "load": 18,
+  "pv": 18
+ },
+ "buckets": [
+  4,
+  8,
+  16,
+  32,
+  64,
+  96
+ ],
+ "load": {
+  "nmae": 3.36,
+  "base": 4.12,
+  "by_h": [
+   3.85,
+   3.35,
+   3.19,
+   3.38,
+   3.3,
+   3.38
+  ],
+  "base_by_h": [
+   4.5,
+   4.02,
+   4.04,
+   4.16,
+   4.09,
+   4.1
+  ],
+  "cov": 83.5,
+  "day": 0.51,
+  "day_base": 1.36
+ },
+ "pv": {
+  "nmae": 4.05,
+  "base": 4.37,
+  "by_h": [
+   3.05,
+   2.63,
+   3.76,
+   4.2,
+   4.12,
+   4.26
+  ],
+  "base_by_h": [
+   6.44,
+   3.39,
+   4.04,
+   4.6,
+   4.29,
+   4.43
+  ],
+  "cov": 87.7,
+  "day": 11.17,
+  "day_base": 9.97
+ },
+ "sim": {
+  "rule": {
+   "fuel_l": 4081.0,
+   "fuel_l_day": 194.4,
+   "dg_starts": 21,
+   "dg_silent_h": 78.8,
+   "shed_kwh": 0.0,
+   "shed12_kwh": 0.0,
+   "soc_end": 0.336,
+   "h2_end": 115.0,
+   "days": 21.0
+  },
+  "plan": {
+   "fuel_l": 3759.0,
+   "fuel_l_day": 179.1,
+   "dg_starts": 43,
+   "dg_silent_h": 0.0,
+   "shed_kwh": 0.0,
+   "shed12_kwh": 0.0,
+   "soc_end": 0.671,
+   "h2_end": 108.8,
+   "days": 21.0
+  },
+  "perfect": {
+   "fuel_l": 3598.0,
+   "fuel_l_day": 171.4,
+   "dg_starts": 41,
+   "dg_silent_h": 0.0,
+   "shed_kwh": 0.0,
+   "shed12_kwh": 0.0,
+   "soc_end": 0.662,
+   "h2_end": 100.0,
+   "days": 21.0
+  }
+ },
+ "sim_s": 210.8
+}
