@@ -46,7 +46,7 @@ class Runtime:
         self.audit = security.AuditLog(os.path.join(self.state_dir, "audit.log"), security.CryptoProvider(key))
         self.policy = None                       # 운전계획 연결 지점: policy(값 사전, 시각) → (디젤, 연료전지, 수전해) 기동 여부. 없으면 규칙 운전
         self.t_ctl = -1e9; self.acc = []; self.slot = None; self.mode = self.cfg.get("mode", "island"); self.plan = int(self.cfg.get("plan", 1))
-        # 군 운용: 운용 장소(전개지 island / 주둔지 grid), 운용 태세(평시·저소음·자립), 자동 부하 차단, 주둔지 설정
+        # 군 운용: 운용 장소(작전지 island / 주둔지 grid), 운용 태세(평시·저소음·자립), 자동 부하 차단, 주둔지 설정
         self.gar = om.Garrison.from_cfg(self.cfg.get("garrison")); self.posture = "평시"; self.auto_enabled = True; self.shedder = om.LoadShedder()
         self.auto_h = None; self.auto_target_h = float(self.cfg.get("autonomy_target_h", 72.0)); self.t_posture = self.now(); self.pv_day_kwh = None
         self.grid_lost = False; self.t_grid_ok = None; self.gar_last = None; self._w = {}; self._pvday = (None, 0.0)
@@ -146,7 +146,7 @@ class Runtime:
         if mode is not None:
             if mode not in om.PLACES: raise ValueError(f"운용 장소 오류: {mode}")
             if mode == "grid" and "GRID.kw" not in self.val and not any(p["tag"] == "GRID.kw" for p in self.pts): raise ValueError("주둔지 운전에는 수전점 계측(GRID.kw, CB.GRID)이 필요합니다")
-            if mode != self.mode: self.mode = mode; self.grid_lost = False; self.t_grid_ok = None; self.note("운용", f"운용 장소 변경 → {'주둔지(상전 연계)' if mode == 'grid' else '전개지(자립 운전)'}", actor=who)
+            if mode != self.mode: self.mode = mode; self.grid_lost = False; self.t_grid_ok = None; self.note("운용", f"운용 장소 변경 → {'주둔지(상전 연계)' if mode == 'grid' else '작전지(자립 운전)'}", actor=who)
         if posture is not None:
             if posture not in om.POSTURES: raise ValueError(f"운용 태세 오류: {posture}")
             if posture != self.posture: self.posture = posture; self.t_posture = self.now(); self.note("운용", f"운용 태세 변경 → {posture}", actor=who)
@@ -225,7 +225,7 @@ class Runtime:
             a = (0, 1 if h2_ok else int(a[1]), 0)
         want = {"DG": bool(a[0]), "FC": bool(a[1]), "_policy": tuple(int(x) for x in a)}
         if self.posture == "저소음": want["_quiet"] = True
-        if self.mode in ("island", "grid"):                           # 자립 운전(전개지, 또는 주둔지 정전 중) N-1 순동 예비력
+        if self.mode in ("island", "grid"):                           # 자립 운전(작전지, 또는 주둔지 정전 중) N-1 순동 예비력
             online = [self.site.ess_kw] * int(g("ESS.status", 1)) + [self.cfg.get("g1_kw", 100.0)] + [self.site.dg_kw] * int(want["DG"]) + [self.site.fc_kw] * int(want["FC"])
             if dp.reserve_need(g("LOAD.p1_kw") + g("LOAD.p2_kw"), online): want["FC"] = True; want["_reserve"] = True
         return want

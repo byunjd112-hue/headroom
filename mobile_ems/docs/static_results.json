@@ -1,6 +1,6 @@
 {
- "date": "2026-11-15 23:48",
- "unittest_s": 91.6,
+ "date": "2026-11-16 00:23",
+ "unittest_s": 90.9,
  "tests": [
   "test_h2_limit_blocks_fuel_cell | ok",
   "test_plan_is_finite_and_avoids_silent_hours | ok",

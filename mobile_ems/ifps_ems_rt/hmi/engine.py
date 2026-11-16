@@ -575,7 +575,7 @@ class Engine:
         return {"ok": True}
 
     def set_ops(self, q, who):
-        """운용 장소(전개지·주둔지)와 운용 태세(평시·저소음·자립) 변경."""
+        """운용 장소(작전지·주둔지)와 운용 태세(평시·저소음·자립) 변경."""
         mode, posture = q.get("mode"), q.get("posture")
         if mode is None and posture is None: raise ValueError("mode 또는 posture 가 필요합니다")
         with self.lock:

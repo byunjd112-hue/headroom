@@ -117,7 +117,7 @@ function sldUpdate(s) {
     $("#fv-" + n.id).textContent = flowing && Math.abs(pk[n.id]) > 0.5 ? `${pk[n.id] < 0 ? "▲" : "▼"} ${F.kw(Math.abs(pk[n.id]))}` : "";
     if (trip) st(n.id, (ko ? "차단기 트립 · " : "CB TRIP · ") + (ANSI_TXT[code(n.id)] || code(n.id)), "var(--alarm)");
     else if (lost) st(n.id, ko ? "통신 두절" : "COMM LOSS", "var(--alarm)");
-    else if (n.id === "GRID") st(n.id, !garr ? (ko ? "미연계(전개지)" : "NOT CONNECTED") : c === 1 ? (ops.outage ? (ko ? "복전 확인 중" : "RESTORING") : (ko ? "수전 중" : "IMPORTING")) : (ko ? "정전 · 자립 전환" : "OUTAGE"), !garr ? "var(--muted)" : c === 1 && !ops.outage ? "var(--ok)" : "var(--alarm)");
+    else if (n.id === "GRID") st(n.id, !garr ? (ko ? "미연계(작전지)" : "NOT CONNECTED") : c === 1 ? (ops.outage ? (ko ? "복전 확인 중" : "RESTORING") : (ko ? "수전 중" : "IMPORTING")) : (ko ? "정전 · 자립 전환" : "OUTAGE"), !garr ? "var(--muted)" : c === 1 && !ops.outage ? "var(--ok)" : "var(--alarm)");
     else if (c === 0) st(n.id, ko ? "차단기 개방 · 분리" : "CB OPEN · ISOLATED", "var(--warn)");
     else if (n.id === "PV") st(n.id, k.pv > 0.5 ? (ko ? "발전 중" : "GENERATING") : (ko ? "발전 없음" : "IDLE"), k.pv > 0.5 ? "var(--pv)" : "var(--muted)");
     else if (n.id === "ESS") st(n.id, k.ess > 0.5 ? (ko ? "방전" : "DISCHARGING") : k.ess < -0.5 ? (ko ? "충전" : "CHARGING") : (ko ? "대기" : "STANDBY"), "var(--ess)");

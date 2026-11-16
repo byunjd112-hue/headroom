@@ -1,9 +1,9 @@
 /* IFPS Mobile EMS HMI — 화면 */
 "use strict";
-/* 운용 장소(전개지·주둔지)와 운용 태세(평시·저소음·자립) 표시 */
+/* 운용 장소(작전지·주둔지)와 운용 태세(평시·저소음·자립) 표시 */
 function opsChip(s) {
   const o = s.ops || {}, ko = S.lang === "ko";
-  const place = o.mode === "grid" ? (o.outage ? [ko ? "주둔지 · 정전 자립" : "GARRISON · OUTAGE", "bad"] : [ko ? "주둔지 · 상전 연계" : "GARRISON · GRID", "ok"]) : [ko ? "전개지 · 자립 운전" : "FIELD · ISLAND", "info"];
+  const place = o.mode === "grid" ? (o.outage ? [ko ? "주둔지 · 정전 자립" : "GARRISON · OUTAGE", "bad"] : [ko ? "주둔지 · 상전 연계" : "GARRISON · GRID", "ok"]) : [ko ? "작전지 · 자립 운전" : "FIELD · ISLAND", "info"];
   const post = o.posture && o.posture !== "평시" ? `<span class="chip warn"><span class="dot"></span>${ko ? o.posture + " 태세" : (o.posture === "저소음" ? "LOW-NOISE" : "AUTONOMY")}</span>` : "";
   const shed = (o.shed || []).length ? `<span class="chip bad"><span class="dot"></span>${ko ? "부하 차단 " : "SHED "}${o.shed.map(f => f === "L3" ? "3" : "2").join("·")}${ko ? "등급" : ""}</span>` : "";
   return `<span class="chip ${place[1]}"><span class="dot"></span>${place[0]}</span>${post}${shed}`;
@@ -161,7 +161,7 @@ const P_CTL = {
       <div class="col" style="grid-template-rows:auto auto 1fr">
         <div class="panel"><div class="hd"><h3>${t("ctl.auto", "자동 제어 (EMS 급전)")}</h3><div class="spacer"></div><span class="sub" title="① 통신 두절 지령 금지 ② 현장 수동 모드 차단 ③ 작업 잠금 차단 ④ 중복 지령 차단 ⑤ 응답 1.5s·재지령 1회 → 지령 취소·대체 전원 ⑥ 선택 후 10s 내 실행 ⑦ 1등급 부하 차단 금지">연동 조건 ⓘ</span></div><div class="bd">
           <div style="display:flex;gap:8px;align-items:center"><div class="seg" id="autoSeg"><button data-v="1">AUTO</button><button data-v="0">MANUAL</button></div><div class="spacer"></div><button class="btn sm" id="ctlNow">제어 즉시 실행</button></div>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><span class="lab" style="width:54px">운용 장소</span><div class="seg" id="placeSeg"><button data-v="island">전개지</button><button data-v="grid">주둔지</button></div></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><span class="lab" style="width:54px">운용 장소</span><div class="seg" id="placeSeg"><button data-v="island">작전지</button><button data-v="grid">주둔지</button></div></div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:6px"><span class="lab" style="width:54px">운용 태세</span><div class="seg" id="postSeg"><button data-v="평시">평시</button><button data-v="저소음">저소음</button><button data-v="자립">자립</button></div></div>
           <div class="kv band" style="margin-top:10px" id="ctlKv"></div><div class="interlock" id="ctlNote"></div></div></div>
         <div class="panel"><div class="hd"><h3>⑥ 차단기 · 부하 관리</h3><div class="spacer"></div><span class="sub">보호 차단은 IED 수행</span></div>
@@ -171,8 +171,8 @@ const P_CTL = {
     const POST_MSG = { "평시": "평시 태세로 바꿉니까?", "저소음": "저소음 태세로 바꿉니까?\n· 디젤 발전기를 기동하지 않습니다(연료전지는 사용)\n· 3등급 부하를 자동으로 차단합니다", "자립": "자립 태세로 바꿉니까?\n· 외부 보급 없이 목표 시간을 버티도록 부하를 단계적으로 관리합니다" };
     $$("#postSeg button").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); if (!confirm(POST_MSG[b.dataset.v])) return; const r = await api("/api/ops", { posture: b.dataset.v }); toast(r.ok ? `운용 태세: ${b.dataset.v}` : r.why, r.ok ? "ok" : "bad"); });
     $$("#placeSeg button").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); const g = b.dataset.v === "grid";
-      if (!confirm(g ? "주둔지(상전 연계) 운전으로 바꿉니까?\n· 상전과 ESS 로 운전하고 디젤·연료전지는 정지합니다\n· 역송 없음, 최대부하 시간대 ESS 방전, 정전 시 자립 전환" : "전개지(자립 운전)로 바꿉니까?\n· 상전 없이 자체 전원으로 운전합니다")) return;
-      const r = await api("/api/ops", { mode: b.dataset.v }); toast(r.ok ? `운용 장소: ${g ? "주둔지" : "전개지"}` : r.why, r.ok ? "ok" : "bad"); });
+      if (!confirm(g ? "주둔지(상전 연계) 운전으로 바꿉니까?\n· 상전과 ESS 로 운전하고 디젤·연료전지는 정지합니다\n· 역송 없음, 최대부하 시간대 ESS 방전, 정전 시 자립 전환" : "작전지(자립 운전)로 바꿉니까?\n· 상전 없이 자체 전원으로 운전합니다")) return;
+      const r = await api("/api/ops", { mode: b.dataset.v }); toast(r.ok ? `운용 장소: ${g ? "주둔지" : "작전지"}` : r.why, r.ok ? "ok" : "bad"); });
     $$("#autoSeg button").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); const on = b.dataset.v === "1"; if (!on && !confirm("자동 제어를 해제하고 수동 운전으로 전환합니까?")) return; const r = await api("/api/auto", { on }); if (r.ok) toast(`자동 제어 ${on ? "설정" : "해제"}`, "ok"); poll(); });
     $("#ctlNow").onclick = async () => { if (!can("operator")) return loginDialog(); const r = await api("/api/control_now", {}); if (r.ok) toast("제어 주기 즉시 실행", "ok"); };
     if (!L.items) layoutLoad();
