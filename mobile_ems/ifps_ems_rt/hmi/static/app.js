@@ -150,11 +150,11 @@ const CTL_UNITS = [
   { id: "ELZ", no: "④", nm: "수소생성·발전체계 · 수전해 30Nm³/h", en: "Electrolyzer · 150kW", col: "fc", dev: "ELZ", kw: "ELZ.kw", ctl: true },
   { id: "EMS", no: "⑤", nm: "이동형 전력체계 EMS · 중앙제어기", en: "Energy management system", col: "accent", dev: null },
   { id: "MTR", no: "⑥", nm: "이동형 배전·변압체계 · 계측/보호 게이트웨이", en: "22.9/6.6kV/380V · metering & IED gateway", col: "load", dev: "MTR", kw: "LOAD.kw" },
-  { id: "GDG", no: "주", nm: "주둔지 기존 디젤발전기 · 1MW급 (비상발전)", en: "Garrison standby diesel generator", col: "dg", dev: "GDG", kw: "GDG.kw", ctl: true },
+  { id: "GDG", no: "주", nm: "주둔지 기존 디젤발전기 · 1MW급 컨테이너형(고정식)", en: "Garrison standby diesel generator", col: "dg", dev: "GDG", kw: "GDG.kw", ctl: true },
   { id: "GRID", no: "주", nm: "주둔지 상전 수전점 · 22.9kV", en: "Utility incoming (no export)", col: "g1", dev: null, kw: "GRID.kw", need: "GRID.kw" },
 ];
 const CB_ROWS = [["PV", "③ PV 인입"], ["DG", "① 디젤 인입"], ["FC", "④ 연료전지 인입"], ["ESS", "② ESS 인입"], ["G1", "① 복합전력 인입"], ["TIE", "모선 A·B 연계"], ["L1", "1등급 부하 (지휘통제·의무)"], ["L2", "2등급 부하 (막사·정비)"], ["L3", "3등급 부하 (일반·탄약)"]];
-const CTL_PHOTO = { ELZ: "FC", EMS: "EMS", G1: "G1", GDG: "DG", GRID: "MTR" };
+const CTL_PHOTO = { ELZ: "FC", EMS: "EMS", G1: "G1", GDG: "GDG", GRID: "MTR" };
 const P_CTL = {
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("ctl.title", "설비 제어")}</h2><span class="sub">IFPS 6개 서브시스템 · 선택-실행(SBO) 2단계 · 연동 조건 · 응답 확인 · 감사 기록</span><div class="spacer"></div><span class="pill" id="ctlCnt">—</span></div>

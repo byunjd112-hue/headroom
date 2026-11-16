@@ -19,7 +19,7 @@ function siteState(s) {
 }
 /* 장비 카드: photos/ 폴더에 실사 이미지가 있으면 사진, 없으면 자체 벡터 일러스트 + 상태 띠 */
 api("/api/photos").then(r => { S.photos = r.files || []; S.sprites = r.sprite_meta || {}; const b = $("#siteMap"); if (b) b.dataset.sig = ""; document.querySelectorAll("[id^=art-]").forEach(g => g.dataset.sig = ""); }).catch(() => { S.photos = []; S.sprites = {}; });
-const SPR_KEY = { GDG: "dg", GRID: "dist", DG: "dg", G1: "dg", ESS: "ess", PV: "pv", FC: "fc", DIST: "dist", MTR: "dist", EMS: "ems", FSU: "fsu", L1: "l1", L2: "l2", L3: "l3", BARRACK: "barrack" };
+const SPR_KEY = { GDG: "gdg", GRID: "dist", DG: "dg", G1: "dg", ESS: "ess", PV: "pv", FC: "fc", DIST: "dist", MTR: "dist", EMS: "ems", FSU: "fsu", L1: "l1", L2: "l2", L3: "l3", BARRACK: "barrack" };
 /* 실사 스프라이트(투명 배경). 상태: 정지 → 채도·밝기 낮춤, 고장·두절 → 적색 착색 */
 function spriteSvg(kind, st, cx, by, w) {
   const k = SPR_KEY[kind], m = S.sprites && S.sprites[k]; if (!m) return null;

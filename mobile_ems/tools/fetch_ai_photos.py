@@ -8,14 +8,15 @@ FILES = {"ess": "hf_20261115_010141_57f8b3f8-dae6-416e-b40a-338600edeb1d", "pv":
          "dist": "hf_20261115_010140_ce0a7fa6-4aba-40bf-bf8e-636cb8a06a87", "ems": "hf_20261115_010141_6ec591ae-4afc-46b4-bd1b-9fc5c8af09f5",
          "l1": "hf_20261115_010243_b2849db0-96f1-46b4-8815-4a43343b2289", "l2": "hf_20261115_010141_910d7576-104e-499e-af71-78e81ddfcf28",
          "l3": "hf_20261115_010140_cb33fdb7-d308-4e95-a0c0-8a1c48d6e2e7", "barrack": "hf_20261115_010241_29ebdaf2-388c-4006-a5b5-7338c80bf800",
-         "fsu": "hf_20261115_010140_e8470644-1f3d-442b-9ed6-bb030642ac2d"}
+         "fsu": "hf_20261115_010140_e8470644-1f3d-442b-9ed6-bb030642ac2d",
+         "gdg": "hf_20261116_011041_b239454d-e21e-47e5-a477-34b322d492da.png"}                      # 주둔지 기존 디젤발전기(컨테이너형 고정식)
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ifps_ems_rt", "hmi", "static", "photos")
 os.makedirs(out, exist_ok=True)
 for name, f in FILES.items():
     dst = os.path.join(out, name + ".jpg")
     try:
         if not BASE.startswith("https://"): raise ValueError("https 주소만 허용")
-        urllib.request.urlretrieve(BASE + f + ".jpeg", dst)  # nosec B310 — 고정 https 주소만 사용
+        urllib.request.urlretrieve(BASE + (f if "." in f else f + ".jpeg"), dst)  # nosec B310 — 고정 https 주소만 사용
         print(f"{name}.jpg  {os.path.getsize(dst) // 1024} KB")
     except Exception as e:
         print(f"{name}: 실패 {e}")
