@@ -1,6 +1,6 @@
 {
- "date": "2026-11-16 01:17",
- "unittest_s": 96.6,
+ "date": "2026-11-16 03:01",
+ "unittest_s": 97.6,
  "tests": [
   "test_h2_limit_blocks_fuel_cell | ok",
   "test_plan_is_finite_and_avoids_silent_hours | ok",
@@ -42,6 +42,7 @@
   "test_autonomy_hours | ok",
   "test_garrison_generator_start_stop_and_min_load | ok",
   "test_garrison_never_exports_and_shaves_peak | ok",
+  "주둔지에서도 이동형 태양광을 그대로 쓴다: 상전 연계 중에는 수전을 줄이고, 정전 중에는 발전기·ESS 부담을 줄인다. | ok",
   "test_shedder_order_hold_and_restore | ok",
   "test_garrison_generator_unavailable_falls_back_to_mobile_sources | ok",
   "주둔지 정전: ESS 가 먼저 버티고, 30초 뒤 기존 디젤발전기를 기동해 ESS·태양광과 함께 운전. 복전하면 발전기를 세운다. | ok",
@@ -94,18 +95,18 @@
   "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
   "test_check_scans_and_module_entry | ok"
  ],
- "n_tests": 91,
+ "n_tests": 92,
  "tests_ok": true,
- "coverage_pct": 94.1,
+ "coverage_pct": 93.8,
  "stmt": {
-  "n": 2708,
-  "hit": 2617,
-  "pct": 96.6
+  "n": 2726,
+  "hit": 2629,
+  "pct": 96.4
  },
  "branch": {
-  "n": 938,
-  "hit": 813,
-  "pct": 86.7
+  "n": 944,
+  "hit": 814,
+  "pct": 86.2
  },
  "coverage_files": [
   [
@@ -134,11 +135,11 @@
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
-   94.5,
-   687,
-   81.1,
-   264,
-   "25-26, 51-52, 63-68, 89-90, 169-170, 282-283, 287, 296, 378, 409-410, 501-502, 583-591, 624-625, 793-794, 810-811"
+   93.7,
+   695,
+   79.6,
+   270,
+   "25-26, 51-52, 63-68, 89-90, 169-170, 282-283, 287, 296, 378, 409-410, 501-502, 583-591, 624-625, 787-792, 804-805, 821-822"
   ],
   [
    "ifps_ems/__main__.py",
@@ -183,10 +184,10 @@
   [
    "ifps_ems_rt/runtime.py",
    98.9,
-   270,
+   275,
    93.0,
    86,
-   "336-338"
+   "343-345"
   ],
   [
    "ifps_ems_rt/mbtool.py",
@@ -295,7 +296,7 @@
   [
    "ifps_ems_rt/opsmode.py",
    100.0,
-   108,
+   113,
    96.7,
    30,
    ""
@@ -367,7 +368,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/runtime.py",
-    81,
+    82,
     "Runtime._read_parallel",
     "Catching too general exception Exception"
    ],
@@ -430,7 +431,7 @@
   ]
  },
  "metrics": {
-  "n_func": 311,
+  "n_func": 314,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -442,7 +443,7 @@
   "len_max": 153,
   "arg_max": 8,
   "depth_max": 5,
-  "file_max": 862,
+  "file_max": 873,
   "over": {
    "cc": [],
    "len": [],
@@ -459,15 +460,6 @@
     32,
     5,
     5
-   ],
-   [
-    "ifps_ems_rt/opsmode.py",
-    "garrison_step",
-    51,
-    20,
-    28,
-    8,
-    2
    ],
    [
     "ifps_ems_rt/pointmap.py",
@@ -513,6 +505,15 @@
     30,
     5,
     3
+   ],
+   [
+    "ifps_ems_rt/opsmode.py",
+    "gdg_step",
+    87,
+    19,
+    23,
+    7,
+    1
    ],
    [
     "ifps_ems_rt/simplant.py",
@@ -589,13 +590,13 @@
     3
    ],
    [
-    "ifps_ems_rt/diag.py",
-    "menu",
-    351,
-    20,
-    32,
-    5,
-    5
+    "ifps_ems_rt/runtime.py",
+    "__init__",
+    26,
+    18,
+    33,
+    4,
+    1
    ]
   ],
   "top_arg": [
@@ -647,16 +648,16 @@
    [
     "ifps_ems_rt/opsmode.py",
     "garrison_step",
-    51,
-    20,
-    28,
+    63,
+    15,
+    22,
     8,
-    2
+    1
    ],
    [
     "ifps_ems_rt/opsmode.py",
     "autonomy",
-    102,
+    112,
     2,
     14,
     8,
@@ -665,7 +666,7 @@
    [
     "ifps_ems_rt/opsmode.py",
     "want",
-    128,
+    138,
     18,
     13,
     8,
@@ -712,7 +713,7 @@
    [
     "ifps_ems_rt/opsmode.py",
     "step",
-    142,
+    152,
     13,
     17,
     5,
@@ -721,7 +722,7 @@
    [
     "ifps_ems_rt/runtime.py",
     "_read_parallel",
-    71,
+    72,
     8,
     14,
     0,
@@ -749,7 +750,7 @@
   "files": [
    [
     "ifps_ems_rt/hmi/engine.py",
-    862
+    873
    ],
    [
     "ifps_ems_rt/diag.py",
@@ -757,7 +758,7 @@
    ],
    [
     "ifps_ems_rt/runtime.py",
-    339
+    346
    ],
    [
     "ifps_ems_rt/hmi/server.py",
@@ -768,12 +769,12 @@
     183
    ],
    [
-    "ifps_ems_rt/simplant.py",
-    165
+    "ifps_ems_rt/opsmode.py",
+    169
    ],
    [
-    "ifps_ems_rt/opsmode.py",
-    159
+    "ifps_ems_rt/simplant.py",
+    165
    ],
    [
     "ifps_ems/forecast.py",
@@ -864,7 +865,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 3278,
+   "loc": 3302,
    "nosec": 0,
    "skipped_tests": 5
   },
@@ -912,11 +913,11 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.4,
- "cc_n": 325,
+ "cc_avg": 5.42,
+ "cc_n": 328,
  "cc_rank": {
-  "A": 208,
-  "B": 69,
+  "A": 210,
+  "B": 70,
   "C": 48,
   "D": 0,
   "E": 0,
@@ -938,12 +939,6 @@
   [
    "ifps_ems_rt/simplant.py",
    "_tick_power",
-   20,
-   "C"
-  ],
-  [
-   "ifps_ems_rt/opsmode.py",
-   "garrison_step",
    20,
    "C"
   ],
@@ -972,14 +967,20 @@
    "C"
   ],
   [
-   "ifps_ems_rt/runtime.py",
-   "__init__",
-   18,
+   "ifps_ems_rt/opsmode.py",
+   "gdg_step",
+   19,
    "C"
   ],
   [
-   "ifps_ems_rt/opsmode.py",
-   "want",
+   "ifps_ems_rt/hmi/engine.py",
+   "sim_action",
+   19,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/runtime.py",
+   "__init__",
    18,
    "C"
   ]
@@ -997,7 +998,7 @@
   ],
   [
    "ifps_ems_rt/runtime.py",
-   6.2,
+   5.5,
    "C"
   ],
   [
@@ -1037,7 +1038,7 @@
   ],
   [
    "ifps_ems_rt/opsmode.py",
-   44.5,
+   42.4,
    "A"
   ],
   [
@@ -1118,13 +1119,13 @@
  ],
  "loc_py": {
   "files": 26,
-  "sloc": 2826,
-  "comments": 376
+  "sloc": 2845,
+  "comments": 379
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   547,
+   549,
    true
   ],
   [

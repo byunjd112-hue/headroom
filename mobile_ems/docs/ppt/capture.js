@@ -12,6 +12,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   const sim = body => post("/api/sim", body);
   const go = async (pg, name, ms = 1500) => { await p.goto(B + "#" + pg); await p.waitForTimeout(ms); if (name) await p.screenshot({ path: D + name + ".png" }); };
   await post("/api/ops", { mode: "island" }); await post("/api/ops", { posture: "평시" }); await sim({ action: "scenario", name: "normal" });
+  await sim({ action: "clock", hour: 13 });                                             // 밤에 찍어도 태양광이 보이게 모의 시각을 낮 13시로
   await p.reload(); await p.waitForTimeout(150000);                                   // 추세 그래프가 쌓일 시간
   // 1) 평상시(작전지)
   await go("overview", "overview", 2500); await go("sld", "sld", 2500); await go("energy", "energy", 7000); await go("control", "control"); await go("comm", "comm");
@@ -31,8 +32,9 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await post("/api/ops", { mode: "grid" }); await p.waitForTimeout(6000);
   await go("control", "r18_ctl_garrison"); await go("sld", "r18_sld_garrison", 2000); await go("overview", "r18_ov_garrison", 2000);
   await sim({ action: "scenario", name: "grid_outage" }); await p.waitForTimeout(5000); await go("sld", "r18_sld_outage", 1500);
+  await sim({ action: "scenario", name: "cloud" });                                     // 구름으로 태양광이 부하보다 작아진 상황(태양광만으로 충분하면 발전기를 켜지 않는다)
   await p.waitForTimeout(50000); await go("control", "r20_ctl_gdg", 2000); await go("sld", "r20_sld_gdg", 2000);                 // 정전 30초 지속 → 주둔지 기존 디젤발전기 기동
-  await sim({ action: "scenario", name: "grid_restore" }); await post("/api/ops", { mode: "island" }); await p.waitForTimeout(3000); await post("/api/ack", { ids: "all" });
+  await sim({ action: "scenario", name: "grid_restore" }); await sim({ action: "release", tag: "PV.kw" }); await post("/api/ops", { mode: "island" }); await p.waitForTimeout(3000); await post("/api/ack", { ids: "all" });
   // 4) 작전지 저소음 태세 → 3등급 자동 차단
   await post("/api/ops", { posture: "저소음" }); await p.waitForTimeout(7000); await go("control", "r18_ctl_quiet"); await go("overview", "r18_ov_quiet", 1500);
   await post("/api/ops", { posture: "평시" });

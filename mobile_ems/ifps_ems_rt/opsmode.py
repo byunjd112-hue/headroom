@@ -34,6 +34,7 @@ class Garrison:
     gdg_restart_soc: float = 0.35     # 이 아래로 내려가면 다시 기동
     gdg_tank_l: float = 5000.0        # 연료 탱크 용량(L, 대당) — 자립 지속시간 계산용
     gdg_l_per_kwh: float = 0.26       # 연료 소비율(L/kWh)
+    gdg_min_run_s: float = 600.0      # 최소 운전 시간(초) — 한 번 켜면 이만큼은 돌린다
 
     @classmethod
     def from_cfg(cls, c):
@@ -46,6 +47,17 @@ class Garrison:
 
     def price(self, hr):
         return {"peak": self.price_peak, "off": self.price_off, "mid": self.price_mid}[self.band(hr)]
+
+
+def _surplus(site, g, grid, pv_kw, elz_on, h2_room, why):
+    """ESS 로도 못 받는 남는 전력 처리: 수전해 기동 → PV 출력 제한. 반환: (PV 제한 kW, 수전해 기동 여부)"""
+    surplus = g.import_min_kw - grid; pv_lim = 0.0; elz = bool(elz_on)
+    if surplus > 0:
+        if not elz_on and h2_room and surplus >= site.elz_kw * 0.5: elz = True; why.append("남는 전력 → 수전해 기동")
+        else: pv_lim = max(1.0, pv_kw - surplus); why.append("남는 전력 → PV 출력 제한(역송 방지)")
+    elif elz_on and (not h2_room or grid - g.import_min_kw > site.elz_kw * 0.5):
+        elz = False; why.append("남는 전력 없음 → 수전해 정지")       # 상전을 사서 수소를 만들지는 않는다
+    return pv_lim, elz
 
 
 def garrison_step(site, g, hr, load_kw, pv_kw, elz_kw, soc, h2_nm3):
@@ -67,31 +79,29 @@ def garrison_step(site, g, hr, load_kw, pv_kw, elz_kw, soc, h2_nm3):
     if net > g.peak_kw and can_dis > 0: why.append(f"피크 억제({g.peak_kw:.0f}kW)")
     target = max(target, g.import_min_kw)                           # 역송 금지: 최소 수전 유지
     ess = max(-can_chg, min(can_dis, net - target))
-    grid = net - ess; pv_lim = 0.0; elz = bool(elz_on)
-    surplus = g.import_min_kw - grid                                # ESS 로도 못 받는 남는 전력
-    h2_room = h2_nm3 < site.h2_nm3 * 0.95
-    if surplus > 0:
-        if not elz_on and h2_room and surplus >= site.elz_kw * 0.5: elz = True; why.append("남는 전력 → 수전해 기동")
-        else: pv_lim = max(1.0, pv_kw - surplus); why.append("남는 전력 → PV 출력 제한(역송 방지)")
-    elif elz_on and (not h2_room or grid - g.import_min_kw > site.elz_kw * 0.5):
-        elz = False; why.append("남는 전력 없음 → 수전해 정지")       # 상전을 사서 수소를 만들지는 않는다
+    if net < g.import_min_kw and ess < -1.0: why = ["남는 태양광 → ESS 충전(역송 방지)"]
+    grid = net - ess; pv_lim, elz = _surplus(site, g, grid, pv_kw, elz_on, h2_nm3 < site.h2_nm3 * 0.95, why)
     return {"grid": round(g.import_min_kw if pv_lim else grid, 1), "ess": round(ess, 1), "pv_lim": round(pv_lim, 1), "elz": elz, "band": band, "why": " · ".join(why) or "수전으로 부하 공급"}
 
 
-def gdg_step(site, g, outage_s, soc, running, net_kw):
+def gdg_step(site, g, outage_s, soc, running, net_kw, hold=False):
     """주둔지 정전 중 기존 디젤발전기 운용 판단. net_kw = 부하 + 수전해 − 태양광 − (이동형 디젤·연료전지 출력).
 
     기동: 정전이 gdg_delay_s 넘게 이어지고 ESS 에 여유가 없거나, 충전율이 gdg_restart_soc 아래일 때.
+    태양광 우선: 태양광이 부하를 감당하면(net_kw ≤ 0) 정전이 길어져도 발전기를 켜지 않고, 운전 중이면 세운다(충전율이 낮을 때는 예외).
     정지: ESS 가 gdg_stop_soc 까지 차고 ESS 만으로 부하를 감당할 수 있을 때(그 뒤 충전율이 내려가면 다시 기동).
+    hold: 최소 운전 시간이 지나지 않았으면 True — 정지 조건이 되어도 계속 돌린다(잦은 기동·정지 방지).
     운전 중: 발전기 부하가 최소 부하율 아래면 ESS 충전으로 올리고, 정격을 넘으면 ESS 방전으로 메운다.
     반환: {run: 기동 여부, ess: ESS 지령 kW(+방전/−충전), gdg: 예상 발전기 부하 kW, why}"""
     can_chg = max(0.0, min(site.ess_kw, (site.soc_max - soc) * site.ess_kwh / site.ess_eff * 4))
     can_dis = max(0.0, min(site.ess_kw, (soc - site.soc_min) * site.ess_kwh * site.ess_eff * 4))
     if running:
-        run = not (soc >= g.gdg_stop_soc and net_kw <= can_dis); why = "ESS 충전 완료 → 발전기 정지, ESS·태양광으로 운전" if not run else "발전기 운전"
+        full = soc >= g.gdg_stop_soc and net_kw <= can_dis; sun = net_kw <= -20.0 and soc >= g.gdg_restart_soc + 0.10
+        run = not (full or sun) or hold
+        why = "발전기 운전" if not (full or sun) else "최소 운전 시간 유지" if hold else "ESS 충전 완료 → 발전기 정지, ESS·태양광으로 운전" if full else "태양광이 부하를 감당 → 발전기 정지"
     else:
-        low = soc < g.gdg_restart_soc; run = low or (outage_s >= g.gdg_delay_s and soc < g.gdg_stop_soc - 0.10) or net_kw > can_dis
-        why = ("충전율 낮음 → 발전기 기동" if low else "정전 지속 → 발전기 기동" if run else "ESS·태양광으로 운전(발전기 대기)")
+        low = soc < g.gdg_restart_soc; run = low or (outage_s >= g.gdg_delay_s and soc < g.gdg_stop_soc - 0.10 and net_kw > 0) or net_kw > can_dis
+        why = ("충전율 낮음 → 발전기 기동" if low else "정전 지속 → 발전기 기동" if run else "태양광으로 부하 공급·ESS 충전(발전기 대기)" if net_kw <= 0 else "ESS·태양광으로 운전(발전기 대기)")
     if not run: return {"run": False, "ess": 0.0, "gdg": 0.0, "why": why}
     target = min(g.gdg_kw, max(net_kw, g.gdg_min_load * g.gdg_kw))          # 발전기에 지울 부하
     ess = max(-can_chg, min(can_dis, net_kw - target))

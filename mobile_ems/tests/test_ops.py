@@ -41,6 +41,22 @@ class TestOpsLogic(unittest.TestCase):
         self.assertTrue(om.gdg_step(s, g, 600, 0.70, True, 60)["run"]); self.assertFalse(om.gdg_step(s, g, 600, 0.86, True, 60)["run"])   # 충전 완료 → 정지
         r = om.gdg_step(s, g, 600, 0.5, True, 1300); self.assertAlmostEqual(r["gdg"], 1000.0, places=0); self.assertAlmostEqual(r["ess"], 300.0, places=0)   # 정격 초과분은 ESS 방전
         r = om.gdg_step(s, g, 600, 0.899, True, 60); self.assertFalse(r["run"])
+        r = om.gdg_step(s, g, 600, 0.6, False, -50); self.assertFalse(r["run"]); self.assertIn("태양광", r["why"])           # 태양광이 부하를 감당하면 정전이 길어도 대기
+        self.assertTrue(om.gdg_step(s, g, 600, 0.30, False, -50)["run"])                                                    # 단, 충전율이 낮으면 기동
+        r = om.gdg_step(s, g, 600, 0.6, True, -50); self.assertFalse(r["run"]); self.assertIn("태양광", r["why"])            # 운전 중 태양광이 충분해지면 정지
+        r = om.gdg_step(s, g, 600, 0.6, True, -50, hold=True); self.assertTrue(r["run"]); self.assertIn("최소 운전", r["why"])   # 최소 운전 시간 안에는 유지
+        self.assertTrue(om.gdg_step(s, g, 600, 0.40, True, -50)["run"])                                                     # 충전율이 낮으면 태양광이 있어도 계속
+
+    def test_garrison_uses_mobile_pv_tied_and_in_outage(self):
+        """주둔지에서도 이동형 태양광을 그대로 쓴다: 상전 연계 중에는 수전을 줄이고, 정전 중에는 발전기·ESS 부담을 줄인다."""
+        s, g = self.s, self.g
+        a = om.garrison_step(s, g, 9.5, 120, 0, 0, 0.6, 500); b = om.garrison_step(s, g, 9.5, 120, 80, 0, 0.6, 500)        # 중간부하 시간대, 태양광 0 / 80 kW
+        self.assertAlmostEqual(a["grid"] - b["grid"], 80.0, places=0); self.assertEqual(b["pv_lim"], 0.0)                  # 태양광만큼 수전 감소, 출력 제한 없음
+        c = om.garrison_step(s, g, 9.5, 60, 300, 0, 0.6, 500); self.assertEqual(c["pv_lim"], 0.0); self.assertLess(c["ess"], -200); self.assertIn("남는 태양광", c["why"])
+        c = om.garrison_step(s, g, 14.0, 60, 300, 0, 0.6, 500); self.assertLess(c["ess"], -200); self.assertNotIn("방전", c["why"])             # 최대부하 시간대라도 남으면 충전(사유도 그렇게 표시)   # 남는 태양광은 먼저 ESS 충전
+        self.assertFalse(om.gdg_step(s, g, 600, 0.80, False, 60 - 200)["run"])                                             # 정전 중 태양광이 부하보다 크면 발전기 대기
+        n = om.gdg_step(s, g, 600, 0.5, True, 700 - 300); d = om.gdg_step(s, g, 600, 0.5, True, 700)
+        self.assertAlmostEqual(d["gdg"] - n["gdg"], 300.0, places=0)                                                       # 발전기 부하가 태양광만큼 줄어든다
 
     def test_autonomy_hours(self):
         a = om.autonomy(self.s, 0.9, 1000, 1500, (30, 40, 50))
@@ -84,6 +100,7 @@ class TestOpsRuntime(Base):
         """주둔지 정전: ESS 가 먼저 버티고, 30초 뒤 기존 디젤발전기를 기동해 ESS·태양광과 함께 운전. 복전하면 발전기를 세운다."""
         clk = [1000.0]; self.rt.now = lambda: clk[0]; self.rt.wall = lambda: dtm.datetime(2026, 11, 16, 20, 0); self.plant.slow["GDG"] = 0.3
         self.plant.set("ESS.soc", 60.0); self.plant.set("CB.GRID", 1); self.rt.scan(); self.rt.set_ops(mode="grid", who="시험"); self.loop(3, clk)
+        self.rt.gar.gdg_min_run_s = 0.0
         self.assertTrue(self.rt.tied()); self.assertFalse(self.rt.decide()["GDG"]); self.assertEqual(self.rt.gdgs, ["GDG"])
         self.plant.set("CB.GRID", 0); self.loop(3, clk); d = self.rt.decide(); self.assertFalse(d["GDG"]); self.assertIn("대기", self.rt.gdg_last["why"])        # 정전 직후: 발전기 대기
         self.assertAlmostEqual(self.plant.get("ESS.kw"), self.plant.get("LOAD.kw") - self.plant.get("PV.kw"), delta=2.0)                                       # ESS 가 부하를 받는다
@@ -95,6 +112,7 @@ class TestOpsRuntime(Base):
         self.assertEqual(int(self.plant.get("GDG.status")), 0); self.assertEqual(self.plant.get("ESS.kw_set"), 0.0)
         self.plant.set("ESS.soc", 30.0); self.loop(3, clk); self.assertTrue(self.rt.decide()["GDG"]); self.rt.control(force=True); self.loop(3, clk)           # 다시 낮아지면 재기동
         self.assertEqual(int(self.plant.get("GDG.status")), 1)
+        self.rt.gar.gdg_min_run_s = 600.0; self.plant.set("ESS.soc", 86.0); self.loop(3, clk); self.assertTrue(self.rt.decide()["GDG"]); self.assertIn("최소 운전", self.rt.gdg_last["why"])   # 최소 운전 시간 안에는 세우지 않는다
         self.plant.set("CB.GRID", 1); self.loop(5, clk, dt=10.0); self.assertTrue(self.rt.tied()); self.assertFalse(self.rt.decide()["GDG"])                   # 복전 → 정지
         self.rt.control(force=True); self.loop(2, clk); self.assertEqual(int(self.plant.get("GDG.status")), 0)
         self.assertGreater(self.rt.auto_h["gdg_kwh"], 1000)                                                                                                 # 자립 시간에 발전기 연료 반영
@@ -103,7 +121,9 @@ class TestOpsRuntime(Base):
         clk = [1000.0]; self.rt.now = lambda: clk[0]; self.plant.set("ESS.soc", 22.0); self.plant.set("CB.GRID", 1); self.rt.scan(); self.rt.set_ops(mode="grid", who="시험")
         self.plant.set("GDG.mode", 1); self.plant.set("CB.GRID", 0); self.loop(4, clk)                           # 발전기가 현장 수동이면 EMS 가 지령할 수 없다
         d = self.rt.decide(); self.assertFalse(d["GDG"]); self.assertTrue(d["DG"] or d["FC"]); self.assertIn("지령 불가", self.rt.gdg_last["why"])
-        self.rt.set_ops(mode="island", who="시험"); self.loop(2, clk); self.assertNotIn("GDG", self.rt.decide())    # 작전지에서는 주둔지 발전기를 다루지 않는다
+        self.rt.set_ops(mode="island", who="시험"); self.loop(2, clk); self.assertNotIn("GDG", self.rt.decide())
+        self.rt.wall = lambda: dtm.datetime(2026, 11, 16, 1, 30); self.assertAlmostEqual(self.rt.hr(), 1.5); self.rt.hr_off = 11.5; self.assertAlmostEqual(self.rt.hr(), 13.0)   # 시연용 모의 시각
+        self.rt.hr_off = 23.0; self.assertAlmostEqual(self.rt.hr(), 0.5)    # 작전지에서는 주둔지 발전기를 다루지 않는다
 
     def test_quiet_posture_forbids_diesel_and_sheds_class3_then_restores(self):
         clk = [1000.0]; self.rt.now = lambda: clk[0]; self.plant.set("ESS.soc", 22.0); self.rt.scan()

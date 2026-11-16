@@ -25,7 +25,7 @@ function renderHeader() {
     `<span class="chip ${s.auto ? "ok" : "warn"}"><span class="dot"></span>${s.auto ? (S.lang === "ko" ? "자동 제어" : "AUTO DISPATCH") : (S.lang === "ko" ? "수동 운전" : "MANUAL")}</span>`,
     `<span class="chip ${nLost ? "bad" : nOk === devs.length ? "ok" : "warn"}"><span class="dot"></span>${S.lang === "ko" ? "통신" : "COMMS"} ${devs.length - nLost}/${devs.length}${nLost || nOk === devs.length ? "" : (S.lang === "ko" ? " · 경로 저하" : " · DEGRADED")}</span>`,
     `<span class="chip ${s.run_mode === "운용" ? "ok" : "warn"}"><span class="dot"></span>${s.run_mode === "운용" ? (S.lang === "ko" ? "운용" : "OPERATIONAL") : (S.lang === "ko" ? "개발 모드" : "DEV MODE")}</span>`,
-    s.sim ? `<span class="chip sim"><span class="dot"></span>SIM</span>` : "",
+    s.sim ? `<span class="chip sim"><span class="dot"></span>SIM${s.sim_state && s.sim_state.clock ? " · 모의 시각 " + s.sim_state.clock : ""}</span>` : "",
   ].join("");
   const c = s.alarm_cnt; $("#almsum").innerHTML = [1, 2, 3, 4].map(p => { const n = c[p].unack, a = c[p].act; return `<div class="pc p${p} ${n || a ? "on" : ""} ${n && p <= 2 ? "blink" : ""}" title="${prioTxt(p)} — 미확인 ${n} / 발생 ${a}" data-act="goalm">${n || a || 0}</div>`; }).join("");
   const unack = s.alarms.filter(a => !a.acked); const nb = $("#nb-alm"); nb.hidden = !unack.length; nb.textContent = unack.length;
@@ -451,7 +451,8 @@ const P_ENG = {
         <div class="panel"><div class="hd"><h3>장치 고장 주입</h3></div><div class="bd np"><table class="t"><thead><tr><th>장치</th><th>무응답 (시간 초과)</th><th>지령 무시 (무응답)</th><th>현장 수동 모드</th></tr></thead><tbody id="simDev"></tbody></table></div>
           <div class="bd"><div class="lab" style="margin-bottom:8px">통신 경로 단절 (전 장치)</div><div style="display:flex;gap:8px" id="simPath"></div></div></div>
         <div class="panel"><div class="hd"><h3>운전 시나리오</h3></div><div class="bd" style="display:flex;flex-wrap:wrap;gap:8px" id="simScn">
-          ${[["load_surge", "부하 급증 +60kW"], ["cloud", "구름 통과 (PV −70%)"], ["night", "야간 (PV 0)"], ["soc_low", "ESS 충전율 22%"], ["soc_critical", "ESS 충전율 17%"], ["h2_low", "수소 잔량 130Nm³"], ["fault_l3", "3등급 급전선 과전류 트립"], ["fault_dg", "디젤 차동(87) 트립"], ["fault_ess", "ESS 지락(64) 트립"], ["tie_open", "모선 연계 개방"], ["grid_outage", "상전 정전(주둔지)"], ["grid_restore", "상전 복전"], ["normal", "▶ 정상 복귀 (전 고장 해제)"]].map(([k, v]) => `<button class="btn ${k === "normal" ? "go" : ""}" data-s="${k}">${v}</button>`).join("")}</div>
+          ${[["load_surge", "부하 급증 +60kW"], ["cloud", "구름 통과 (PV −70%)"], ["night", "야간 (PV 0)"], ["soc_low", "ESS 충전율 22%"], ["soc_critical", "ESS 충전율 17%"], ["h2_low", "수소 잔량 130Nm³"], ["fault_l3", "3등급 급전선 과전류 트립"], ["fault_dg", "디젤 차동(87) 트립"], ["fault_ess", "ESS 지락(64) 트립"], ["tie_open", "모선 연계 개방"], ["grid_outage", "상전 정전(주둔지)"], ["grid_restore", "상전 복전"], ["normal", "▶ 정상 복귀 (전 고장 해제)"]].map(([k, v]) => `<button class="btn ${k === "normal" ? "go" : ""}" data-s="${k}">${v}</button>`).join("")}
+          ${[[13, "모의 시각 13시(주간·태양광)"], [21, "모의 시각 21시(야간)"], ["", "실제 시각으로"]].map(([h, v]) => `<button class="btn" data-clk="${h}">${v}</button>`).join("")}</div>
           <div class="bd" style="border-top:1px solid var(--line)"><div class="lab" style="margin-bottom:8px">값 강제 (가상 장치 레지스터)</div><div class="form"><label>TAG<select class="in" id="svTag">${tags.map(x => `<option>${x}</option>`).join("")}</select></label><label>값<input class="in" id="svVal" type="number" step="any" style="width:100px"></label><label style="flex-direction:row;gap:6px;align-items:center;text-transform:none"><input type="checkbox" id="svHold" checked>유지</label><button class="btn eng" id="svGo">적용</button></div>
           <div id="simHold" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"></div></div></div></div>
       <div class="panel" style="margin-top:18px"><div class="hd"><h3>급전선 차단기 · 보호 동작 주입</h3><div class="spacer"></div><span class="sub">보호 IED가 차단기를 트립하고 ANSI 보호요소 코드를 게이트웨이로 보고하는 상황을 모사</span></div>
@@ -459,6 +460,7 @@ const P_ENG = {
     const act = async b => { if (!can("engineer")) { toast("엔지니어 권한 필요", "bad"); return loginDialog(); } const r = await api("/api/sim", b); if (r.ok) { S.snap.sim_state = r.sim; this.simUpdate(); toast("고장 주입 적용", "ok"); } else toast(r.why, "bad"); };
     this._simAct = act;
     $$("#simScn [data-s]").forEach(b => b.onclick = () => act({ action: "scenario", name: b.dataset.s }));
+    $$("#simScn [data-clk]").forEach(b => b.onclick = () => act({ action: "clock", hour: b.dataset.clk === "" ? null : +b.dataset.clk }));
     $("#svGo").onclick = () => { const x = parseFloat($("#svVal").value); if (!Number.isFinite(x)) return toast("값을 숫자로 입력하십시오", "bad"); act({ action: "set", tag: $("#svTag").value, value: x, hold: $("#svHold").checked }); };
     this.simUpdate();
   },

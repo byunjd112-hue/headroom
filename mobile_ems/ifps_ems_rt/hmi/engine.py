@@ -8,7 +8,7 @@
 장치 소켓은 modbus.Client의 잠금으로 보호되므로 수집·지령·레지스터 탐색이 같은 연결을 섞어 써도 프레임이 섞이지 않는다.
 """
 import collections, copy, json, math, os, queue, random, secrets, tempfile, threading, time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from ifps_ems import __version__ as CORE_VERSION
 from ifps_ems.solar import clear_pv_kw
 from ifps_ems.config import SUP
@@ -131,10 +131,10 @@ class AlarmManager:
 class SimDriver:
     def __init__(self, plant, site):
         self.p = plant; self.site = site; self.hold = {}; self.cloud = 0.9; self.run = True; self.t_last = time.time()
-        self.scn = ""; self.extra_load = 0.0; self.err = ""
+        self.scn = ""; self.extra_load = 0.0; self.err = ""; self.off_h = 0.0
 
     def step(self):
-        now = datetime.now(); hr = now.hour + now.minute / 60 + now.second / 3600; doy = now.timetuple().tm_yday
+        now = datetime.now() + timedelta(hours=self.off_h); hr = now.hour + now.minute / 60 + now.second / 3600; doy = now.timetuple().tm_yday
         self.cloud += 0.02 * (0.85 - self.cloud) + random.gauss(0, 0.015); self.cloud = min(1.02, max(0.15, self.cloud))
         day = 1 / (1 + math.exp(-(hr - 7.5) * 2)) * 1 / (1 + math.exp((hr - 18.5) * 2))
         p1 = 28 + random.gauss(0, 0.4)
@@ -591,7 +591,7 @@ class Engine:
         return {"ok": True, "ops": self.ops()}
 
     def ops(self):
-        rt = self.rt; g = rt.gar; hr = datetime.now().hour + datetime.now().minute / 60
+        rt = self.rt; g = rt.gar; hr = rt.hr()
         return {"mode": rt.mode, "tied": rt.tied(), "outage": rt.mode == "grid" and not rt.tied(), "posture": rt.posture, "autonomy": rt.auto_h, "target_h": rt.auto_target_h,
                 "target_left_h": round(max(0.0, rt.auto_target_h - (rt.now() - rt.t_posture) / 3600.0), 1) if rt.posture == "자립" else None,
                 "shed": sorted(rt.shedder.mine), "shed_why": dict(rt.shedder.why), "garrison": rt.gar_last, "gdg": rt.gdg_last, "gdgs": list(rt.gdgs), "gdg_kw": g.gdg_kw, "can_grid": any(p["tag"] == "GRID.kw" for p in rt.pts),
@@ -709,6 +709,7 @@ class Engine:
     def sim_state(self):
         p = self.plant
         return {"muted": sorted(p.muted), "noack": sorted(p.no_ack), "down": sorted(p.down), "hold": dict(self.simdrv.hold), "scenario": self.simdrv.scn,
+                "clock": (datetime.now() + timedelta(hours=self.simdrv.off_h)).strftime("%H:%M") if self.simdrv.off_h else "",
                 "ports": list(self.sim_ports), "manual": [d for d in ("DG", "FC", "ELZ", "PV") if f"{d}.mode" in p.by_tag and p.get(f"{d}.mode") > 0.5]}
 
     def trend_since(self, since_ms=0):
@@ -781,6 +782,15 @@ class Engine:
         if q["action"] == "fault": self.simdrv.trip(f, int(q.get("code", 51)))
         else: self.plant.set(f"CB.{f}", 1 if q.get("on", True) else 0); self.plant.set(f"FLT.{f}", 0)
 
+    def _sim_clock(self, hour):
+        """시연용 모의 시각: 가상 장치(태양광·부하)와 EMS 시간대 판단을 같은 시각으로 옮긴다. hour 가 없으면 실제 시각으로 되돌린다."""
+        off = 0.0
+        if hour is not None:
+            h = float(hour); now = datetime.now()
+            if not (math.isfinite(h) and 0 <= h < 24): raise ValueError("시각은 0 이상 24 미만")
+            off = h - (now.hour + now.minute / 60)
+        self.simdrv.off_h = off; self.rt.hr_off = off
+
     def sim_action(self, q, who):
         if not self.sim: raise ValueError("가상 장치 모드가 아님")
         a = q["action"]; p = self.plant; tgt = q.get("target"); on = q.get("on", True)
@@ -789,6 +799,7 @@ class Engine:
         elif a == "manual": p.set(f"{tgt}.mode", 1 if on else 0)
         elif a == "set": self._sim_set(q)
         elif a == "release": self.simdrv.hold.pop(q["tag"], None)
+        elif a == "clock": self._sim_clock(q.get("hour"))
         elif a == "scenario" and q["name"] in ("grid_outage", "grid_restore"):
             if "CB.GRID" not in p.by_tag: raise ValueError("수전점 계측이 없음")
             out = q["name"] == "grid_outage"; p.set("CB.GRID", 0 if out else 1); p.set("FLT.GRID", 27 if out else 0)

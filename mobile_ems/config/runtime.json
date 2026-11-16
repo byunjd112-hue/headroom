@@ -46,7 +46,8 @@
   "gdg_stop_soc": 0.85,
   "gdg_restart_soc": 0.35,
   "gdg_tank_l": 5000,
-  "gdg_l_per_kwh": 0.26
+  "gdg_l_per_kwh": 0.26,
+  "gdg_min_run_s": 600
  },
  "pointmap": "pointmap.csv",
  "state_dir": "state",
