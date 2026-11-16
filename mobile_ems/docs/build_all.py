@@ -27,7 +27,7 @@ def clean(rev):
     n = 0
     for dp, _, fs in os.walk(OUT):
         for f in fs:
-            m = re.search(r"_(Rev\d+)\.(docx|pptx|pdf)$", f)
+            m = re.search(r"_(Rev\d+)\.(docx|pptx|pdf|html)$", f)
             if m and (m.group(1) != rev or m.group(2) == "pdf"): os.remove(os.path.join(dp, f)); n += 1
     old = os.path.join(OUT, "보고자료")
     if os.path.isdir(old) and not os.listdir(old): os.rmdir(old)
@@ -54,6 +54,7 @@ def main(argv=None):
     os.makedirs(OUT, exist_ok=True); print(f"이전 리비전 산출물 {clean(rev)}개 삭제")
     for b in BUILDERS: run(["node", os.path.join(DOCS, b), rev, date], env=env)
     run(["node", os.path.join(DOCS, "ppt", "build_deck.js"), rev, ym], env=env)
+    run([sys.executable, os.path.join(DOCS, "fmea", "build_fmea.py"), rev, date])          # FMEA·FTA 통합 분석 워크벤치(HTML)
     names = sorted(os.path.relpath(os.path.join(dp, f), OUT) for dp, _, fs in os.walk(OUT) for f in fs)
     bad = [n for n in names if rev not in n]
     print(f"산출물 {len(names)}개 (docs/out):"); [print("   ", n) for n in names]
