@@ -71,7 +71,8 @@ def main(argv=None):
     for b in BUILDERS: run(["node", os.path.join(DOCS, b), rev, date], env=env)
     run(["node", os.path.join(DOCS, "ppt", "build_deck.js"), rev, ym], env=env)
     run(["node", os.path.join(DOCS, "ppt", "build_hw_deck.js"), rev, ym], env=env)            # 하드웨어 구성 기술자료
-    run([sys.executable, os.path.join(DOCS, "fmea", "build_fmea.py"), rev, date])          # FMEA·FTA 통합 분석 워크벤치(HTML)
+    run([sys.executable, os.path.join(DOCS, "fmea", "build_fmea.py"), rev, date])
+    run([sys.executable, os.path.join(DOCS, "ppt", "add_ems_to_proposal.py"), rev])                 # 제안 발표 자료 EMS 보완본(원본이 있을 때만)          # FMEA·FTA 통합 분석 워크벤치(HTML)
     names = sorted(os.path.relpath(os.path.join(dp, f), OUT) for dp, _, fs in os.walk(OUT) for f in fs)
     bad = [n for n in names if rev not in n]
     print(f"산출물 {len(names)}개 (docs/out):"); [print("   ", n) for n in names]
