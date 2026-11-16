@@ -70,6 +70,7 @@ def main(argv=None):
     os.makedirs(OUT, exist_ok=True); print(f"이전 리비전 산출물 {clean(rev)}개 삭제")
     for b in BUILDERS: run(["node", os.path.join(DOCS, b), rev, date], env=env)
     run(["node", os.path.join(DOCS, "ppt", "build_deck.js"), rev, ym], env=env)
+    run(["node", os.path.join(DOCS, "ppt", "build_hw_deck.js"), rev, ym], env=env)            # 하드웨어 구성 기술자료
     run([sys.executable, os.path.join(DOCS, "fmea", "build_fmea.py"), rev, date])          # FMEA·FTA 통합 분석 워크벤치(HTML)
     names = sorted(os.path.relpath(os.path.join(dp, f), OUT) for dp, _, fs in os.walk(OUT) for f in fs)
     bad = [n for n in names if rev not in n]
