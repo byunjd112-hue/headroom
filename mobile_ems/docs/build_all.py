@@ -34,6 +34,21 @@ def clean(rev):
     return n
 
 
+def bundle(rev):
+    """docs/out 전체를 IFPS_EMS_문서_<Rev>.zip 으로 묶는다. 한글 파일 이름이 Windows 에서 깨지지 않게 파이썬 zipfile 로 만든다
+    (zipfile 은 한글 이름에 UTF-8 표시를 붙인다. 리눅스 zip 명령은 붙이지 않아 Windows 탐색기에서 이름이 깨진다)."""
+    import zipfile
+    for f in os.listdir(ROOT):
+        if re.fullmatch(r"IFPS_EMS_문서_Rev\d+\.zip", f): os.remove(os.path.join(ROOT, f))
+    z = os.path.join(ROOT, f"IFPS_EMS_문서_{rev}.zip")
+    with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as zf:
+        for dp, _, fs in sorted(os.walk(OUT)):
+            for f in sorted(fs): p = os.path.join(dp, f); zf.write(p, os.path.relpath(p, OUT).replace(os.sep, "/"))
+        bad = [i.filename for i in zf.infolist() if not i.filename.isascii() and not i.flag_bits & 0x800]
+    if bad: sys.exit(f"UTF-8 표시가 없는 파일 이름: {bad}")
+    return z
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="관련 문서 전체를 같은 리비전으로 생성")
     ap.add_argument("--rev", help="리비전(기본: VERSION 파일)"); ap.add_argument("--measure", action="store_true", help="정적·동적 측정부터 다시"); ap.add_argument("--soak", type=int, default=300)
@@ -48,7 +63,8 @@ def main(argv=None):
         z = os.path.join(ROOT, f"IFPS_Mobile_EMS_{rev}.zip")
         dirty = subprocess.run(["git", "status", "--porcelain", "."], cwd=ROOT, capture_output=True, text=True).stdout.strip()  # nosec B603 B607 — 고정 인자
         if dirty: sys.exit("커밋하지 않은 변경이 있습니다. 먼저 커밋하십시오:\n" + dirty[:600])
-        run(["git", "archive", "--format=zip", f"--prefix=IFPS_Mobile_EMS_{rev}/", "-o", z, "HEAD:" + os.path.basename(ROOT)], cwd=os.path.dirname(ROOT)); print("패키지:", z); return 0
+        run(["git", "archive", "--format=zip", f"--prefix=IFPS_Mobile_EMS_{rev}/", "-o", z, "HEAD:" + os.path.basename(ROOT)], cwd=os.path.dirname(ROOT)); print("패키지:", z)
+        print("문서 묶음:", bundle(rev)); return 0
     if a.measure:
         run([sys.executable, "tools/static_report.py"]); run([sys.executable, "tools/measure.py", "docs/test_results.json", "--soak", str(a.soak)])
     os.makedirs(OUT, exist_ok=True); print(f"이전 리비전 산출물 {clean(rev)}개 삭제")
