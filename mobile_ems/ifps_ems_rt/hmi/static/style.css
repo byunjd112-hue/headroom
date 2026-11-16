@@ -581,3 +581,10 @@ td.ell { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-spac
 #engBody > .grid > .grid, #engBody > .grid > div:not(.panel) { overflow: auto; align-content: start; }
 #engBody > .panel + .panel { margin-top: 12px !important; flex: 0 1 auto; max-height: 46%; }
 td.nw, th.nw { white-space: nowrap; } table.tc td.ell { max-width: 120px; }
+
+/* 설비 카드 9~10장(주둔지 발전기·상전 수전점 포함): 5칸 × 2줄 */
+.devs5 { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.devs5 .dev > .hd { padding: 8px 10px 2px; } .devs5 .dev > .hd h3 { font-size: 11.5px; } .devs5 .dev > .bd { padding: 6px 10px 8px; }
+.devs5 .dev .eqimg .eqph { height: 118px; } .devs5 .dev .big { font-size: 23px; }
+.devs5 .dev .meta { gap: 4px; } .devs5 .dev .meta > div { padding: 3px 4px; } .devs5 .dev .meta .lab { font-size: 9.5px; } .devs5 .dev .meta .v { font-size: 11px; }
+.devs5 .dev .acts { gap: 4px; } .devs5 .dev .acts .btn { padding: 0 7px; font-size: 11px; } .devs5 .dev .acts input.in { width: 46px !important; }

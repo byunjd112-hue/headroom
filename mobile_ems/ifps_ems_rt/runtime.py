@@ -35,7 +35,9 @@ class Runtime:
         self.pool = ThreadPoolExecutor(max_workers=max(2, sum(len(lk.cl) for lk in self.links.values())), thread_name_prefix="scan")
         self.ctl = [n for n in self.links if f"{n}.cmd" in self.links[n].by_tag]
         self.dev = {n: sv.Device(n) for n in self.ctl}
-        self.cmd = RtCommander({n: self.links[n] for n in self.ctl}, self.dev, clock=clock)
+        self.gdgs = [n for n in self.ctl if n.startswith("GDG")]          # 주둔지 기존 디젤발전기(여러 대면 GDG, GDG2 …)
+        fb = {"DG": ["FC"], "FC": ["DG"]}; fb.update({n: ["DG", "FC"] for n in self.gdgs})      # 주둔지 발전기 기동 실패 → 이동형 디젤·연료전지
+        self.cmd = RtCommander({n: self.links[n] for n in self.ctl}, self.dev, fallback=fb, clock=clock)
         self.cmd.gate = self.controllable; self.cmd.tick = lambda: self.wd.kick("제어", self.now())
         self.cmd.done_s = {n: float(d["done_s"]) for n, d in self.cfg["devices"].items() if "done_s" in d}
         self.lm = sv.LinkMonitor(list(self.links)); self.wd = sv.Watchdog(["수집", "제어"])
@@ -49,7 +51,7 @@ class Runtime:
         # 군 운용: 운용 장소(작전지 island / 주둔지 grid), 운용 태세(평시·저소음·자립), 자동 부하 차단, 주둔지 설정
         self.gar = om.Garrison.from_cfg(self.cfg.get("garrison")); self.posture = "평시"; self.auto_enabled = True; self.shedder = om.LoadShedder()
         self.auto_h = None; self.auto_target_h = float(self.cfg.get("autonomy_target_h", 72.0)); self.t_posture = self.now(); self.pv_day_kwh = None
-        self.grid_lost = False; self.t_grid_ok = None; self.gar_last = None; self._w = {}; self._pvday = (None, 0.0)
+        self.grid_lost = False; self.t_grid_ok = None; self.t_outage = None; self.gdg_last = None; self.gar_last = None; self._w = {}; self._pvday = (None, 0.0)
         self._load_ops()
         ok, why = security.crypto_gate(self.audit.c, self.cfg.get("run_mode", "개발"))
         if not ok: raise RuntimeError(why)
@@ -164,7 +166,7 @@ class Runtime:
         closed = int(round(self.val.get("CB.GRID", 0))) == 1
         if not closed:
             self.t_grid_ok = None
-            if not self.grid_lost: self.grid_lost = True; self.note("운용", "상전 정전(수전 차단기 개방) — 자립 운전으로 전환"); self._write("ESS", "ESS.kw_set", 0.0, 0.5); self._write("PV", "PV.lim_set", 0.0, 0.5)
+            if not self.grid_lost: self.grid_lost = True; self.t_outage = t; self.note("운용", "상전 정전(수전 차단기 개방) — 자립 운전으로 전환"); self._write("ESS", "ESS.kw_set", 0.0, 0.5); self._write("PV", "PV.lim_set", 0.0, 0.5)
         elif self.grid_lost:
             if self.t_grid_ok is None: self.t_grid_ok = t
             if t - self.t_grid_ok >= self.gar.restore_s: self.grid_lost = False; self.note("운용", f"상전 복전 {self.gar.restore_s:.0f}초 안정 — 주둔지 운전 복귀")
@@ -185,12 +187,28 @@ class Runtime:
         if self._pvday[0] != doy: self._pvday = (doy, 0.6 * 0.25 * sum(float(clear_pv_kw(self.site, doy, h / 4)) for h in range(96)))
         return self._pvday[1]
 
+    def _autonomy_update(self, soc):
+        """자립 지속시간. 주둔지에서는 기존 디젤발전기 연료도 넣는다(저소음 태세에서는 뺀다)."""
+        g = lambda k, d=0.0: self.val.get(k, d); quiet = self.posture == "저소음"; gdg_e = 0.0
+        if self.mode == "grid" and not quiet:
+            gdg_e = sum(g(f"{n}.fuel_pct") / 100.0 * self.gar.gdg_tank_l / self.gar.gdg_l_per_kwh for n in self.gdgs)
+        self.auto_h = om.autonomy(self.site, soc, g("H2.nm3"), g("DG.fuel_l"), (g("LOAD.p1_kw"), g("LOAD.p2_kw"), g("LOAD.p3_kw")), self._pv_day(), quiet, gdg_e)
+
+    def _shed_want(self, t, soc):
+        """자립 운전 중 부하 차단 필요 여부. 공급 능력 = 지금 붙어 있는 전원의 합."""
+        g = lambda k, d=0.0: self.val.get(k, d); s = self.site
+        ess_ok = g("ESS.status", 1) > 0.5 and soc > s.soc_min + 0.02
+        avail = (s.ess_kw if ess_ok else 0.0) + float(self.cfg.get("g1_kw", 100.0)) * (g("CB.G1", 1) == 1) + s.dg_kw * (g("DG.status") > 0.5) + s.fc_kw * (g("FC.status") > 0.5) + max(0.0, g("PV.kw"))
+        avail += sum(self.gar.gdg_kw for n in self.gdgs if g(f"{n}.status") > 0.5 and g(f"CB.{n}", 1) == 1)
+        target = max(0.0, self.auto_target_h - (t - self.t_posture) / 3600.0) if self.posture == "자립" else self.auto_target_h
+        return om.LoadShedder.want(s, self.posture, soc, avail, g("LOAD.p1_kw") + g("LOAD.p2_kw"), g("LOAD.kw"), self.auto_h, target)
+
     def fast_control(self):
         """매 수집 주기(1초)에 도는 빠른 제어: 주둔지 ESS·PV 설정값(역송 방지·피크 억제), 부하 자동 차단·복구, 자립 지속시간.
         반환: 한 일 목록. 자동 제어가 꺼져 있으면 계산만 하고 쓰지 않는다."""
         t = self.now(); g = lambda k, d=0.0: self.val.get(k, d); s = self.site; done = []; hr = self.wall().hour + self.wall().minute / 60
-        self._grid_watch(t); tied = self.tied(); soc = g("ESS.soc", 60.0) / 100; quiet = self.posture == "저소음"
-        self.auto_h = om.autonomy(s, soc, g("H2.nm3"), g("DG.fuel_l"), (g("LOAD.p1_kw"), g("LOAD.p2_kw"), g("LOAD.p3_kw")), self._pv_day(), quiet)
+        self._grid_watch(t); tied = self.tied(); soc = g("ESS.soc", 60.0) / 100
+        self._autonomy_update(soc)
         if tied:
             r = om.garrison_step(s, self.gar, hr, g("LOAD.kw"), g("PV.kw"), g("ELZ.kw"), soc, g("H2.nm3")); self.gar_last = r
             if self.auto_enabled:
@@ -199,14 +217,10 @@ class Runtime:
         else:
             self.gar_last = None
             if self.mode != "grid": self._w.pop("ESS.kw_set", None)
+        self._gdg_control(t, tied, soc)
         # 부하 자동 차단·복구(상전 연계 중에는 공급 능력으로 끊지 않는다)
         cb = {f: (int(round(self.val[f"CB.{f}"])) if f"CB.{f}" in self.val else None) for f in ("L2", "L3")}
-        if tied: want = {"L3": "", "L2": ""}
-        else:
-            ess_ok = g("ESS.status", 1) > 0.5 and soc > s.soc_min + 0.02
-            avail = (s.ess_kw if ess_ok else 0.0) + float(self.cfg.get("g1_kw", 100.0)) * (g("CB.G1", 1) == 1) + s.dg_kw * (g("DG.status") > 0.5) + s.fc_kw * (g("FC.status") > 0.5) + max(0.0, g("PV.kw"))
-            target = max(0.0, self.auto_target_h - (t - self.t_posture) / 3600.0) if self.posture == "자립" else self.auto_target_h
-            want = om.LoadShedder.want(s, self.posture, soc, avail, g("LOAD.p1_kw") + g("LOAD.p2_kw"), g("LOAD.kw"), self.auto_h, target)
+        want = {"L3": "", "L2": ""} if tied else self._shed_want(t, soc)
         mtr = self.links.get("MTR")
         if self.auto_enabled and mtr is not None and "LDS.L3" in mtr.by_tag and self.lm.controllable("MTR"):
             for f, act, why in self.shedder.step(t, want, cb, soc, s.soc_min):
@@ -214,10 +228,28 @@ class Runtime:
                 self.note("지령", f"부하 자동 {'차단' if act == 'shed' else '복구'}: {nm}({f}) — {why}{'' if ok else ' (쓰기 실패)'}"); done.append((f, act))
         return done
 
+    def _gdg_ready(self):
+        """지령할 수 있는 주둔지 발전기(통신 정상, 원격 모드)."""
+        return [n for n in self.gdgs if self.controllable(n) and not self.dev[n].manual]
+
+    def _gdg_control(self, t, tied, soc):
+        """주둔지 정전 중 기존 디젤발전기 판단과 ESS 지령. 기동·정지 지령 자체는 제어 주기(decide)에서 낸다."""
+        g = lambda k, d=0.0: self.val.get(k, d)
+        if self.mode != "grid" or tied or not self.gdgs: self.gdg_last = None; return
+        running = [n for n in self.gdgs if g(f"{n}.status") > 0.5]
+        net = g("LOAD.kw") + g("ELZ.kw") - g("PV.kw") - g("DG.kw") - g("FC.kw")
+        r = om.gdg_step(self.site, self.gar, t - (self.t_outage if self.t_outage is not None else t), soc, bool(running), net)
+        if not self._gdg_ready() and not running: r = dict(r, run=False, why="주둔지 발전기 지령 불가(통신 두절·현장 수동) → 이동형 전원으로 운전")
+        prev = self.gdg_last; self.gdg_last = r
+        if prev is None or prev["run"] != r["run"]: self.t_ctl = -1e9          # 판단이 바뀌면 다음 주기를 기다리지 않고 곧바로 지령
+        if self.auto_enabled: self._write("ESS", "ESS.kw_set", r["ess"] if running else 0.0, 2.0)
+
     def decide(self):
         g = lambda k, d=0.0: self.val.get(k, d); hr = self.wall().hour + self.wall().minute / 60
         if self.tied():                                               # 주둔지 상전 연계: 디젤·연료전지는 쉬고 상전과 ESS 로 운전(수전해는 남는 전력이 있을 때만)
-            r = self.gar_last or {}; return {"DG": False, "FC": False, "_policy": (0, 0, int(bool(r.get("elz")))), "_garrison": True}
+            r = self.gar_last or {}; w = {"DG": False, "FC": False, "_policy": (0, 0, int(bool(r.get("elz")))), "_garrison": True}
+            if self.gdgs: w["GDG"] = False                            # 주둔지 발전기는 대기
+            return w
         if self.policy: a = self.policy(dict(self.val), hr)
         else: a = dp.rule_action(self.site, g("ESS.soc", 60.0) / 100, g("H2.nm3", self.site.h2_nm3 * 0.7), int(g("DG.status")), int(g("FC.status")), g("LOAD.kw"), g("PV.kw"), hr)
         if self.posture == "저소음" and a[0]:                         # 저소음 태세: 디젤 금지. 연료전지로 대신하고(수소가 있으면) 3등급 부하는 자동 차단
@@ -225,23 +257,32 @@ class Runtime:
             a = (0, 1 if h2_ok else int(a[1]), 0)
         want = {"DG": bool(a[0]), "FC": bool(a[1]), "_policy": tuple(int(x) for x in a)}
         if self.posture == "저소음": want["_quiet"] = True
+        gdg_on = self._decide_gdg(want)
         if self.mode in ("island", "grid"):                           # 자립 운전(작전지, 또는 주둔지 정전 중) N-1 순동 예비력
-            online = [self.site.ess_kw] * int(g("ESS.status", 1)) + [self.cfg.get("g1_kw", 100.0)] + [self.site.dg_kw] * int(want["DG"]) + [self.site.fc_kw] * int(want["FC"])
-            if dp.reserve_need(g("LOAD.p1_kw") + g("LOAD.p2_kw"), online): want["FC"] = True; want["_reserve"] = True
+            online = [self.site.ess_kw] * int(g("ESS.status", 1)) + [self.cfg.get("g1_kw", 100.0)] + [self.site.dg_kw] * int(want["DG"]) + [self.site.fc_kw] * int(want["FC"]) + [self.gar.gdg_kw] * int(gdg_on)
+            if not gdg_on and dp.reserve_need(g("LOAD.p1_kw") + g("LOAD.p2_kw"), online): want["FC"] = True; want["_reserve"] = True
         return want
+
+    def _decide_gdg(self, want):
+        """주둔지 정전: 기존 디젤발전기를 먼저 쓰고 이동형 디젤·연료전지는 쉰다. 반환: 발전기를 실제로 쓸 수 있는가."""
+        if self.mode != "grid" or not self.gdgs: return False
+        r = self.gdg_last or {}; want["GDG"] = bool(r.get("run")) and self.posture != "저소음"
+        on = want["GDG"] and bool(self._gdg_ready() or any(self.val.get(f"{n}.status", 0.0) > 0.5 for n in self.gdgs))
+        if on: want["DG"] = False; want["FC"] = False; want["_policy"] = (0, 0, 0); want["_gdg"] = True
+        return on
 
     def control(self, force=False):
         t = self.now()
         if not force and t - self.t_ctl < self.cfg.get("ctrl_s", 60.0):
             self.wd.kick("제어", t); return []                       # 제어 주기 전이어도 제어 과정은 살아 있다
         self.t_ctl = t; want = self.decide(); done = []
-        for n in ("DG", "FC"):
-            if n not in self.dev: continue
-            d = self.dev[n]
-            if want[n] != d.on:
-                n0 = len(self.cmd.log); ok, dt = self.cmd.send(n, "start" if want[n] else "stop")
+        for n in ("DG", "FC") + tuple(self.gdgs):
+            if n not in self.dev or (n in self.gdgs and "GDG" not in want): continue
+            d = self.dev[n]; w_n = want["GDG"] if n in self.gdgs else want[n]
+            if w_n != d.on:
+                n0 = len(self.cmd.log); ok, dt = self.cmd.send(n, "start" if w_n else "stop")
                 for e in self.cmd.log[n0:]: self.note("지령", e["text"])
-                done.append((n, want[n], ok, round(dt, 2)))
+                done.append((n, w_n, ok, round(dt, 2)))
         if len(self.cmd.log) > 2000: del self.cmd.log[:1000]
         self.wd.kick("제어", self.now())
         return done

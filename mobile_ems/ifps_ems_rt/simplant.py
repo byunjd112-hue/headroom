@@ -19,7 +19,7 @@ class Plant:
         for p in pts:                                                     # 대응표에 있는 주소만 존재한다(그 밖의 주소를 읽으면 예외 02)
             for i in range(mb.NREG[p["type"]]): self.reg[p["device"]][(p["fc"], p["addr"] + i)] = 0
         for tag, v in {"LOAD.kw": 80.0, "LOAD.p1_kw": 30.0, "LOAD.p2_kw": 30.0, "LOAD.p3_kw": 20.0, "PV.kw": 40.0, "ESS.soc": 60.0, "ESS.status": 1,
-                       "H2.nm3": 700.0, "DG.fuel_l": 900.0, "ENV.temp": 20.0, "ENV.press": 1013.0, "ENV.rh": 50.0, "BUS.hz": 60.0,
+                       "H2.nm3": 700.0, "DG.fuel_l": 900.0, "GDG.fuel_pct": 85.0, "ENV.temp": 20.0, "ENV.press": 1013.0, "ENV.rh": 50.0, "BUS.hz": 60.0,
                        "PV.status": 1, **{f"CB.{f}": 1 for f in ("PV", "DG", "FC", "ESS", "G1", "TIE", "L1", "L2", "L3")}}.items():
             if tag in self.by_tag: self.set(tag, v)
 
@@ -75,12 +75,22 @@ class Plant:
         self._put((("ELZ.kw", elz), ("ELZ.h2_rate", 30.0 * g("ELZ.status")), ("PV.lim", g("PV.lim_set") or 400.0)))
         net = g("LOAD.kw") + elz - g("PV.kw") - dg - fc
         tied = "CB.GRID" in self.by_tag and int(round(self.get("CB.GRID"))) == 1
+        if tied and "GDG.status" in self.by_tag:
+            self.set("GDG.kw", 0.0)
+            if int(round(g("CB.GDG"))) != 2: self.set("CB.GDG", 0)
         if tied:                                                             # 상전 연계: ESS 는 EMS 지령대로(충전율 한계 안에서), 나머지는 상전이 메운다
             soc = g("ESS.soc"); sp = g("ESS.kw_set"); ess = (min(sp, 500.0) if soc > 10.5 else min(sp, 0.0)) if sp >= 0 else (max(sp, -500.0) if soc < 89.5 else 0.0)
             ess *= cb("ESS"); grid = net - ess
             self._exp_t = self._exp_t if (grid < -20 and self._exp_t is not None) else now
             if now - self._exp_t > 3.0: self.set("CB.GRID", 2); self.set("FLT.GRID", 32)        # 역송 3초 지속 → 역전력 보호(32) 트립
-        else: ess = net * cb("ESS"); grid = 0.0
+        else:
+            gdg = 0.0
+            if "GDG.status" in self.by_tag:                                   # 주둔지 디젤발전기: 운전 중이면 차단기 투입, ESS 지령을 뺀 나머지를 부담
+                on = g("GDG.status") > 0.5 and int(round(g("CB.GDG"))) != 2
+                self.set("CB.GDG", 2 if int(round(g("CB.GDG"))) == 2 else int(on))
+                if on: gdg = min(1000.0, max(0.0, net - max(-500.0, min(500.0, g("ESS.kw_set")))))
+                self.set("GDG.kw", gdg); self.set("GDG.fuel_pct", max(0.0, g("GDG.fuel_pct") - gdg * 0.26 / 5000.0 * 100.0 * dt / 3600.0))
+            ess = (net - gdg) * cb("ESS"); grid = 0.0
         if "BUS.a_v" in self.by_tag: self._tick_bus(now)
         self._put((("DG.kw", dg), ("FC.kw", fc), ("ESS.kw", ess), ("GRID.kw", grid)))
         if "ESS.soc" in self.by_tag: self.set("ESS.soc", min(90.0, max(10.0, g("ESS.soc") - ess * dt / 3600 / 1000.0 * 100)))
@@ -88,6 +98,7 @@ class Plant:
     def _tick_bus(self, now):
         g, cb = self._g, self._cb
         src_a = (cb("DG") and g("DG.status") > 0.5) or (cb("FC") and g("FC.status") > 0.5)
+        src_a = src_a or ("CB.GDG" in self.by_tag and int(round(self.get("CB.GDG"))) == 1)
         src_a = src_a or ("CB.GRID" in self.by_tag and int(round(self.get("CB.GRID"))) == 1)
         a_live = src_a or (cb("TIE") and (cb("ESS") or cb("G1")))
         b_live = (cb("ESS") and g("ESS.status") > 0.5) or cb("G1") or (cb("TIE") and a_live)

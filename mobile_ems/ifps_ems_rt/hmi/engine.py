@@ -207,7 +207,7 @@ class Engine:
         if sim:
             pts = pm.load(os.path.join(base, cfg["pointmap"]), cfg["devices"])
             units = {n: d["unit"] for n, d in cfg["devices"].items()}
-            self.plant = Plant(pts, units); pa, pb = self.plant.start(self.hcfg.get("sim_ports", [0, 0]))
+            self.plant = Plant(pts, units); self.plant.slow["GDG"] = 5.0; pa, pb = self.plant.start(self.hcfg.get("sim_ports", [0, 0]))
             c2 = copy.deepcopy(cfg); c2["allow"] = ["127.0.0.0/8"]
             for n in c2["devices"]: c2["devices"][n]["paths"] = [["127.0.0.1", pa], ["127.0.0.1", pb]]
             c2["pointmap"] = os.path.join(base, cfg["pointmap"]); c2["state_dir"] = os.path.join(base, cfg.get("state_dir", "state") + "_sim")
@@ -459,7 +459,10 @@ class Engine:
         if gc is not None:
             code = int(round(v.get("FLT.GRID", 0))); grid = rt.mode == "grid"
             A.set("grid.trip", grid and gc > 1.5, 1, "CB-GRID", f"수전 차단기 트립 — {ANSI.get(code, f'보호요소 {code}')}")
-            A.set("grid.out", grid and rt.grid_lost, 1, "GRID", "상전 정전 — 자립 운전으로 전환(무정전: ESS 계통 형성). 디젤·연료전지 자동 투입")
+            A.set("grid.out", grid and rt.grid_lost, 1, "GRID", "상전 정전 — 자립 운전으로 전환(무정전: ESS 계통 형성). " + ("주둔지 발전기 자동 투입" if rt.gdgs else "디젤·연료전지 자동 투입"))
+        for n in rt.gdgs:                                                       # 주둔지 기존 발전기 차단기
+            c = v.get(f"CB.{n}")
+            if c is not None: code = int(round(v.get(f"FLT.{n}", 0))); A.set(f"cb.trip.{n}", c > 1.5, 1, f"CB-{n}", f"주둔지 발전기 차단기 트립 — {ANSI.get(code, f'보호요소 {code}')}")
         if "BUS.a_v" in v:
             A.set("bus.a", v["BUS.a_v"] < 300, 1, "BUS-A", "모선 A 무전압(정전)"); A.set("bus.b", v.get("BUS.b_v", 440) < 300, 1, "BUS-B", "모선 B 무전압(정전)")
 
@@ -512,10 +515,11 @@ class Engine:
         want = rt.decide(); note = getattr(rt.policy, "note", "") if rt.policy else "규칙 운전"
         want["ELZ"] = bool(want["_policy"][2]) and not want.get("DG")      # 수전해: 계획이 고르고 디젤 운전 중이 아닐 때만
         done = []
-        for n in ("DG", "FC", "ELZ"):
-            if n not in rt.dev: continue
-            if want[n] != rt.dev[n].on:
-                ok, dt = self._send(n, "start" if want[n] else "stop", who); done.append({"dev": n, "on": want[n], "ok": ok, "dt": round(dt, 2)})
+        for n in ("DG", "FC", "ELZ") + tuple(rt.gdgs):
+            if n not in rt.dev or (n in rt.gdgs and "GDG" not in want): continue
+            w_n = want["GDG"] if n in rt.gdgs else want[n]
+            if w_n != rt.dev[n].on:
+                ok, dt = self._send(n, "start" if w_n else "stop", who); done.append({"dev": n, "on": w_n, "ok": ok, "dt": round(dt, 2)})
         self._fc_setpoint(want, who)
         self.last_decision = {"t": wall_iso(), "want": {k: bool(v) for k, v in want.items() if not k.startswith("_")}, "reserve": bool(want.get("_reserve")),
                               "policy": note or "규칙 운전", "action": list(want["_policy"]), "done": done, "ms": round((time.monotonic() - t0) * 1000)}
@@ -590,7 +594,7 @@ class Engine:
         rt = self.rt; g = rt.gar; hr = datetime.now().hour + datetime.now().minute / 60
         return {"mode": rt.mode, "tied": rt.tied(), "outage": rt.mode == "grid" and not rt.tied(), "posture": rt.posture, "autonomy": rt.auto_h, "target_h": rt.auto_target_h,
                 "target_left_h": round(max(0.0, rt.auto_target_h - (rt.now() - rt.t_posture) / 3600.0), 1) if rt.posture == "자립" else None,
-                "shed": sorted(rt.shedder.mine), "shed_why": dict(rt.shedder.why), "garrison": rt.gar_last, "can_grid": any(p["tag"] == "GRID.kw" for p in rt.pts),
+                "shed": sorted(rt.shedder.mine), "shed_why": dict(rt.shedder.why), "garrison": rt.gar_last, "gdg": rt.gdg_last, "gdgs": list(rt.gdgs), "gdg_kw": g.gdg_kw, "can_grid": any(p["tag"] == "GRID.kw" for p in rt.pts),
                 "gcfg": {"peak_kw": g.peak_kw, "import_min_kw": g.import_min_kw, "reserve_soc": g.reserve_soc, "band": g.band(hr), "priced": bool(g.price_peak or g.price_mid or g.price_off)}}
 
     def set_auto(self, on, who):
@@ -665,9 +669,9 @@ class Engine:
         soc = g("ESS.soc", 0.0); h2 = g("H2.nm3", 0.0); fuel = g("DG.fuel_l", 0.0)
         ess_h = ((soc / 100 - s.soc_min) * s.ess_kwh / ess) if ess > 1 else None
         return {"load": load, "pv": pv, "dg": dg, "fc": fc, "ess": ess, "soc": soc, "h2": h2, "fuel": fuel, "l1": g("LOAD.p1_kw"), "l2": g("LOAD.p2_kw"), "l3": g("LOAD.p3_kw"),
-                "gen": pv + dg + fc + max(ess, 0.0), "renew": (min(pv, load) / load * 100) if load > 1 else 0.0, "reserve_margin": margin, "reserve_need": margin < 0,
+                "gen": pv + dg + fc + max(ess, 0.0) + max(g("GRID.kw"), 0.0) + max(g("GDG.kw"), 0.0), "renew": (min(pv, load) / load * 100) if load > 1 else 0.0, "reserve_margin": margin, "reserve_need": margin < 0,
                 "online_kw": online, "ess_h": ess_h, "h2_h": h2 / (s.fc_kw * s.fc_nm3_per_kwh) if s.fc_kw else None, "fuel_h": fuel / (s.dg_kw * s.dg_l_per_kwh) if s.dg_kw else None,
-                "grid": g("GRID.kw"), "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "elz": elz, "g1_kw": float(self.cfg.get("g1_kw", 100.0))}
+                "grid": g("GRID.kw"), "gdg": sum(g(f"{n}.kw") for n in rt.gdgs), "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "elz": elz, "g1_kw": float(self.cfg.get("g1_kw", 100.0))}
 
     def _snap_values(self, now):
         rt = self.rt

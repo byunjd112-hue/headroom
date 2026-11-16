@@ -39,7 +39,14 @@
   "price_peak": 0,
   "price_mid": 0,
   "price_off": 0,
-  "restore_s": 30
+  "restore_s": 30,
+  "gdg_kw": 1000,
+  "gdg_min_load": 0.3,
+  "gdg_delay_s": 30,
+  "gdg_stop_soc": 0.85,
+  "gdg_restart_soc": 0.35,
+  "gdg_tank_l": 5000,
+  "gdg_l_per_kwh": 0.26
  },
  "pointmap": "pointmap.csv",
  "state_dir": "state",
@@ -127,6 +134,21 @@
    ],
    "unit": 6,
    "order": "ABCD"
+  },
+  "GDG": {
+   "paths": [
+    [
+     "192.168.10.17",
+     502
+    ],
+    [
+     "192.168.10.117",
+     502
+    ]
+   ],
+   "unit": 7,
+   "order": "ABCD",
+   "done_s": 30
   }
  },
  "auto": true,

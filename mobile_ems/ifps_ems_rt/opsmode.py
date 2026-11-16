@@ -26,6 +26,14 @@ class Garrison:
     price_mid: float = 0.0
     price_off: float = 0.0
     restore_s: float = 30.0           # 복전 뒤 이 시간 동안 안정하면 주둔지 운전으로 복귀
+    # 주둔지 기존 디젤발전기(비상발전기, MW급). 정전 중 ESS·태양광과 함께 무정전 자립 운전에 쓴다
+    gdg_kw: float = 1000.0            # 정격(대당)
+    gdg_min_load: float = 0.30        # 최소 부하율. 이보다 낮으면 ESS 충전으로 부하를 올린다(저부하 운전 방지)
+    gdg_delay_s: float = 30.0         # 정전이 이 시간 넘게 이어지면 기동(짧은 정전은 ESS 로만 버틴다)
+    gdg_stop_soc: float = 0.85        # ESS 가 이만큼 차면 정지하고 ESS·태양광으로 운전
+    gdg_restart_soc: float = 0.35     # 이 아래로 내려가면 다시 기동
+    gdg_tank_l: float = 5000.0        # 연료 탱크 용량(L, 대당) — 자립 지속시간 계산용
+    gdg_l_per_kwh: float = 0.26       # 연료 소비율(L/kWh)
 
     @classmethod
     def from_cfg(cls, c):
@@ -70,20 +78,41 @@ def garrison_step(site, g, hr, load_kw, pv_kw, elz_kw, soc, h2_nm3):
     return {"grid": round(g.import_min_kw if pv_lim else grid, 1), "ess": round(ess, 1), "pv_lim": round(pv_lim, 1), "elz": elz, "band": band, "why": " · ".join(why) or "수전으로 부하 공급"}
 
 
-def autonomy(site, soc, h2_nm3, fuel_l, loads, pv_kwh_day=0.0, quiet=False):
+def gdg_step(site, g, outage_s, soc, running, net_kw):
+    """주둔지 정전 중 기존 디젤발전기 운용 판단. net_kw = 부하 + 수전해 − 태양광 − (이동형 디젤·연료전지 출력).
+
+    기동: 정전이 gdg_delay_s 넘게 이어지고 ESS 에 여유가 없거나, 충전율이 gdg_restart_soc 아래일 때.
+    정지: ESS 가 gdg_stop_soc 까지 차고 ESS 만으로 부하를 감당할 수 있을 때(그 뒤 충전율이 내려가면 다시 기동).
+    운전 중: 발전기 부하가 최소 부하율 아래면 ESS 충전으로 올리고, 정격을 넘으면 ESS 방전으로 메운다.
+    반환: {run: 기동 여부, ess: ESS 지령 kW(+방전/−충전), gdg: 예상 발전기 부하 kW, why}"""
+    can_chg = max(0.0, min(site.ess_kw, (site.soc_max - soc) * site.ess_kwh / site.ess_eff * 4))
+    can_dis = max(0.0, min(site.ess_kw, (soc - site.soc_min) * site.ess_kwh * site.ess_eff * 4))
+    if running:
+        run = not (soc >= g.gdg_stop_soc and net_kw <= can_dis); why = "ESS 충전 완료 → 발전기 정지, ESS·태양광으로 운전" if not run else "발전기 운전"
+    else:
+        low = soc < g.gdg_restart_soc; run = low or (outage_s >= g.gdg_delay_s and soc < g.gdg_stop_soc - 0.10) or net_kw > can_dis
+        why = ("충전율 낮음 → 발전기 기동" if low else "정전 지속 → 발전기 기동" if run else "ESS·태양광으로 운전(발전기 대기)")
+    if not run: return {"run": False, "ess": 0.0, "gdg": 0.0, "why": why}
+    target = min(g.gdg_kw, max(net_kw, g.gdg_min_load * g.gdg_kw))          # 발전기에 지울 부하
+    ess = max(-can_chg, min(can_dis, net_kw - target))
+    if ess < -1.0: why += f" · ESS 충전으로 부하율 {g.gdg_min_load * 100:.0f}% 유지"
+    return {"run": True, "ess": round(ess, 1), "gdg": round(max(0.0, net_kw - ess), 1), "why": why}
+
+
+def autonomy(site, soc, h2_nm3, fuel_l, loads, pv_kwh_day=0.0, quiet=False, extra_kwh=0.0):
     """외부 보급 없이 버틸 수 있는 시간(시간). 전 부하 / 3등급 차단 / 1등급만. quiet(저소음)면 디젤 연료를 세지 않는다.
     저장 에너지(ESS·수소·연료)에 하루 평균 태양광을 더해 계산한다. 반환: {full, shed3, p1, store_kwh}"""
     p1_kw, p2_kw, p3_kw = loads                                     # 1·2·3등급 부하(kW)
     e_ess = max(0.0, soc - site.soc_min) * site.ess_kwh * site.ess_eff
     e_h2 = max(0.0, h2_nm3 - site.h2_nm3 * site.h2_min) / site.fc_nm3_per_kwh
     e_dg = 0.0 if quiet else max(0.0, fuel_l) / site.dg_l_per_kwh
-    store = e_ess + e_h2 + e_dg; pv_avg = max(0.0, pv_kwh_day) / 24.0
+    store = e_ess + e_h2 + e_dg + max(0.0, extra_kwh); pv_avg = max(0.0, pv_kwh_day) / 24.0
     def hours(load):
         if load <= 0.5: return 999.0
         need = load - pv_avg
         return 999.0 if need <= 0.5 else min(999.0, store / need)
     return {"full": round(hours(p1_kw + p2_kw + p3_kw), 1), "shed3": round(hours(p1_kw + p2_kw), 1), "p1": round(hours(p1_kw), 1), "store_kwh": round(store, 0),
-            "ess_kwh": round(e_ess, 0), "h2_kwh": round(e_h2, 0), "dg_kwh": round(e_dg, 0)}
+            "ess_kwh": round(e_ess, 0), "h2_kwh": round(e_h2, 0), "dg_kwh": round(e_dg, 0), "gdg_kwh": round(max(0.0, extra_kwh), 0)}
 
 
 class LoadShedder:

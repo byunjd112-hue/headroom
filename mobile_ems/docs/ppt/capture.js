@@ -31,6 +31,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await post("/api/ops", { mode: "grid" }); await p.waitForTimeout(6000);
   await go("control", "r18_ctl_garrison"); await go("sld", "r18_sld_garrison", 2000); await go("overview", "r18_ov_garrison", 2000);
   await sim({ action: "scenario", name: "grid_outage" }); await p.waitForTimeout(5000); await go("sld", "r18_sld_outage", 1500);
+  await p.waitForTimeout(50000); await go("control", "r20_ctl_gdg", 2000); await go("sld", "r20_sld_gdg", 2000);                 // 정전 30초 지속 → 주둔지 기존 디젤발전기 기동
   await sim({ action: "scenario", name: "grid_restore" }); await post("/api/ops", { mode: "island" }); await p.waitForTimeout(3000); await post("/api/ack", { ids: "all" });
   // 4) 작전지 저소음 태세 → 3등급 자동 차단
   await post("/api/ops", { posture: "저소음" }); await p.waitForTimeout(7000); await go("control", "r18_ctl_quiet"); await go("overview", "r18_ov_quiet", 1500);

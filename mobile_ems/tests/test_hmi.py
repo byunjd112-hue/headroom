@@ -47,7 +47,7 @@ class TestHmi(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/", timeout=5) as f:
             html = f.read().decode(); self.assertIn("IFPS", html); self.assertIn("default-src 'self'", f.headers["Content-Security-Policy"])
         s = self.req("/api/snapshot")[1]
-        self.assertEqual(set(s["devices"]), {"DG", "FC", "ESS", "MTR", "ELZ", "PV"}); self.assertTrue(all(d["link"] == "정상" for d in s["devices"].values()))
+        self.assertEqual(set(s["devices"]), {"DG", "FC", "ESS", "MTR", "ELZ", "PV", "GDG"}); self.assertTrue(all(d["link"] == "정상" for d in s["devices"].values()))
         self.assertGreater(s["kpi"]["load"], 30); self.assertEqual(s["me"]["role"], "viewer")
         self.assertGreater(len(self.req("/api/trend")[1]["rows"]), 0); self.assertGreater(len(self.req("/api/trace")[1]["rows"]), 0)
         self.assertEqual(self.req("/static/../../runtime.py")[0], 404)                                # 경로 이탈 차단
