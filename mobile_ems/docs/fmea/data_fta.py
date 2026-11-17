@@ -155,6 +155,7 @@ S09 = [  # No, FM, 현 예방대책, 구현 위치, 검증 시험, 판정
  [13, "FM-29·34", "역송 방지·피크 억제", "opsmode.py(garrison_step)", "test_garrison_never_exports_and_shaves_peak, test_garrison_peak_discharge_no_export_outage_and_restore", "시험 확인(가상 장치)"],
  [14, "FM-30·31·32·35", "정전 전환·주둔지 발전기·최소 운전 시간", "opsmode.py(gdg_step), runtime.py(_gdg_control)", "test_garrison_generator_start_stop_and_min_load, test_garrison_generator_unavailable_falls_back_to_mobile_sources, test_garrison_uses_mobile_pv_tied_and_in_outage", "시험 확인(가상 장치)"],
  [15, "FM-36·37·38", "규칙 운전 대체·이력 정리", "ifps_ems(forecast·plan)", "test_plan_policy_decides_from_history_and_falls_back, test_R18_history_with_gap_and_torn_row_is_regridded, test_accuracy_on_sample_site", "시험 확인(합성 자료)"],
+ [21, "FM-36·38", "지속 학습: 검증 후 적용·자료 점검·최근 오차 보정·되돌리기", "ifps_ems/learner.py, hmi/engine.py(ai_train)", "test_first_training_adopts_and_records, test_worse_challenger_is_rejected_and_rollback_restores, test_each_kind_is_judged_separately, test_bad_or_short_data_is_not_learned, test_recent_error_correction", "시험 확인(합성 자료)"],
  [16, "FM-43·44", "감사 기록 연쇄·격리·회전", "ifps_ems_rt/audit", "test_R02_rotation_keeps_chain_and_detects_tamper, test_R07_torn_tail_is_quarantined_and_chain_continues, test_R02_audit_write_failure_does_not_raise", "시험 확인"],
  [17, "FM-24·45", "운용 상태 보존·검증", "runtime.py(set_ops)", "test_ops_persist_and_validation", "시험 확인(상호 검증은 미구현)"],
  [18, "FM-10·28", "없음(현 리비전 미구현)", "—", "—", "미구현 — 보완설계 대상"],

@@ -612,3 +612,6 @@ td.nw, th.nw { white-space: nowrap; } table.tc td.ell { max-width: 120px; }
 .ce-diff { margin: 8px 0 0; padding: 8px 10px; background: #0b1118; border: 1px solid var(--line); border-radius: 8px; font: 11px/1.5 var(--mono); max-height: 420px; overflow: auto; white-space: pre; }
 .ce-diff .a { color: #9ff0c9; background: rgba(47,208,138,.12); display: inline-block; min-width: 100%; } .ce-diff .r { color: #ff9aa8; background: rgba(255,77,100,.10); display: inline-block; min-width: 100%; } .ce-diff .h { color: var(--muted); }
 .ce-json { width: 100%; height: 610px; font-size: 11.5px; line-height: 1.45; resize: none; white-space: pre; }
+
+/* 넓은 대화상자(AI 학습 상태 등) */
+.modal:has(> .wide) { width: min(1080px, calc(100vw - 32px)); }

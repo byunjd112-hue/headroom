@@ -161,6 +161,18 @@
   "elz_kw": 150.0,
   "h2_min": 0.3
  },
+ "ai": {
+  "enabled": true,
+  "retrain_h": 24,
+  "sim_retrain_h": 2,
+  "first_min": 3,
+  "holdout_days": 3,
+  "min_gain": 0.0,
+  "keep": 10,
+  "nmae_limit": 15,
+  "bias_slots": 8,
+  "bias_tau": 8
+ },
  "hmi": {
   "bind": "127.0.0.1",
   "port": 8080,

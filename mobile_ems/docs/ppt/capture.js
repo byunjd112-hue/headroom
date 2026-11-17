@@ -19,7 +19,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await go("trends", null, 1500); await p.click('#trWin [data-w="300"]'); await p.waitForTimeout(2500); await p.screenshot({ path: D + "trends.png" });
   await go("control", null, 1200); await p.click('button[data-c="start"][data-d="DG"]'); await p.waitForTimeout(900); await p.screenshot({ path: D + "sbo.png" }); await p.keyboard.press("Escape"); await p.waitForTimeout(400);
   await go("eng"); await p.click('#engTabs [data-t="explorer"]'); await p.waitForTimeout(500); await p.selectOption("#exTgt", "MTR|A"); await p.selectOption("#exFc", "4"); await p.fill("#exAddr", "0"); await p.fill("#exCnt", "8"); await p.click("#exRead"); await p.waitForTimeout(900); await p.screenshot({ path: D + "eng_explorer.png" });
-  await p.click('#engTabs [data-t="trace"]'); await p.waitForTimeout(2500); const row = await p.$("#trRows tr[data-i]"); if (row) await row.click(); await p.waitForTimeout(400); await p.screenshot({ path: D + "eng_trace.png" });
+  await p.click('#engTabs [data-t="trace"]'); await p.waitForTimeout(2500); const row = await p.$("#trRows tr[data-i]"); if (row) await row.click().catch(() => {});     /* 추적 표가 그 사이 다시 그려지면 건너뛴다 */ await p.waitForTimeout(400); await p.screenshot({ path: D + "eng_trace.png" });
   await p.click('#engTabs [data-t="points"]'); await p.waitForTimeout(1500); await p.screenshot({ path: D + "eng_points.png" });
   await p.click('#engTabs [data-t="sim"]'); await p.waitForTimeout(1200); await p.screenshot({ path: D + "eng_sim.png" });
   // 설정 편집: 화면에서만 고쳐 보이고(배율 고침·점 추가·검사) 저장하지 않는다
@@ -29,6 +29,9 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await p.click('.ce-bar [data-a="check"]'); await p.waitForTimeout(1500); await p.screenshot({ path: D + "eng_config.png" });
   await go("overview", null, 1500); await p.click('[data-act="layedit"]'); await p.waitForTimeout(800); const it = await p.$(".meq"); if (it) { const bb = await it.boundingBox(); await p.mouse.click(bb.x + bb.width / 2, bb.y + bb.height / 2); } await p.waitForTimeout(500); await p.screenshot({ path: D + "layedit.png" });
   await p.click('[data-act="layedit"]'); await p.waitForTimeout(600);
+  // 지속 학습 상태 창(학습 한 번 돌린 뒤)
+  await post("/api/ai/train", {}); for (let i = 0; i < 80; i++) { await p.waitForTimeout(3000); const a = await p.evaluate(async () => (await fetch("/api/ai")).json()); if (!a.busy && a.history.length) break; }
+  await go("energy", null, 9000); await p.click("#enAi"); await p.waitForTimeout(1500); await p.screenshot({ path: D + "ai_learn.png" }); await p.evaluate(() => closeModal());
   // 2) 고장: 2등급 급전선 과전류 트립 + 연료전지 통신 두절
   await sim({ action: "fault", target: "L2", code: 51 }); await sim({ action: "mute", target: "FC", on: true }); await p.waitForTimeout(6000);
   await go("overview", "fault_overview", 2000); await go("sld", "fault_sld"); await go("alarms", "alarms"); await go("comm", "fault_comm");

@@ -1,6 +1,6 @@
 {
- "date": "2026-11-17 12:43",
- "unittest_s": 98.7,
+ "date": "2026-11-17 13:52",
+ "unittest_s": 131.0,
  "tests": [
   "test_backups_are_pruned_and_broken_backup_refused | ok",
   "test_pointmap_errors_block_save | ok",
@@ -44,6 +44,12 @@
   "test_7_forecast_accuracy_and_energy | ok",
   "test_8_breaker_trip_shown_and_deenergizes_feeder | ok",
   "test_9_layout_edit_persist_and_validate | ok",
+  "test_bad_or_short_data_is_not_learned | ok",
+  "test_cli_and_cut | ok",
+  "부하는 좋아지고 태양광은 나빠지면 부하 모델만 바꾼다(태양광은 현재 모델을 유지). | ok",
+  "test_first_training_adopts_and_records | ok",
+  "test_recent_error_correction | ok",
+  "test_worse_challenger_is_rejected_and_rollback_restores | ok",
   "test_autonomy_hours | ok",
   "test_garrison_generator_start_stop_and_min_load | ok",
   "test_garrison_never_exports_and_shaves_peak | ok",
@@ -101,27 +107,27 @@
   "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
   "test_check_scans_and_module_entry | ok"
  ],
- "n_tests": 98,
+ "n_tests": 104,
  "tests_ok": true,
- "coverage_pct": 93.3,
+ "coverage_pct": 92.7,
  "stmt": {
-  "n": 2938,
-  "hit": 2821,
-  "pct": 96.0
+  "n": 3173,
+  "hit": 3023,
+  "pct": 95.3
  },
  "branch": {
-  "n": 1032,
-  "hit": 884,
-  "pct": 85.7
+  "n": 1110,
+  "hit": 946,
+  "pct": 85.2
  },
  "coverage_files": [
   [
    "ifps_ems_rt/hmi/server.py",
-   87.4,
-   183,
-   84.0,
-   106,
-   "73-75, 94-95, 125-127, 162-166, 176-177, 196-203"
+   84.8,
+   191,
+   78.4,
+   116,
+   "74-76, 95-96, 126-128, 163-168, 170-174, 184-185, 204-211"
   ],
   [
    "ifps_ems_rt/hmi/__main__.py",
@@ -133,11 +139,11 @@
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
-   92.5,
-   697,
-   77.4,
-   270,
-   "26-27, 52-53, 64-69, 90-91, 165, 170-171, 284-285, 289, 298, 380, 407-409, 411-412, 503-504, 524, 534-536, 585-593, 626-627, 789-794, 806-807, 823-824"
+   90.1,
+   769,
+   78.3,
+   286,
+   "26-27, 52-53, 64-69, 90-91, 165, 170-171, 287-288, 292, 301, 339, 348-356, 358-360, 362-366, 370-371, 374-377, 380-382, 454, 501-502, 594-595, 615, 625-627, 676-684, 717-718, 880-885, 897-898, 914-915"
   ],
   [
    "ifps_ems_rt/diag.py",
@@ -164,12 +170,20 @@
    "51-52"
   ],
   [
+   "ifps_ems/learner.py",
+   97.9,
+   141,
+   91.7,
+   48,
+   "128, 133, 215"
+  ],
+  [
    "ifps_ems_rt/hmi/cfgedit.py",
    98.0,
-   200,
-   95.0,
-   80,
-   "102, 237-239"
+   205,
+   95.1,
+   82,
+   "104, 243-245"
   ],
   [
    "ifps_ems_rt/modbus.py",
@@ -198,10 +212,10 @@
   [
    "ifps_ems_rt/runtime.py",
    98.9,
-   275,
+   276,
    93.0,
    86,
-   "343-345"
+   "344-346"
   ],
   [
    "ifps_ems_rt/mbtool.py",
@@ -214,9 +228,9 @@
   [
    "ifps_ems/forecast.py",
    99.1,
-   112,
-   83.3,
-   42,
+   116,
+   77.3,
+   44,
    "23"
   ],
   [
@@ -318,7 +332,7 @@
   [
    "ifps_ems_rt/planlink.py",
    100.0,
-   42,
+   46,
    80.0,
    10,
    ""
@@ -334,15 +348,19 @@
  ],
  "pylint": {
   "E": 0,
-  "W": 12,
+  "W": 15,
   "by_id": [
    [
     "W0718 broad-exception-caught",
-    9
+    11
    ],
    [
     "W0613 unused-argument",
     3
+   ],
+   [
+    "W1510 subprocess-run-check",
+    1
    ]
   ],
   "items": [
@@ -373,8 +391,16 @@
    [
     "W0718",
     "broad-exception-caught",
+    "ifps_ems/learner.py",
+    184,
+    "train",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
     "ifps_ems_rt/planlink.py",
-    56,
+    62,
     "PlanPolicy.__call__",
     "Catching too general exception Exception"
    ],
@@ -382,7 +408,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/runtime.py",
-    82,
+    83,
     "Runtime._read_parallel",
     "Catching too general exception Exception"
    ],
@@ -398,7 +424,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    284,
+    287,
     "Engine._scan_loop",
     "Catching too general exception Exception"
    ],
@@ -406,7 +432,23 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    370,
+    359,
+    "Engine.ai_train",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W1510",
+    "subprocess-run-check",
+    "ifps_ems_rt/hmi/engine.py",
+    356,
+    "Engine.ai_train",
+    "'subprocess.run' used without explicitly defining the value for 'check'."
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/hmi/engine.py",
+    431,
     "Engine._compute_forecast",
     "Catching too general exception Exception"
    ],
@@ -414,7 +456,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    411,
+    501,
     "Engine._sup_loop",
     "Catching too general exception Exception"
    ],
@@ -422,7 +464,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    503,
+    594,
     "Engine._exec_loop",
     "Catching too general exception Exception"
    ],
@@ -430,7 +472,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/server.py",
-    94,
+    95,
     "make_handler.H.do_GET",
     "Catching too general exception Exception"
    ],
@@ -438,14 +480,14 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/server.py",
-    176,
+    184,
     "make_handler.H.do_POST",
     "Catching too general exception Exception"
    ]
   ]
  },
  "metrics": {
-  "n_func": 340,
+  "n_func": 369,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -454,10 +496,10 @@
    "file": 1000
   },
   "cc_max": 20,
-  "len_max": 163,
+  "len_max": 171,
   "arg_max": 8,
   "depth_max": 5,
-  "file_max": 875,
+  "file_max": 966,
   "over": {
    "cc": [],
    "len": [],
@@ -545,18 +587,36 @@
     "make_handler",
     17,
     1,
-    163,
+    171,
     1,
     0
    ],
    [
     "ifps_ems_rt/hmi/server.py",
     "do_POST",
-    106,
+    107,
     1,
-    72,
+    79,
     0,
     3
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "_compute_forecast",
+    391,
+    18,
+    44,
+    0,
+    4
+   ],
+   [
+    "ifps_ems_rt/hmi/engine.py",
+    "__init__",
+    201,
+    12,
+    42,
+    4,
+    2
    ],
    [
     "ifps_ems_rt/hmi/__main__.py",
@@ -568,29 +628,11 @@
     2
    ],
    [
-    "ifps_ems_rt/hmi/engine.py",
-    "_compute_forecast",
-    333,
-    16,
-    41,
-    0,
-    4
-   ],
-   [
-    "ifps_ems_rt/hmi/engine.py",
-    "__init__",
-    201,
-    11,
-    40,
-    4,
-    2
-   ],
-   [
     "ifps_ems_rt/hmi/server.py",
     "do_GET",
     58,
     1,
-    38,
+    39,
     0,
     3
    ],
@@ -608,7 +650,7 @@
     "__init__",
     26,
     18,
-    33,
+    34,
     4,
     1
    ]
@@ -700,7 +742,7 @@
    [
     "ifps_ems_rt/hmi/engine.py",
     "_sup_loop",
-    398,
+    488,
     5,
     15,
     0,
@@ -736,7 +778,7 @@
    [
     "ifps_ems_rt/runtime.py",
     "_read_parallel",
-    72,
+    73,
     8,
     14,
     0,
@@ -764,7 +806,7 @@
   "files": [
    [
     "ifps_ems_rt/hmi/engine.py",
-    875
+    966
    ],
    [
     "ifps_ems_rt/diag.py",
@@ -772,15 +814,19 @@
    ],
    [
     "ifps_ems_rt/runtime.py",
-    346
+    347
    ],
    [
     "ifps_ems_rt/hmi/cfgedit.py",
-    267
+    273
    ],
    [
     "ifps_ems_rt/hmi/server.py",
-    214
+    222
+   ],
+   [
+    "ifps_ems/learner.py",
+    216
    ],
    [
     "ifps_ems_rt/modbus.py",
@@ -796,7 +842,7 @@
    ],
    [
     "ifps_ems/forecast.py",
-    157
+    163
    ],
    [
     "ifps_ems/supervisor.py",
@@ -828,7 +874,7 @@
    ],
    [
     "ifps_ems_rt/planlink.py",
-    59
+    65
    ],
    [
     "ifps_ems/config.py",
@@ -883,9 +929,9 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 3646,
+   "loc": 3924,
    "nosec": 0,
-   "skipped_tests": 7
+   "skipped_tests": 9
   },
   "results": []
  },
@@ -897,6 +943,22 @@
    34,
    "Possible binding to all interfaces.",
    "CWE-605"
+  ],
+  [
+   "B404",
+   "LOW",
+   "ifps_ems_rt/hmi/engine.py",
+   348,
+   "Consider possible security implications associated with the subprocess module.",
+   "CWE-78"
+  ],
+  [
+   "B603",
+   "LOW",
+   "ifps_ems_rt/hmi/engine.py",
+   356,
+   "subprocess call - check for execution of untrusted input.",
+   "CWE-78"
   ],
   [
    "B404",
@@ -947,12 +1009,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.59,
- "cc_n": 355,
+ "cc_avg": 5.57,
+ "cc_n": 384,
  "cc_rank": {
-  "A": 222,
-  "B": 77,
-  "C": 56,
+  "A": 244,
+  "B": 79,
+  "C": 61,
   "D": 0,
   "E": 0,
   "F": 0
@@ -1037,8 +1099,8 @@
   ],
   [
    "ifps_ems_rt/hmi/cfgedit.py",
-   9.5,
-   "B"
+   8.3,
+   "C"
   ],
   [
    "ifps_ems_rt/simplant.py",
@@ -1046,18 +1108,23 @@
    "A"
   ],
   [
+   "ifps_ems/learner.py",
+   34.4,
+   "A"
+  ],
+  [
    "ifps_ems/forecast.py",
-   35.4,
+   34.5,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/server.py",
+   37.9,
    "A"
   ],
   [
    "ifps_ems_rt/modbus.py",
    38.0,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/hmi/server.py",
-   38.8,
    "A"
   ],
   [
@@ -1096,6 +1163,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/planlink.py",
+   60.5,
+   "A"
+  ],
+  [
    "ifps_ems/__main__.py",
    60.8,
    "A"
@@ -1113,11 +1185,6 @@
   [
    "ifps_ems/solar.py",
    62.0,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/planlink.py",
-   62.1,
    "A"
   ],
   [
@@ -1157,9 +1224,9 @@
   ]
  ],
  "loc_py": {
-  "files": 27,
-  "sloc": 3063,
-  "comments": 393
+  "files": 28,
+  "sloc": 3306,
+  "comments": 428
  },
  "js": [
   [
@@ -1179,7 +1246,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/energy.js",
-   123,
+   144,
    true
   ],
   [

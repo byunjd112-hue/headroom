@@ -224,6 +224,8 @@ class Engine:
             # 실측 이력이 8일 미만이면: 가상 장치 시연은 합성 자료로 계획하고, 실장치는 이력이 쌓일 때까지 규칙 운전한다
             self.rt.policy = PlanPolicy(self.rt.site, os.path.join(self.rt.state_dir, "history.csv"), plan_dir, days_since_deploy,
                                         demo_csv=os.path.join(plan_dir, "sample_site_data.csv") if sim else None); self.plan_note = "예측 기반 운전계획(동적계획법)"
+        self.ai_cfg = dict({"enabled": True, "retrain_h": 24.0, "sim_retrain_h": 2.0, "first_min": 3.0}, **(self.cfg.get("ai") or {}))
+        self.ai_busy = False; self.ai_last = None; self.ai_next = time.time() + 60.0 * float(self.ai_cfg["first_min"])
         self._tag_dev = {p["tag"]: p["device"] for p in self.rt.pts}
         self.cfged = ConfigEditor(self.cfg_path, note=self.rt.note)                      # 설정 편집기(원본 설정 파일 대상, 재기동 후 적용)
         self.lock = threading.RLock(); self.alarms = AlarmManager(); self.jobs = queue.Queue(); self.busy = None
@@ -261,6 +263,7 @@ class Engine:
         threading.Thread(target=self._exec_loop, name="exec", daemon=True).start()
         threading.Thread(target=self._sup_loop, name="sup", daemon=True).start()
         self.forecast()                                                          # 예측·정밀도 사전 계산(백그라운드)
+        threading.Thread(target=self._ai_loop, name="ai", daemon=True).start()   # 지속 학습(별도 프로세스로 학습, 검증 통과 시 적용)
         if self.simdrv:
             self.simdrv.step(); threading.Thread(target=self.simdrv.loop, name="sim", daemon=True).start()
 
@@ -325,10 +328,65 @@ class Engine:
     def forecast(self, force=False):
         with self.fc_lock:
             c = self.fc_cache
-            if c is None or force or time.time() - c["_t"] > (600 if c.get("ok") else 20):       # 실패는 20초 뒤 다시 시도
+            stale = c is not None and c.get("ok") and c.get("_slot") != self._slot_now()          # 15분 구간이 넘어가면 새 실측을 넣어 다시 예측한다
+            if c is None or force or stale or time.time() - c["_t"] > (600 if c.get("ok") else 20):       # 실패는 20초 뒤 다시 시도
                 if not self._fc_busy:
                     self._fc_busy = True; threading.Thread(target=self._compute_forecast, daemon=True).start()
             return c or {"ok": False, "why": "예측 계산 중…"}
+
+    # ── 지속 학습
+    def _models_dir(self):
+        return self.plan_dir or os.path.join(os.path.dirname(self.cfg_path), "..", "results")
+
+    def _ai_loop(self):
+        while self.running:
+            time.sleep(5.0)
+            if self.ai_cfg.get("enabled") and not self.ai_busy and time.time() >= self.ai_next: self.ai_train("주기")
+
+    def ai_train(self, who="주기"):
+        """학습 한 주기를 별도 프로세스로 돌린다(제어 주기를 방해하지 않고, 학습이 죽어도 EMS 는 계속 돈다). 반환: 기록."""
+        import subprocess, sys  # nosec B404 — 같은 파이썬으로 학습 모듈을 실행(고정 인자)
+        from ifps_ems import learner
+        if self.ai_busy: return {"ok": False, "why": "학습이 이미 진행 중"}
+        self.ai_busy = True; rec = {"adopted": False, "why": ""}; md = self._models_dir()
+        try:
+            site = self.rt.site; hist, md, src = self._forecast_source(site)
+            opt = os.path.join(self.rt.state_dir, "ai_train.json")
+            with open(opt, "w", encoding="utf-8") as f: json.dump({"site": site.to_dict(), "ai": {k: v for k, v in self.ai_cfg.items() if k in learner.DEFAULTS}, "source": src}, f, ensure_ascii=False)
+            r = subprocess.run([sys.executable, "-m", "ifps_ems.learner", hist, md, opt], capture_output=True, text=True, timeout=900,   # nosec B603 — 고정 인자, shell 미사용
+                               cwd=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+            rec = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else {"adopted": False, "why": f"학습 프로세스 오류: {(r.stderr or '')[-200:]}"}
+        except Exception as e:                            # 학습 실패는 기록만 한다(현재 모델 유지)
+            rec = {"adopted": False, "why": str(e) if isinstance(e, ValueError) else f"학습 실패: {type(e).__name__}: {e}"}
+        finally:
+            self.ai_busy = False; self.ai_next = time.time() + 3600.0 * float(self.ai_cfg["sim_retrain_h" if self.sim else "retrain_h"])
+        self.ai_last = rec; self.rt.ai_degraded = bool(rec.get("degraded"))
+        self.rt.note("예측", f"지속 학습({who}): {rec.get('why', '')}" + (f" — 판 {rec['ver']}" if rec.get("ver") else ""), actor=who if who != "주기" else "ems")
+        if rec.get("adopted") or rec.get("recal"): self._ai_adopted()
+        return dict(rec, ok=True)
+
+    def _ai_adopted(self):
+        """새 모델(또는 되돌린 모델)을 운전 계획과 예측 화면에 반영한다."""
+        if self.rt.policy is not None and hasattr(self.rt.policy, "reload"): self.rt.policy.reload()
+        self.forecast(force=True)
+
+    def ai_rollback(self, who):
+        from ifps_ems import learner
+        rec = learner.rollback(self._models_dir()); self.rt.note("예측", f"예측 모델 되돌리기: {rec['why']}", actor=who)
+        if rec.get("adopted"): self._ai_adopted()
+        return dict(rec, ok=bool(rec.get("adopted")))
+
+    def ai_status(self):
+        from ifps_ems import learner
+        md = self._models_dir(); act = learner.active(md)
+        return {"ok": True, "enabled": bool(self.ai_cfg.get("enabled")), "busy": self.ai_busy, "active": act, "history": learner.history(md)[-12:][::-1], "degraded": self.rt.ai_degraded,
+                "next_s": max(0, round(self.ai_next - time.time())), "retrain_h": float(self.ai_cfg["sim_retrain_h" if self.sim else "retrain_h"]), "limit": float(self.ai_cfg.get("nmae_limit", learner.DEFAULTS["nmae_limit"])),
+                "min_rows": learner.MIN_FIT + int(self.ai_cfg.get("holdout_days", learner.DEFAULTS["holdout_days"])) * 96}
+
+    @staticmethod
+    def _slot_now():
+        """마지막으로 끝난 15분 구간의 시작 시각."""
+        n = datetime.now(); return n.replace(minute=n.minute // 15 * 15, second=0, microsecond=0) - timedelta(minutes=15)
 
     def _compute_forecast(self):
         try:
@@ -338,7 +396,9 @@ class Engine:
             site = self.rt.site; hist, md, src = self._forecast_source(site)
             d = dataio.load_csv(hist, site); n = d["n"]
             fl, fp = LoadForecaster(site), PVForecaster(site); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp)
-            o = n - 1; l50, llo, lhi, _ = fl.predict(d, o); p50, plo, phi, _ = fp.predict(d, o)
+            from ifps_ems import learner
+            meta = learner.active(md); o = n - 1                                # 적용 중인 모델 정보(최근 오차 보정을 켤지 포함)
+            l50, llo, lhi, bl = learner.predict(fl, d, o, "load", site, meta); p50, plo, phi, bp = learner.predict(fp, d, o, "pv", site, meta)
             # 백테스트: 마지막 7일, 6시간 간격 발행
             el = {b: [] for b in range(len(BUCKET))}; ep = {b: [] for b in range(len(BUCKET))}; cl = []; cp = []; mean_l = float(np.mean(d["load"][-7 * 96:]))
             day_l, day_p, pts = [], [], []
@@ -364,7 +424,8 @@ class Engine:
                            "load_cov": round(float(np.mean(cl)) * 100, 1), "pv_cov": round(float(np.mean(cp)) * 100, 1) if cp else None,
                            "load_day": round(float(np.mean(day_l)) * 100, 2), "pv_day": round(float(np.mean(day_p)) * 100, 2),
                            "buckets": list(BUCKET), "load_by_h": mk(el), "pv_by_h": mk(ep), "n_issue": len(day_l), "scatter": pts[:400], "limit": 15.0},
-                   "daily": daily, "_t": time.time(), "calc_s": None}
+                   "daily": daily, "_t": time.time(), "_slot": self._slot_now(), "calc_s": None,
+                   "ai": {"ver": meta.get("ver"), "t": meta.get("t"), "bias_load": None if bl is None else round(bl, 2), "bias_pv": None if bp is None else round(bp, 3)}}
             self.rt.pv_day_kwh = float(np.sum(p50)) * 0.25                     # 자립 지속시간 계산에 쓰는 하루 태양광 예상량
             with self.fc_lock: self.fc_cache = out
         except Exception as e:
@@ -383,7 +444,36 @@ class Engine:
         if not os.path.exists(hist):
             if not self.sim: raise ValueError(f"실측 이력이 {rows}줄(8일 = 768줄 필요)입니다. 이력이 쌓이면 자동으로 예측을 시작합니다")
             self._make_demo_data(md, site)                    # 시연 모드: 합성 자료와 모델이 없으면 만들어 쓴다
+        if self.sim:
+            live = self._live_demo(md, site, rows); src = f"합성 현장 자료 + 가상 장치 실측 {max(rows, 0)}구간(지금 시각까지 이어 붙임)"
+            from ifps_ems import learner
+            if not learner.active(md):                    # 시연 첫 기동: 기본 모델을 지금 자료에 맞춰 한 번 학습·검증해 둔다(이후는 주기 학습)
+                rec = learner.train(live, md, site, {k: v for k, v in self.ai_cfg.items() if k in learner.DEFAULTS}, source=src)
+                self.ai_last = rec; self.rt.note("예측", f"지속 학습(첫 기동): {rec.get('why', '')}")
+            return live, md, src
         return hist, md, "합성 현장 자료(실측 8일 미만)"
+
+    def _live_demo(self, md, site, rows):
+        """시연 모드: 합성 자료를 '지금'까지 이어지게 만들고 가상 장치의 실측 이력(history.csv)을 덮어쓴다 → 시간이 지나면 예측도 따라 움직인다.
+        합성 자료는 그해 1월 1일부터 내일까지를 하루에 한 번 만든다(같은 씨앗이라 지난 구간의 값은 바뀌지 않는다)."""
+        import csv
+        from ifps_ems import dataio
+        now = datetime.now(); slot = self._slot_now(); ref = now - timedelta(days=45); anchor = datetime(ref.year, 1, 1)
+        base = os.path.join(md, f"demo_base_{anchor:%Y}_{now:%Y%m%d}.csv"); fmt = "%Y-%m-%d %H:%M"
+        if not os.path.exists(base):
+            for f in os.listdir(md):
+                if f.startswith("demo_base_"): os.remove(os.path.join(md, f))
+            dataio.gen_sample(site, base + ".tmp", days=(now.date() - anchor.date()).days + 2, start=anchor.strftime(fmt)); os.replace(base + ".tmp", base)
+        lo = (slot - timedelta(days=60)).strftime(fmt); hi = slot.strftime(fmt); real = {}
+        if rows > 0:
+            with open(os.path.join(self.rt.state_dir, "history.csv"), encoding="utf-8") as f: real = {r[0]: r for r in csv.reader(f) if r and lo < r[0] <= hi}
+        live = os.path.join(md, "demo_live.csv")
+        with open(base, encoding="utf-8") as f, open(live + ".tmp", "w", newline="", encoding="utf-8") as g:
+            rd = csv.reader(f); wr = csv.writer(g); wr.writerow(next(rd))
+            for r in rd:
+                if lo < r[0] <= hi: wr.writerow(real.get(r[0], r))
+        os.replace(live + ".tmp", live)
+        return live
 
     def _make_demo_data(self, md, site):
         """시연용 합성 현장 자료(120일)와 예측 모델을 만든다. 실행 파일(run_sim)을 거치지 않고 기동했거나 results 폴더가 비었을 때."""
@@ -431,6 +521,7 @@ class Engine:
             src = self._tag_dev.get(tag, dev)                                 # 그 점을 읽어 오는 장치(예: PV.kw 는 계측 게이트웨이)
             lost = rt.lm.state.get(src) in ("두절", "재조회 대기")           # 장치 두절이면 '통신 두절' 경보 하나로 충분하다(점마다 올리지 않는다)
             A.set(f"q3.{tag}", f == 3 and not lost, 3, dev, f"{tag} 값 갱신 지연(>{SUP['stale_s']:.0f}초)")
+        A.set("ai.degraded", rt.ai_degraded, 3, "EMS", "예측 정확도 저하 — 계획 운전을 쉬고 규칙 운전 중(자료가 쌓이면 다시 학습)")
         A.set("audit", bool(rt.audit_err), 2, "EMS", f"감사 기록 쓰기 실패 — 저장 공간·권한 확인 ({rt.audit_err})")
 
     def _alarms_process(self, k):

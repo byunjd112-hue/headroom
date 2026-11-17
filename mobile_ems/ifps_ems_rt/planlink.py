@@ -11,6 +11,7 @@ from ifps_ems import dataio, dispatch as dp
 from ifps_ems.config import HORIZON
 from ifps_ems.forecast import LoadForecaster, PVForecaster
 
+from ifps_ems import learner
 MIN_ROWS = 8 * 96                       # 예측 특징에 필요한 최소 이력(8일)
 
 
@@ -18,10 +19,15 @@ class PlanPolicy:
     """demo_csv: 실측 이력이 모자랄 때 대신 쓸 합성 자료(가상 장치 시연 전용). 실장치 운전에서는 주지 않는다 — 이력이 쌓일 때까지 규칙 운전한다."""
 
     def __init__(self, site, hist_csv, model_dir, days_since_deploy=30, demo_csv=None, clock=time.monotonic):
-        self.site, self.hist, self.demo = site, hist_csv, demo_csv; self.fl, self.fp = LoadForecaster(site), PVForecaster(site)
-        dataio.load_model(os.path.join(model_dir, "model_load.npz"), self.fl); dataio.load_model(os.path.join(model_dir, "model_pv.npz"), self.fp)
+        self.site, self.hist, self.demo = site, hist_csv, demo_csv; self.md = model_dir; self.reload()
         self.pl = dp.Planner(site); self.kappa = dp.kappa_for(days_since_deploy); self.clock = clock
         self.V = None; self.k = 0; self.rows = 0; self.fc = None; self.note = ""; self.t_plan = None; self.src = ""; self.sh = None
+
+    def reload(self):
+        """적용 중인 예측 모델을 다시 읽는다(지속 학습이 새 모델을 적용했을 때)."""
+        self.fl, self.fp = LoadForecaster(self.site), PVForecaster(self.site)
+        dataio.load_model(os.path.join(self.md, "model_load.npz"), self.fl); dataio.load_model(os.path.join(self.md, "model_pv.npz"), self.fp)
+        self.meta = learner.active(self.md); self.t_plan = None
 
     def _history(self):
         """쓸 이력을 고른다: 실측이 8일 이상이면 실측, 아니면 시연용 합성 자료(있을 때만)."""
@@ -37,7 +43,7 @@ class PlanPolicy:
         if hr is not None:                                               # 기준 줄을 현재 시각대와 맞춘다(합성 자료·오래된 이력의 시각 어긋남 방지)
             q = int(hr * 4) % 96; same = np.nonzero((np.round(d["hour"] * 4).astype(int) % 96) == q)[0]; same = same[same >= MIN_ROWS - 1]
             if len(same): o = int(same[-1])
-        l50, _, lhi, _ = self.fl.predict(d, o); p50, plo, _, _ = self.fp.predict(d, o)
+        l50, _, lhi, _ = learner.predict(self.fl, d, o, "load", self.site, self.meta); p50, plo, _, _ = learner.predict(self.fp, d, o, "pv", self.site, self.meta)
         lf = l50 + self.kappa * (lhi - l50); pf = np.clip(p50 - self.kappa * (p50 - plo), 0, None)       # 보수적 수급: 부하는 높게, PV는 낮게
         sh = d["load_p"][max(0, o + 1 - HORIZON):o + 1]; sh = sh / np.maximum(sh.sum(1, keepdims=True), 1e-9)
         if len(sh) < HORIZON: sh = np.vstack([np.tile(sh[:1], (HORIZON - len(sh), 1)), sh])

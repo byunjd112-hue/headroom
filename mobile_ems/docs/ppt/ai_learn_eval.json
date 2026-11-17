@@ -1,0 +1,136 @@
+{
+ "cycles": [
+  {
+   "days": 30,
+   "adopted": true,
+   "recal": false,
+   "why": "검증 통과 — 부하·태양광 모델 적용",
+   "kinds": {
+    "load": {
+     "current": null,
+     "new": 3.32,
+     "gain": null,
+     "near": 3.54,
+     "near_bias": 3.71,
+     "bias_on": false,
+     "better": true,
+     "n": 768
+    },
+    "pv": {
+     "current": null,
+     "new": 5.61,
+     "gain": null,
+     "near": 3.83,
+     "near_bias": 5.28,
+     "bias_on": false,
+     "better": true,
+     "n": 351
+    }
+   },
+   "updated": [
+    "load",
+    "pv"
+   ],
+   "sec": 3.2
+  },
+  {
+   "days": 45,
+   "adopted": true,
+   "recal": true,
+   "why": "검증 통과 — 부하 모델 적용(태양광은 현재 모델이 더 정확해 유지, 예측 구간만 재보정)",
+   "kinds": {
+    "load": {
+     "current": 3.51,
+     "new": 3.44,
+     "gain": 0.07,
+     "near": 3.92,
+     "near_bias": 3.49,
+     "bias_on": true,
+     "better": true,
+     "n": 768
+    },
+    "pv": {
+     "current": 4.5,
+     "new": 6.12,
+     "gain": -1.62,
+     "near": 1.76,
+     "near_bias": 1.79,
+     "bias_on": false,
+     "better": false,
+     "n": 328
+    }
+   },
+   "updated": [
+    "load"
+   ],
+   "sec": 3.5
+  },
+  {
+   "days": 60,
+   "adopted": false,
+   "recal": true,
+   "why": "현재 모델 유지 — 새 모델의 검증 오차가 더 크거나 같음(예측 구간만 최근 자료로 재보정)",
+   "kinds": {
+    "load": {
+     "current": 3.33,
+     "new": 3.36,
+     "gain": -0.03,
+     "near": 3.08,
+     "near_bias": 3.25,
+     "bias_on": false,
+     "better": false,
+     "n": 768
+    },
+    "pv": {
+     "current": 3.33,
+     "new": 3.7,
+     "gain": -0.37,
+     "near": 2.65,
+     "near_bias": 2.3,
+     "bias_on": true,
+     "better": false,
+     "n": 312
+    }
+   },
+   "updated": [],
+   "sec": 3.2
+  }
+ ],
+ "defaults": {
+  "holdout_days": 3,
+  "min_gain": 0.0,
+  "keep": 10,
+  "max_days": 120,
+  "max_gap": 0.2,
+  "bias_slots": 8,
+  "bias_tau": 8.0,
+  "nmae_limit": 15.0
+ },
+ "min_rows": 1728,
+ "drift": {
+  "why": "검증 통과 — 부하 모델 적용(태양광은 현재 모델이 더 정확해 유지, 예측 구간만 재보정)",
+  "kinds": {
+   "load": {
+    "current": 17.28,
+    "new": 3.45,
+    "gain": 13.83,
+    "near": 3.38,
+    "near_bias": 3.57,
+    "bias_on": false,
+    "better": true,
+    "n": 768
+   },
+   "pv": {
+    "current": 3.33,
+    "new": 3.7,
+    "gain": -0.37,
+    "near": 2.65,
+    "near_bias": 2.3,
+    "bias_on": true,
+    "better": false,
+    "n": 312
+   }
+  },
+  "adopted": true
+ }
+}

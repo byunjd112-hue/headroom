@@ -69,6 +69,7 @@ def make_handler(eng):
                     return self._send(200, {"rows": eng.rt.audit.tail(int(q.get("n", 200)))[::-1]})
                 if p == "/api/audit/verify": return self._send(200, eng.audit_verify())
                 if p == "/api/info": return self._send(200, eng.runtime_info())
+                if p == "/api/ai": return self._send(200, eng.ai_status())
                 if p == "/api/config":
                     s = self._sess("engineer")
                     if s: self._send(200, eng.cfged.read())
@@ -158,6 +159,13 @@ def make_handler(eng):
                     s = self._sess("operator")
                     if s: self._send(200, eng.reset_layout(s["name"]))
                     return
+                if p in ("/api/ai/train", "/api/ai/rollback"):
+                    s = self._sess("engineer")
+                    if not s: return
+                    if p.endswith("rollback"): return self._send(200, eng.ai_rollback(s["name"]))
+                    if eng.ai_busy: return self._send(200, {"ok": False, "why": "학습이 이미 진행 중"})
+                    threading.Thread(target=eng.ai_train, args=(s["name"],), daemon=True).start()
+                    return self._send(200, {"ok": True, "started": True})
                 if p in ("/api/config/check", "/api/config/save", "/api/config/restore"):
                     s = self._sess("engineer")
                     if not s: return

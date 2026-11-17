@@ -67,6 +67,12 @@ class _Base:
         for b in range(len(BUCKET)):
             self.models[b] = Ridge(3.0).fit(np.array(X[b]), np.array(Y[b])) if len(X[b]) > 30 else None
         self.trained = True
+        return self.calibrate(d)
+
+    def calibrate(self, d):
+        """예측 구간(10~90%)을 최근 자료의 오차로 다시 맞춘다. 모델 가중치는 그대로 둔다(지속 학습이 모델을 유지할 때도 구간은 새로 맞춘다)."""
+        n = d["n"]; cut = n - CAL_ROWS - HORIZON
+        if cut < self.MIN_O: raise ValueError(f"보정 자료 부족: {n}행")
         Xc, Yc, Oc = self._samples(d, range(cut, n - 1, 2))
         for b in range(len(BUCKET)):
             if not Xc[b]: continue

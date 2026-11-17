@@ -47,6 +47,7 @@ class Runtime:
         self.key_note = ""
         if key is None: key, self.key_note = security.load_or_create_key(self.state_dir)
         self.audit = security.AuditLog(os.path.join(self.state_dir, "audit.log"), security.CryptoProvider(key))
+        self.ai_degraded = False                 # 예측 정확도 저하(지속 학습이 판정) → 계획 운전을 쉬고 규칙 운전
         self.policy = None                       # 운전계획 연결 지점: policy(값 사전, 시각) → (디젤, 연료전지, 수전해) 기동 여부. 없으면 규칙 운전
         self.t_ctl = -1e9; self.acc = []; self.slot = None; self.mode = self.cfg.get("mode", "island"); self.plan = int(self.cfg.get("plan", 1))
         # 군 운용: 운용 장소(작전지 island / 주둔지 grid), 운용 태세(평시·저소음·자립), 자동 부하 차단, 주둔지 설정
@@ -257,7 +258,7 @@ class Runtime:
             r = self.gar_last or {}; w = {"DG": False, "FC": False, "_policy": (0, 0, int(bool(r.get("elz")))), "_garrison": True}
             if self.gdgs: w["GDG"] = False                            # 주둔지 발전기는 대기
             return w
-        if self.policy: a = self.policy(dict(self.val), hr)
+        if self.policy and not self.ai_degraded: a = self.policy(dict(self.val), hr)
         else: a = dp.rule_action(self.site, g("ESS.soc", 60.0) / 100, g("H2.nm3", self.site.h2_nm3 * 0.7), int(g("DG.status")), int(g("FC.status")), g("LOAD.kw"), g("PV.kw"), hr)
         if self.posture == "저소음" and a[0]:                         # 저소음 태세: 디젤 금지. 연료전지로 대신하고(수소가 있으면) 3등급 부하는 자동 차단
             h2_ok = g("H2.nm3") > self.site.h2_nm3 * self.site.h2_min * 1.2

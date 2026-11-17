@@ -125,6 +125,22 @@ class TestForecastWithoutSampleFiles(unittest.TestCase):
             try:
                 eng._compute_forecast(); fc = eng.fc_cache; self.assertTrue(fc["ok"], fc.get("why")); self.assertEqual(len(fc["load"]), 96); self.assertIn("합성", fc["source"])
                 self.assertTrue(all(os.path.exists(os.path.join(empty, n)) for n in ("sample_site_data.csv", "model_load.npz", "model_pv.npz")))
+                # R-25: 시연 모드의 예측은 고정된 옛 자료가 아니라 '지금 시각'까지 이어진 자료로 계산하고, 15분 구간이 넘어가면 다시 계산한다
+                from datetime import datetime, timedelta
+                issued = datetime.strptime(fc["issued"], "%Y-%m-%d %H:%M"); self.assertLess(abs((datetime.now() - issued).total_seconds()), 31 * 60); self.assertEqual(fc["hist_ts"][-1], fc["issued"])
+                self.assertEqual(eng.forecast()["issued"], fc["issued"]); self.assertFalse(eng._fc_busy)                         # 같은 구간에서는 다시 계산하지 않는다
+                hist = os.path.join(eng.rt.state_dir, "history.csv"); new = not os.path.exists(hist)                             # 가상 장치 실측이 예측 자료에 들어간다
+                with open(hist, "a", encoding="utf-8") as h:
+                    if new: h.write("ts,load_kw,load_p1,load_p2,load_p3,pv_kw,temp,press,rh,plan,mode\n")
+                    h.write(f"{fc['issued']},333.00,100.00,120.00,113.00,0.00,10.00,1012.00,55.00,1,2\n")
+                eng._compute_forecast(); self.assertAlmostEqual(eng.fc_cache["load_act"][-1], 333.0, places=1); self.assertIn("가상 장치 실측 1구간", eng.fc_cache["source"])
+                real = type(eng)._slot_now; type(eng)._slot_now = staticmethod(lambda: real() + timedelta(minutes=15))
+                try:
+                    eng.forecast(); t0 = time.time()
+                    while eng._fc_busy and time.time() - t0 < 60: time.sleep(0.1)
+                    nxt = datetime.strptime(eng.fc_cache["issued"], "%Y-%m-%d %H:%M"); self.assertEqual(nxt - issued, timedelta(minutes=15))    # 구간이 넘어가면 발행 시각이 따라 움직인다
+                finally:
+                    type(eng)._slot_now = real
                 eng.sim = False; shutil.rmtree(empty); eng._compute_forecast()                       # 실장치: 이력이 모자라면 이유를 알려 준다
                 self.assertFalse(eng.fc_cache["ok"]); self.assertIn("8일", eng.fc_cache["why"]); self.assertNotIn("FileNotFound", eng.fc_cache["why"])
             finally:

@@ -72,7 +72,7 @@ function donut(parts, size = 150) {
 const P_EN = {
   fc: null, hrs: null,
   mount(m) {
-    m.innerHTML = `<div class="pagehd"><h2>${t("nav.energy", "발전·예측")}</h2><span class="sub" id="enSub">금일 전력량 적산 · 24시간 예측 · 예측 정밀도(최근 7일 백테스트)</span><div class="spacer"></div><button class="btn" id="enRe">예측 다시 계산</button></div>
+    m.innerHTML = `<div class="pagehd"><h2>${t("nav.energy", "발전·예측")}</h2><span class="sub" id="enSub">금일 전력량 적산 · 24시간 예측 · 예측 정밀도(최근 7일 백테스트)</span><div class="spacer"></div><button class="btn eng" id="enAi">AI 학습 상태</button><button class="btn" id="enRe">예측 다시 계산</button></div>
     <div class="pg" style="grid-template-rows:104px 1fr 1fr">
     <div class="en-tiles" id="enTiles"></div>
     <div class="pg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
@@ -85,10 +85,31 @@ const P_EN = {
       <div class="panel"><div class="hd"><h3>금일 시간대별 발전량</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--pv)"></i>PV</span><span><i style="background:var(--dg)"></i>DG</span><span><i style="background:var(--fc)"></i>FC</span><span><i style="background:var(--ess)"></i>ESS 방전</span><span><i style="background:var(--load)"></i>부하</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="hrC"></canvas></div></div></div>
       <div class="panel"><div class="hd"><h3>일별 발전·부하 (최근 14일)</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--load)"></i>부하 kWh</span><span><i style="background:var(--pv)"></i>PV kWh</span><span><i style="background:color-mix(in srgb, var(--pv) 60%, transparent)"></i>청천 PV 가능량</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="dayC"></canvas></div></div></div>
     </div></div>`;
+    $("#enAi").onclick = () => this.aiDialog();
     $("#enRe").onclick = async () => { if (!can("operator")) { toast("운용자 권한 필요", "bad"); return loginDialog(); } const r = await api("/api/forecast?force=1"); if (r.ok === false && !r.why) return; toast("예측 재계산 요청", "ok"); setTimeout(() => this.load(), 2500); };
     clearTimeout(this._retry); this._retry = null;
     this.load(); clearInterval(this._t); this._t = setInterval(() => { if (S.page === "energy") this.load(); }, 10000);
     this._ro = new ResizeObserver(() => this.draw()); this._ro.observe($("#fcL"));
+  },
+  async aiDialog() {
+    const a = await api("/api/ai"); if (!a.ok) return toast(a.why || "불러오기 실패", "bad");
+    const act = a.active || {}, n = v => v === null || v === undefined ? "—" : v, kn = k => k === "load" ? "부하" : "태양광";
+    const row = h => `<tr><td class="mono">${esc(h.t || "")}</td><td>${h.adopted ? `<span class="pill ok">적용</span>` : `<span class="pill">유지</span>`}</td><td class="mono">${["load", "pv"].map(k => h.kinds && h.kinds[k] ? `${kn(k)} ${n(h.kinds[k].current)} → ${n(h.kinds[k].new)}%` : "").filter(Boolean).join(" · ") || "—"}</td><td>${esc(h.why || "")}</td></tr>`;
+    modal(`<div class="wide" style="padding:18px 20px"><h3 style="margin:0">AI 학습 상태 <span class="muted" style="font-weight:400;font-size:12px">— 자료가 쌓이면 스스로 다시 배우고, 검증을 통과한 모델만 적용합니다</span></h3>
+      <div class="kv" style="margin:10px 0">
+        <span class="k">적용 중인 모델</span><span class="v">${act.ver ? esc(act.ver) + " (" + esc(act.t || "") + ")" : "기본 모델(자체 학습 전)"}</span>
+        <span class="k">학습 자료</span><span class="v" style="font-family:var(--sans);font-size:11.5px">${act.rows ? act.rows + "구간(" + Math.floor(act.rows / 96) + "일) · " + esc(act.source || "") : "—"}</span>
+        <span class="k">검증 오차 (부하 / 태양광)</span><span class="v ${a.degraded ? "badc" : ""}">${n(act.load && act.load.nmae)}% / ${n(act.pv && act.pv.nmae)}% <span class="muted">(한도 ${a.limit}%)</span></span>
+        <span class="k">최근 오차 보정</span><span class="v">${act.load ? (act.load.bias_on ? "부하 켬" : "부하 끔") + " · " + (act.pv && act.pv.bias_on ? "태양광 켬" : "태양광 끔") : "—"}${this.fc && this.fc.ai && this.fc.ai.bias_load !== null && this.fc.ai.bias_load !== undefined ? ` <span class="muted">(지금 부하 ${this.fc.ai.bias_load > 0 ? "+" : ""}${this.fc.ai.bias_load} kW)</span>` : ""}</span>
+        <span class="k">다음 학습</span><span class="v">${a.busy ? "지금 학습 중…" : a.enabled ? Math.floor(a.next_s / 60) + "분 뒤 (주기 " + a.retrain_h + "시간)" : "꺼짐"}</span>
+        <span class="k">운전 반영</span><span class="v ${a.degraded ? "badc" : "okc"}">${a.degraded ? "정확도 저하 — 규칙 운전 중" : "예측 계획 운전에 사용"}</span>
+      </div>
+      <div style="max-height:300px;overflow:auto"><table class="t"><thead><tr><th>시각</th><th>판단</th><th>검증 오차 (현재 → 새 모델)</th><th>사유</th></tr></thead><tbody>${(a.history || []).map(row).join("") || `<tr><td colspan="4" class="muted">아직 학습 기록이 없습니다. 자료가 ${a.min_rows}구간(${Math.floor(a.min_rows / 96)}일) 이상 쌓이면 시작합니다.</td></tr>`}</tbody></table></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" id="aiBack">이전 모델로 되돌리기</button><button class="btn eng" id="aiNow">지금 학습</button><button class="btn" id="aiClose">닫기</button></div></div>`, box => {
+      box.querySelector("#aiClose").onclick = closeModal;
+      box.querySelector("#aiNow").onclick = async () => { if (!can("engineer")) { toast("엔지니어 권한 필요", "bad"); return; } const r = await api("/api/ai/train", {}); toast(r.ok ? "학습을 시작했습니다(1~2분). 끝나면 이 창을 다시 열어 확인하십시오" : (r.why || "실패"), r.ok ? "ok" : "bad"); closeModal(); };
+      box.querySelector("#aiBack").onclick = async () => { if (!can("engineer")) { toast("엔지니어 권한 필요", "bad"); return; } if (!confirm("바로 앞 판의 예측 모델로 되돌립니다.")) return; const r = await api("/api/ai/rollback", {}); toast(r.why || (r.ok ? "되돌렸습니다" : "실패"), r.ok ? "ok" : "bad"); closeModal(); this.load(); };
+    });
   },
   async load() {
     const [f, e] = await Promise.all([api("/api/forecast"), api("/api/energy")]);
