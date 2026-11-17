@@ -60,28 +60,42 @@ def _surplus(site, g, grid, pv_kw, elz_on, h2_room, why):
     return pv_lim, elz
 
 
-def garrison_step(site, g, hr, load_kw, pv_kw, elz_kw, soc, h2_nm3):
-    """주둔지(상전 연계) 한 주기의 목표값. 역송 없음·피크 억제·시간대 충방전·정전 대비 충전율 유지.
-
-    반환: {grid: 목표 수전 kW, ess: ESS 지령 kW(+방전/−충전), pv_lim: PV 출력 제한 kW(0 = 제한 없음), elz: 수전해 기동 여부, why: 설명}
-    """
-    elz_on = elz_kw > 1.0                                           # 수전해 운전 중(소비 전력으로 판단)
-    net = load_kw + elz_kw - pv_kw                                  # ESS 가 가만히 있을 때의 수전 전력(음수면 남는 전력)
-    band = g.band(hr); why = []
-    can_dis = max(0.0, min(site.ess_kw, (soc - g.reserve_soc) * site.ess_kwh * site.ess_eff * 4))        # 15분 안에 하한에 닿지 않는 범위
-    can_chg = max(0.0, min(site.ess_kw, (site.soc_max - soc) * site.ess_kwh / site.ess_eff * 4))
+def _tou_target(g, band, net, soc, can, why):
+    """평소(평시·저소음)의 수전 목표: 시간대 충·방전, 정전 대비 충전율 회복, 피크 억제."""
+    can_dis, can_chg = can
     if band == "peak" and can_dis > 0: target = g.import_min_kw; why.append("최대부하 시간대: ESS 방전으로 수전 축소")
     elif band == "off" and can_chg > 0: target = min(g.peak_kw, net + min(g.charge_kw, can_chg)); why.append("경부하 시간대: ESS 충전")
     else: target = net
     if soc < g.reserve_soc - 0.02 and can_chg > 0:                    # 정전 대비 하한 아래면 시간대와 무관하게 채운다
         target = max(target, min(g.peak_kw, net + min(g.charge_kw, can_chg))); why.append("정전 대비 충전율 회복")
-    target = min(target, g.peak_kw) if net > g.peak_kw and can_dis > 0 else target                     # 피크 억제
-    if net > g.peak_kw and can_dis > 0: why.append(f"피크 억제({g.peak_kw:.0f}kW)")
+    if net > g.peak_kw and can_dis > 0: target = min(target, g.peak_kw); why.append(f"피크 억제({g.peak_kw:.0f}kW)")
+    return target
+
+
+def garrison_step(site, g, hr, load_kw, pv_kw, elz_kw, soc, h2_nm3, self_supply=False):
+    """주둔지(상전 연계) 한 주기의 목표값. 역송 없음·피크 억제·시간대 충방전·정전 대비 충전율 유지.
+
+    self_supply: 주둔지 자립 태세는 전시·유사시 상전 상실을 뜻한다(수전 차단기가 열려 있으면 정전 논리로 운전한다). 이 값은 그 태세인데도
+    수전 차단기가 아직 투입되어 있을 때의 안전한 대체 동작이다 — 수전을 최소 수전 전력으로 묶고 태양광·ESS(충전율 하한 근처까지)로 공급한다.
+    시간대 충전(상전으로 ESS 를 채우는 일)을 하지 않으며, 그래도 모자라 상전을 쓰게 되면 short(kW)로 알린다(실행기가 연료전지·디젤을 투입).
+    반환: {grid: 목표 수전 kW, ess: ESS 지령 kW(+방전/−충전), pv_lim: PV 출력 제한 kW(0 = 제한 없음), elz: 수전해 기동 여부, why: 설명}
+    """
+    elz_on = elz_kw > 1.0                                           # 수전해 운전 중(소비 전력으로 판단)
+    net = load_kw + elz_kw - pv_kw                                  # ESS 가 가만히 있을 때의 수전 전력(음수면 남는 전력)
+    band = g.band(hr); why = []
+    floor = (site.soc_min + 0.05) if self_supply else g.reserve_soc   # 방전 하한: 평소에는 정전 대비 충전율, 자립 태세에서는 충전율 하한 근처까지
+    can_dis = max(0.0, min(site.ess_kw, (soc - floor) * site.ess_kwh * site.ess_eff * 4))        # 15분 안에 하한에 닿지 않는 범위
+    can_chg = max(0.0, min(site.ess_kw, (site.soc_max - soc) * site.ess_kwh / site.ess_eff * 4))
+    if self_supply: target = g.import_min_kw; why.append("자립 태세: 상전 사용 최소화(태양광·ESS 로 공급)")
+    else: target = _tou_target(g, band, net, soc, (can_dis, can_chg), why)
     target = max(target, g.import_min_kw)                           # 역송 금지: 최소 수전 유지
     ess = max(-can_chg, min(can_dis, net - target))
     if net < g.import_min_kw and ess < -1.0: why = ["남는 태양광 → ESS 충전(역송 방지)"]
     grid = net - ess; pv_lim, elz = _surplus(site, g, grid, pv_kw, elz_on, h2_nm3 < site.h2_nm3 * 0.95, why)
-    return {"grid": round(g.import_min_kw if pv_lim else grid, 1), "ess": round(ess, 1), "pv_lim": round(pv_lim, 1), "elz": elz, "band": band, "why": " · ".join(why) or "수전으로 부하 공급"}
+    short = max(0.0, grid - g.import_min_kw) if (self_supply and not pv_lim) else 0.0
+    if short > 1.0: why.append(f"자체 전원 부족 — 상전 {short:.0f}kW 수전")
+    return {"grid": round(g.import_min_kw if pv_lim else grid, 1), "ess": round(ess, 1), "pv_lim": round(pv_lim, 1), "elz": elz, "band": band, "short": round(short, 1),
+            "why": " · ".join(why) or "수전으로 부하 공급"}
 
 
 def gdg_step(site, g, outage_s, soc, running, net_kw, hold=False):

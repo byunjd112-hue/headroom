@@ -215,15 +215,20 @@ class Runtime:
         t = self.now(); g = lambda k, d=0.0: self.val.get(k, d); s = self.site; done = []; hr = self.hr()
         self._grid_watch(t); tied = self.tied(); soc = g("ESS.soc", 60.0) / 100
         self._autonomy_update(soc)
-        if tied:
-            r = om.garrison_step(s, self.gar, hr, g("LOAD.kw"), g("PV.kw"), g("ELZ.kw"), soc, g("H2.nm3")); self.gar_last = r
+        phys = self.mode == "grid" and int(round(g("CB.GRID", 0))) == 1      # 수전 차단기가 실제로 투입되어 있는가(복전 확인 시간 중 포함)
+        if tied or phys:
+            ss = self.posture == "자립" or not tied                      # 복전 확인 중에도 역송 방지는 곧바로 한다(수전 최소화) — 기다리는 동안 태양광이 남으면 역전력 보호가 동작한다
+            # 주둔지 자립 태세(상전 상실)인데 수전 차단기가 아직 투입 상태일 때도 같다: 수전을 최소로 묶는다(경보로 분리 확인 요청)
+            load = g("LOAD.kw") - ((g("DG.kw") + g("FC.kw")) if ss else 0.0)     # 자립 태세에서 돌리는 연료전지·디젤 출력은 부하에서 뺀다
+            r = om.garrison_step(s, self.gar, hr, load, g("PV.kw"), g("ELZ.kw"), soc, g("H2.nm3"), self_supply=ss); self.gar_last = r
+            if self.posture == "저소음": r["why"] += " · 저소음 태세: 상전 연계 중에는 평시와 같음(발전기 정지 상태)"
             if self.auto_enabled:
                 if self._write("ESS", "ESS.kw_set", r["ess"], 1.0): done.append(("ESS.kw_set", r["ess"]))
                 self._write("PV", "PV.lim_set", r["pv_lim"], 1.0)
         else:
             self.gar_last = None
             if self.mode != "grid": self._w.pop("ESS.kw_set", None)
-        self._gdg_control(t, tied, soc)
+        self._gdg_control(t, tied or phys, soc)
         # 부하 자동 차단·복구(상전 연계 중에는 공급 능력으로 끊지 않는다)
         cb = {f: (int(round(self.val[f"CB.{f}"])) if f"CB.{f}" in self.val else None) for f in ("L2", "L3")}
         want = {"L3": "", "L2": ""} if tied else self._shed_want(t, soc)
@@ -255,8 +260,9 @@ class Runtime:
     def decide(self):
         g = lambda k, d=0.0: self.val.get(k, d); hr = self.hr()
         if self.tied():                                               # 주둔지 상전 연계: 디젤·연료전지는 쉬고 상전과 ESS 로 운전(수전해는 남는 전력이 있을 때만)
-            r = self.gar_last or {}; w = {"DG": False, "FC": False, "_policy": (0, 0, int(bool(r.get("elz")))), "_garrison": True}
-            if self.gdgs: w["GDG"] = False                            # 주둔지 발전기는 대기
+            r = self.gar_last or {}; dg, fc = self._self_supply_sources(r) if self.posture == "자립" else (False, False)
+            w = {"DG": dg, "FC": fc, "_policy": (int(dg), int(fc), int(bool(r.get("elz")))), "_garrison": True}
+            if self.gdgs: w["GDG"] = False                            # 주둔지 발전기는 대기(상전과 병렬 운전하지 않는다)
             return w
         if self.policy and not self.ai_degraded: a = self.policy(dict(self.val), hr)
         else: a = dp.rule_action(self.site, g("ESS.soc", 60.0) / 100, g("H2.nm3", self.site.h2_nm3 * 0.7), int(g("DG.status")), int(g("FC.status")), g("LOAD.kw"), g("PV.kw"), hr)
@@ -270,6 +276,16 @@ class Runtime:
             online = [self.site.ess_kw] * int(g("ESS.status", 1)) + [self.cfg.get("g1_kw", 100.0)] + [self.site.dg_kw] * int(want["DG"]) + [self.site.fc_kw] * int(want["FC"]) + [self.gar.gdg_kw] * int(gdg_on)
             if not gdg_on and dp.reserve_need(g("LOAD.p1_kw") + g("LOAD.p2_kw"), online): want["FC"] = True; want["_reserve"] = True
         return want
+
+    def _self_supply_sources(self, r):
+        """주둔지 자립 태세(상전 연계 중): 태양광·ESS 로 모자라면 연료전지, 그래도 모자라거나 수소가 없으면 이동형 디젤을 돌린다.
+        한 번 켠 전원은 ESS 가 60% 로 찰 때까지 유지한다(잦은 기동·정지 방지). 반환: (디젤, 연료전지)"""
+        g = lambda k, d=0.0: self.val.get(k, d); s = self.site; soc = g("ESS.soc", 60.0) / 100; short = float(r.get("short", 0.0))
+        need = short > 5.0 or soc < s.soc_min + 0.10; keep = soc < 0.60
+        h2_ok = g("H2.nm3") > s.h2_nm3 * s.h2_min * 1.2; fc_on = g("FC.status") > 0.5; dg_on = g("DG.status") > 0.5
+        fc = h2_ok and (need or (fc_on and keep))
+        dg = (dg_on and keep) or (need and (not h2_ok or fc_on))      # 연료전지를 돌려도 모자라거나 수소가 없을 때
+        return bool(dg), bool(fc)
 
     def _decide_gdg(self, want):
         """주둔지 정전: 기존 디젤발전기를 먼저 쓰고 이동형 디젤·연료전지는 쉰다. 반환: 발전기를 실제로 쓸 수 있는가."""

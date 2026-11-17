@@ -58,6 +58,21 @@ class TestOpsLogic(unittest.TestCase):
         n = om.gdg_step(s, g, 600, 0.5, True, 700 - 300); d = om.gdg_step(s, g, 600, 0.5, True, 700)
         self.assertAlmostEqual(d["gdg"] - n["gdg"], 300.0, places=0)                                                       # 발전기 부하가 태양광만큼 줄어든다
 
+    def test_garrison_self_supply_holds_import_at_minimum(self):
+        """주둔지 자립 태세: 상전이 붙어 있어도 쓰지 않는다(수전 = 최소 수전), 상전으로 ESS 를 채우지 않는다."""
+        s, g = self.s, self.g
+        for hr in (3, 9.5, 11, 14, 20):
+            for load in (40, 120, 260):
+                for pv in (0, 150, 380):
+                    r = om.garrison_step(s, g, hr, load, pv, 0, 0.6, 500, self_supply=True)
+                    self.assertAlmostEqual(r["grid"], g.import_min_kw, places=1, msg=(hr, load, pv)); self.assertEqual(r["short"], 0.0)
+                    if load > pv + g.import_min_kw: self.assertGreater(r["ess"], 0); self.assertIn("자립 태세", r["why"])           # 모자라는 만큼 ESS 방전(시간대와 무관)
+        n = om.garrison_step(s, g, 3, 120, 0, 0, 0.6, 500); self.assertLess(n["ess"], 0); self.assertGreater(n["grid"], 100)          # 평소 경부하 시간대: 상전으로 충전
+        r = om.garrison_step(s, g, 14, 120, 0, 0, 0.40, 500, self_supply=True); self.assertGreater(r["ess"], 100)                     # 정전 대비 하한(50%) 아래로도 방전(자립 태세)
+        r = om.garrison_step(s, g, 14, 120, 0, 0, s.soc_min + 0.05, 500, self_supply=True)                                            # ESS 가 바닥이면 상전을 쓰고 알린다
+        self.assertAlmostEqual(r["short"], 115.0, delta=1.0); self.assertIn("자체 전원 부족", r["why"]); self.assertAlmostEqual(r["grid"], 120.0, delta=1.0)
+        r = om.garrison_step(s, g, 14, 700, 0, 0, 0.6, 500, self_supply=True); self.assertAlmostEqual(r["ess"], 500.0, delta=1.0); self.assertAlmostEqual(r["short"], 195.0, delta=1.0)   # PCS 정격 초과분
+
     def test_autonomy_hours(self):
         a = om.autonomy(self.s, 0.9, 1000, 1500, (30, 40, 50))
         self.assertEqual(a["ess_kwh"], 712); self.assertEqual(a["h2_kwh"], 933); self.assertEqual(a["dg_kwh"], 5357)
@@ -124,6 +139,33 @@ class TestOpsRuntime(Base):
         self.rt.set_ops(mode="island", who="시험"); self.loop(2, clk); self.assertNotIn("GDG", self.rt.decide())
         self.rt.wall = lambda: dtm.datetime(2026, 11, 16, 1, 30); self.assertAlmostEqual(self.rt.hr(), 1.5); self.rt.hr_off = 11.5; self.assertAlmostEqual(self.rt.hr(), 13.0)   # 시연용 모의 시각
         self.rt.hr_off = 23.0; self.assertAlmostEqual(self.rt.hr(), 0.5)    # 작전지에서는 주둔지 발전기를 다루지 않는다
+
+    def test_mode_matrix_every_place_and_posture_behaves_as_defined(self):
+        """운용 장소(작전지 / 주둔지 연계 / 주둔지 정전) × 태세(평시 / 저소음 / 자립) 9가지가 정의대로 동작한다."""
+        clk = [1000.0]; self.rt.now = lambda: clk[0]; self.rt.wall = lambda: dtm.datetime(2026, 11, 16, 3, 0); p = self.plant; rt = self.rt       # 새벽 3시(경부하 시간대)
+        st = lambda: (round(p.get("GRID.kw")), int(p.get("DG.status")), int(p.get("FC.status")), int(p.get("GDG.status")), int(p.get("CB.L3")), int(p.get("CB.L2")))
+        def settle(n=3):
+            for _ in range(n): self.loop(3, clk); rt.control(force=True); self.loop(3, clk)
+        p.set("ESS.soc", 60.0); p.set("CB.GRID", 1); rt.scan()
+        # ── 작전지: 상전을 쓰지 않는다(수전 계측이 있어도 판단에 넣지 않는다)
+        rt.set_ops(mode="island", posture="평시"); settle(); self.assertFalse(rt.tied()); self.assertIsNone(rt.gar_last); self.assertNotIn("GDG", rt.decide()); self.assertEqual(st()[4:], (1, 1))
+        rt.set_ops(posture="저소음"); self.loop(5, clk); settle(); self.assertEqual(st()[1], 0); self.assertEqual(st()[4], 0); self.assertTrue(rt.decide().get("_quiet"))      # 디젤 금지, 3등급 차단
+        rt.set_ops(posture="평시"); self.loop(3, clk); clk[0] += 70; settle(); self.assertEqual(st()[4], 1)                                                                # 태세를 풀면 60초 뒤 복구
+        # ── 주둔지 · 상전 연계
+        rt.set_ops(mode="grid", posture="평시"); settle(); self.assertTrue(rt.tied()); self.assertEqual(st()[1:4], (0, 0, 0)); self.assertGreater(p.get("GRID.kw"), 100); self.assertLess(p.get("ESS.kw"), -20)   # 경부하: 상전으로 충전
+        rt.set_ops(posture="저소음"); settle(); self.assertEqual(st()[1:], (0, 0, 0, 1, 1)); self.assertGreater(p.get("GRID.kw"), 100)                                   # 상전은 조용하다 → 평시와 같음, 부하 차단 없음
+        rt.set_ops(posture="자립"); settle(); self.assertAlmostEqual(p.get("GRID.kw"), rt.gar.import_min_kw, delta=1.5); self.assertGreater(p.get("ESS.kw"), 20)            # 수전 최소화, ESS 방전
+        self.assertEqual(st()[1:], (0, 0, 0, 1, 1)); self.assertIn("자립 태세", rt.gar_last["why"])                                                                       # ESS 로 충분하면 발전기를 켜지 않고, 부하도 끊지 않는다
+        p.set("ESS.soc", 21.0); settle(4); self.assertEqual(int(p.get("FC.status")), 1); self.assertEqual(int(p.get("GDG.status")), 0)                                    # ESS 가 바닥나면 연료전지 투입(주둔지 발전기는 상전과 병렬하지 않는다)
+        self.assertLess(p.get("GRID.kw"), 40.0); self.assertEqual(st()[4:], (1, 1))
+        p.set("ESS.soc", 62.0); settle(); self.assertEqual(int(p.get("FC.status")), 0)                                                                                 # ESS 가 60% 를 넘으면 정지
+        # ── 주둔지 · 정전
+        rt.set_ops(posture="평시"); settle(); p.set("CB.GRID", 0); self.loop(3, clk); self.assertFalse(rt.tied()); clk[0] += 40; settle(4)
+        self.assertEqual(int(p.get("GDG.status")), 1); self.assertEqual(st()[0:3], (0, 0, 0))                                                                           # 정전 30초 지속 → 주둔지 발전기, 이동형 전원은 쉼
+        rt.set_ops(posture="저소음"); self.loop(5, clk); clk[0] += 700; settle(4); self.assertEqual(int(p.get("GDG.status")), 0); self.assertEqual(st()[1], 0); self.assertEqual(st()[4], 0)   # 저소음: 발전기·디젤 금지, 3등급 차단
+        rt.set_ops(posture="자립"); self.loop(3, clk); clk[0] += 70; settle(4); self.assertEqual(int(p.get("GDG.status")), 1)                                             # 자립: 주둔지 발전기를 다시 쓴다
+        p.set("CB.GRID", 1); self.loop(3, clk); clk[0] += 40; settle(4); self.assertTrue(rt.tied()); self.assertEqual(int(p.get("GDG.status")), 0)                        # 복전 → 발전기 정지
+        self.assertAlmostEqual(p.get("GRID.kw"), rt.gar.import_min_kw, delta=1.5)                                                                                        # 태세가 자립이므로 복전 뒤에도 수전 최소화
 
     def test_quiet_posture_forbids_diesel_and_sheds_class3_then_restores(self):
         clk = [1000.0]; self.rt.now = lambda: clk[0]; self.plant.set("ESS.soc", 22.0); self.rt.scan()

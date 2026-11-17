@@ -89,11 +89,23 @@ class AlarmManager:
                 elif a["state"] == "RTN":
                     a.update(state="ACT", acked=False, t_on=time.time(), t_off=None, text=text, prio=prio)
                     self.hist.appendleft({"t": time.time(), "ev": "재발생", "prio": prio, "src": src, "text": text})
-                else: a["text"] = text
+                else:
+                    a["text"] = text
+                    if prio < a["prio"]:                  # 더 급해졌다(예: 연료 보충 요청 → 긴급): 등급을 올리고 다시 미확인으로
+                        a["acked"] = False; a["ack_by"] = None; self.hist.appendleft({"t": time.time(), "ev": "격상", "prio": prio, "src": src, "text": text})
+                    a["prio"] = prio
             elif a is not None and a["state"] == "ACT":
                 a["state"] = "RTN"; a["t_off"] = time.time()
                 self.hist.appendleft({"t": time.time(), "ev": "복귀", "prio": a["prio"], "src": a["src"], "text": a["text"]})
                 if a["acked"]: del self.items[key]
+
+    def renew(self, key):
+        """확인한 경보를 다시 '미확인'으로 돌린다(조치될 때까지 주기적으로 다시 알릴 때)."""
+        with self.lock:
+            a = self.items.get(key)
+            if a is not None and a["state"] == "ACT" and a["acked"]:
+                a["acked"] = False; a["ack_by"] = None; a["t_on"] = time.time()
+                self.hist.appendleft({"t": time.time(), "ev": "재통보", "prio": a["prio"], "src": a["src"], "text": a["text"]})
 
     def event(self, prio, src, text):
         """한 번 생기고 끝나는 사건 경보(지령 실패 등). 확인하면 사라진다."""
@@ -224,6 +236,7 @@ class Engine:
             # 실측 이력이 8일 미만이면: 가상 장치 시연은 합성 자료로 계획하고, 실장치는 이력이 쌓일 때까지 규칙 운전한다
             self.rt.policy = PlanPolicy(self.rt.site, os.path.join(self.rt.state_dir, "history.csv"), plan_dir, days_since_deploy,
                                         demo_csv=os.path.join(plan_dir, "sample_site_data.csv") if sim else None); self.plan_note = "예측 기반 운전계획(동적계획법)"
+        self.fuel_cfg = dict({"dg_tank_l": 1000.0, "warn_pct": 50.0, "warn_h": 8.0, "repeat_min": 30.0}, **(self.cfg.get("fuel") or {})); self._fuel_t = {}
         self.ai_cfg = dict({"enabled": True, "retrain_h": 24.0, "sim_retrain_h": 2.0, "first_min": 3.0}, **(self.cfg.get("ai") or {}))
         self.ai_busy = False; self.ai_last = None; self.ai_next = time.time() + 60.0 * float(self.ai_cfg["first_min"])
         self._tag_dev = {p["tag"]: p["device"] for p in self.rt.pts}
@@ -533,11 +546,31 @@ class Engine:
         A.set("soc.hi", soc > s.soc_max * 100 - 1, 4, "ESS", f"ESS 충전율 상한 근접 {soc:.1f}% — PV 출력 제한 가능")
         h2 = g("H2.nm3", s.h2_nm3)
         A.set("h2.lo", h2 < s.h2_nm3 * s.h2_min * 1.5, 2, "FC", f"수소 잔량 낮음 {h2:.0f}Nm³")
-        if "DG.fuel_l" in v: A.set("fuel.lo", g("DG.fuel_l") < 300, 3, "DG", f"디젤 연료 낮음 {g('DG.fuel_l'):.0f}L")
+        self._alarms_fuel()
         A.set("reserve", k["reserve_need"], 3, "EMS", f"N-1 순동 예비력 부족 {k['reserve_margin']:.0f}kW — 연료전지 병렬 필요")
         for n, d in rt.dev.items():
             A.set(f"man.{n}", d.manual, 4, n, f"{n} 현장 수동 모드 — EMS 지령 차단")
         A.set("auto.off", not self.auto, 4, "EMS", "자동 제어 해제 — 운용자 수동 지령 운전")
+
+    def fuel_status(self):
+        """디젤 연료 현황: [(장치, 이름, 잔량 %, 잔량 L, 정격 운전 기준 남은 시간)]. 남은 시간은 가장 빨리 줄어드는 경우(정격 연속 운전)로 계산한다."""
+        rt = self.rt; g = lambda k, d=0.0: rt.val.get(k, d); s = rt.site; gar = rt.gar; f = self.fuel_cfg; out = []
+        if "DG.fuel_l" in rt.val:
+            lit = g("DG.fuel_l"); out.append(("DG", "이동형 디젤발전기", 100.0 * lit / max(1.0, f["dg_tank_l"]), lit, lit / max(1e-6, s.dg_kw * s.dg_l_per_kwh)))
+        for n in rt.gdgs:
+            if f"{n}.fuel_pct" in rt.val:
+                pct = g(f"{n}.fuel_pct"); lit = pct / 100.0 * gar.gdg_tank_l; out.append((n, "주둔지 디젤발전기", pct, lit, lit / max(1e-6, gar.gdg_kw * gar.gdg_l_per_kwh)))
+        return out
+
+    def _alarms_fuel(self):
+        """연료 보충 경보: 잔량이 warn_pct(기본 50%) 이하이거나 정격 운전 기준 warn_h(기본 8시간) 이내로 떨어지면 올리고,
+        보충될 때까지 repeat_min 마다 다시 알린다(확인해도 조치 전에는 다시 울린다). 고갈 최소 8시간 전에 알리기 위한 것이다."""
+        f = self.fuel_cfg; A = self.alarms; now = time.time()
+        for n, nm, pct, lit, hrs in self.fuel_status():
+            low = pct <= f["warn_pct"] or hrs <= f["warn_h"]; urgent = hrs <= f["warn_h"]; key = f"fuel.{n}"
+            A.set(key, low, 1 if urgent else 2, n, f"{nm} 연료 {pct:.0f}%({lit:.0f}L) — 정격 운전 기준 약 {hrs:.1f}시간분. 연료 보충 요청" + (f" [긴급: {f['warn_h']:.0f}시간 이내 고갈]" if urgent else ""))
+            if not low: self._fuel_t.pop(n, None)
+            elif now - self._fuel_t.setdefault(n, now) >= 60.0 * f["repeat_min"]: A.renew(key); self._fuel_t[n] = now
 
     def _alarms_grid(self):
         """차단기·모선 경보(보호 IED 게이트웨이)."""
@@ -553,6 +586,7 @@ class Engine:
             code = int(round(v.get("FLT.GRID", 0))); grid = rt.mode == "grid"
             A.set("grid.trip", grid and gc > 1.5, 1, "CB-GRID", f"수전 차단기 트립 — {ANSI.get(code, f'보호요소 {code}')}")
             A.set("grid.out", grid and rt.grid_lost, 1, "GRID", "상전 정전 — 자립 운전으로 전환(무정전: ESS 계통 형성). " + ("주둔지 발전기 자동 투입" if rt.gdgs else "디젤·연료전지 자동 투입"))
+            A.set("grid.wartime", grid and rt.posture == "자립" and rt.tied(), 2, "GRID", "자립 태세(상전 상실 대비)인데 수전 차단기가 투입 상태 — 상전 분리를 확인하십시오. 분리 전까지는 수전을 최소로 묶고 운전합니다(주둔지 발전기는 상전과 병렬 운전하지 않음)")
         for n in rt.gdgs:                                                       # 주둔지 기존 발전기 차단기
             c = v.get(f"CB.{n}")
             if c is not None: code = int(round(v.get(f"FLT.{n}", 0))); A.set(f"cb.trip.{n}", c > 1.5, 1, f"CB-{n}", f"주둔지 발전기 차단기 트립 — {ANSI.get(code, f'보호요소 {code}')}")
@@ -677,9 +711,10 @@ class Engine:
         if mode is None and posture is None: raise ValueError("mode 또는 posture 가 필요합니다")
         with self.lock:
             self.rt.set_ops(mode=mode, posture=posture, who=who)
-            if self.sim and mode is not None and "CB.GRID" in self.plant.by_tag:      # 가상 장치: 주둔지로 바꾸면 수전 차단기를 투입한 상태로 모사
-                self.plant.set("CB.GRID", 1 if mode == "grid" else 0); self.plant.set("FLT.GRID", 0)
-                if mode != "grid": self.plant.set("ESS.kw_set", 0)
+            if self.sim and "CB.GRID" in self.plant.by_tag:
+                # 가상 장치: 주둔지 평시·저소음이면 상전이 붙은 상태, 주둔지 자립(전시·유사시 상전 상실)이면 수전 차단기가 열린 상태로 모사한다
+                self.plant.set("CB.GRID", 1 if (self.rt.mode == "grid" and self.rt.posture != "자립") else 0); self.plant.set("FLT.GRID", 0)
+                if self.rt.mode != "grid": self.plant.set("ESS.kw_set", 0)
         self.rt.t_ctl = -1e9                                                         # 다음 주기에 곧바로 다시 판단
         return {"ok": True, "ops": self.ops()}
 

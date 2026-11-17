@@ -90,7 +90,7 @@ class Plant:
                 self.set("CB.GDG", 2 if int(round(g("CB.GDG"))) == 2 else int(on))
                 if on: gdg = min(1000.0, max(0.0, net - max(-500.0, min(500.0, g("ESS.kw_set")))))
                 self.set("GDG.kw", gdg); self.set("GDG.fuel_pct", max(0.0, g("GDG.fuel_pct") - gdg * 0.26 / 5000.0 * 100.0 * dt / 3600.0))
-            ess = (net - gdg) * cb("ESS"); grid = 0.0
+            ess = (net - gdg) * cb("ESS"); grid = 0.0; self._exp_t = now                        # 연계가 아닐 때는 역송 시간을 세지 않는다(재투입 직후 곧바로 트립하지 않게)
         if "BUS.a_v" in self.by_tag: self._tick_bus(now)
         self._put((("DG.kw", dg), ("FC.kw", fc), ("ESS.kw", ess), ("GRID.kw", grid)))
         if "ESS.soc" in self.by_tag: self.set("ESS.soc", min(90.0, max(10.0, g("ESS.soc") - ess * dt / 3600 / 1000.0 * 100)))

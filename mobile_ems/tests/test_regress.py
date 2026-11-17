@@ -162,6 +162,32 @@ class TestServerHardening(HmiBase):
         h = http.client.HTTPConnection("127.0.0.1", self.httpd.server_address[1], timeout=5); h.request(method, path, body=body, headers=headers or {})
         r = h.getresponse(); out = r.status, r.read(); h.close(); return out
 
+    def test_R26_garrison_autonomy_means_grid_lost_and_fuel_alarm_repeats(self):
+        """R-26: 주둔지 자립 태세 = 전시·유사시 상전 상실. 가상 장치에서는 자립을 고르면 수전 차단기가 열린 상태가 되고 정전 논리로 운전한다.
+        연료는 50% 이하(또는 정격 운전 8시간분 이하)에서 보충 경보를 올리고, 확인해도 보충 전에는 주기적으로 다시 알린다."""
+        eng, p, A = self.eng, self.eng.plant, self.eng.alarms; item = lambda k: A.items.get(k)
+        try:
+            eng.set_ops({"mode": "grid"}, "시험"); time.sleep(2.5); self.assertEqual(int(p.get("CB.GRID")), 1); self.assertTrue(eng.rt.tied())
+            eng.set_ops({"posture": "자립"}, "시험"); time.sleep(3.0); self.assertEqual(int(p.get("CB.GRID")), 0); self.assertFalse(eng.rt.tied()); self.assertTrue(eng.rt.grid_lost)
+            self.assertAlmostEqual(p.get("GRID.kw"), 0.0, delta=0.5); self.assertEqual(item("grid.out")["state"], "ACT"); self.assertIsNone(item("grid.wartime"))
+            p.hold = getattr(p, "hold", None); eng.simdrv.hold["PV.kw"] = 300.0; time.sleep(2.0)       # 태양광이 부하보다 훨씬 많은 낮
+            p.set("CB.GRID", 1); time.sleep(6.0)                                                     # R-27: 차단기가 다시 닫힌 직후(복전 확인 30초 전)에도 역송 방지가 곧바로 동작해 역전력 트립이 없다
+            self.assertEqual(int(p.get("CB.GRID")), 1); self.assertGreaterEqual(p.get("GRID.kw"), -1.0); self.assertTrue(eng.rt.grid_lost)
+            eng.simdrv.hold.pop("PV.kw", None); eng.rt.grid_lost = False; time.sleep(2.5); self.assertEqual(item("grid.wartime")["state"], "ACT"); self.assertLess(p.get("GRID.kw"), 15.0)   # 수전 최소화로 운전
+            eng.set_ops({"posture": "평시"}, "시험"); time.sleep(2.5); self.assertEqual(int(p.get("CB.GRID")), 1)
+            # 연료 보충 경보
+            p.set("DG.fuel_l", 900.0); p.set("GDG.fuel_pct", 85.0); time.sleep(2.5); self.assertTrue(item("fuel.DG") is None or item("fuel.DG")["state"] != "ACT")
+            p.set("DG.fuel_l", 480.0); time.sleep(2.5); a = item("fuel.DG"); self.assertEqual((a["state"], a["prio"]), ("ACT", 2)); self.assertIn("연료 보충 요청", a["text"]); self.assertIn("48%", a["text"])
+            a["acked"] = True; eng._fuel_t["DG"] -= 31 * 60; time.sleep(2.5); self.assertFalse(item("fuel.DG")["acked"])            # 확인해도 30분 뒤 다시 알린다
+            self.assertTrue(any(h["ev"] == "재통보" for h in A.journal(50)))
+            p.set("DG.fuel_l", 150.0); time.sleep(2.5); a = item("fuel.DG"); self.assertEqual(a["prio"], 1); self.assertIn("긴급", a["text"])                    # 8시간분 이하 → 긴급
+            p.set("GDG.fuel_pct", 50.0); time.sleep(2.5); g = item("fuel.GDG"); self.assertEqual((g["state"], g["prio"]), ("ACT", 2)); self.assertIn("9.6시간", g["text"])   # 50%에서 아직 8시간 넘게 남는다
+            p.set("GDG.fuel_pct", 40.0); time.sleep(2.5); self.assertEqual(item("fuel.GDG")["prio"], 1)
+            p.set("DG.fuel_l", 900.0); p.set("GDG.fuel_pct", 85.0); time.sleep(2.5); self.assertNotEqual(item("fuel.DG")["state"] if item("fuel.DG") else "RTN", "ACT")
+        finally:
+            p.set("DG.fuel_l", 900.0); p.set("GDG.fuel_pct", 85.0); eng.set_ops({"mode": "island", "posture": "평시"}, "시험"); time.sleep(1.5)
+            for k in ("all",): eng.alarms.ack(k, "시험") if hasattr(eng.alarms, "ack") else None
+
     def test_R03_negative_content_length_rejected(self):
         s = socket.create_connection(("127.0.0.1", self.httpd.server_address[1]), timeout=5)
         s.sendall(b"POST /api/login HTTP/1.1\r\nHost: x\r\nContent-Length: -1\r\nConnection: close\r\n\r\n" + b'{"pin":"0"}'); data = s.recv(4096); s.close()

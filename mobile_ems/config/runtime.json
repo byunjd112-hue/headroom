@@ -161,6 +161,12 @@
   "elz_kw": 150.0,
   "h2_min": 0.3
  },
+ "fuel": {
+  "dg_tank_l": 1000,
+  "warn_pct": 50,
+  "warn_h": 8,
+  "repeat_min": 30
+ },
  "ai": {
   "enabled": true,
   "retrain_h": 24,
