@@ -54,7 +54,7 @@ def _surplus(site, g, grid, pv_kw, elz_on, h2_room, why):
     surplus = g.import_min_kw - grid; pv_lim = 0.0; elz = bool(elz_on)
     if surplus > 0:
         if not elz_on and h2_room and surplus >= site.elz_kw * 0.5: elz = True; why.append("남는 전력 → 수전해 기동")
-        else: pv_lim = max(1.0, pv_kw - surplus); why.append("남는 전력 → PV 출력 제한(역송 방지)")
+        pv_lim = max(1.0, pv_kw - surplus); why.append("남는 전력 → PV 출력 제한(역송 방지)")      # 수전해가 실제로 받기 전까지도 역송이 없게, 기동과 함께 제한한다
     elif elz_on and (not h2_room or grid - g.import_min_kw > site.elz_kw * 0.5):
         elz = False; why.append("남는 전력 없음 → 수전해 정지")       # 상전을 사서 수소를 만들지는 않는다
     return pv_lim, elz

@@ -22,7 +22,7 @@ python -m ifps_ems gen-sample results/sample_site_data.csv         # (실측 이
 python -m ifps_ems train results/sample_site_data.csv results      # 예측 모델 학습
 python -m ifps_ems_rt.hmi config/runtime.json --sim --plan results --open   # 가상 장치
 python -m ifps_ems_rt.hmi config/runtime.json --plan results --open         # 실장치
-python -m unittest discover -s tests                               # 시험 97건
+python -m unittest discover -s tests                               # 시험 98건
 diag.bat --demo                                                    # 현장 진단 도구 연습(가상 장치) · 실장비는 diag.bat
 ```
 제어화면: http://127.0.0.1:8080 · 기본 PIN 운용자 `1111`, 엔지니어 `2222`(개발 모드 전용). 운용 모드(`run_mode: "운용"`)는 평문·기본 PIN, 외부 바인드, 가상 장치를 기동 단계에서 거부한다 — `python -m ifps_ems_rt.hmi.pin`으로 해시를 만들어 `pin_operator_hash`/`pin_engineer_hash`에 넣는다

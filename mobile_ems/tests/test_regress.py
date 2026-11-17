@@ -190,3 +190,19 @@ del HmiBase
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestGarrisonNeverExportsWhileElectrolyzerStarts(unittest.TestCase):
+    """R-24: 주둔지에서 ESS 가 가득 차고 태양광이 남을 때, 수전해를 '기동'만 하고 태양광을 제한하지 않아 그 주기의 목표 수전이 음수(역송)가 되던 결함.
+    C++ 이식 중 불변 조건(목표 수전 ≥ 최소 수전) 검사로 찾았다."""
+
+    def test_R24_target_import_never_below_minimum(self):
+        import random
+        from ifps_ems_rt import opsmode as om
+        from ifps_ems.config import Site
+        s, g, r = Site(), om.Garrison(), random.Random(24)
+        x = om.garrison_step(s, g, 10.2, 22.4, 365.4, 0.0, 0.90, 413.4)                      # 발견 당시 조건: 목표 수전 −342 kW 였다
+        self.assertTrue(x["elz"]); self.assertGreater(x["pv_lim"], 0.0); self.assertGreaterEqual(x["grid"], g.import_min_kw)
+        for _ in range(20000):
+            a = (r.uniform(0, 24), r.uniform(0, 400), r.uniform(0, 420), r.choice([0.0, 50.0]), r.uniform(0.1, 0.95), r.uniform(0, 1000))
+            self.assertGreaterEqual(om.garrison_step(s, g, *a)["grid"], g.import_min_kw - 1e-6, a)

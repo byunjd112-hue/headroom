@@ -1,0 +1,71 @@
+// 이동형 전력체계 EMS — C++ 이식(1단계) 신뢰성 사전 점검서 (입력: cpp_results.json — tools/cpp_report.py 가 만든다)
+const fs = require("fs"); const L = require("./lib.js"); const { P, H1, H2, NUM, TBL, GAP } = L;
+const R = JSON.parse(fs.readFileSync(__dirname + "/cpp_results.json", "utf8"));
+const REV = process.argv[2] || "Rev00", DATE = process.argv[3] || "", OUT = process.argv[4] || __dirname + `/out/이동형전력체계EMS_Cpp이식_신뢰성사전점검서_${REV}.docx`;
+const b = [], C = R.coverage_total, M = R.metrics || {}, T = R.tidy || {};
+const pct = (a, n) => (100 * a / Math.max(1, n)).toFixed(1) + "%";
+
+L.cover(b, "이동형 전력체계 EMS C++ 이식 신뢰성 사전 점검서", "1단계: 통신 부호화 · 군 운용 논리  |  MISRA C++:2008 기준  |  파이썬 기준 구현과의 동등성 시험",
+  [["문서번호", `HAES-IFPS-EMS-CPP-001  ${REV} (초안)`], ["작성일", DATE], ["적용 기준", "MISRA C++:2008 (ISO C++03 문법)"], ["대상 소스", "cpp/include, cpp/src — " + R.files.length + "개 파일"],
+   ["점검 도구", "g++ · clang++(엄격 경고), gcov(실행률), clang-tidy(정적 분석), lizard(메트릭), 자체 규칙 점검"],
+   ["비고", "공인 신뢰성 시험 도구의 결과가 아니다. 공인 시험 전에 문제를 걸러 내기 위한 사전 점검이다. 발주처가 정한 등급·목표값·지정 도구는 확인이 필요하다."]]);
+
+b.push(H1("1. 요약"));
+b.push(TBL(["항목", "결과", "비고"], [
+  ["파이썬 판과의 동등성 · 단위 시험", `확인 ${R.tests.checks.toLocaleString()}건 중 실패 ${R.tests.failed}건`, "같은 입력에 같은 출력(난수 씨앗 고정 벡터)"],
+  ["문장 실행률", `${C.line_pct}%  (${C.lines_hit} / ${C.lines})`, "gcov"], ["분기 실행률", `${C.branch_pct}%  (${C.branches_hit} / ${C.branches})`, "gcov -b"],
+  ["엄격 컴파일", R.compile.map(c => (c.ok ? "통과" : "실패") + ` (진단 ${c.diagnostics}건)`).join(" / "), R.compile.map(c => c.compiler.split(" ")[0]).join(" / ") + ", 경고를 오류로 처리"],
+  ["정적 분석 경고", T.warnings === undefined ? "미실행" : `${T.warnings}건`, T.version || ""], ["MISRA C++:2008 기계 점검 위반", `${R.misra_auto_violations}건`, `기계로 확인 가능한 규칙 ${R.misra.filter(x => x.auto).length}종`],
+  ["소스 메트릭", M.n_func ? `함수 ${M.n_func}개 · 최대 순환 복잡도 ${M.cc_max} · 최대 길이 ${M.len_max}줄 · 최대 인자 ${M.arg_max}개` : "미측정", M.n_func ? `기준(복잡도 ${M.limits.cc}·길이 ${M.limits.len}·인자 ${M.limits.arg}) 초과 ${Object.values(M.over).flat().length}건` : ""]],
+  [28, 36, 36], { bold: [0] }));
+b.push(GAP()); b.push(P("이번 단계는 EMS 가운데 통신을 하지 않는 계산 부분(값 부호화·프레임 검증, 주둔지 제어, 주둔지 발전기 운용, 자립 지속시간, 부하 자동 차단)을 C++ 로 옮긴 것이다. 수집 루프, 지령 처리, 감사 기록, 화면 서버, 예측·계획은 다음 단계 대상이며 아직 파이썬 판으로 동작한다."));
+
+b.push(H1("2. 이식 범위와 단계"));
+b.push(TBL(["단계", "대상", "상태"], [["1단계 (본 문서)", "Modbus 값 부호화·복호화(16·32·64비트, 바이트 순서 4종), 프레임 생성·응답 검증, 군 운용 논리(주둔지 제어·발전기 운용·자립 지속시간·부하 자동 차단)", "완료 — 사전 점검"],
+  ["2단계", "대응표, 수집 루프, 지령·응답 처리, 감사 기록, 설정 검사", "예정"], ["3단계", "화면 서버, 예측·계획, 전 기능 동등성 시험", "예정"], ["4단계", "공인 도구 결과 반영 보완", "공인 도구 결과 입수 후"]], [16, 64, 20], { bold: [0] }));
+b.push(GAP()); b.push(P("파이썬 판은 버리지 않고 기준 구현(정답지)으로 둔다. C++ 판이 파이썬 판과 같은 결과를 내는지를 자동으로 비교해, 옮기는 과정의 실수를 잡는다."));
+
+b.push(H1("3. 설계 원칙 (MISRA C++:2008 대응)"));
+["C++03 문법만 쓴다(MISRA C++:2008 의 기준 언어). auto·nullptr·람다·long long 을 쓰지 않는다.", "동적 메모리를 쓰지 않는다(new·delete·표준 컨테이너 없음). 크기가 정해진 배열만 쓴다.",
+ "예외를 쓰지 않는다. 모든 함수가 상태값을 돌려주고, 오류면 출력값을 쓰지 않는다.", "매크로는 헤더 포함 방지용만 쓴다. 상수는 const, 종류는 enum 으로 정의한다.",
+ "형 변환은 static_cast 만 쓴다. 포인터 형 변환·공용체·reinterpret_cast 를 쓰지 않는다.", "실수(f32·f64)의 비트 표현을 메모리로 재해석하지 않는다. IEEE 754 규칙에 따라 산술(ldexp·frexp)로 조립·분해한다.",
+ "함수마다 return 은 하나, 제어문 본문은 항상 중괄호, if … else if 는 else 로 끝내고 switch 에는 default 를 둔다.", "실수의 ==·!= 비교를 하지 않는다. 재귀를 쓰지 않는다. 크기가 드러나는 자료형 이름(u8·u16·u32·i32·f64)을 쓴다.",
+ "시험 코드(cpp/tests)는 표준 입출력·문자열을 쓰므로 규칙 적용 대상에서 뺀다."].forEach(t => b.push(NUM(t)));
+
+b.push(H1("4. 동적 시험 결과"));
+b.push(H2("4.1 파이썬 기준 구현과의 동등성")); b.push(P(`시험 벡터: ${R.vectors}`));
+b.push(TBL(["대상", "비교 방법"], [["값 복호화(decode)", "자료형 8종 × 바이트 순서 4종 × 배율, 결과값이 비트 단위로 같은지"], ["값 부호화(encode)", "수용·거부 판정과 레지스터 값이 같은지(범위 밖·반올림 경계 포함)"],
+  ["주둔지 제어", "목표 수전·ESS 지령·태양광 제한(반올림 오차 0.05 이내), 수전해 판단, 시간대. 추가로 '목표 수전 ≥ 최소 수전' 불변 조건"], ["주둔지 발전기 운용", "기동 판단·사유·ESS 지령·발전기 부하"],
+  ["자립 지속시간", "전 부하·3등급 차단·1등급 기준 시간, 저장 에너지"], ["부하 자동 차단", "차단 사유(등급별)와, 60개 시나리오 × 120주기의 차단·복구 조치 순서"]], [26, 74], { bold: [0] }));
+b.push(GAP()); b.push(P("파이썬 판은 결과를 소수 한 자리로 반올림해 돌려주고 C++ 판은 반올림하지 않은 값을 돌려준다. 그래서 전력값은 반올림 오차(0.05) 안에서 같은지를 본다. 64비트 정수는 배정도 실수로 정확히 표현되는 범위(2^53 미만)만 비교했다."));
+b.push(H2("4.2 실행률"));
+b.push(TBL(["파일", "문장", "분기", "실행되지 않은 줄"], Object.entries(R.coverage).map(([f, v]) => [f, `${pct(v.lines_hit, v.lines)} (${v.lines_hit}/${v.lines})`, `${pct(v.branches_hit, v.branches)} (${v.branches_hit}/${v.branches})`, v.missed_lines.join(", ") || "없음"]), [30, 22, 22, 26], { mono: [0] }));
+b.push(GAP()); b.push(P("실행되지 않은 줄은 switch 문의 default 방어 코드다(규칙 6-4-6 이 요구). 앞 단계에서 자료형을 먼저 걸러 내므로 정상 호출로는 도달하지 않는다. 공인 시험에서 요구하면 해당 내부 함수를 직접 부르는 시험으로 채울 수 있다."));
+
+b.push(H1("5. 정적 점검 결과"));
+b.push(H2("5.1 엄격 컴파일")); b.push(TBL(["컴파일러", "결과", "진단"], R.compile.map(c => [c.compiler, c.ok ? "통과" : "실패", c.diagnostics + "건"]), [56, 22, 22]));
+b.push(GAP()); b.push(P("적용 옵션: " + (R.compile[0] ? R.compile[0].flags : "")));
+b.push(H2("5.2 정적 분석 (clang-tidy)")); b.push(P(T.warnings === undefined ? "clang-tidy 가 없어 실행하지 않았다." : `경고 ${T.warnings}건. 적용 점검군: clang-analyzer, bugprone, cert, misc, 중괄호·C 방식 형 변환·reinterpret_cast·공용체·동적 메모리 관련 점검. (인자 순서 혼동 가능성 점검 bugprone-easily-swappable-parameters 는 MISRA 규칙이 아니어서 뺐다.)`));
+if (T.sample && T.sample.length) b.push(TBL(["경고"], T.sample.map(x => [x.replace(/^.*cpp\//, "")]), [100]));
+b.push(H2("5.3 MISRA C++:2008 규칙 점검"));
+b.push(TBL(["규칙", "내용", "확인 방법", "위반"], R.misra.map(x => [x.rule, x.text, x.auto ? "기계 점검" : "컴파일러·도구·사람 검토", x.auto ? x.count + "건" : "—"]), [16, 54, 18, 12], { center: [3] }));
+b.push(GAP()); b.push(P("이 표는 MISRA C++:2008 의 전체 228개 규칙 가운데 정규식·컴파일러 경고로 기계 확인이 가능한 일부만 다룬다. 전체 규칙 준수 판정은 공인 도구로 해야 한다. 공인 도구가 지적하는 항목은 4단계에서 고치거나, 고칠 수 없으면 근거를 적어 예외(deviation)로 관리한다."));
+b.push(H2("5.4 소스 메트릭"));
+if (M.n_func) { b.push(TBL(["항목", "값", "기준"], [["함수 수", M.n_func, "—"], ["실행 줄 수(함수 본문)", M.nloc, "—"], ["순환 복잡도 최대 / 평균", `${M.cc_max} / ${M.cc_avg}`, `${M.limits.cc} 이하`], ["함수 길이 최대", M.len_max + "줄", `${M.limits.len}줄 이하`], ["인자 수 최대", M.arg_max + "개", `${M.limits.arg}개 이하`]], [40, 30, 30], { bold: [0] }));
+  b.push(GAP()); b.push(TBL(["복잡도 상위 함수", "복잡도", "길이", "인자"], M.top_cc.map(f => [f.name, f.cc, f.len, f.arg]), [58, 14, 14, 14], { mono: [0], center: [1, 2, 3] })); }
+else b.push(P("lizard 가 없어 측정하지 않았다."));
+
+b.push(H1("6. 이식 중 찾은 결함"));
+b.push(TBL(["번호", "내용", "원인", "조치"], [["R-24", "주둔지에서 ESS 가 가득 차고 태양광이 크게 남을 때, 그 주기의 목표 수전이 음수(역송)가 됨(발견 조건에서 −342 kW)", "수전해를 '기동'만 하고 태양광 제한을 함께 걸지 않음. 수전해가 실제로 전력을 받기 전까지 남는 전력이 갈 곳이 없음",
+  "수전해 기동과 동시에 태양광 출력 제한을 건다. 파이썬·C++ 양쪽 수정, 회귀 시험 R-24 추가(무작위 2만 조건에서 목표 수전 ≥ 최소 수전)"]], [8, 34, 28, 30], { bold: [0] }));
+b.push(GAP()); b.push(P("이 결함은 C++ 시험에 '목표 수전은 최소 수전 이상'이라는 불변 조건 검사를 넣으면서 드러났다. 파이썬 판의 기존 시험은 대표 조건만 확인해 놓쳤다."));
+
+b.push(H1("7. 한계와 다음 단계"));
+["공인 도구(LDRA·VectorCAST·QAC·CodeScroll 등)로 측정한 결과가 아니다. 공식 수치는 해당 도구로 다시 내야 한다.", "MISRA C++:2008 전체 규칙을 점검한 것이 아니다(5.3 의 일부 규칙만 기계 점검).",
+ "MC/DC 실행률은 측정하지 않았다. 요구 등급에 포함되면 공인 도구로 측정해야 한다.", "C++ 핵심부는 아직 EMS 실행 파일에 연결되지 않았다. 지금 운전되는 것은 파이썬 판이다.",
+ "64비트 정수는 배정도 실수로 주고받으므로 2^53 이상의 값은 정확도가 떨어진다(전력량 적산값 등 실사용 범위에서는 문제없음).", "음의 영(−0.0)을 실수형으로 쓰면 부호가 보존되지 않는다(양의 영으로 기록).",
+ "Windows(MSVC) 빌드 설정은 넣었으나 이 환경에서 빌드해 보지 못했다(Linux g++·clang++ 로만 확인)."].forEach(t => b.push(NUM(t)));
+b.push(GAP()); b.push(P("재현 방법: python tools/cpp_report.py  (벡터 생성 → 빌드 → 시험 → 실행률 → 정적 점검 → docs/cpp_results.json)"));
+
+fs.mkdirSync(require("path").dirname(OUT), { recursive: true });
+L.save(b, OUT, "이동형 전력체계 EMS C++ 이식 신뢰성 사전 점검서");

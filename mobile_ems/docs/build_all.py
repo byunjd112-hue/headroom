@@ -12,7 +12,7 @@ docs/out 에는 현재 리비전 파일만 남긴다(이전 리비전 산출물�
 import argparse, datetime, os, re, subprocess, sys  # nosec B404 — 개발 도구 실행(고정 인자)
 
 DOCS = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(DOCS); OUT = os.path.join(DOCS, "out")
-BUILDERS = ["build_test_report.js", "build_reliability_report.js", "build_security_review.js", "build_interface_guide.js", "build_device_guides.js"]
+BUILDERS = ["build_test_report.js", "build_reliability_report.js", "build_security_review.js", "build_interface_guide.js", "build_device_guides.js", "build_cpp_report.js"]
 
 
 def run(args, cwd=ROOT, env=None):
@@ -66,6 +66,7 @@ def main(argv=None):
         run(["git", "archive", "--format=zip", f"--prefix=IFPS_Mobile_EMS_{rev}/", "-o", z, "HEAD:" + os.path.basename(ROOT)], cwd=os.path.dirname(ROOT)); print("패키지:", z)
         print("문서 묶음:", bundle(rev)); return 0
     if a.measure:
+        run([sys.executable, "tools/cpp_report.py"])                       # C++ 핵심부: 동등성 시험·실행률·정적 점검
         run([sys.executable, "tools/static_report.py"]); run([sys.executable, "tools/measure.py", "docs/test_results.json", "--soak", str(a.soak)])
     os.makedirs(OUT, exist_ok=True); print(f"이전 리비전 산출물 {clean(rev)}개 삭제")
     for b in BUILDERS: run(["node", os.path.join(DOCS, b), rev, date], env=env)

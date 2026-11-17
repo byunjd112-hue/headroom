@@ -1,6 +1,6 @@
 {
- "date": "2026-11-17 00:20",
- "unittest_s": 96.1,
+ "date": "2026-11-17 12:03",
+ "unittest_s": 98.3,
  "tests": [
   "test_backups_are_pruned_and_broken_backup_refused | ok",
   "test_pointmap_errors_block_save | ok",
@@ -66,6 +66,7 @@
   "test_R09a_slow_starting_device_needs_done_s | ok",
   "test_R09b_seq_and_cmd_go_in_one_frame | ok",
   "results 폴더가 비어 있어도(실행 파일을 거치지 않고 기동) 시연 모드의 발전·예측 화면이 동작한다. | ok",
+  "test_R24_target_import_never_below_minimum | ok",
   "test_R06_malformed_frames_raise_modbus_error_only | ok",
   "test_R03_negative_content_length_rejected | ok",
   "test_R04_snapshot_is_strict_json_even_with_nan | ok",
@@ -100,18 +101,18 @@
   "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
   "test_check_scans_and_module_entry | ok"
  ],
- "n_tests": 97,
+ "n_tests": 98,
  "tests_ok": true,
- "coverage_pct": 93.5,
+ "coverage_pct": 93.4,
  "stmt": {
   "n": 2938,
-  "hit": 2825,
-  "pct": 96.2
+  "hit": 2824,
+  "pct": 96.1
  },
  "branch": {
-  "n": 1034,
-  "hit": 890,
-  "pct": 86.1
+  "n": 1032,
+  "hit": 885,
+  "pct": 85.8
  },
  "coverage_files": [
   [
@@ -132,11 +133,11 @@
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
-   93.1,
+   93.0,
    697,
-   78.9,
+   77.8,
    270,
-   "26-27, 52-53, 64-69, 90-91, 160, 170-171, 284-285, 289, 298, 380, 407-409, 411-412, 503-504, 585-593, 626-627, 789-794, 806-807, 823-824"
+   "26-27, 52-53, 64-69, 90-91, 165, 170-171, 284-285, 289, 298, 380, 411-412, 503-504, 524, 534-536, 585-593, 626-627, 789-794, 806-807, 823-824"
   ],
   [
    "ifps_ems_rt/diag.py",
@@ -310,8 +311,8 @@
    "ifps_ems_rt/opsmode.py",
    100.0,
    113,
-   96.7,
-   30,
+   96.4,
+   28,
    ""
   ],
   [
@@ -882,9 +883,9 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 3535,
+   "loc": 3645,
    "nosec": 0,
-   "skipped_tests": 5
+   "skipped_tests": 7
   },
   "results": []
  },
@@ -896,6 +897,22 @@
    34,
    "Possible binding to all interfaces.",
    "CWE-605"
+  ],
+  [
+   "B404",
+   "LOW",
+   "tools/cpp_report.py",
+   9,
+   "Consider possible security implications associated with the subprocess module.",
+   "CWE-78"
+  ],
+  [
+   "B603",
+   "LOW",
+   "tools/cpp_report.py",
+   32,
+   "subprocess call - check for execution of untrusted input.",
+   "CWE-78"
   ],
   [
    "B310",
@@ -1060,7 +1077,7 @@
   ],
   [
    "ifps_ems_rt/opsmode.py",
-   42.4,
+   42.5,
    "A"
   ],
   [
@@ -1142,7 +1159,7 @@
  "loc_py": {
   "files": 27,
   "sloc": 3063,
-  "comments": 392
+  "comments": 393
  },
  "js": [
   [

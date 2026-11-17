@@ -1,0 +1,263 @@
+{
+ "standard": "MISRA C++:2008 (ISO C++03)",
+ "files": [
+  "src/modbus_codec.cpp",
+  "src/ops_logic.cpp",
+  "include/ems_types.h",
+  "include/modbus_codec.h",
+  "include/ops_logic.h"
+ ],
+ "vectors": "벡터: decode 3524, encode 3993, garrison 3000, gdg 3000, autonomy 2000, shedwant 3000, shedseq 7260",
+ "compile": [
+  {
+   "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+   "flags": "-std=c++98 -Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wfloat-equal -Wold-style-cast -Wcast-qual -Wundef -fno-exceptions -fno-rtti",
+   "ok": true,
+   "diagnostics": 0
+  },
+  {
+   "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)",
+   "flags": "-std=c++98 -Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wfloat-equal -Wold-style-cast -Wcast-qual -Wundef -fno-exceptions -fno-rtti",
+   "ok": true,
+   "diagnostics": 0
+  }
+ ],
+ "tests": {
+  "ok": true,
+  "checks": 81391,
+  "failed": 0,
+  "tail": [
+   "확인 81391건, 실패 0건"
+  ]
+ },
+ "coverage": {
+  "src/modbus_codec.cpp": {
+   "lines": 292,
+   "lines_hit": 286,
+   "branches": 217,
+   "branches_hit": 212,
+   "missed_lines": [
+    213,
+    214,
+    215,
+    276,
+    277,
+    278
+   ]
+  },
+  "src/ops_logic.cpp": {
+   "lines": 182,
+   "lines_hit": 182,
+   "branches": 166,
+   "branches_hit": 165,
+   "missed_lines": []
+  }
+ },
+ "coverage_total": {
+  "lines": 474,
+  "lines_hit": 468,
+  "branches": 383,
+  "branches_hit": 377,
+  "line_pct": 98.7,
+  "branch_pct": 98.4
+ },
+ "tidy": {
+  "version": "Ubuntu LLVM version 18.1.3",
+  "checks": "-*,clang-analyzer-*,bugprone-*,-bugprone-easily-swappable-parameters,cert-*,misc-*,-misc-include-cleaner,-misc-use-anonymous-namespace,readability-braces-around-statements,google-readability-casting,cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-type-union-access,cppcoreguidelines-pro-type-const-cast,cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory",
+  "warnings": 0,
+  "kinds": [],
+  "sample": []
+ },
+ "misra": [
+  {
+   "rule": "0-1-x / 18-4-1",
+   "text": "동적 메모리(new·delete·malloc·free) 사용 금지",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "15-x",
+   "text": "예외(throw·try·catch) 미사용 — 상태값 반환 방식",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "9-5-1",
+   "text": "공용체(union) 금지",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "6-6-1 / 6-6-2",
+   "text": "goto 금지",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "5-2-4",
+   "text": "C 방식·함수 표기 형 변환 금지(static_cast 사용)",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "5-2-7 / 5-2-8",
+   "text": "reinterpret_cast·const_cast·dynamic_cast 금지",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "16-0-x / 16-2-1",
+   "text": "매크로 금지(포함 방지용만 허용)",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "16-2-x",
+   "text": "#undef·#pragma·#if 조건부 컴파일 금지",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "27-0-1",
+   "text": "<cstdio> 입출력 금지",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "18-0-x",
+   "text": "<cstdlib>·<cstring>·<ctime>·<csignal> 금지",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "3-9-2",
+   "text": "크기가 드러나지 않는 기본 자료형 직접 사용 금지(ems_types.h 제외)",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "2-13-x / C++03",
+   "text": "C++11 이후 문법(auto·nullptr·constexpr·long long) 미사용",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "7-5-4",
+   "text": "재귀 금지 — 아래 호출 그래프 점검으로 확인",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "6-6-5",
+   "text": "함수당 return 하나",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "6-3-1 / 6-4-1",
+   "text": "제어문 본문은 중괄호 — clang-tidy readability-braces-around-statements 로 확인",
+   "auto": false,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "6-4-2",
+   "text": "if … else if 는 else 로 끝남 — 사람 검토",
+   "auto": false,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "6-4-6",
+   "text": "switch 에 default",
+   "auto": true,
+   "count": 0,
+   "where": []
+  },
+  {
+   "rule": "6-2-2",
+   "text": "실수 == · != 비교 금지 — 컴파일러 -Wfloat-equal 로 확인",
+   "auto": false,
+   "count": 0,
+   "where": []
+  }
+ ],
+ "misra_funcs": 49,
+ "misra_auto_violations": 0,
+ "metrics": {
+  "n_func": 44,
+  "limits": {
+   "cc": 20,
+   "len": 200,
+   "arg": 8
+  },
+  "cc_max": 17,
+  "cc_avg": 5.16,
+  "len_max": 65,
+  "arg_max": 6,
+  "over": {
+   "cc": [],
+   "len": [],
+   "arg": []
+  },
+  "top_cc": [
+   {
+    "file": "src/ops_logic.cpp",
+    "name": "ems::ops::gdgStep",
+    "cc": 17,
+    "len": 65,
+    "arg": 4
+   },
+   {
+    "file": "src/ops_logic.cpp",
+    "name": "ems::ops::LoadShedder::step",
+    "cc": 17,
+    "len": 52,
+    "arg": 4
+   },
+   {
+    "file": "src/modbus_codec.cpp",
+    "name": "ems::mb::integerWords",
+    "cc": 16,
+    "len": 35,
+    "arg": 2
+   },
+   {
+    "file": "src/ops_logic.cpp",
+    "name": "ems::ops::shedWant",
+    "cc": 14,
+    "len": 42,
+    "arg": 2
+   },
+   {
+    "file": "src/modbus_codec.cpp",
+    "name": "ems::mb::rawValue",
+    "cc": 12,
+    "len": 47,
+    "arg": 1
+   },
+   {
+    "file": "src/modbus_codec.cpp",
+    "name": "ems::mb::encode",
+    "cc": 11,
+    "len": 59,
+    "arg": 5
+   }
+  ],
+  "nloc": 795
+ }
+}
