@@ -588,3 +588,27 @@ td.nw, th.nw { white-space: nowrap; } table.tc td.ell { max-width: 120px; }
 .devs5 .dev .eqimg .eqph { height: 118px; } .devs5 .dev .big { font-size: 23px; }
 .devs5 .dev .meta { gap: 4px; } .devs5 .dev .meta > div { padding: 3px 4px; } .devs5 .dev .meta .lab { font-size: 9.5px; } .devs5 .dev .meta .v { font-size: 11px; }
 .devs5 .dev .acts { gap: 4px; } .devs5 .dev .acts .btn { padding: 0 7px; font-size: 11px; } .devs5 .dev .acts input.in { width: 46px !important; }
+
+/* ── 설정 편집기: 장치별 카드 + 그 자리 편집. 고친 줄 초록, 새 줄 파랑, 지울 줄 줄긋기 */
+.ce-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; } .ce-sep { width: 1px; height: 22px; background: var(--line2); margin: 0 4px; }
+.ce-stat { font-size: 12px; } .ce-chg { color: var(--ok); } .ce-new { color: var(--accent); } .ce-del { color: var(--alarm); }
+.ce-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 12px; height: 790px; }
+.ce-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; overflow: auto; padding-right: 4px; align-content: start; align-items: start; grid-auto-rows: max-content;
+  background-image: radial-gradient(rgba(140,170,200,.14) 1px, transparent 1px); background-size: 18px 18px; border-radius: 12px; }
+.ce-card { background: var(--panel); border: 1px solid var(--line2); border-radius: 12px; overflow: hidden; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.ce-card.on { border-color: var(--accent2); box-shadow: 0 0 0 2px rgba(62,198,255,.25), 0 6px 18px rgba(0,0,0,.25); }
+.ce-hd { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel2); border-bottom: 1px solid var(--line); font-size: 12px; } .ce-hd b { font-size: 14px; color: var(--text); }
+.ce-tb { max-height: 300px; overflow: auto; } .ce-tb table { border-collapse: collapse; font-size: 11.5px; }
+.ce-tb th { position: sticky; top: 0; background: var(--panel); color: var(--muted); font-weight: 600; font-size: 10.5px; text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--line); z-index: 1; }
+.ce-tb td { padding: 1px 2px; border-bottom: 1px solid rgba(120,150,180,.1); }
+.ce-in { height: 23px; background: transparent; border: 1px solid transparent; border-radius: 5px; color: var(--text); font: 11.5px var(--mono); padding: 0 4px; outline: none; }
+.ce-in:hover { border-color: var(--line2); } .ce-in:focus { border-color: var(--accent2); background: rgba(31,143,209,.12); } select.ce-in { padding: 0 1px; } select.ce-in option { background: #0f1720; }
+.ce-in.d { color: #9ff0c9; font-weight: 700; } tr.chg td { background: rgba(47,208,138,.13); } tr.new td { background: rgba(62,198,255,.13); } tr.del td { background: rgba(255,77,100,.10); } tr.del .ce-in { text-decoration: line-through; opacity: .55; }
+.ce-act { white-space: nowrap; } .ce-act button { background: transparent; border: 0; color: var(--muted); cursor: pointer; padding: 2px 4px; font-size: 12px; } .ce-act button:hover { color: var(--text); }
+.ce-side { min-width: 0; display: flex; flex-direction: column; } .ce-side > #ceSide { overflow: auto; flex: 1; }
+.ce-box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; } .ce-box h4 { margin: 0 0 10px; font-size: 13px; } .ce-box h4 .muted { font-weight: 400; font-size: 11.5px; }
+.ce-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .ce-form label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--muted); } .ce-form .in { width: 100%; font-family: var(--mono); }
+.ce-err { color: #ff9aa8; font-size: 12px; padding: 3px 0; } .ce-warn { color: var(--warn); font-size: 12px; padding: 3px 0; }
+.ce-diff { margin: 8px 0 0; padding: 8px 10px; background: #0b1118; border: 1px solid var(--line); border-radius: 8px; font: 11px/1.5 var(--mono); max-height: 420px; overflow: auto; white-space: pre; }
+.ce-diff .a { color: #9ff0c9; background: rgba(47,208,138,.12); display: inline-block; min-width: 100%; } .ce-diff .r { color: #ff9aa8; background: rgba(255,77,100,.10); display: inline-block; min-width: 100%; } .ce-diff .h { color: var(--muted); }
+.ce-json { width: 100%; height: 610px; font-size: 11.5px; line-height: 1.45; resize: none; white-space: pre; }

@@ -69,6 +69,10 @@ def make_handler(eng):
                     return self._send(200, {"rows": eng.rt.audit.tail(int(q.get("n", 200)))[::-1]})
                 if p == "/api/audit/verify": return self._send(200, eng.audit_verify())
                 if p == "/api/info": return self._send(200, eng.runtime_info())
+                if p == "/api/config":
+                    s = self._sess("engineer")
+                    if s: self._send(200, eng.cfged.read())
+                    return
                 if p == "/api/forecast":
                     if q.get("force") == "1" and self._sess("operator") is None: return           # 다시 계산은 무거운 작업
                     return self._send(200, {k: v for k, v in eng.forecast(q.get("force") == "1").items() if not k.startswith("_")})
@@ -154,6 +158,12 @@ def make_handler(eng):
                     s = self._sess("operator")
                     if s: self._send(200, eng.reset_layout(s["name"]))
                     return
+                if p in ("/api/config/check", "/api/config/save", "/api/config/restore"):
+                    s = self._sess("engineer")
+                    if not s: return
+                    if p.endswith("restore"): return self._send(200, eng.cfged.restore(b.get("name"), s["name"]))
+                    if b.get("kind") not in ("runtime", "pointmap"): return self._err(400, "kind 는 runtime 또는 pointmap")
+                    return self._send(200, eng.cfged.check(b["kind"], b) if p.endswith("check") else eng.cfged.save(b["kind"], b, s["name"]))
                 if p == "/api/sim":
                     s = self._sess("engineer")
                     if s: self._send(200, eng.sim_action(b, s["name"]))

@@ -109,7 +109,7 @@ B_DESIGN = [  # FM, 보완설계 반영 내용, 반영 대상, 검증 방법, �
  ["FM-28", "[신규] 자립 운전 중 충전율 상한 근접 시 태양광 출력 제한", "runtime.py(fast_control), opsmode.py", "만충·과잉 태양광 모의 시험", "다음 리비전", "EMS 개발"],
  ["FM-30", "[신규] 정전 판정 다중화(차단기 + 수전 전력 + 전압)", "runtime.py(_grid_watch), pointmap.csv", "차단기 상태 왜곡 시험", "다음 리비전", "EMS 개발"],
  ["FM-32", "ESS 지령 변화율 제한, 발전기 협조 시험", "opsmode.py(gdg_step), SAT 절차서", "부하 급변 시험", "SAT", "EMS 개발"],
- ["FM-49", "설정 값 범위·일관성 검증 확대, 설정 해시 표시", "runtime.py(--check)", "모순 설정 기동 거부 시험", "다음 리비전", "EMS 개발"],
+ ["FM-49", "설정 편집기의 범위·일관성 검사(구현) + 기동 시 같은 검사 적용·설정 해시 머리줄 표시(추가)", "hmi/cfgedit.py, runtime.py(--check)", "모순 설정 저장·기동 거부 시험", "다음 리비전", "EMS 개발"],
  ["FM-50", "포트 보안, 미지령 상태 변화 감지 경보, 보안성 검토 갱신", "망 구성, runtime.py, 보안성 검토 문서", "비인가 단말·미지령 변화 시험", "SAT", "체계통합(SI)"],
  ["FM-51", "FAT·SAT 절차서, 72시간 연속 시험, 형상 통제", "시험 절차서, VERSION 관리", "전 항목 통과", "SAT", "EMS 개발"],
  ["C-01", "전 장치 생존 계수(hb) 필수 요구", "안내서 01~07, 연동 방안서", "진단 도구 자동 진단 ⑥", "FAT", "장비 제작사"],
@@ -158,7 +158,8 @@ S09 = [  # No, FM, 현 예방대책, 구현 위치, 검증 시험, 판정
  [16, "FM-43·44", "감사 기록 연쇄·격리·회전", "ifps_ems_rt/audit", "test_R02_rotation_keeps_chain_and_detects_tamper, test_R07_torn_tail_is_quarantined_and_chain_continues, test_R02_audit_write_failure_does_not_raise", "시험 확인"],
  [17, "FM-24·45", "운용 상태 보존·검증", "runtime.py(set_ops)", "test_ops_persist_and_validation", "시험 확인(상호 검증은 미구현)"],
  [18, "FM-10·28", "없음(현 리비전 미구현)", "—", "—", "미구현 — 보완설계 대상"],
- [19, "FM-49", "기동 전 점검·기동 거부", "runtime.py(--check), engine.py(security_check)", "test_check_scans_and_module_entry, test_start_failures_return_codes, test_unverified_crypto_refused_in_operation_mode", "시험 확인"],
+ [19, "FM-05·49", "설정 편집기: 저장 전 검사·백업·되돌리기·비밀 값 가림", "ifps_ems_rt/hmi/cfgedit.py", "test_pointmap_errors_block_save, test_pointmap_save_backup_pending_and_restore, test_runtime_validation_and_secret_kept, test_backups_are_pruned_and_broken_backup_refused", "시험 확인"],
+ [20, "FM-49", "기동 전 점검·기동 거부", "runtime.py(--check), engine.py(security_check)", "test_check_scans_and_module_entry, test_start_failures_return_codes, test_unverified_crypto_refused_in_operation_mode", "시험 확인"],
 ]
 B_CRIT = [["점수", "심각도 S (임무 영향)", "발생도 O (예상 빈도)", "검출도 D (사전 검출 가능성)"],
  ["9~10", "1등급(임무 필수) 부하 급전 상실 또는 인명·설비 위험", "매우 높음 (월 1회 이상)", "상시 감시 불가 — 고장 후 인지"],

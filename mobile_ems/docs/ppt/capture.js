@@ -22,6 +22,11 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await p.click('#engTabs [data-t="trace"]'); await p.waitForTimeout(2500); const row = await p.$("#trRows tr[data-i]"); if (row) await row.click(); await p.waitForTimeout(400); await p.screenshot({ path: D + "eng_trace.png" });
   await p.click('#engTabs [data-t="points"]'); await p.waitForTimeout(1500); await p.screenshot({ path: D + "eng_points.png" });
   await p.click('#engTabs [data-t="sim"]'); await p.waitForTimeout(1200); await p.screenshot({ path: D + "eng_sim.png" });
+  // 설정 편집: 화면에서만 고쳐 보이고(배율 고침·점 추가·검사) 저장하지 않는다
+  await p.click('#engTabs [data-t="config"]'); await p.waitForTimeout(1500);
+  await p.evaluate(() => { const E = CfgEdit, i = E.rows.findIndex(r => r.v[0] === "DG.fuel_l"); E.rows[i].v[5] = "0.1"; let at = 0; E.rows.forEach((r, k) => { if (r.v[1] === "DG") at = k + 1; });
+    E.rows.splice(at, 0, { v: ["DG.kwh", "DG", "3", "20", "u32", "0.1", "kWh", "", "", "r", "CDAB"], o: -1, del: false }); E.rt.devices.DG.done_s = 8; E.cards(); E.stat(); });
+  await p.click('.ce-bar [data-a="check"]'); await p.waitForTimeout(1500); await p.screenshot({ path: D + "eng_config.png" });
   await go("overview", null, 1500); await p.click('[data-act="layedit"]'); await p.waitForTimeout(800); const it = await p.$(".meq"); if (it) { const bb = await it.boundingBox(); await p.mouse.click(bb.x + bb.width / 2, bb.y + bb.height / 2); } await p.waitForTimeout(500); await p.screenshot({ path: D + "layedit.png" });
   await p.click('[data-act="layedit"]'); await p.waitForTimeout(600);
   // 2) 고장: 2등급 급전선 과전류 트립 + 연료전지 통신 두절

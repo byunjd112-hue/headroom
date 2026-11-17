@@ -354,12 +354,12 @@ const P_ENG = {
   tab: "explorer", traceLast: 0, traceRows: [], paused: false,
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("eng.title", "디버그 · 엔지니어링 도구")}</h2><span class="sub">현장 시운전(FAT/SAT)·고장 분석용. 쓰기·고장 주입은 엔지니어 권한과 감사 기록이 필요합니다</span></div>
-    <div class="tabs" id="engTabs"><button data-t="explorer">${t("eng.explorer", "레지스터 탐색기")}</button><button data-t="trace">${t("eng.trace", "프레임 추적")}</button><button data-t="points">${t("eng.points", "포인트 맵")}</button><button data-t="sim">${t("eng.sim", "시뮬레이터 · 고장 주입")}</button><button data-t="info">${t("eng.info", "시스템 정보")}</button></div><div id="engBody"></div>`;
+    <div class="tabs" id="engTabs"><button data-t="explorer">${t("eng.explorer", "레지스터 탐색기")}</button><button data-t="trace">${t("eng.trace", "프레임 추적")}</button><button data-t="points">${t("eng.points", "포인트 맵")}</button><button data-t="sim">${t("eng.sim", "시뮬레이터 · 고장 주입")}</button><button data-t="config">${t("eng.config", "설정 편집")}</button><button data-t="info">${t("eng.info", "시스템 정보")}</button></div><div id="engBody"></div>`;
     $$("#engTabs button").forEach(b => b.onclick = () => { this.tab = b.dataset.t; this.show(); }); this.show();
   },
   show() {
     $$("#engTabs button").forEach(b => b.classList.toggle("on", b.dataset.t === this.tab)); clearInterval(this._ex); this._ex = null;
-    ({ explorer: () => this.explorer(), trace: () => this.trace(), points: () => this.points(), sim: () => this.sim(), info: () => this.info() })[this.tab]();
+    ({ explorer: () => this.explorer(), trace: () => this.trace(), points: () => this.points(), sim: () => this.sim(), config: () => CfgEdit.open($("#engBody")), info: () => this.info() })[this.tab]();
   },
   explorer() {
     const devs = Object.keys(S.snap.devices);

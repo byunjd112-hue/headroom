@@ -16,6 +16,7 @@ from .. import __version__ as RT_VERSION
 from .. import modbus as mb, pointmap as pm
 from ..runtime import Runtime
 from ..simplant import Plant
+from .cfgedit import ConfigEditor
 
 PRIO_TXT = {1: "긴급", 2: "높음", 3: "보통", 4: "낮음"}
 def _pkg_rev():
@@ -224,6 +225,7 @@ class Engine:
             self.rt.policy = PlanPolicy(self.rt.site, os.path.join(self.rt.state_dir, "history.csv"), plan_dir, days_since_deploy,
                                         demo_csv=os.path.join(plan_dir, "sample_site_data.csv") if sim else None); self.plan_note = "예측 기반 운전계획(동적계획법)"
         self._tag_dev = {p["tag"]: p["device"] for p in self.rt.pts}
+        self.cfged = ConfigEditor(self.cfg_path, note=self.rt.note)                      # 설정 편집기(원본 설정 파일 대상, 재기동 후 적용)
         self.lock = threading.RLock(); self.alarms = AlarmManager(); self.jobs = queue.Queue(); self.busy = None
         self.auto = bool(self.cfg.get("auto", True)); self.running = False
         self.trend = collections.deque(maxlen=4 * 3600); self.scan_ms = collections.deque(maxlen=600)
