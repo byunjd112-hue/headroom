@@ -77,7 +77,7 @@ const P_EN = {
     <div class="en-tiles" id="enTiles"></div>
     <div class="pg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
       <div class="panel"><div class="hd"><h3>부하 예측 · 24시간</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--load)"></i>실측</span><span><i style="background:#fff"></i>예측(중앙)</span><span><i style="background:color-mix(in srgb, var(--load) 33%, transparent)"></i>80% 예측 구간</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="fcL"></canvas></div></div></div>
-      <div class="panel"><div class="hd"><h3>PV 발전 예측 · 24시간</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--pv)"></i>실측</span><span><i style="background:#fff"></i>예측(중앙)</span><span><i style="background:color-mix(in srgb, var(--pv) 33%, transparent)"></i>80% 예측 구간</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="fcP"></canvas></div></div></div>
+      <div class="panel"><div class="hd"><h3>PV 발전 예측 · 24시간</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--pv)"></i>실측</span><span><i style="background:#fff"></i>예측(중앙)</span><span><i style="background:color-mix(in srgb, var(--pv) 33%, transparent)"></i>80% 예측 구간</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="fcP"></canvas></div><div class="pvai" id="pvAi"></div></div></div>
       <div class="panel"><div class="hd"><h3>예측 정밀도</h3><div class="spacer"></div><span class="sub" id="accSub"></span></div><div class="bd"><div class="accbig" id="accBig"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:10px"><div><div class="lab" style="margin-bottom:6px">선행시간별 오차 — 부하 (기준선 15%)</div><div id="accL"></div></div><div><div class="lab" style="margin-bottom:6px">선행시간별 오차 — PV (설비용량 대비)</div><div id="accP"></div></div></div></div></div>
     </div><div class="pg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
@@ -118,6 +118,15 @@ const P_EN = {
     if (f.ok) this.fc = f; else { $("#accSub").textContent = f.why || "예측 계산 중"; clearTimeout(this._retry); this._retry = setTimeout(() => this.load(), 1500); }   // 재시도는 한 줄기만
     this.draw();
   },
+  pvAi(f) {                                                               // 태양광 예측 보강: 하늘 카메라 + 주의집중(닮은 과거 찾기)
+    const s = f.sky || {}, a = f.pv_ai || {};
+    const cam = !s.on ? "하늘 카메라 사용 안 함" : s.ok ? `구름량 <b>${F.n(s.cover, 0)}%</b>` : esc(s.why || "사진 없음");
+    const img = s.on && s.t ? `<img src="/api/skycam.png?t=${Math.floor(s.t)}" alt="하늘 사진">` : `<div class="noimg">사진 없음</div>`;
+    const mix = a.on ? `섞는 비율 ${a.alpha.map((x, i) => "≤" + f.acc.buckets[i] / 4 + "h " + Math.round(x * 100) + "%").filter((_, i) => a.alpha[i] > 0).join(" · ")}` : "검증에서 도움이 안 되어 쉬는 중(릿지 회귀만 사용)";
+    const refs = !a.on ? "" : a.refs.length ? "가장 닮은 과거: " + a.refs.map(r => `${esc(r[0].slice(5))} (${r[1]}%)`).join(", ") : "닮은 과거 표시는 낮에만";
+    const imp = a.on ? "중요하게 본 것: " + a.near.slice(0, 3).map(r => esc(r[0])).join(", ") : "";
+    return `${img}<div><div><span class="tag">하늘 카메라</span> ${cam}</div><div><span class="tag">주의집중 예측</span> ${mix}</div><div class="muted">${refs}${refs && imp ? " · " : ""}${imp}</div></div>`;
+  },
   draw() {
     if (!$("#fcL")) return; const f = this.fc;
     if (this.hrs) drawHourly($("#hrC"), this.hrs, "fill");
@@ -125,6 +134,7 @@ const P_EN = {
     drawForecast($("#fcL"), f, "load", TV("--load"), "fill"); drawForecast($("#fcP"), f, "pv", TV("--pv"), "fill"); drawDaily($("#dayC"), f.daily, "fill"); drawScatter($("#scat"), f.acc.scatter, "fill");
     const a = f.acc, okc = v => v !== null && v <= a.limit ? "ok" : "warnc";
     $("#accSub").textContent = `${f.source} · 발행 ${f.issued} · 백테스트 ${a.n_issue}회 · 모델 ${f.trained.load && f.trained.pv ? "학습됨" : "미학습(전일 동시각)"}`;
+    $("#pvAi").innerHTML = this.pvAi(f);
     $("#accBig").innerHTML = `<div><div class="lab">부하 오차 nMAE</div><div class="big ${okc(a.load_nmae)}">${F.n(a.load_nmae, 1)}<small>%</small></div><div class="muted" style="font-size:12px">기준 ≤ 15%</div></div>
       <div><div class="lab">PV 오차 (용량 대비)</div><div class="big ${okc(a.pv_nmae)}">${F.n(a.pv_nmae, 1)}<small>%</small></div><div class="muted" style="font-size:12px">기준 ≤ 15%</div></div>
       <div><div class="lab">80% 구간 포함률</div><div class="big ${a.load_cov >= 70 ? "ok" : "warnc"}">${F.n(a.load_cov, 0)}<small>% / ${F.n(a.pv_cov, 0)}%</small></div><div class="muted" style="font-size:12px">기준 ≥ 70%</div></div>

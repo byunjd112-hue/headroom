@@ -16,8 +16,9 @@ class TestHmi(unittest.TestCase):
         cfg["ctrl_s"] = 3600; cfg["timeout_s"] = 0.3; cfg["hmi"] = {"pin_operator": "4321", "pin_engineer": "8765", "sbo_s": 5}
         with open(p, "w", encoding="utf-8") as f: json.dump(cfg, f, ensure_ascii=False)
         from test_rt import ensure_sample
-        ensure_sample(os.path.join(ROOT, "results"))
-        cls.eng = Engine(p, sim=True, plan_dir=os.path.join(ROOT, "results")); cls.eng.start(); cls.httpd = serve(cls.eng, "127.0.0.1", 0)
+        ensure_sample(os.path.join(ROOT, "results")); res = os.path.join(cls.td, "results"); os.makedirs(res)      # 시험이 개발 폴더의 모델을 바꾸지 않게 복사본을 쓴다
+        for f in ("sample_site_data.csv", "model_load.npz", "model_pv.npz"): shutil.copy(os.path.join(ROOT, "results", f), res)
+        cls.eng = Engine(p, sim=True, plan_dir=res); cls.eng.start(); cls.httpd = serve(cls.eng, "127.0.0.1", 0)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"; time.sleep(2.5)
 
     @classmethod

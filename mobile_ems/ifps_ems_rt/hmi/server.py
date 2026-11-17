@@ -76,7 +76,10 @@ def make_handler(eng):
                     return
                 if p == "/api/forecast":
                     if q.get("force") == "1" and self._sess("operator") is None: return           # 다시 계산은 무거운 작업
-                    return self._send(200, {k: v for k, v in eng.forecast(q.get("force") == "1").items() if not k.startswith("_")})
+                    return self._send(200, {k: v for k, v in eng.forecast(q.get("force") == "1").items() if not k.startswith("_")} | {"sky": eng.skyw.status()})
+                if p == "/api/skycam.png":
+                    img = eng.skyw.image()
+                    return self._send(200, img, "image/png") if img else self._err(404, "사진 없음")
                 if p == "/api/energy": return self._send(200, eng.energy_hours())
                 if p == "/api/layout": return self._send(200, eng.layout())
                 if p == "/api/photos": return self._send(200, eng.photos())

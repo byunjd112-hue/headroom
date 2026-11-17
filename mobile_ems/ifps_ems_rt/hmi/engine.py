@@ -17,7 +17,9 @@ from .. import modbus as mb, pointmap as pm
 from ..runtime import Runtime
 from ..simplant import Plant
 from .cfgedit import ConfigEditor
+from ifps_ems.dataio import sky_from_clearness as dataio_sky
 from . import fuelwatch
+from .skywatch import SkyWatch
 
 PRIO_TXT = {1: "긴급", 2: "높음", 3: "보통", 4: "낮음"}
 def _pkg_rev():
@@ -143,18 +145,25 @@ class AlarmManager:
 
 # ───────────────────────────────── 가상 장치 구동(현장 부하·PV 변화 모사)
 class SimDriver:
+    LEAD = 1500                                   # 카메라가 미리 보는 시간(초): 하늘 전체를 보므로 태양을 가리기 전의 구름이 보인다
+
     def __init__(self, plant, site):
         self.p = plant; self.site = site; self.hold = {}; self.cloud = 0.9; self.run = True; self.t_last = time.time()
+        self.ahead = collections.deque([0.9] * self.LEAD); self.sky = None        # 앞으로 올 구름(25분치)과 하늘 카메라가 보는 구름량(밤에는 None)
         self.scn = ""; self.extra_load = 0.0; self.err = ""; self.off_h = 0.0
+
+    def _cloud_step(self, clear):
+        """구름을 한 걸음 진행한다. 카메라가 보는 구름량은 15~25분 뒤 태양을 가릴 구름이다(밤에는 None)."""
+        nxt = self.ahead[-1] + 0.02 * (0.85 - self.ahead[-1]) + random.gauss(0, 0.015); self.ahead.append(min(1.02, max(0.15, nxt))); self.cloud = self.ahead.popleft()
+        far = list(self.ahead)[900:]; self.sky = dataio_sky(sum(far) / len(far)) if clear > 0.02 * self.site.pv_kwp else None
 
     def step(self):
         now = datetime.now() + timedelta(hours=self.off_h); hr = now.hour + now.minute / 60 + now.second / 3600; doy = now.timetuple().tm_yday
-        self.cloud += 0.02 * (0.85 - self.cloud) + random.gauss(0, 0.015); self.cloud = min(1.02, max(0.15, self.cloud))
         day = 1 / (1 + math.exp(-(hr - 7.5) * 2)) * 1 / (1 + math.exp((hr - 18.5) * 2))
         p1 = 28 + random.gauss(0, 0.4)
         p2 = 22 + 18 * day + random.gauss(0, 0.8)
         p3 = 9 + 16 * day * (0.6 + 0.4 * math.sin(math.pi * max(0.0, min(1.0, (hr - 7) / 12)))) + random.gauss(0, 0.8) + self.extra_load
-        clear = float(clear_pv_kw(self.site, doy, hr)); pv = max(0.0, clear * self.cloud * (1 + random.gauss(0, 0.01)))
+        clear = float(clear_pv_kw(self.site, doy, hr)); self._cloud_step(clear); pv = max(0.0, clear * self.cloud * (1 + random.gauss(0, 0.01)))
         if "PV.status" in self.p.by_tag:                                    # 인버터 분리 → 0, 출력 제한 적용
             pv = 0.0 if self.p.get("PV.status") < .5 else min(pv, self.p.get("PV.lim_set") or 400.0)
         temp = 16 + 7 * math.sin(2 * math.pi * (hr - 9) / 24) + random.gauss(0, 0.05)
@@ -239,6 +248,7 @@ class Engine:
                                         demo_csv=os.path.join(plan_dir, "sample_site_data.csv") if sim else None); self.plan_note = "예측 기반 운전계획(동적계획법)"
         self.fuel_cfg = dict({"dg_tank_l": 1000.0, "warn_pct": 50.0, "warn_h": 8.0, "repeat_min": 30.0}, **(self.cfg.get("fuel") or {})); self._fuel_t = {}
         self.ai_cfg = dict({"enabled": True, "retrain_h": 24.0, "sim_retrain_h": 2.0, "first_min": 3.0}, **(self.cfg.get("ai") or {}))
+        self.skyw = SkyWatch(self)                                                      # 하늘 카메라(구름량 → 태양광 예측 입력)
         self.ai_busy = False; self.ai_last = None; self.ai_next = time.time() + 60.0 * float(self.ai_cfg["first_min"])
         self._tag_dev = {p["tag"]: p["device"] for p in self.rt.pts}
         self.cfged = ConfigEditor(self.cfg_path, note=self.rt.note)                      # 설정 편집기(원본 설정 파일 대상, 재기동 후 적용)
@@ -355,6 +365,8 @@ class Engine:
     def _ai_loop(self):
         while self.running:
             time.sleep(5.0)
+            try: self.skyw.step(self)
+            except Exception as e: self.rt.note("예측", f"하늘 카메라 처리 실패: {type(e).__name__}: {e}")          # 카메라 문제로 학습 주기가 멈추면 안 된다
             if self.ai_cfg.get("enabled") and not self.ai_busy and time.time() >= self.ai_next: self.ai_train("주기")
 
     def ai_train(self, who="주기"):
@@ -409,7 +421,7 @@ class Engine:
             from ifps_ems.forecast import LoadForecaster, PVForecaster, BUCKET, bucket_of
             site = self.rt.site; hist, md, src = self._forecast_source(site)
             d = dataio.load_csv(hist, site); n = d["n"]
-            fl, fp = LoadForecaster(site), PVForecaster(site); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp)
+            fl, fp = LoadForecaster(site), PVForecaster(site); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp) and fp.trained
             from ifps_ems import learner
             meta = learner.active(md); o = n - 1                                # 적용 중인 모델 정보(최근 오차 보정을 켤지 포함)
             l50, llo, lhi, bl = learner.predict(fl, d, o, "load", site, meta); p50, plo, phi, bp = learner.predict(fp, d, o, "pv", site, meta)
@@ -439,7 +451,8 @@ class Engine:
                            "load_day": round(float(np.mean(day_l)) * 100, 2), "pv_day": round(float(np.mean(day_p)) * 100, 2),
                            "buckets": list(BUCKET), "load_by_h": mk(el), "pv_by_h": mk(ep), "n_issue": len(day_l), "scatter": pts[:400], "limit": 15.0},
                    "daily": daily, "_t": time.time(), "_slot": self._slot_now(), "calc_s": None,
-                   "ai": {"ver": meta.get("ver"), "t": meta.get("t"), "bias_load": None if bl is None else round(bl, 2), "bias_pv": None if bp is None else round(bp, 3)}}
+                   "ai": {"ver": meta.get("ver"), "t": meta.get("t"), "bias_load": None if bl is None else round(bl, 2), "bias_pv": None if bp is None else round(bp, 3)},
+                   "sky": self.skyw.status(), "pv_ai": fp.explain(d, o)}
             self.rt.pv_day_kwh = float(np.sum(p50)) * 0.25                     # 자립 지속시간 계산에 쓰는 하루 태양광 예상량
             with self.fc_lock: self.fc_cache = out
         except Exception as e:
@@ -461,9 +474,7 @@ class Engine:
         if self.sim:
             live = self._live_demo(md, site, rows); src = f"합성 현장 자료 + 가상 장치 실측 {max(rows, 0)}구간(지금 시각까지 이어 붙임)"
             from ifps_ems import learner
-            if not learner.active(md):                    # 시연 첫 기동: 기본 모델을 지금 자료에 맞춰 한 번 학습·검증해 둔다(이후는 주기 학습)
-                rec = learner.train(live, md, site, {k: v for k, v in self.ai_cfg.items() if k in learner.DEFAULTS}, source=src)
-                self.ai_last = rec; self.rt.note("예측", f"지속 학습(첫 기동): {rec.get('why', '')}")
+            if not learner.active(md) and not self.ai_busy: self.ai_next = min(self.ai_next, time.time())      # 시연 첫 기동: 곧바로 한 번 학습·검증한다(별도 프로세스 — 제어 주기를 방해하지 않게)
             return live, md, src
         return hist, md, "합성 현장 자료(실측 8일 미만)"
 
@@ -473,7 +484,7 @@ class Engine:
         import csv
         from ifps_ems import dataio
         now = datetime.now(); slot = self._slot_now(); ref = now - timedelta(days=45); anchor = datetime(ref.year, 1, 1)
-        base = os.path.join(md, f"demo_base_{anchor:%Y}_{now:%Y%m%d}.csv"); fmt = "%Y-%m-%d %H:%M"
+        base = os.path.join(md, f"demo_base_s{anchor:%Y}_{now:%Y%m%d}.csv"); fmt = "%Y-%m-%d %H:%M"
         if not os.path.exists(base):
             for f in os.listdir(md):
                 if f.startswith("demo_base_"): os.remove(os.path.join(md, f))

@@ -167,6 +167,12 @@
   "warn_h": 8,
   "repeat_min": 30
  },
+ "skycam": {
+  "enabled": true,
+  "path": "",
+  "max_age_s": 180,
+  "period_s": 10
+ },
  "ai": {
   "enabled": true,
   "retrain_h": 24,

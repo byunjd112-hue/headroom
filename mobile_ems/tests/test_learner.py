@@ -33,7 +33,7 @@ class TestLearner(unittest.TestCase):
         time.sleep(1.1); r = learner.train(self.csv, md, self.site, {"min_gain": 50.0})         # 50%p 이상 좋아져야 한다는 조건 → 모델 유지
         self.assertFalse(r["adopted"]); self.assertTrue(r["recal"]); self.assertIn("현재 모델 유지", r["why"]); a = learner.active(md)
         self.assertEqual(a["updated"], []); self.assertEqual(a["prev"], v1); self.assertTrue(np.array_equal(w1, np.load(os.path.join(md, "model_load.npz"))["b0_w"]))      # 가중치는 그대로(구간만 재보정)
-        time.sleep(1.1); r2 = learner.train(self.csv, md, self.site); self.assertTrue(r2["adopted"]); self.assertEqual(sorted(learner.active(md)["updated"]), ["load", "pv"])
+        time.sleep(1.1); r2 = learner.train(self.csv, md, self.site, {"min_gain": -50.0}); self.assertTrue(r2["adopted"]); self.assertEqual(sorted(learner.active(md)["updated"]), ["load", "pv"])
         b = learner.rollback(md); self.assertTrue(b["adopted"]); self.assertEqual(learner.active(md)["ver"], a["ver"]); self.assertGreaterEqual(len(learner.history(md)), 3)
 
     def test_bad_or_short_data_is_not_learned(self):

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import numpy as np
 from .solar import clear_pv_kw
 
-HIST_COLS = ["ts", "load_kw", "load_p1", "load_p2", "load_p3", "pv_kw", "temp", "press", "rh", "plan", "mode"]
+HIST_COLS = ["ts", "load_kw", "load_p1", "load_p2", "load_p3", "pv_kw", "temp", "press", "rh", "plan", "mode", "sky"]
 
 
 def _f(x, d=np.nan):
@@ -42,7 +42,8 @@ def load_csv(path, site):
     d = {"n": n, "ts": ts, "doy": np.array([x.timetuple().tm_yday for x in dt], dtype=float),
          "hour": np.array([x.hour + x.minute / 60 for x in dt], dtype=float), "dow": np.array([x.weekday() for x in dt], dtype=int),
          "load": col("load_kw"), "load_p": np.stack([col("load_p1"), col("load_p2"), col("load_p3")], 1) if n else np.zeros((0, 3)),
-         "pv": col("pv_kw"), "temp": col("temp"), "press": col("press"), "rh": col("rh"), "plan": col("plan"), "mode": col("mode")}
+         "pv": col("pv_kw"), "temp": col("temp"), "press": col("press"), "rh": col("rh"), "plan": col("plan"), "mode": col("mode"),
+         "sky": np.clip(col("sky"), 0.0, 1.0)}                # 하늘 카메라 구름량(0~1). 없는 칸(미설치·야간·고장)은 비워 둔다(앞 값으로 채우지 않는다)
     for k in ("load", "pv", "temp", "press", "rh", "plan", "mode"):
         d[k] = _ffill(d[k])
     if n: d["load_p"] = np.stack([_ffill(d["load_p"][:, i]) for i in range(3)], 1)
@@ -76,9 +77,8 @@ def gen_sample(site, path, days=120, start="2026-07-01 00:00", seed=7):
     """합성 현장 자료(15분)를 만든다. 실측이 쌓이기 전 학습·시험용."""
     rng = np.random.default_rng(seed); t0 = datetime.strptime(start, "%Y-%m-%d %H:%M"); n = days * 96
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)           # 폴더가 없으면 만든다(받은 패키지에는 results 폴더가 없다)
-    press = 1013.0; cloud = 0.9; wx = 0; plan = 1
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f); w.writerow(HIST_COLS)
+    press = 1013.0; cloud = 0.9; wx = 0; plan = 1; rows = []; clouds = []; clears = []
+    if True:
         for i in range(n):
             t = t0 + timedelta(minutes=15 * i); hr = t.hour + t.minute / 60; doy = t.timetuple().tm_yday
             if i % 96 == 0:
@@ -95,5 +95,18 @@ def gen_sample(site, path, days=120, start="2026-07-01 00:00", seed=7):
             p2 = (18 + 16 * day + 0.9 * max(0.0, temp - 24)) * act + rng.normal(0, 1.5)
             p3 = (8 + 18 * day * (0.6 + 0.4 * math.sin(math.pi * (hr - 7) / 12)) ) * act * (0.8 if t.weekday() == 6 else 1.0) + rng.normal(0, 1.5)
             p1, p2, p3 = max(p1, 0), max(p2, 0), max(p3, 0)
-            w.writerow([t.strftime("%Y-%m-%d %H:%M"), f"{p1 + p2 + p3:.2f}", f"{p1:.2f}", f"{p2:.2f}", f"{p3:.2f}", f"{pv:.2f}", f"{temp:.2f}", f"{press:.2f}", f"{rh:.2f}", plan, 2])
+            rows.append([t.strftime("%Y-%m-%d %H:%M"), f"{p1 + p2 + p3:.2f}", f"{p1:.2f}", f"{p2:.2f}", f"{p3:.2f}", f"{pv:.2f}", f"{temp:.2f}", f"{press:.2f}", f"{rh:.2f}", plan, 2])
+            clouds.append(cloud); clears.append(clear)
+    # 하늘 카메라 구름량(가정): 카메라는 하늘 전체를 보므로 15~30분 뒤 태양을 가릴 구름을 미리 본다. 낮에만 값이 있다. 다른 열의 값이 바뀌지 않게 난수를 따로 쓴다.
+    rs = np.random.default_rng(seed + 1000)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f); w.writerow(HIST_COLS)
+        for i in range(n):
+            ahead = 0.5 * (clouds[min(n - 1, i + 1)] + clouds[min(n - 1, i + 2)]); e = rs.normal(0, 0.04)
+            w.writerow(rows[i] + [f"{sky_from_clearness(ahead) + e:.3f}" if clears[i] > 0.02 * site.pv_kwp else ""])
     return n
+
+
+def sky_from_clearness(c):
+    """청천 지수(투과율) → 구름량(0~1) 환산(합성 자료·가상 장치용)."""
+    return min(1.0, max(0.0, (1.0 - c) / 0.85))

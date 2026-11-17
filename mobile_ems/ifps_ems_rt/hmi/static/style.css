@@ -615,3 +615,8 @@ td.nw, th.nw { white-space: nowrap; } table.tc td.ell { max-width: 120px; }
 
 /* 넓은 대화상자(AI 학습 상태 등) */
 .modal:has(> .wide) { width: min(1080px, calc(100vw - 32px)); }
+
+.pvai{display:flex;gap:10px;align-items:center;padding:6px 2px 0;font-size:12px;line-height:1.55;min-height:58px}
+.pvai img,.pvai .noimg{width:72px;height:54px;border-radius:6px;object-fit:cover;border:1px solid var(--line);flex:none}
+.pvai .noimg{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10.5px}
+.pvai .tag{display:inline-block;font-size:10.5px;padding:0 6px;border-radius:9px;border:1px solid var(--line);color:var(--muted);margin-right:4px}

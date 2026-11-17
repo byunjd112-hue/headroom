@@ -20,6 +20,7 @@ BAK = re.compile(r"^(runtime|pointmap)\.\d{8}-\d{6}(-\d+)?\.bak$")
 RANGE = {"scan_s": (0.2, 60), "ctrl_s": (1, 3600), "timeout_s": (0.05, 10), "autonomy_target_h": (1, 720), "g1_kw": (0, 10000)}
 AI_RANGE = {"retrain_h": (0.5, 720), "sim_retrain_h": (0.1, 720), "first_min": (0, 1440), "holdout_days": (1, 14), "min_gain": (0, 50), "keep": (2, 100), "max_days": (20, 720),
             "max_gap": (0, 1), "bias_slots": (3, 96), "bias_tau": (1, 96), "nmae_limit": (1, 100)}
+SKY_RANGE = {"max_age_s": (10, 3600), "period_s": (2, 600)}
 FUEL_RANGE = {"dg_tank_l": (10, 1e6), "warn_pct": (5, 95), "warn_h": (1, 240), "repeat_min": (1, 1440)}
 G_RANGE = {"peak_kw": (0, 1e5), "import_min_kw": (0, 1e4), "reserve_soc": (0, 1), "charge_kw": (0, 1e5), "restore_s": (0, 3600), "gdg_kw": (0, 1e5), "gdg_min_load": (0, 1),
            "gdg_delay_s": (0, 3600), "gdg_stop_soc": (0, 1), "gdg_restart_soc": (0, 1), "gdg_tank_l": (0, 1e6), "gdg_l_per_kwh": (0.05, 1), "gdg_min_run_s": (0, 86400)}
@@ -105,6 +106,23 @@ def _check_garrison(g, bad):
         except (TypeError, ValueError) as e: bad.append(f"garrison: {e}")
 
 
+def _check_sections(cfg, bad):
+    """연료 경보·하늘 카메라·지속 학습 설정의 범위 검사."""
+    fu = cfg.get("fuel") or {}
+    if not isinstance(fu, dict): bad.append("fuel: 객체여야 함"); fu = {}
+    for k, (lo, hi) in FUEL_RANGE.items():
+        if k in fu and not _in(fu[k], lo, hi): bad.append(f"fuel.{k}: {lo}~{hi} 범위의 숫자")
+    sk = cfg.get("skycam") or {}
+    if not isinstance(sk, dict): bad.append("skycam: 객체여야 함"); sk = {}
+    for k, (lo, hi) in SKY_RANGE.items():
+        if k in sk and not _in(sk[k], lo, hi): bad.append(f"skycam.{k}: {lo}~{hi} 범위의 숫자")
+    if "path" in sk and not isinstance(sk["path"], str): bad.append("skycam.path: 문자열(사진 파일 경로, 비우면 state/skycam.png)")
+    ai = cfg.get("ai") or {}
+    if not isinstance(ai, dict): bad.append("ai: 객체여야 함"); ai = {}
+    for k, (lo, hi) in AI_RANGE.items():
+        if k in ai and not _in(ai[k], lo, hi): bad.append(f"ai.{k}: {lo}~{hi} 범위의 숫자")
+
+
 def check_runtime(cfg):
     """운전 설정 구조·범위 검사. 반환: (오류 목록, 주의 목록)"""
     bad, warn = [], []
@@ -116,14 +134,7 @@ def check_runtime(cfg):
     for n, d in devs.items(): _check_device(n, d, bad, units)
     if "MTR" not in devs: warn.append("MTR(계측 게이트웨이) 장치가 없음 — 부하 계측·부하 자동 차단 불가")
     _check_garrison(cfg.get("garrison") or {}, bad)
-    fu = cfg.get("fuel") or {}
-    if not isinstance(fu, dict): bad.append("fuel: 객체여야 함"); fu = {}
-    for k, (lo, hi) in FUEL_RANGE.items():
-        if k in fu and not _in(fu[k], lo, hi): bad.append(f"fuel.{k}: {lo}~{hi} 범위의 숫자")
-    ai = cfg.get("ai") or {}
-    if not isinstance(ai, dict): bad.append("ai: 객체여야 함"); ai = {}
-    for k, (lo, hi) in AI_RANGE.items():
-        if k in ai and not _in(ai[k], lo, hi): bad.append(f"ai.{k}: {lo}~{hi} 범위의 숫자")
+    _check_sections(cfg, bad)
     h = cfg.get("hmi") or {}
     if isinstance(h, dict) and str(h.get("bind", "127.0.0.1")) not in ("127.0.0.1", "localhost", "::1"): warn.append(f"제어화면이 {h.get('bind')} 에 열림 — 폐쇄망 내부 단말에서만 사용")
     return bad, warn

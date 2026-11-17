@@ -2,7 +2,8 @@
 """부하·PV 24시간(96구간) 예측. 로직 설명서 3·4·5장.
 
 부하: 목표 y = 부하(i+h) / 기준 부하(i). 선행시간 구간(BUCKET)별 릿지 회귀와 전일 동시각을 결합한다.
-PV : 지수 r = 실제 출력 / 청천 출력을 예측해 청천 출력을 곱한다. 외부 기상 예보 없이 현장 센서만 쓴다.
+PV : 지수 r = 실제 출력 / 청천 출력을 예측해 청천 출력을 곱한다. 외부 기상 예보 없이 현장 센서(기온·기압·습도)와 하늘 카메라의 구름량을 쓴다.
+     릿지 회귀에 주의집중(어텐션) 예측(attn.py — 지금과 닮은 과거 상황을 찾아 가중 평균)을 선행시간 구간별 비율 α 로 섞는다. α 는 보정 구간에서 오차가 가장 작은 값으로 정한다.
 예측 구간: 보정 구간(마지막 7일) 잔차의 10%·90% 분위수(분포 가정 없음).
 """
 import math
@@ -10,6 +11,7 @@ import numpy as np
 from .config import HORIZON
 from .models import Ridge, quantiles
 from .solar import clear_pv_kw
+from .attn import Attention, sky_pair
 
 HS = (1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 80, 96)     # 학습 선행시간 표본
 BUCKET = (4, 8, 16, 32, 64, 96)                            # 선행시간 구간 상한
@@ -66,8 +68,10 @@ class _Base:
         X, Y, _ = self._samples(d, range(self.MIN_O, cut, stride))
         for b in range(len(BUCKET)):
             self.models[b] = Ridge(3.0).fit(np.array(X[b]), np.array(Y[b])) if len(X[b]) > 30 else None
-        self.trained = True
+        self.trained = True; self._post_fit(d, cut)
         return self.calibrate(d)
+
+    def _post_fit(self, d, cut): pass
 
     def calibrate(self, d):
         """예측 구간(10~90%)을 최근 자료의 오차로 다시 맞춘다. 모델 가중치는 그대로 둔다(지속 학습이 모델을 유지할 때도 구간은 새로 맞춘다)."""
@@ -120,8 +124,46 @@ def _clear_at(site, d, o, h):
 
 
 class PVForecaster(_Base):
-    def __init__(self, site):
+    NFEAT = 20
+    ALPHAS = (0.0, 0.25, 0.5, 0.75, 1.0)
+    MIN_GAIN = 0.02                                 # 주의집중 예측을 섞으려면 보정 구간 오차가 이만큼(2%)은 줄어야 한다(우연한 차이로 섞지 않는다)
+
+    def __init__(self, site, use_sky=True, use_att=True):
         super().__init__(site); self.q = np.tile([-0.08, 0.08], (len(BUCKET), 1))
+        self.use_sky, self.use_att = use_sky, use_att; self.att = Attention(HORIZON); self.alpha = np.zeros(len(BUCKET)); self._ac = None
+
+    def to_arrays(self):
+        a = super().to_arrays(); a.update(self.att.to_arrays()); a["alpha"] = self.alpha
+        return a
+
+    def from_arrays(self, a):
+        super().from_arrays(a)
+        if any(m is not None and len(m.w) != self.NFEAT + 1 for m in self.models):          # 이전 판 모델(입력 수가 다름) → 학습 전 상태로 두고 다시 학습하게 한다
+            self.models = [None] * len(BUCKET); self.trained = False; return
+        self.att.from_arrays(a); self.alpha = a["alpha"] if "alpha" in a and self.att.fitted else np.zeros(len(BUCKET))
+
+    def _att_at(self, d, o, h):
+        """주의집중 예측의 h 구간 뒤 지수(없으면 NaN). 같은 발행 시점의 계산은 한 번만 한다."""
+        if self._ac is None or self._ac[0] is not d or self._ac[1] != o or self._ac[2] != d["n"]:
+            self._ac = (d, o, d["n"], self.att.predict(d, o, self._idx(d), self.site.pv_kwp))
+        return float(self._ac[3][h - 1])
+
+    def _post_fit(self, d, cut):
+        """주의집중 예측기를 학습하고, 릿지와 섞는 비율 α 를 선행시간 구간별로 정한다(보정 구간에서 오차가 가장 작은 값 — 도움이 안 되면 0)."""
+        self.alpha = np.zeros(len(BUCKET)); self._ac = None
+        if not self.use_att or not self.att.fit(d, self._idx(d), self.site.pv_kwp).fitted: return
+        X, Y, O = self._samples(d, range(cut, d["n"] - 1, 2))
+        for b in range(len(BUCKET)):
+            if len(Y[b]) < 30: continue
+            y = np.array(Y[b]); base = np.array([self._base_point(d, o, h, x) for (o, h), x in zip(O[b], X[b])]); a = np.array([self._att_at(d, o, h) for o, h in O[b]])
+            a = np.where(np.isfinite(a), a, base); err = [float(np.mean(np.abs((1 - al) * base + al * a - y))) for al in self.ALPHAS]
+            i = int(np.argmin(err)); self.alpha[b] = self.ALPHAS[i] if err[i] < err[0] * (1.0 - self.MIN_GAIN) else 0.0
+
+    def explain(self, d, o):
+        """예측 근거(화면 표시용): 섞는 비율, 가장 많이 참고한 과거 시점, 중요하게 본 특징."""
+        if not self.att.fitted or not np.any(self.alpha > 0): return {"on": False}
+        imp = self.att.importance(); day = d["clear"][o] > 0.05 * self.site.pv_kwp          # 닮은 과거는 낮에만 보여 준다(밤에는 상황이 모두 같아 의미가 없다)
+        return {"on": True, "alpha": [float(x) for x in self.alpha], "refs": self.att.explain(d, o, self._idx(d), self.site.pv_kwp) if day else [], "near": imp[0], "far": imp[1]}
 
     def _idx(self, d):
         if "_r" not in d:
@@ -138,19 +180,26 @@ class PVForecaster(_Base):
         seg = r[max(0, o - 7):o + 1]; var = float(np.nanstd(seg)) if np.sum(np.isfinite(seg)) > 1 else 0.0
         tgt = o + h; ry = r[tgt - 96] if tgt - 96 >= 0 and np.isfinite(r[tgt - 96]) else rd
         P = d["press"]; pm = lambda k: P[o] - P[max(0, o - k)]
+        s0, ds = sky_pair(d, o, r1) if self.use_sky else (0.0, 0.0)          # 하늘 카메라 구름량과 30분 변화
         th = (d["hour"][o] + h * 0.25) % 24; k = self.site.pv_kwp
         return [h / 96.0, self._clear_at(d, o, h) / k, d["clear"][o] / k, math.sin(2 * math.pi * th / 24), math.cos(2 * math.pi * th / 24),
                 r1, r3, var, rd, ry, P[o] - float(np.mean(P[max(0, o - 95):o + 1])), pm(12), pm(48), pm(96),
-                d["rh"][o], d["rh"][o] - d["rh"][max(0, o - 24)], d["temp"][o], d["temp"][o] - d["temp"][max(0, o - 96)]]
+                d["rh"][o], d["rh"][o] - d["rh"][max(0, o - 24)], d["temp"][o], d["temp"][o] - d["temp"][max(0, o - 96)], s0, ds]
 
     def target(self, d, o, h):
         r = self._idx(d)[o + h]
         return None if not np.isfinite(r) else float(r)
 
-    def _point(self, d, o, h, x):
+    def _base_point(self, d, o, h, x):
         b = bucket_of(h)
         if not self.trained or self.models[b] is None: return x[9]          # 전일 동시각 지수
         return W_MODEL * float(self.models[b].predict(x)[0]) + (1 - W_MODEL) * x[9]
+
+    def _point(self, d, o, h, x):
+        y = self._base_point(d, o, h, x); al = float(self.alpha[bucket_of(h)])
+        if al <= 0.0 or not self.trained: return y
+        a = self._att_at(d, o, h)
+        return y if not np.isfinite(a) else (1 - al) * y + al * a
 
     def predict(self, d, o):
         p50 = np.zeros(HORIZON); lo = np.zeros(HORIZON); hi = np.zeros(HORIZON)

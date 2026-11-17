@@ -20,7 +20,16 @@ from . import opsmode as om
 from dataclasses import replace
 from ifps_ems.solar import clear_pv_kw
 
-HIST_COLS = ["ts", "load_kw", "load_p1", "load_p2", "load_p3", "pv_kw", "temp", "press", "rh", "plan", "mode"]
+HIST_COLS = ["ts", "load_kw", "load_p1", "load_p2", "load_p3", "pv_kw", "temp", "press", "rh", "plan", "mode", "sky"]
+
+
+def _add_sky_header(pth):
+    """이전 판이 만든 이력 파일(sky 열 없음)의 머리줄에 sky 를 붙인다. 지난 줄은 그대로 둔다(빈 값으로 읽힌다)."""
+    with open(pth, encoding="utf-8") as f: head = f.readline(); rest = f.read()
+    if "sky" in head.strip().split(","): return
+    tmp = pth + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="") as f: f.write(head.rstrip("\r\n") + ",sky\n" + rest)
+    os.replace(tmp, pth)
 
 
 class Runtime:
@@ -48,9 +57,10 @@ class Runtime:
         self.key_note = ""
         if key is None: key, self.key_note = security.load_or_create_key(self.state_dir)
         self.audit = security.AuditLog(os.path.join(self.state_dir, "audit.log"), security.CryptoProvider(key))
+        self.sky = float("nan")                  # 하늘 카메라 구름량(0~1). 없으면 NaN — 화면부(skywatch)가 넣는다
         self.ai_degraded = False                 # 예측 정확도 저하(지속 학습이 판정) → 계획 운전을 쉬고 규칙 운전
         self.policy = None                       # 운전계획 연결 지점: policy(값 사전, 시각) → (디젤, 연료전지, 수전해) 기동 여부. 없으면 규칙 운전
-        self.t_ctl = -1e9; self.acc = []; self.slot = None; self.mode = self.cfg.get("mode", "island"); self.plan = int(self.cfg.get("plan", 1))
+        self.t_ctl = -1e9; self.acc = []; self.acc_sky = []; self.slot = None; self.mode = self.cfg.get("mode", "island"); self.plan = int(self.cfg.get("plan", 1))
         # 군 운용: 운용 장소(작전지 island / 주둔지 grid), 운용 태세(평시·저소음·자립), 자동 부하 차단, 주둔지 설정
         self.gar = om.Garrison.from_cfg(self.cfg.get("garrison")); self.posture = "평시"; self.auto_enabled = True; self.shedder = om.LoadShedder()
         self.auto_h = None; self.auto_target_h = float(self.cfg.get("autonomy_target_h", 72.0)); self.t_posture = self.now(); self.pv_day_kwh = None
@@ -323,14 +333,16 @@ class Runtime:
         g = lambda k: self.val.get(k, float("nan")); w = self.wall(); slot = w.replace(minute=w.minute // 15 * 15, second=0, microsecond=0)
         if self.slot is not None and slot != self.slot and self.acc:
             m = [sum(c) / len(c) for c in zip(*self.acc)]; pth = os.path.join(self.state_dir, "history.csv"); new = not os.path.exists(pth)
+            sk = [x for x in self.acc_sky if x == x]; sky = f"{sum(sk) / len(sk):.3f}" if sk else ""              # 구름량은 값이 있을 때만 적는다
+            if not new: _add_sky_header(pth)
             with open(pth, "a", newline="", encoding="utf-8") as f:
                 wr = csv.writer(f)
                 if new: wr.writerow(HIST_COLS)
-                wr.writerow([self.slot.strftime("%Y-%m-%d %H:%M")] + [f"{x:.2f}" for x in m] + [self.plan, {"grid": 0, "direct": 1, "island": 2}.get(self.mode, 2)])
-            self.acc = []
+                wr.writerow([self.slot.strftime("%Y-%m-%d %H:%M")] + [f"{x:.2f}" for x in m] + [self.plan, {"grid": 0, "direct": 1, "island": 2}.get(self.mode, 2), sky])
+            self.acc = []; self.acc_sky = []
         self.slot = slot
         row = [g("LOAD.kw"), g("LOAD.p1_kw"), g("LOAD.p2_kw"), g("LOAD.p3_kw"), g("PV.kw"), g("ENV.temp"), g("ENV.press"), g("ENV.rh")]
-        if all(x == x for x in row): self.acc.append(row)
+        if all(x == x for x in row): self.acc.append(row); self.acc_sky.append(self.sky)
 
     def save(self):
         tmp = os.path.join(self.state_dir, "last.json.tmp")
