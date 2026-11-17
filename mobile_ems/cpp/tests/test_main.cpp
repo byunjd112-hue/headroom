@@ -2,6 +2,9 @@
 // (2) 프레임·오류 경로 단위 시험. 시험 코드는 MISRA 적용 대상이 아니다(표준 입출력·문자열 사용).
 #include "modbus_codec.h"
 #include "ops_logic.h"
+#include "pointmap.h"
+#include "sha256.h"
+#include "supervise.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -253,6 +256,173 @@ static void testCodecUnits()
     check(mb::parseWriteResponse(wlong, 13U, 9U, 3U, 10U, 2U, ex) == mb::ST_ERR_FRAME, "쓰기 응답 길이 초과");
 }
 
+// ───────────── 2단계: 대응표, SHA-256·HMAC, 감시·지령
+static pm::Point pointOf(const std::vector<std::string>& r)
+{
+    pm::Point p;
+    for (u32 i = 0U; i < pm::MAX_TAG; ++i) { p.tag[i] = (i < r[0].size()) ? r[0][i] : '\0'; }
+    p.tag[pm::MAX_TAG - 1U] = '\0';
+    p.device = integer(r[1]); p.fc = static_cast<u32>(integer(r[2])); p.addr = static_cast<u32>(integer(r[3])); p.type = static_cast<u32>(integer(r[4])); p.scale = num(r[5]);
+    p.unit = static_cast<u32>(integer(r[6])); p.hasLo = integer(r[7]) == 1; p.lo = num(r[8]); p.hasHi = integer(r[9]) == 1; p.hi = num(r[10]); p.rw = static_cast<u32>(integer(r[11])); p.order = static_cast<u32>(integer(r[12]));
+    return p;
+}
+
+static void testPointmap(const std::string& dir)
+{
+    static pm::Point pts[pm::MAX_POINTS];
+    g_case = "대응표 검사 동등성";
+    std::vector<std::vector<std::string> > rows = load(dir, "pm_validate.txt");
+    u32 n = 0U;
+    for (std::size_t i = 0; i < rows.size(); ++i)
+    {
+        const std::vector<std::string>& r = rows[i];
+        if (r[0] == "case") { n = 0U; }
+        else if (r[0] == "expect")
+        {
+            pm::Report rep;
+            pm::validate(pts, n, rep);
+            u32 total = 0U;
+            for (u32 k = 0U; k < static_cast<u32>(pm::E_KIND_COUNT); ++k) { check(static_cast<int>(rep.count[k]) == integer(r[1 + k]), "오류 종류별 건수"); total += rep.count[k]; }
+            check(rep.total == total, "합계"); check((total == 0U) == (rep.firstIndex == n), "첫 오류 위치");
+        }
+        else { pts[n] = pointOf(r); ++n; }
+    }
+    g_case = "읽기 묶음 동등성";
+    rows = load(dir, "pm_blocks.txt");
+    for (std::size_t i = 0; i < rows.size(); ++i)
+    {
+        const std::vector<std::string>& r = rows[i];
+        if (r[0] == "case") { n = 0U; }
+        else if (r[0] == "expect")
+        {
+            pm::Block bl[pm::MAX_BLOCKS];
+            const u32 k = pm::blocks(pts, n, integer(r[1]), static_cast<u32>(integer(r[2])), static_cast<u32>(integer(r[3])), bl);
+            check(static_cast<int>(k) == integer(r[4]), "묶음 수");
+            for (u32 b = 0U; (b < k) && (static_cast<int>(k) == integer(r[4])); ++b)
+            {
+                check((static_cast<int>(bl[b].fc) == integer(r[5 + 4 * b])) && (static_cast<int>(bl[b].start) == integer(r[6 + 4 * b])) && (static_cast<int>(bl[b].count) == integer(r[7 + 4 * b])) && (static_cast<int>(bl[b].points) == integer(r[8 + 4 * b])), "묶음 내용");
+                check(bl[b].count <= 125U, "한 번에 읽는 개수 한도");
+            }
+        }
+        else { pts[n] = pointOf(r); ++n; }
+    }
+    g_case = "대응표 한도";
+    pm::Report rep;
+    pm::validate(pts, 0U, rep); check(rep.total == 0U && rep.firstIndex == 0U, "빈 표");
+    for (u32 i = 0U; i < pm::MAX_POINTS; ++i) { std::ostringstream t; t << "D0.q" << i; std::vector<std::string> r; r.push_back(t.str()); const char* rest[12] = { "0", "3", "0", "0", "0x1p+0", "9", "0", "0x0p+0", "0", "0x0p+0", "0", "0" }; for (int k = 0; k < 12; ++k) { r.push_back(rest[k]); } pts[i] = pointOf(r); pts[i].addr = i * 300U; }
+    pm::validate(pts, pm::MAX_POINTS + 50U, rep); check(rep.total == 0U, "최대 점 수(초과분은 보지 않음)");
+    pm::Block bl[pm::MAX_BLOCKS];
+    check(pm::blocks(pts, pm::MAX_POINTS + 50U, 0, 0U, 100U, bl) == pm::MAX_BLOCKS, "묶음 표 한도에서 멈춤");
+    g_case = "십진수 해석 동등성";
+    std::ifstream f((dir + "/decimal.txt").c_str()); std::string line; int nline = 0;
+    while (std::getline(f, line))
+    {
+        const std::size_t e = line.rfind(']'); const std::string text = line.substr(1, e - 1); const std::string want = line.substr(e + 2);
+        f64 v = 0.0; const bool ok = pm::parseDecimal(text.c_str(), static_cast<u32>(text.size()), v);
+        check(ok == (want != "bad"), "수용·거부 [" + text + "]"); if (ok && (want != "bad")) { check(v == num(want), "값 [" + text + "]"); }
+        ++nline;
+    }
+    check(nline > 1000, "벡터 수"); f64 v = 0.0; check(!pm::parseDecimal("1234567890123456", 16U, v), "16자리 거부");
+}
+
+static std::vector<u8> unhex(const std::string& s)
+{
+    std::vector<u8> out;
+    if (s != "-") { for (std::size_t i = 0; (i + 1) < s.size(); i += 2) { out.push_back(static_cast<u8>(std::strtol(s.substr(i, 2).c_str(), 0, 16))); } }
+    return out;
+}
+
+static std::string hexOf(const u8 d[], u32 n)
+{
+    static const char* const H = "0123456789abcdef"; std::string s;
+    for (u32 i = 0U; i < n; ++i) { s += H[d[i] >> 4]; s += H[d[i] & 0x0FU]; }
+    return s;
+}
+
+static void testSha(const std::string& dir)
+{
+    g_case = "SHA-256·HMAC 동등성";
+    const std::vector<std::vector<std::string> > rows = load(dir, "sha.txt");
+    const u8 none[1] = { 0U };
+    for (std::size_t i = 0; i < rows.size(); ++i)
+    {
+        const std::vector<u8> msg = unhex(rows[i][0]); const std::vector<u8> key = unhex(rows[i][1]);
+        const u8* m = msg.empty() ? none : &msg[0]; const u8* k = key.empty() ? none : &key[0];
+        u8 d[crypto::SHA256_LEN]; u8 mac[crypto::SHA256_LEN]; u8 d2[crypto::SHA256_LEN];
+        crypto::Sha256 h; h.update(m, static_cast<u32>(msg.size())); h.finish(d);
+        check(hexOf(d, crypto::SHA256_LEN) == rows[i][2], "SHA-256");
+        crypto::Sha256 h2; const u32 half = static_cast<u32>(msg.size() / 2U);                 // 나눠 넣어도 같은 결과
+        h2.update(m, half); h2.update(m + half, static_cast<u32>(msg.size()) - half); h2.finish(d2);
+        check(crypto::sameDigest(d, d2), "나눠 넣기");
+        crypto::hmacSha256(k, static_cast<u32>(key.size()), m, static_cast<u32>(msg.size()), mac);
+        check(hexOf(mac, crypto::SHA256_LEN) == rows[i][3], "HMAC");
+        d2[31] = static_cast<u8>(d2[31] ^ 1U); check(!crypto::sameDigest(d, d2), "1비트 차이 검출");
+    }
+}
+
+class MockPort : public sv::ICommandPort
+{
+public:
+    MockPort() : writeOk(true), cancelOk(true), writes(0), cancels(0), lastSeq(0U), lastCode(0U) {}
+    virtual bool writeCommand(u16 seq, u16 code) { ++writes; lastSeq = seq; lastCode = code; return writeOk; }
+    virtual bool cancel() { ++cancels; return cancelOk; }
+    bool writeOk; bool cancelOk; int writes; int cancels; u16 lastSeq; u16 lastCode;
+};
+
+static void testSupervise(const std::string& dir)
+{
+    g_case = "지령 순번 동등성";
+    const std::vector<std::vector<std::string> > rows = load(dir, "seq.txt");
+    for (std::size_t i = 0; i < rows.size(); ++i) { check(static_cast<int>(sv::Commander::nextSeq(static_cast<u16>(integer(rows[i][0])), static_cast<u16>(integer(rows[i][1])))) == integer(rows[i][2]), "다음 순번"); }
+    check(sv::Commander::nextSeq(65535U, 0U) == 1U && sv::Commander::nextSeq(0U, 0U) == 1U && sv::Commander::nextSeq(65534U, 0U) == 65535U, "순환");
+
+    g_case = "값 범위 감시";
+    sv::ValueGuard g(true, 0.0, true, 100.0); const f64 zero = 0.0;
+    check(!g.hasValue() && g.ageS(5.0) < 0.0, "처음에는 값 없음");
+    check(g.accept(50.0, 1.0) && g.hasValue() && g.value() == 50.0, "범위 안 수용");
+    check(!g.accept(150.0, 2.0) && !g.accept(-1.0, 3.0) && !g.accept(zero / zero, 4.0) && !g.accept(1.0 / zero, 5.0), "범위 밖·NaN·무한대 거부");
+    check(g.value() == 50.0 && g.rejected() == 4U && g.ageS(6.0) == 5.0, "직전 값 유지와 경과 시간");
+    check(g.accept(0.0, 7.0) && g.accept(100.0, 8.0), "경계값 수용");
+    sv::ValueGuard open(false, 0.0, false, 0.0); check(open.accept(-1.0e9, 0.0) && open.accept(1.0e9, 0.0) && !open.accept(zero / zero, 0.0), "범위 없는 점");
+    sv::ValueGuard half(true, 0.0, false, 0.0); check(half.accept(1.0e9, 0.0) && !half.accept(-0.1, 0.0), "하한만 있는 점");
+
+    g_case = "생존 계수 감시";
+    sv::HeartbeatMonitor hb(5.0);
+    check(!hb.frozen(100.0), "값을 받기 전에는 판정하지 않음");
+    hb.update(10U, 0.0); check(!hb.frozen(4.9) && hb.frozen(5.0), "5초 정지");
+    hb.update(10U, 6.0); check(hb.frozen(6.0), "같은 값이면 계속 정지");
+    hb.update(11U, 7.0); check(!hb.frozen(7.0) && !hb.frozen(11.9) && hb.frozen(12.0), "값이 바뀌면 풀림");
+    hb.update(0U, 13.0); check(!hb.frozen(13.0), "65535 → 0 순환도 변화로 본다");
+
+    g_case = "지령 응답 처리";
+    sv::CmdConfig cfg; cfg.ackS = 1.5; cfg.doneS = 0.0; cfg.retries = 1U;
+    { MockPort p; sv::Commander c(p, cfg);                                         // 정상: 수용과 상태 변화를 같은 주기에 확인
+      check(c.state() == sv::CS_IDLE && c.start(true, 1U, 7U, 0.0) && c.seq() == 8U && p.lastSeq == 8U && p.lastCode == 1U, "시작: 순번 = 장치 순번 + 1");
+      check(!c.start(true, 1U, 7U, 0.1) && p.writes == 1, "진행 중 중복 시작 거부");
+      c.poll(0.2, true, 7U, false); check(c.state() == sv::CS_WAIT_ACK, "아직 미수용");
+      c.poll(0.3, false, 8U, true); check(c.state() == sv::CS_WAIT_ACK, "읽기 실패 주기는 판단하지 않음");
+      c.poll(0.4, true, 8U, true); check(c.state() == sv::CS_OK && c.failure() == sv::CF_NONE && c.attempts() == 1U && p.cancels == 0, "수용 + 상태 변화 = 완료");
+      c.poll(9.0, true, 8U, true); check(c.state() == sv::CS_OK, "완료 뒤 poll 은 영향 없음");
+      check(c.start(false, 2U, 8U, 10.0) && c.seq() == 9U, "다음 지령"); }
+    { MockPort p; sv::Commander c(p, cfg);                                         // 무응답: 재지령 1회 → 취소
+      c.start(true, 1U, 0U, 0.0); c.poll(1.0, true, 0U, false); c.poll(1.5, true, 0U, false);
+      check(c.state() == sv::CS_WAIT_ACK && c.attempts() == 2U && c.seq() == 2U && p.writes == 2, "한도 경과 → 새 순번으로 재지령");
+      c.poll(2.0, true, 1U, true); check(c.state() == sv::CS_WAIT_ACK, "옛 순번 응답은 수용으로 보지 않음");
+      c.poll(3.0, true, 0U, false); check(c.state() == sv::CS_FAILED && c.failure() == sv::CF_NO_ACK && p.cancels == 1 && c.cancelled(), "무응답 → 취소(cmd=0)"); }
+    { MockPort p; cfg.doneS = 30.0; sv::Commander c(p, cfg);                       // 기동이 느린 장비: 수용 뒤 완료 한도까지 대기
+      c.start(true, 1U, 0U, 0.0); c.poll(0.5, true, 1U, false); check(c.state() == sv::CS_WAIT_DONE, "수용했으나 아직 기동 중");
+      c.poll(20.0, true, 1U, false); check(c.state() == sv::CS_WAIT_DONE && c.attempts() == 1U, "완료 한도 안에서는 재지령하지 않음");
+      c.poll(25.0, true, 1U, true); check(c.state() == sv::CS_OK, "늦은 기동 완료"); }
+    { MockPort p; cfg.doneS = 2.0; p.cancelOk = false; sv::Commander c(p, cfg);    // 수용했으나 상태 미변화 → 재지령 → 실패, 취소 쓰기도 실패
+      c.start(false, 2U, 5U, 0.0); c.poll(0.1, true, 6U, true); c.poll(2.1, true, 6U, true); check(c.attempts() == 2U && c.state() == sv::CS_WAIT_ACK, "완료 한도 경과 → 재지령");
+      c.poll(2.2, true, 7U, true); c.poll(4.2, true, 7U, true); check(c.state() == sv::CS_FAILED && c.failure() == sv::CF_NOT_DONE && !c.cancelled(), "수용했으나 상태 미변화, 취소 실패 보고"); }
+    { MockPort p; p.writeOk = false; cfg.doneS = 0.0; sv::Commander c(p, cfg);     // 쓰기 실패: 응답을 믿지 않고 한도까지 기다린 뒤 재지령
+      c.start(true, 1U, 0U, 0.0); c.poll(0.5, true, 1U, true); check(c.state() == sv::CS_WAIT_ACK, "쓰기 실패 중에는 우연히 맞는 값도 무시");
+      c.poll(1.5, true, 0U, false); c.poll(3.0, true, 0U, false); check(c.state() == sv::CS_FAILED && p.writes == 2 && p.cancels == 1, "쓰기 실패 → 재지령 → 취소"); }
+    { MockPort p; cfg.retries = 0U; sv::Commander c(p, cfg); c.poll(1.0, true, 0U, false); check(c.state() == sv::CS_IDLE, "대기 중 poll 은 영향 없음");
+      c.start(true, 1U, 65535U, 0.0); check(c.seq() == 1U, "순번 순환"); c.poll(1.5, true, 0U, false); check(c.state() == sv::CS_FAILED && c.attempts() == 1U, "재지령 0회 설정"); }
+}
+
 int main(int argc, char* argv[])
 {
     const std::string dir = (argc > 1) ? argv[1] : "build/vec";
@@ -260,6 +430,9 @@ int main(int argc, char* argv[])
     testDecode(dir);
     testEncode(dir);
     testOps(dir);
+    testPointmap(dir);
+    testSha(dir);
+    testSupervise(dir);
     std::cout << "확인 " << g_checks << "건, 실패 " << g_fail << "건\n";
     return (g_fail == 0) ? 0 : 1;
 }

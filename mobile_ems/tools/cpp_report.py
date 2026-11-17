@@ -9,7 +9,8 @@ MISRA C++:2008 기계 점검(일부 규칙), 소스 메트릭(lizard). 결과: d
 import json, os, re, shutil, subprocess, sys  # nosec B404 — 개발 도구 실행(고정 인자)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); CPP = os.path.join(ROOT, "cpp"); B = os.path.join(CPP, "build")
-SRC = ["src/modbus_codec.cpp", "src/ops_logic.cpp"]; HDR = ["include/ems_types.h", "include/modbus_codec.h", "include/ops_logic.h"]
+SRC = ["src/modbus_codec.cpp", "src/ops_logic.cpp", "src/pointmap.cpp", "src/sha256.cpp", "src/supervise.cpp"]
+HDR = ["include/ems_types.h", "include/modbus_codec.h", "include/ops_logic.h", "include/pointmap.h", "include/sha256.h", "include/supervise.h"]
 STRICT = ["-std=c++98", "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-Wconversion", "-Wsign-conversion", "-Wshadow", "-Wfloat-equal", "-Wold-style-cast", "-Wcast-qual", "-Wundef",
           "-fno-exceptions", "-fno-rtti", "-fsyntax-only", "-Iinclude"]
 TIDY = "-*,clang-analyzer-*,bugprone-*,-bugprone-easily-swappable-parameters,cert-*,misc-*,-misc-include-cleaner,-misc-use-anonymous-namespace,readability-braces-around-statements,google-readability-casting,cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-type-union-access,cppcoreguidelines-pro-type-const-cast,cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory"
@@ -22,7 +23,7 @@ RULES = [("0-1-x / 18-4-1", "동적 메모리(new·delete·malloc·free) 사용 
          ("5-2-7 / 5-2-8", "reinterpret_cast·const_cast·dynamic_cast 금지", r"\b(reinterpret_cast|const_cast|dynamic_cast)\b"),
          ("16-0-x / 16-2-1", "매크로 금지(포함 방지용만 허용)", r"^\s*#\s*define\s+(?!EMS_\w+_H\s*$)"), ("16-2-x", "#undef·#pragma·#if 조건부 컴파일 금지", r"^\s*#\s*(undef|pragma|if\b|elif)"),
          ("27-0-1", "<cstdio> 입출력 금지", r"<c?stdio(\.h)?>|\bprintf\b|\bscanf\b"), ("18-0-x", "<cstdlib>·<cstring>·<ctime>·<csignal> 금지", r"<c(stdlib|string|time|signal|setjmp)>|<(stdlib|string|time|signal|setjmp)\.h>"),
-         ("3-9-2", "크기가 드러나지 않는 기본 자료형 직접 사용 금지(ems_types.h 제외)", r"\b(unsigned|signed|short|long|int|char|float|double)\b"),
+         ("3-9-2", "크기가 드러나지 않는 기본 자료형 직접 사용 금지(ems_types.h 제외, 문자 자료의 char 는 허용 — 규칙 5-0-11)", r"\b(unsigned|signed|short|long|int|float|double)\b"),
          ("2-13-x / C++03", "C++11 이후 문법(auto·nullptr·constexpr·long long) 미사용", r"\b(auto|nullptr|constexpr|noexcept|decltype|static_assert)\b|\blong\s+long\b"),
          ("7-5-4", "재귀 금지 — 아래 호출 그래프 점검으로 확인", None), ("6-6-5", "함수당 return 하나", None), ("6-3-1 / 6-4-1", "제어문 본문은 중괄호 — clang-tidy readability-braces-around-statements 로 확인", None), ("6-4-2", "if … else if 는 else 로 끝남 — 사람 검토", None),
          ("6-4-6", "switch 에 default", None), ("6-2-2", "실수 == · != 비교 금지 — 컴파일러 -Wfloat-equal 로 확인", None)]

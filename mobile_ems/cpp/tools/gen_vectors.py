@@ -78,7 +78,68 @@ def shed_seq():
     return out
 
 
-nd, ne = codec(); L, ga, gd, au, sw = ops(); sq = shed_seq()
+UNITS = ["kW", "kWh", "%", "V", "A", "Hz", "Nm3", "L", "degC", ""]
+PKIND = ["이름 중복", "자료형 오류", "바이트 순서 오류", "기능 코드 오류", "읽기·쓰기 구분 오류", "지령은 보유", "단위 오류", "배율 0", "범위 하한", "정의되지 않은 장치", "주소 겹침", "전력 채널 단위"]
+
+
+def phase2():
+    """2단계 벡터: 대응표 검사·읽기 묶음, SHA-256·HMAC, 십진수 해석, 지령 순번."""
+    import hashlib, hmac
+    from ifps_ems_rt import pointmap as pm
+    devs = {"D0": {}, "D1": {}}; val, blk = [], []
+    for case in range(400):
+        n = R.randrange(1, 40); pts = []; addr = {("D0", 3): 0, ("D0", 4): 0, ("D1", 3): 0, ("D1", 4): 0}; faulty = case % 4 != 0
+        for i in range(n):
+            dv = R.choice(["D0", "D1"]); fc = R.choice([3, 4]); ty = R.choice(TYPES); rw = "w" if (fc == 3 and R.random() < 0.2) else "r"; un = R.choice(UNITS)
+            tag = f"{dv}.p{i}" if R.random() < 0.85 else f"{dv}.x{i}.kw"
+            if tag.endswith(".kw") and not faulty: un = "kW"
+            a = addr[(dv, fc)] + R.choice([0, 0, 0, 1, 3]); addr[(dv, fc)] = a + mb.NREG[ty]
+            lo, hi = R.choice([(None, None), (0.0, 100.0), (-50.0, 50.0), (None, 10.0)])
+            p = {"tag": tag, "device": dv, "fc": fc, "addr": a, "type": ty, "scale": R.choice([1.0, 0.1, 0.01, -0.1]), "unit": un, "lo": lo, "hi": hi, "rw": rw, "order_raw": "", "order": R.choice(ORDERS)}
+            if faulty and R.random() < 0.25:
+                k = R.randrange(11)
+                if k == 0 and pts: p["tag"] = R.choice(pts)["tag"]
+                elif k == 1: p["type"] = "u99"
+                elif k == 2: p["order"] = None
+                elif k == 3: p["fc"] = R.choice([1, 6])
+                elif k == 4: p["rw"] = "x"
+                elif k == 5: p["rw"] = "w"; p["fc"] = 4
+                elif k == 6: p["unit"] = "kVA"
+                elif k == 7: p["scale"] = 0.0
+                elif k == 8: p["lo"], p["hi"] = 10.0, 10.0
+                elif k == 9: p["device"] = "NOPE"
+                else: p["addr"] = max(0, a - 1)
+            pts.append(p)
+        errs = pm.validate(pts, devs); cnt = [sum(1 for e in errs if k in e) for k in PKIND]
+        assert sum(cnt) == len(errs), errs
+        enc = lambda p: " ".join(str(x) for x in (p["tag"], {"D0": 0, "D1": 1}.get(p["device"], -1), p["fc"], p["addr"], TYPES.index(p["type"]) if p["type"] in TYPES else 8, h(p["scale"]),
+                                                  UNITS.index(p["unit"]) if p["unit"] in UNITS else 99, int(p["lo"] is not None), h(p["lo"] or 0.0), int(p["hi"] is not None), h(p["hi"] or 0.0),
+                                                  {"r": 0, "w": 1}.get(p["rw"], 2), ORDERS.index(p["order"]) if p["order"] else 4))
+        val.append(f"case {n}"); val += [enc(p) for p in pts]; val.append("expect " + " ".join(str(c) for c in cnt))
+        if not faulty:
+            for dv in ("D0", "D1"):
+                gap = R.choice([0, 0, 1, 4]); mx = R.choice([100, 8, 20]); mix = pts[:]; R.shuffle(mix); bs = pm.blocks(mix, dv, gap, mx)      # 입력 순서가 섞여 있어도 주소순으로 묶는다
+                blk.append(f"case {n}"); blk += [enc(p) for p in mix]; blk.append(f"expect {0 if dv == 'D0' else 1} {gap} {mx} {len(bs)} " + " ".join(f"{b[0]} {b[1]} {b[2]} {len(b[3])}" for b in bs))
+    sha = []
+    for _ in range(300):
+        msg = bytes(R.randrange(256) for _ in range(R.choice([0, 1, 55, 56, 57, 63, 64, 65, 119, 120, R.randrange(300)]))); key = bytes(R.randrange(256) for _ in range(R.choice([0, 1, 32, 64, 65, 100])))
+        sha.append(f"{msg.hex() or '-'} {key.hex() or '-'} {hashlib.sha256(msg).hexdigest()} {hmac.new(key, msg, hashlib.sha256).hexdigest()}")
+    dec = []
+    for _ in range(1500):
+        ip = str(R.randrange(0, 10 ** R.randrange(1, 9))); fp = "".join(R.choice("0123456789") for _ in range(R.randrange(0, 7))); t = R.choice(["", "-", "+"]) + ip + ("." + fp if (fp or R.random() < 0.1) else "")
+        t = R.choice([t, t, t, t, "abc", "", "1e5", "1.2.3", "-", ".", "12a", " 1"]) if R.random() < 0.15 else t
+        try: v = h(float(t)) if (t.strip() == t and "e" not in t.lower() and t not in ("", "-", "+") and "_" not in t and any(c.isdigit() for c in t) and "inf" not in t and "nan" not in t) else "bad"
+        except ValueError: v = "bad"
+        dec.append(f"[{t}] {v}")
+    seq = []; cur = 0
+    for _ in range(500):
+        last = R.choice([0, cur, R.randrange(65536), 65535, 65534]); nxt = max(cur, last) % 65535 + 1; seq.append(f"{cur} {last} {nxt}"); cur = R.choice([nxt, nxt, R.randrange(65536)])
+    return val, blk, sha, dec, seq
+
+
+nd, ne = codec(); L, ga, gd, au, sw = ops(); sq = shed_seq(); pv, pb, sh2, dc, sq2 = phase2()
+for name, rows in (("pm_validate.txt", pv), ("pm_blocks.txt", pb), ("sha.txt", sh2), ("decimal.txt", dc), ("seq.txt", sq2)):
+    open(os.path.join(OUT, name), "w").write("\n".join(rows) + "\n")
 for name, rows in (("site.txt", L), ("garrison.txt", ga), ("gdg.txt", gd), ("autonomy.txt", au), ("shedwant.txt", sw), ("shedseq.txt", sq)):
     open(os.path.join(OUT, name), "w").write("\n".join(rows) + "\n")
-print(f"벡터: decode {nd}, encode {ne}, garrison {len(ga)}, gdg {len(gd)}, autonomy {len(au)}, shedwant {len(sw)}, shedseq {len(sq)}")
+print(f"벡터: decode {nd}, encode {ne}, garrison {len(ga)}, gdg {len(gd)}, autonomy {len(au)}, shedwant {len(sw)}, shedseq {len(sq)}, 대응표 검사 {sum(1 for x in pv if x.startswith('case'))}, 읽기 묶음 {sum(1 for x in pb if x.startswith('case'))}, SHA·HMAC {len(sh2)}, 십진수 {len(dc)}, 순번 {len(sq2)}")

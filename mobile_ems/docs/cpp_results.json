@@ -3,11 +3,17 @@
  "files": [
   "src/modbus_codec.cpp",
   "src/ops_logic.cpp",
+  "src/pointmap.cpp",
+  "src/sha256.cpp",
+  "src/supervise.cpp",
   "include/ems_types.h",
   "include/modbus_codec.h",
-  "include/ops_logic.h"
+  "include/ops_logic.h",
+  "include/pointmap.h",
+  "include/sha256.h",
+  "include/supervise.h"
  ],
- "vectors": "벡터: decode 3524, encode 3993, garrison 3000, gdg 3000, autonomy 2000, shedwant 3000, shedseq 7260",
+ "vectors": "벡터: decode 3524, encode 3993, garrison 3000, gdg 3000, autonomy 2000, shedwant 3000, shedseq 7260, 대응표 검사 400, 읽기 묶음 200, SHA·HMAC 300, 십진수 1500, 순번 500",
  "compile": [
   {
    "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
@@ -24,10 +30,10 @@
  ],
  "tests": {
   "ok": true,
-  "checks": 81391,
+  "checks": 93615,
   "failed": 0,
   "tail": [
-   "확인 81391건, 실패 0건"
+   "확인 93615건, 실패 0건"
   ]
  },
  "coverage": {
@@ -51,15 +57,36 @@
    "branches": 166,
    "branches_hit": 165,
    "missed_lines": []
+  },
+  "src/pointmap.cpp": {
+   "lines": 123,
+   "lines_hit": 123,
+   "branches": 150,
+   "branches_hit": 143,
+   "missed_lines": []
+  },
+  "src/sha256.cpp": {
+   "lines": 107,
+   "lines_hit": 107,
+   "branches": 36,
+   "branches_hit": 35,
+   "missed_lines": []
+  },
+  "src/supervise.cpp": {
+   "lines": 90,
+   "lines_hit": 90,
+   "branches": 64,
+   "branches_hit": 62,
+   "missed_lines": []
   }
  },
  "coverage_total": {
-  "lines": 474,
-  "lines_hit": 468,
-  "branches": 383,
-  "branches_hit": 377,
-  "line_pct": 98.7,
-  "branch_pct": 98.4
+  "lines": 794,
+  "lines_hit": 788,
+  "branches": 633,
+  "branches_hit": 617,
+  "line_pct": 99.2,
+  "branch_pct": 97.5
  },
  "tidy": {
   "version": "Ubuntu LLVM version 18.1.3",
@@ -141,7 +168,7 @@
   },
   {
    "rule": "3-9-2",
-   "text": "크기가 드러나지 않는 기본 자료형 직접 사용 금지(ems_types.h 제외)",
+   "text": "크기가 드러나지 않는 기본 자료형 직접 사용 금지(ems_types.h 제외, 문자 자료의 char 는 허용 — 규칙 5-0-11)",
    "auto": true,
    "count": 0,
    "where": []
@@ -196,17 +223,17 @@
    "where": []
   }
  ],
- "misra_funcs": 49,
+ "misra_funcs": 85,
  "misra_auto_violations": 0,
  "metrics": {
-  "n_func": 44,
+  "n_func": 82,
   "limits": {
    "cc": 20,
    "len": 200,
    "arg": 8
   },
   "cc_max": 17,
-  "cc_avg": 5.16,
+  "cc_avg": 4.6,
   "len_max": 65,
   "arg_max": 6,
   "over": {
@@ -237,27 +264,27 @@
     "arg": 2
    },
    {
-    "file": "src/ops_logic.cpp",
-    "name": "ems::ops::shedWant",
-    "cc": 14,
-    "len": 42,
+    "file": "src/pointmap.cpp",
+    "name": "ems::pm::checkPoint",
+    "cc": 16,
+    "len": 12,
+    "arg": 3
+   },
+   {
+    "file": "src/pointmap.cpp",
+    "name": "ems::pm::validate",
+    "cc": 15,
+    "len": 54,
     "arg": 2
    },
    {
-    "file": "src/modbus_codec.cpp",
-    "name": "ems::mb::rawValue",
-    "cc": 12,
-    "len": 47,
-    "arg": 1
-   },
-   {
-    "file": "src/modbus_codec.cpp",
-    "name": "ems::mb::encode",
-    "cc": 11,
-    "len": 59,
-    "arg": 5
+    "file": "src/pointmap.cpp",
+    "name": "ems::pm::blocks",
+    "cc": 15,
+    "len": 54,
+    "arg": 4
    }
   ],
-  "nloc": 795
+  "nloc": 1308
  }
 }

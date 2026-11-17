@@ -1,4 +1,4 @@
-# IFPS 이동형 EMS — C++ 핵심부(1단계: 통신 부호화, 군 운용 논리). MISRA C++:2008 은 C++03 기준이다.
+# IFPS 이동형 EMS — C++ 핵심부(1·2단계: 통신 부호화, 군 운용 논리, 대응표, 감시·지령, SHA-256·HMAC). MISRA C++:2008 은 C++03 기준이다.
 cmake_minimum_required(VERSION 3.10)
 project(ifps_ems_core CXX)
 set(CMAKE_CXX_STANDARD 98)
@@ -10,7 +10,7 @@ if(MSVC)
 else()
   add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wshadow -Wfloat-equal -Wold-style-cast -Wcast-qual -Wundef -Wswitch-default -fno-exceptions -fno-rtti)
 endif()
-add_library(ems_core STATIC src/modbus_codec.cpp src/ops_logic.cpp)
+add_library(ems_core STATIC src/modbus_codec.cpp src/ops_logic.cpp src/pointmap.cpp src/sha256.cpp src/supervise.cpp)
 target_include_directories(ems_core PUBLIC include)
 if(EMS_COVERAGE AND NOT MSVC)
   target_compile_options(ems_core PRIVATE --coverage -O0)

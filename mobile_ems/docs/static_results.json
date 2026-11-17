@@ -1,6 +1,6 @@
 {
- "date": "2026-11-17 12:03",
- "unittest_s": 98.3,
+ "date": "2026-11-17 12:43",
+ "unittest_s": 98.7,
  "tests": [
   "test_backups_are_pruned_and_broken_backup_refused | ok",
   "test_pointmap_errors_block_save | ok",
@@ -103,16 +103,16 @@
  ],
  "n_tests": 98,
  "tests_ok": true,
- "coverage_pct": 93.4,
+ "coverage_pct": 93.3,
  "stmt": {
   "n": 2938,
-  "hit": 2824,
-  "pct": 96.1
+  "hit": 2821,
+  "pct": 96.0
  },
  "branch": {
   "n": 1032,
-  "hit": 885,
-  "pct": 85.8
+  "hit": 884,
+  "pct": 85.7
  },
  "coverage_files": [
   [
@@ -133,11 +133,11 @@
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
-   93.0,
+   92.5,
    697,
-   77.8,
+   77.4,
    270,
-   "26-27, 52-53, 64-69, 90-91, 165, 170-171, 284-285, 289, 298, 380, 411-412, 503-504, 524, 534-536, 585-593, 626-627, 789-794, 806-807, 823-824"
+   "26-27, 52-53, 64-69, 90-91, 165, 170-171, 284-285, 289, 298, 380, 407-409, 411-412, 503-504, 524, 534-536, 585-593, 626-627, 789-794, 806-807, 823-824"
   ],
   [
    "ifps_ems_rt/diag.py",
@@ -883,7 +883,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 3645,
+   "loc": 3646,
    "nosec": 0,
    "skipped_tests": 7
   },
@@ -910,7 +910,7 @@
    "B603",
    "LOW",
    "tools/cpp_report.py",
-   32,
+   33,
    "subprocess call - check for execution of untrusted input.",
    "CWE-78"
   ],
