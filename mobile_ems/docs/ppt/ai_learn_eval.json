@@ -18,10 +18,10 @@
     },
     "pv": {
      "current": null,
-     "new": 5.61,
+     "new": 4.48,
      "gain": null,
-     "near": 3.83,
-     "near_bias": 5.28,
+     "near": 3.43,
+     "near_bias": 3.48,
      "bias_on": false,
      "better": true,
      "n": 351
@@ -31,7 +31,7 @@
     "load",
     "pv"
    ],
-   "sec": 3.2
+   "sec": 6.7
   },
   {
    "days": 45,
@@ -50,11 +50,11 @@
      "n": 768
     },
     "pv": {
-     "current": 4.5,
-     "new": 6.12,
-     "gain": -1.62,
-     "near": 1.76,
-     "near_bias": 1.79,
+     "current": 5.1,
+     "new": 5.94,
+     "gain": -0.84,
+     "near": 2.06,
+     "near_bias": 2.24,
      "bias_on": false,
      "better": false,
      "n": 328
@@ -63,7 +63,7 @@
    "updated": [
     "load"
    ],
-   "sec": 3.5
+   "sec": 6.9
   },
   {
    "days": 60,
@@ -82,18 +82,18 @@
      "n": 768
     },
     "pv": {
-     "current": 3.33,
-     "new": 3.7,
-     "gain": -0.37,
-     "near": 2.65,
-     "near_bias": 2.3,
+     "current": 3.44,
+     "new": 3.58,
+     "gain": -0.14,
+     "near": 2.39,
+     "near_bias": 2.23,
      "bias_on": true,
      "better": false,
      "n": 312
     }
    },
    "updated": [],
-   "sec": 3.2
+   "sec": 7.0
   }
  ],
  "defaults": {
@@ -121,11 +121,11 @@
     "n": 768
    },
    "pv": {
-    "current": 3.33,
-    "new": 3.7,
-    "gain": -0.37,
-    "near": 2.65,
-    "near_bias": 2.3,
+    "current": 3.44,
+    "new": 3.58,
+    "gain": -0.14,
+    "near": 2.39,
+    "near_bias": 2.23,
     "bias_on": true,
     "better": false,
     "n": 312

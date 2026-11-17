@@ -1,0 +1,142 @@
+// 이동형 전력체계 EMS — AI 예측 논문(초안). 수치는 docs/ppt/ai_paper_eval.json(ai_paper_eval.py 가 만든다)에서 읽는다. 손으로 수치를 적지 않는다.
+// node build_ai_paper.js [Rev] [작성일] [출력.docx]
+const fs = require("fs"), path = require("path"); const L = require("./lib.js"); const { P, H1, H2, EQ, TBL, GAP, run } = L;
+const { Paragraph, ImageRun, AlignmentType } = require("docx");
+const E = JSON.parse(fs.readFileSync(path.join(__dirname, "ppt", "ai_paper_eval.json"), "utf8")), LE = JSON.parse(fs.readFileSync(path.join(__dirname, "ppt", "ai_learn_eval.json"), "utf8"));
+const REV = process.argv[2] || "Rev00", DATE = process.argv[3] || "", OUT = process.argv[4] || path.join(__dirname, "out", `이동형전력체계EMS_AI예측_논문_${REV}.docx`);
+const b = [], PV = E.pv, P0 = PV[0], P1 = PV[1], P3 = PV[2], pc = v => v === null || v === undefined ? "—" : Number(v).toFixed(2) + "%", cut = (a, c) => Math.round((1 - c / a) * 100), NP = E.cost.params_ridge + E.cost.params_att + E.cost.params_alpha;
+let figN = 0, tabN = 0, eqN = 0;
+const C = (t, o = {}) => new Paragraph(Object.assign({ alignment: AlignmentType.CENTER, spacing: { after: 100 }, children: [run(t, o.run || {})] }, o.p || {}));
+function fig(file, w, h, cap) { figN++; const ext = path.extname(file).slice(1) === "png" ? "png" : "jpg";
+  b.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 40 }, children: [new ImageRun({ type: ext, data: fs.readFileSync(path.join(__dirname, "ppt", "img", file)), transformation: { width: w, height: h }, altText: { title: cap, description: cap, name: file } })] }));
+  b.push(C(`그림 ${figN}. ${cap}`, { run: { size: 20 }, p: { spacing: { after: 160 } } })); return figN; }
+const m3 = (name, cap) => fig(`ai3d_m_${name}.jpg`, 620, 349, cap + " (실제 학습 값을 3차원에 그대로 배치해 그린 것)"), ch = (name, cap) => fig(`aich_${name}.png`, 600, 310, cap);
+const eq = t => { eqN++; b.push(new Paragraph({ spacing: { before: 60, after: 100 }, indent: { left: 500 }, tabStops: [{ type: "right", position: 9500 }], children: [run(t, { font: "Cambria Math", size: 23 }), run(`\t(${eqN})`, { size: 21 })] })); return eqN; };
+const tbl = (cap, head, rows, w, o) => { tabN++; b.push(C(`표 ${tabN}. ${cap}`, { run: { size: 20 }, p: { spacing: { before: 140, after: 60 } } })); b.push(TBL(head, rows, w, o)); b.push(GAP()); return tabN; };
+const para = t => b.push(P(t, { alignment: AlignmentType.JUSTIFIED }));
+
+// ── 제목·요약
+b.push(C("기상 예보 없이 동작하는 이동형 마이크로그리드의 부하·태양광 단기 예측:", { run: { size: 32, bold: true }, p: { spacing: { before: 400, after: 60 } } }));
+b.push(C("릿지 회귀, 하늘 카메라 구름량, 주의집중 예측의 결합과 검증 기반 지속 학습", { run: { size: 32, bold: true }, p: { spacing: { after: 200 } } }));
+b.push(C("Short-Term Load and PV Forecasting for a Deployable Microgrid without Weather Forecasts: Combining Ridge Regression, Sky-Camera Cloud Cover and Attention with Validation-Gated Continual Learning", { run: { size: 22, italics: true }, p: { spacing: { after: 240 } } }));
+b.push(C("한화에어로스페이스㈜ 에너지솔루션사업센터", { run: { size: 22 } })); b.push(C(`기술 논문 초안 · ${REV} · ${DATE}`, { run: { size: 20, color: "595959" }, p: { spacing: { after: 300 } } }));
+b.push(P([run("요약  ", { bold: true }), run(`작전지에 전개하는 이동형 전력체계는 통신이 닫힌 환경에서 운용되므로 외부 기상 예보를 받을 수 없고, 연산 장치도 노트북급으로 제한된다. 본 논문은 이런 조건에서 앞으로 24시간의 부하와 태양광 출력을 15분 단위로 예측하는 방법을 제시한다. 태양광은 출력을 청천 출력으로 나눈 청천 지수를 예측 대상으로 삼고, (1) 선행시간 구간별 릿지 회귀, (2) 하늘 카메라 사진의 붉은빛·푸른빛 비율로 구한 구름량, (3) 지금과 닮은 과거 상황을 찾아 그 뒤의 실측을 가중 평균하는 주의집중(어텐션) 예측을 결합한다. 두 예측을 섞는 비율은 선행시간 구간마다 검증 오차가 2% 이상 줄 때만 0 보다 크게 둔다. 운용 중에는 주기적으로 다시 학습하되, 학습에 쓰지 않은 최근 자료에서 현재 모델보다 나쁘지 않을 때만 새 모델을 적용한다. 학습되는 값은 태양광 모델 전체가 ${NP}개이며 노트북 CPU 에서 학습 ${E.cost.train_pv_s}초, 예측 ${E.cost.predict_s}초가 걸린다. 합성 현장 자료 ${E.data.days}일(시험 ${E.data.test_days}일)에서 태양광의 2시간 이내 오차는 릿지 회귀만 쓸 때 ${pc(P0.near)}에서 ${pc(P3.near)}로 ${cut(P0.near, P3.near)}% 줄었고, 24시간 전체 오차는 ${pc(P0.nmae)}에서 ${pc(P3.nmae)}로 거의 같았다. 부하는 전일 같은 시각 기준선 대비 ${cut(E.load.base, E.load.nmae)}% 낮은 ${pc(E.load.nmae)}였다. 결과는 합성 자료에 한정되며, 하늘 카메라가 15~30분 뒤의 구름을 미리 본다는 가정이 들어 있어 실제 효과는 현장 자료로 다시 확인해야 한다.`)], { alignment: AlignmentType.JUSTIFIED }));
+b.push(P([run("주제어  ", { bold: true }), run("마이크로그리드, 단기 예측, 태양광 발전 예측, 릿지 회귀, 전천 카메라, 주의집중(어텐션), 커널 회귀, 지속 학습, 예측 구간")]));
+b.push(P([run("Abstract  ", { bold: true }), run(`A deployable field microgrid operates on a closed network, so it cannot receive external weather forecasts, and its computing is limited to a laptop-class machine. We present a method that forecasts load and PV output for the next 24 hours at 15-minute resolution under these constraints. For PV we forecast the clear-sky index and combine (1) ridge regression per lead-time bucket, (2) cloud cover from the red–blue ratio of all-sky camera images, and (3) an attention predictor that averages what actually followed similar past situations. The blending ratio is set per lead-time bucket and is non-zero only when validation error drops by at least 2%. In operation the model is retrained periodically, but a new model is adopted only if it is not worse than the current one on recent data held out from training. The PV model has ${NP} learned values; training takes ${E.cost.train_pv_s} s and one forecast ${E.cost.predict_s} s on a laptop CPU. On ${E.data.days} days of synthetic site data (${E.data.test_days} test days), PV error within 2 hours fell from ${pc(P0.near)} to ${pc(P3.near)} (${cut(P0.near, P3.near)}% lower), while the 24-hour error was nearly unchanged (${pc(P0.nmae)} to ${pc(P3.nmae)}). The results are limited to synthetic data that assumes the camera sees clouds 15–30 minutes ahead; the real benefit must be re-measured with field data.`)], { alignment: AlignmentType.JUSTIFIED }));
+b.push(P([run("Keywords  ", { bold: true }), run("microgrid, short-term forecasting, PV forecasting, ridge regression, all-sky camera, attention, kernel regression, continual learning, prediction interval")]));
+
+// ── 1. 서론
+b.push(H1("1. 서론"));
+para("이동형 전력체계는 디젤발전기, 연료전지, 에너지저장장치(ESS), 이동형 태양광을 묶어 작전지에 전력을 공급한다. 에너지관리시스템(EMS)은 연료 소비와 소음을 줄이기 위해 발전기 기동 시점과 ESS 충·방전을 미리 계획하며, 이 계획은 앞으로 24시간의 부하와 태양광 출력 예측에 기댄다. 예측이 크게 틀리면 발전기를 불필요하게 돌리거나, 반대로 야간에 ESS 가 모자라 발전기를 급히 켜게 된다.");
+para("일반 전력 계통의 예측과 달리 이 환경에는 세 가지 제약이 있다. 첫째, 폐쇄망에서 운용하므로 수치 예보 등 외부 기상 자료를 받을 수 없다. 둘째, 연산 장치가 노트북급이어서 큰 신경망을 학습하기 어렵고, 학습이 제어 주기를 방해해서는 안 된다. 셋째, 전개 직후에는 현장 자료가 거의 없으며 편성과 계절에 따라 부하와 날씨의 성질이 바뀐다. 여기에 더해, 운용자가 예측 결과를 믿고 쓰려면 왜 그렇게 예측했는지를 설명할 수 있어야 한다.");
+para("본 논문의 기여는 다음과 같다. (1) 외부 예보 없이 현장 센서와 하늘 카메라만으로 동작하는 가벼운 예측 구조를 제시한다. (2) 닮은 과거 상황을 가중 평균하는 주의집중 예측을 특징별 중요도만 학습하는 형태로 구성해, 학습 값이 수십 개에 그치고 참고한 과거 시점을 그대로 보여 줄 수 있게 했다. (3) 두 예측을 섞는 비율과 모델 교체를 모두 '학습에 쓰지 않은 자료에서의 오차'로 결정해, 도움이 되지 않는 요소가 스스로 꺼지게 했다. (4) 효과가 나타나는 구간과 나타나지 않는 구간을 구분해 보고한다.");
+
+// ── 2. 관련 연구
+b.push(H1("2. 관련 연구"));
+para("릿지 회귀는 가중치의 크기에 벌점을 주어 특징 사이의 상관이 클 때에도 안정적인 해를 주는 선형 회귀이다[1]. 부하 예측 분야에서는 선형 모형에 시각·요일·기온과 과거 부하를 넣는 방식이 오래 쓰여 왔고, 점 예측과 함께 예측 구간을 내는 확률적 예측의 필요성이 강조되어 왔다[2]. 분위수를 직접 추정하는 방법은 분포를 가정하지 않고 구간을 만들 수 있게 한다[3].");
+para("태양광의 수 분~수 시간 앞 예측에서는 지상에서 하늘을 찍는 전천 카메라가 쓰인다. 맑은 하늘과 구름은 붉은빛과 푸른빛의 비가 달라, 화소별 색 비율에 경계값을 적용해 구름을 구분하는 방법이 널리 알려져 있다[4][5][6]. 전천 영상으로 구름의 이동을 추적해 수십 분 앞의 일사를 예측한 연구도 있다[7]. 본 논문은 이 가운데 가장 단순한 색 비율 판정만을 쓰고, 구름 이동 추적은 다루지 않는다.");
+para("주의집중(어텐션)은 질의와 열쇠의 닮은 정도를 소프트맥스로 가중치로 바꾸어 값을 가중 합하는 연산으로, 대형 언어 모델의 바탕인 트랜스포머의 핵심이다[8]. 닮은 표본을 거리에 따라 가중 평균하는 생각 자체는 커널 회귀로 오래전에 제시되었으며[9][10], 본 논문의 주의집중 예측은 특징별 척도를 학습하는 커널 회귀로 볼 수 있다. 본 논문은 새로운 학습 이론을 제안하는 것이 아니라, 알려진 요소들을 폐쇄망·저사양·소량 자료라는 조건에 맞게 결합하고 검증 절차로 묶은 것이다.");
+
+// ── 3. 문제와 자료
+b.push(H1("3. 문제 정의와 자료"));
+para(`시각은 15분 구간으로 나눈다. 예측을 내는 시점을 o, 선행시간을 h(1~96구간, 24시간)라 하면, 목표는 o 까지의 측정값만으로 부하 L(o+h)와 태양광 출력 P(o+h)의 중앙값과 80% 구간을 내는 것이다. 이력의 한 줄은 15분 평균으로, 부하 합계와 등급별 부하, 태양광 출력, 기온, 기압, 습도, 하늘 카메라 구름량(0~1), 편성 단계, 운전 방식을 담는다. 구름량은 카메라가 없거나 밤이면 비워 둔다.`);
+H2 && b.push(H2("3.1 청천 출력과 청천 지수"));
+para("태양광 출력은 시각과 계절에 따라 크게 변하므로, 구름이 없을 때 낼 수 있는 출력으로 나눈 비율을 예측 대상으로 삼는다. 태양 천정각 θ 는 위도 φ, 태양 적위 δ, 시간각 ω 로부터");
+eq("cos θ = sin φ · sin δ + cos φ · cos δ · cos ω");
+para("로 구하며, δ 와 균시차는 날짜의 삼각함수 급수로 계산한다. 청천 전천 일사는 Haurwitz 식을 쓰고, 청천 출력은 설비 용량 P_kWp 와 종합 성능계수 PR 을 곱해 구한다.");
+eq("G = 1098 · cos θ · exp(−0.057 / cos θ)  [W/㎡] ,    P_clear = P_kWp · PR · G / 1000");
+para("청천 지수와 최종 출력 예측은 다음과 같다. 청천 출력이 설비 용량의 5% 미만인 구간(밤)은 r 을 정의하지 않는다.");
+eq("r(t) = clip( P(t) / P_clear(t) , 0 , 1.2 ) ,    P̂(o+h) = r̂(o+h) · P_clear(o+h)");
+b.push(H2("3.2 특징"));
+para("모든 특징은 o 까지의 측정값으로만 만든다. 부하의 예측 대상은 기준 부하 B(o)(전개 후 14일까지의 평균, 이후 고정)로 나눈 비율 y = L(o+h)/B(o)이다.");
+tbl("예측에 쓰는 특징", ["대상", "특징", "수"], [
+  ["태양광 (20)", "선행시간 h/96, 목표 시각과 현재의 청천 출력(용량 대비), 목표 시각의 sin·cos", 5], ["", "청천 지수: 최근 1시간·3시간 평균, 2시간 표준편차, 24시간 평균, 전일 같은 시각", 5], ["", "기압: 24시간 평균 대비, 3·12·24시간 변화 / 습도와 6시간 변화 / 기온과 24시간 변화", 8], ["", "하늘 카메라 구름량과 30분 변화", 2],
+  ["부하 (18)", "선행시간 h/96, 목표 시각의 1·2·3차 주기(sin·cos), 일요일 여부, 편성 단계", 9], ["", "부하: 현재, 최근 1시간·24시간 평균, 전일·전주 같은 시각, 전일 대비 변화", 6], ["", "기온, 목표 시각의 기온 추정, 목표 시각의 청천 출력", 3]], [16, 74, 10], { bold: [0], center: [2] });
+
+// ── 4. 방법
+b.push(H1("4. 방법"));
+m3("arch", "태양광 예측 모델의 전체 구조. 블록의 개수가 실제 특징·가중치·중요도·비율의 개수이다");
+b.push(H2("4.1 선행시간 구간별 릿지 회귀"));
+para("선행시간을 6개 구간(1·2·4·8·16·24시간 이내)으로 나누고 구간 b 마다 따로 학습한다. 특징을 평균 μ, 표준편차 σ 로 표준화한 행렬 Z 에 대해 가중치는 닫힌 식으로 구한다(절편에는 벌점을 주지 않는다).");
+eq("w_b = (ZᵀZ + λI)⁻¹ Zᵀy ,    λ = 3");
+para("예측은 모형 출력에 전일 같은 시각의 값을 20% 섞는다. 입력이 학습 범위를 벗어났을 때 선형 모형이 크게 벗어나는 것을 줄이기 위한 것이다.");
+eq("r̂_R(o, h) = 0.8 · w_bᵀ z(o, h) + 0.2 · r(o + h − 96)");
+para(`학습 표본은 o 를 3구간마다 옮기며 선행시간 14종에 대해 만든다. 반복 최적화가 없으므로 같은 자료에서는 항상 같은 모델이 나온다. 그림 ${figN + 1}은 1시간 이내 구간에서 학습된 결과를 두 특징에 대한 단면으로 보인 것이다.`);
+m3("ridge", `릿지 회귀(1시간 이내 구간)의 학습 표본 ${E.viz.ridge.pts.length}개와 학습된 단면 ŷ = c + a·x₁ + b·x₂ (a = ${E.viz.ridge.a}, b = ${E.viz.ridge.b}). 나머지 18개 특징은 평균에 고정했다`);
+b.push(H2("4.2 예측 구간"));
+para("모델 학습에서 빼 둔 마지막 7일(보정 구간)에서 오차 e = r − r̂ 의 10%·90% 분위수를 구간 b 별로 구해 80% 예측 구간을 만든다. 운전 계획은 배치 초기일수록 큰 계수 κ 로 부하는 위쪽, 태양광은 아래쪽 경계 쪽으로 치우친 값을 쓴다.");
+eq("[ r̂ + Q₁₀(e_b) ,  r̂ + Q₉₀(e_b) ] × P_clear");
+m3("band", "한 번의 태양광 24시간 예측. 띠는 80% 예측 구간, 점은 그 뒤의 실측이다");
+b.push(H2("4.3 하늘 카메라 구름량"));
+para("카메라가 찍은 하늘 사진의 각 화소에서 붉은빛 R 과 푸른빛 B 의 정규화 차이를 구한다. 맑은 하늘은 R 이 B 보다 훨씬 작고 구름은 R 과 B 가 비슷하므로, 경계값보다 큰 화소를 구름으로 센다. 포화된 태양 원반은 세지 않으며, 평균 밝기가 낮은 사진(야간)은 판정하지 않는다.");
+eq("ρ = (R − B) / (R + B + 1) ,    c = |{ρ > −0.12}| / |하늘 화소|");
+para("구름량 c 는 10초마다 읽어 15분 평균으로 이력에 남긴다. 사진이 없거나 3분 넘게 갱신되지 않았거나 읽기에 실패하면 값을 비우고, 그때는 구름량 자리에 (1 − 최근 1시간 청천 지수)/0.85 를 대신 넣는다. 따라서 카메라 고장이 예측을 멈추게 하지 않는다.");
+b.push(H2("4.4 주의집중 예측"));
+para(`지금 상황을 나타내는 벡터 q(o)와 과거 시점 i 의 상황 K_i 를 같은 방법으로 만든다. 성분은 ${E.att.features}개로, ${E.att.names.join(", ")}이다. 값 V_i(h)는 시점 i 에서 h 구간 뒤에 실제로 관측된 청천 지수이다. 표준화한 성분에 특징별 중요도 s_k 를 곱한 거리로 가중치를 정한다.`);
+const EQW = eq("d_i = Σ_k s_k² ( q̃_k − K̃_ik )² ,    w_i = m_i · exp(−d_i) / Σ_j m_j · exp(−d_j)");
+eq("r̂_A(o, h) = Σ_i w_i · V_i(h)");
+para(`여기서 m_i 는 기억 i 의 값이 예측 시점 전에 모두 관측된 경우(O_i + 96 ≤ o)에만 1 이다. 즉 미래의 자료는 쓰지 않으며, 이는 예측 시점 뒤의 자료를 바꿔도 예측이 변하지 않음을 확인하는 시험으로 검증한다. 식 (${EQW})은 질의–열쇠의 닮음을 소프트맥스로 가중치로 바꾸는 주의집중 연산과 같은 꼴이며, 통계적으로는 대각 척도를 학습하는 Nadaraya–Watson 커널 회귀에 해당한다.`);
+para(`중요도 s 는 가까운 예측(2시간 이내)과 먼 예측(2~24시간)에 따로 두어 모두 ${E.cost.params_att}개이다. 학습은 최근 7일의 시점들을 그 이전 기억만으로 맞혀 본 평균 절대 오차를 목표로, 한 번에 한 성분씩 2배·1/2배·0 으로 바꿔 보아 오차가 줄 때만 받아들이는 좌표 하강을 2회 반복한다. 기억은 1시간 간격으로 만들며 본 실험에서는 ${E.att.memories.toLocaleString()}건이다.`);
+m3("attn", `한 번의 예측(${E.viz.att.issued})에서 질의 q 주변의 기억. 다면체 크기와 빛줄기 굵기는 가중치 w_i, 색은 1시간 뒤 실측 V_i 이다. 가중 합 ${E.viz.att.pred_1h}, 실측 ${E.viz.att.act_1h}`);
+m3("imp", "학습된 특징별 중요도 s_k (주황: 2시간 이내, 청록: 2~24시간). 0 은 그 특징을 보지 않는다는 뜻이다");
+b.push(H2("4.5 검증된 비율로 섞기"));
+para("최종 예측은 두 예측을 구간별 비율 α_b 로 섞는다. α_b 는 보정 구간에서 평균 절대 오차가 가장 작은 값을 5개 후보 가운데 고르되, 릿지 회귀만 쓸 때보다 2% 이상 줄지 않으면 0 으로 둔다.");
+eq("r̂ = (1 − α_b) · r̂_R + α_b · r̂_A ,    α_b ∈ {0, ¼, ½, ¾, 1}");
+eq("α_b = 0   if   MAE_b(α_b) ≥ 0.98 · MAE_b(0)");
+m3("alpha", "학습된 구간별 섞는 비율 α_b. 주황이 주의집중의 몫이다");
+b.push(H2("4.6 검증 기반 지속 학습"));
+para("운용 중에는 정해진 주기(기본 24시간)로 다시 학습한다. 먼저 자료의 행 수, 결측 비율, 값이 멈춘 비율을 점검해 기준에 못 미치면 학습하지 않는다. 도전 모델은 최근 3일을 빼고 학습하고, 그 3일에서 6시간 간격으로 24시간 예측을 발행해 현재 모델과 같은 방법으로 채점한다.");
+eq("NMAE = (1/N) Σ_t | ŷ_t − y_t | / S");
+eq("교체  ⇔  NMAE(도전) ≤ NMAE(현재) − δ");
+para("S 는 부하에서는 평균 부하, 태양광에서는 설비 용량(낮 구간만)이다. 판단은 부하와 태양광을 따로 하며, 통과한 종류만 전체 자료로 다시 학습해 적용하고 이전 판은 보관해 한 번에 되돌릴 수 있게 한다. 모델을 유지하는 주기에도 예측 구간은 최근 자료로 다시 맞춘다. 적용 중인 모델의 NMAE 가 한도(15%)를 넘으면 계획 운전을 쉬고 규칙 운전으로 넘어간다. 학습은 별도 프로세스에서 실행해 제어 주기를 방해하지 않는다.");
+para("학습 주기 사이에는 직전 2시간의 한 구간 앞 예측 오차로 가까운 구간을 보정한다. 부하는 오차 평균 b 를 더하고 태양광은 실측과 예측의 비 ρ 를 곱하며, 선행시간에 따라 지수적으로 줄인다(τ = 2시간). 이 보정은 검증에서 2시간 이내 오차를 줄일 때만 켠다.");
+eq("ŷ′(h) = ŷ(h) + b · e^(−(h−1)/τ)  (부하) ,    ŷ′(h) = ŷ(h) · (1 + (ρ − 1) · e^(−(h−1)/τ))  (태양광)");
+
+// ── 5. 실험
+b.push(H1("5. 실험"));
+b.push(H2("5.1 설정"));
+para(`현장 실측이 아직 없어 합성 현장 자료를 썼다. 자료는 ${E.data.days}일(15분 간격)이며 난수 씨앗을 고정해 다시 만들 수 있다. 날씨는 맑음·구름·비의 세 상태를 하루 단위로 옮겨 다니고, 구름에 의한 투과율은 평균으로 돌아가는 1차 자기회귀 과정으로 만들었다. 부하는 고정 부하와 주간 활동 부하, 기온에 따른 냉방 부하, 편성 단계에 따른 배율로 구성했다. 하늘 카메라 구름량은 '카메라가 하늘 전체를 보므로 15~30분 뒤 태양을 가릴 구름을 미리 본다'는 가정에 따라, 한두 구간 뒤 투과율의 평균에 잡음을 더해 만들었다. 설비 용량은 ${E.data.kwp} kW, 시험 기간 평균 부하는 ${E.data.mean_load} kW 이다.`);
+para(`앞 ${E.data.train_days}일로 학습·보정하고 뒤 ${E.data.test_days}일을 시험에 썼다. 시험 기간에는 2시간마다 24시간 예측을 발행했다(${E.data.issues}회). 오차는 평균 절대 오차를 부하는 평균 부하로, 태양광은 설비 용량으로 나눈 값(%)이며 태양광은 낮 구간만 센다. 기준선은 전일 같은 시각의 값이다.`);
+b.push(H2("5.2 결과"));
+tbl(`시험 ${E.data.test_days}일의 예측 오차와 구간 포함률`, ["대상", "방법", "24시간", "2시간 이내", "80% 구간 포함률"],
+  [["부하", "전일 같은 시각", pc(E.load.base), pc(E.load.base_near), "—"], ["부하", "릿지 회귀", pc(E.load.nmae), pc(E.load.near), E.load.cov + "%"], ["태양광", "전일 같은 시각", pc(P0.base), pc(P0.base_near), "—"]].concat(PV.map(p => ["태양광", p.name, pc(p.nmae), pc(p.near), p.cov + "%"])), [12, 36, 16, 18, 18], { bold: [0], center: [2, 3, 4] });
+tbl("태양광 예측의 선행시간 구간별 오차(설비 용량 대비 %)와 섞는 비율", ["구간"].concat(E.data.buckets.map(x => "≤ " + x + "h")),
+  [["전일 같은 시각"].concat(P0.base_by_h.map(pc)), ["릿지 회귀"].concat(P0.by_h.map(pc)), ["＋하늘 카메라"].concat(P1.by_h.map(pc)), ["＋주의집중"].concat(P3.by_h.map(pc)), ["α_b"].concat(P3.alpha.map(a => Math.round(a * 100) + "%"))], [22, 13, 13, 13, 13, 13, 13], { bold: [0], center: [1, 2, 3, 4, 5, 6] });
+ch("pv_h", "태양광 예측의 선행시간 구간별 오차"); ch("load_h", "부하 예측의 선행시간 구간별 오차");
+para(`부하는 전 구간에서 기준선보다 낮았다(24시간 ${pc(E.load.base)} → ${pc(E.load.nmae)}, ${cut(E.load.base, E.load.nmae)}% 감소). 태양광은 릿지 회귀만으로 기준선 대비 24시간 오차가 ${cut(P0.base, P0.nmae)}% 낮았고, 하늘 카메라를 넣으면 1시간 이내 오차가 ${pc(P0.by_h[0])}에서 ${pc(P1.by_h[0])}로, 주의집중을 섞으면 ${pc(P3.by_h[0])}로 줄었다. 2시간 이내로 보면 ${pc(P0.near)} → ${pc(P1.near)} → ${pc(P3.near)}이다. 반면 4시간 이후 구간에서는 세 구성의 차이가 0.05%p 이내였고, 24시간 전체 오차는 ${pc(P0.nmae)}에서 ${pc(P3.nmae)}로 사실상 같았다.`);
+para(`섞는 비율은 ${E.data.buckets.map((x, i) => "≤" + x + "h " + Math.round(P3.alpha[i] * 100) + "%").join(", ")}로 정해졌다. 가까운 두 구간에서 주의집중의 몫이 크고 중간 구간은 0 이다. 16시간 이내 구간에서는 25%가 선택되었으나 시험 오차는 ${pc(P1.by_h[4])}에서 ${pc(P3.by_h[4])}로 오히려 조금 늘어, 보정 구간에서의 선택이 시험 구간에서 항상 유지되지는 않음을 보인다. 80% 구간 포함률은 부하 ${E.load.cov}%, 태양광 ${P3.cov}%로 목표 부근이었다.`);
+ch("fc_pv", "태양광 24시간 예측의 한 예"); ch("att_w", "한 번의 예측에서 가중치가 큰 기억 40건의 가중치");
+para(`그림 ${figN - 1}·${figN}의 예측에서 가중치가 가장 큰 기억은 ${E.sample.refs.slice(0, 3).map(r => r[0] + "(" + r[1] + "%)").join(", ")}였다. 위 10건의 합은 ${E.sample.top10_share}%, 유효 기억 수(1/Σw²)는 ${E.sample.eff_n}건으로, 예측이 소수의 특이한 날에 좌우되지 않고 닮은 상황 수백 건의 평균에 가깝다. 학습된 중요도는 가까운 예측에서 ${E.att.top_near.slice(0, 2).map(r => r[0] + "(" + r[1] + ")").join(", ")}, 먼 예측에서 ${E.att.top_far.slice(0, 3).map(r => r[0] + "(" + r[1] + ")").join(", ")} 순으로 컸다.`);
+b.push(H2("5.3 지속 학습과 계산 비용"));
+{ const c = LE.cycles, d = LE.drift, r = (lab, k, kn) => [lab, kn, pc(k.current), pc(k.new), k.better ? "교체" : "유지"];
+  tbl("학습 주기별 판단(자료가 쌓이는 경우와 부하가 30% 늘어난 경우)", ["상황", "종류", "현재 모델", "도전 모델", "판단"], [r("45일째", c[1].kinds.load, "부하"), r("45일째", c[1].kinds.pv, "태양광"), r("60일째", c[2].kinds.load, "부하"), r("60일째", c[2].kinds.pv, "태양광"), r("부하 30% 증가 뒤", d.kinds.load, "부하")], [30, 14, 19, 19, 18], { bold: [0], center: [1, 2, 3, 4] });
+  para(`자료의 성질이 변하지 않는 동안에는 개선 폭이 작고, 검증 오차가 더 큰 도전 모델은 걸러졌다. 부하가 30% 늘어난 경우에는 이전 모델의 오차가 ${pc(d.kinds.load.current)}까지 커졌다가 다시 학습한 모델에서 ${pc(d.kinds.load.new)}로 돌아왔다.`); }
+tbl("계산 비용(노트북 CPU, 단일 프로세스)", ["항목", "값"], [["학습되는 값(태양광)", `릿지 ${E.cost.params_ridge} + 중요도 ${E.cost.params_att} + 비율 ${E.cost.params_alpha} = ${NP}개`], ["학습 시간", `부하 ${E.cost.train_load_s}초, 태양광 ${E.cost.train_pv_s}초`], ["24시간 예측 한 번(부하+태양광)", `${E.cost.predict_s}초`], ["모델 파일", `부하 ${E.cost.load_kb} KB, 태양광 ${E.cost.pv_kb} KB`]], [40, 60], { bold: [0] });
+
+// ── 6. 고찰
+b.push(H1("6. 고찰과 한계"));
+para("효과는 가까운 구간에 집중되었다. 하늘 카메라는 태양을 가리기 전의 구름을 먼저 보므로 수십 분~2시간의 예측을 돕지만, 반나절 뒤의 날씨에 대해서는 정보를 주지 못한다. 외부 예보를 쓸 수 없는 조건에서 먼 구간의 오차는 계절과 최근 추세가 설명하는 수준에 머문다. EMS 의 발전기 기동과 ESS 충·방전 판단은 가까운 구간의 예측에 민감하므로 이 개선은 실용적 의미가 있으나, 연료 절감량으로 환산한 효과는 본 논문에서 측정하지 않았다.");
+para("본 연구의 가장 큰 한계는 합성 자료이다. 실제 부하와 날씨는 합성 과정보다 불규칙하며, 특히 '카메라가 15~30분 뒤의 구름을 본다'는 가정은 결과에 직접 영향을 준다. 실제 선행 시간은 구름 높이와 풍속에 따라 달라지고, 색 비율과 고정 경계값에 의한 구름 판정은 태양 주변의 눈부심, 렌즈 오염, 박무에 약하다고 알려져 있다. 따라서 표의 개선 폭을 현장에서 그대로 기대할 수는 없다. 다만 섞는 비율과 모델 교체가 모두 검증 오차로 결정되므로, 현장에서 카메라나 주의집중이 도움이 되지 않으면 해당 요소가 자동으로 꺼지고 릿지 회귀 수준의 성능이 유지되도록 설계되어 있다.");
+para("그 밖의 한계로, 비교 대상이 전일 같은 시각과 자체 구성 요소에 한정되어 다른 학습 방법(나무 기반 모형, 순환·합성곱 신경망 등)과의 비교가 없다. 시험 기간이 14일로 짧아 계절 변화에 대한 평가가 부족하고, 16시간 이내 구간의 예에서 보듯 보정 구간에서 고른 비율이 시험 구간에서 유지되지 않는 경우가 있다. 또한 본 모델은 학습 값이 백수십 개인 통계 모형으로, 주의집중 연산의 원리를 빌렸을 뿐 대형 언어 모델과 같은 일반적 능력을 갖는 것은 아니다.");
+
+// ── 7. 결론
+b.push(H1("7. 결론"));
+para(`외부 기상 예보 없이 노트북급 장치에서 동작하는 부하·태양광 24시간 예측 방법을 제시했다. 릿지 회귀에 하늘 카메라 구름량과 주의집중 예측을 검증된 비율로 결합했으며, 운용 중 재학습은 학습에 쓰지 않은 자료에서 나쁘지 않을 때만 적용한다. 합성 자료에서 태양광의 2시간 이내 오차는 ${cut(P0.near, P3.near)}% 줄었고 24시간 전체는 거의 같았다. 앞으로 시험 운용에서 얻는 실측 자료와 실제 카메라 사진으로 같은 평가를 반복하고, 구름 판정의 현장 보정과 예측 개선이 연료 소비에 주는 영향을 측정할 계획이다.`);
+
+// ── 참고문헌·부록
+b.push(H1("참고문헌"));
+["[1] A. E. Hoerl and R. W. Kennard, “Ridge regression: Biased estimation for nonorthogonal problems,” Technometrics, vol. 12, no. 1, pp. 55–67, 1970.",
+ "[2] T. Hong and S. Fan, “Probabilistic electric load forecasting: A tutorial review,” International Journal of Forecasting, vol. 32, no. 3, pp. 914–938, 2016.",
+ "[3] R. Koenker and G. Bassett, “Regression quantiles,” Econometrica, vol. 46, no. 1, pp. 33–50, 1978.",
+ "[4] C. N. Long, J. M. Sabburg, J. Calbó, and D. Pagès, “Retrieving cloud characteristics from ground-based daytime color all-sky images,” Journal of Atmospheric and Oceanic Technology, vol. 23, no. 5, pp. 633–652, 2006.",
+ "[5] A. Heinle, A. Macke, and A. Srivastav, “Automatic cloud classification of whole sky images,” Atmospheric Measurement Techniques, vol. 3, no. 3, pp. 557–567, 2010.",
+ "[6] Q. Li, W. Lu, and J. Yang, “A hybrid thresholding algorithm for cloud detection on ground-based color images,” Journal of Atmospheric and Oceanic Technology, vol. 28, no. 10, pp. 1286–1296, 2011.",
+ "[7] C. W. Chow et al., “Intra-hour forecasting with a total sky imager at the UC San Diego solar energy testbed,” Solar Energy, vol. 85, no. 11, pp. 2881–2893, 2011.",
+ "[8] A. Vaswani et al., “Attention is all you need,” in Advances in Neural Information Processing Systems 30, 2017.",
+ "[9] E. A. Nadaraya, “On estimating regression,” Theory of Probability and Its Applications, vol. 9, no. 1, pp. 141–142, 1964.",
+ "[10] G. S. Watson, “Smooth regression analysis,” Sankhyā: The Indian Journal of Statistics, Series A, vol. 26, no. 4, pp. 359–372, 1964."].forEach(t => b.push(P(t, { spacing: { after: 60, line: 280 }, indent: { left: 420, hanging: 420 } })));
+b.push(H1("부록 A. 재현 방법과 설정값"));
+tbl("주요 설정값", ["항목", "값", "항목", "값"], [["시간 간격 / 예측 범위", "15분 / 96구간", "릿지 벌점 λ", "3"], ["선행시간 구간", "≤1·2·4·8·16·24시간", "전일 값 혼합", "20%"], ["보정 구간", "최근 7일", "예측 구간", "10~90% 분위수"], ["구름 판정 경계", "ρ > −0.12", "사진 유효 시간", "180초"], ["기억 간격", "1시간", "중요도 후보", "×2, ×½, 0 (2회)"], ["섞는 비율 후보", "0, ¼, ½, ¾, 1", "최소 개선", "2%"], ["검증 구간", "최근 3일", "재학습 주기", "24시간"], ["정확도 한도", "NMAE 15%", "보관 판 수", "10"]], [26, 24, 26, 24], { bold: [0, 2] });
+para("수치와 그림은 다음 순서로 다시 만들 수 있다: python docs/ppt/ai_paper_eval.py (수치) → node docs/ppt/ai_render3d.js (입체 그림) → node docs/ppt/ai_charts.js (그래프) → python docs/build_all.py (문서). 구현은 ifps_ems/forecast.py, attn.py, skycam.py, learner.py 에 있으며 시험은 tests/test_sky.py, tests/test_learner.py 이다.");
+para("입체 그림(그림 1, 2, 3, 4, 5, 6)은 꾸민 그림이 아니라 학습된 값(가중치·거리·중요도·비율)과 실제 예측을 3차원 좌표에 그대로 놓고 렌더링한 것이다. 본 문서는 심사를 거치지 않은 기술 논문 초안이다.");
+L.save(b, OUT, `이동형 전력체계 EMS AI 예측 논문(초안) ${REV}`);

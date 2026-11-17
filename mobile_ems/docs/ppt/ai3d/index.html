@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><title>AI 3D</title>
+<style>
+html,body{margin:0;background:#0d0f13;width:1600px;height:900px;overflow:hidden;font-family:"Inter","WenQuanYi Zen Hei",sans-serif}
+canvas{position:absolute;left:0;top:0}
+.lb{position:absolute;color:#e9eef5;font-size:17px;white-space:nowrap;text-shadow:0 1px 6px #000,0 0 2px #000;line-height:1.25}
+.lb small{font-size:13.5px;color:#b8c3d1}
+.lb.tag{background:rgba(16,20,27,.78);border:1px solid #3a4658;border-radius:8px;padding:5px 10px}
+.lb.tag.hot{border-color:#ffb347;color:#ffe2b0}
+.lb.ax{font-size:16px;color:#cfd8e3;font-weight:600}
+.lb.num{font-size:17px;font-weight:700;color:#fff}
+.lb.rot{font-size:14.5px;transform-origin:0 0;transform:rotate(38deg);color:#d5dde8}
+.lb.rot i{color:#8fa0b5;font-style:normal;font-size:12px}
+.ttl{position:absolute;left:60px;top:38px;color:#fff}
+.ttl b{display:block;font-size:31px;letter-spacing:-.3px}
+.ttl span{display:block;margin-top:8px;font-size:15.5px;color:#aeb9c7;max-width:1480px}
+.fx{position:absolute;font-family:"DejaVu Serif","WenQuanYi Zen Hei",serif;font-size:23px;color:#ffe9c4;background:rgba(16,20,27,.8);border-left:4px solid #ffb347;padding:11px 18px;border-radius:4px}
+</style>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script>
+<script type="module" src="/scene.js"></script>

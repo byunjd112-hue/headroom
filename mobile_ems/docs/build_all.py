@@ -12,7 +12,7 @@ docs/out 에는 현재 리비전 파일만 남긴다(이전 리비전 산출물�
 import argparse, datetime, os, re, subprocess, sys  # nosec B404 — 개발 도구 실행(고정 인자)
 
 DOCS = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(DOCS); OUT = os.path.join(DOCS, "out")
-BUILDERS = ["build_test_report.js", "build_reliability_report.js", "build_security_review.js", "build_interface_guide.js", "build_device_guides.js", "build_cpp_report.js"]
+BUILDERS = ["build_test_report.js", "build_reliability_report.js", "build_security_review.js", "build_interface_guide.js", "build_device_guides.js", "build_cpp_report.js", "build_ai_paper.js"]
 
 
 def run(args, cwd=ROOT, env=None):
@@ -71,6 +71,7 @@ def main(argv=None):
     os.makedirs(OUT, exist_ok=True); print(f"이전 리비전 산출물 {clean(rev)}개 삭제")
     for b in BUILDERS: run(["node", os.path.join(DOCS, b), rev, date], env=env)
     run(["node", os.path.join(DOCS, "ppt", "build_deck.js"), rev, ym], env=env)
+    run(["node", os.path.join(DOCS, "ppt", "build_ai_deck.js"), rev, ym], env=env)            # AI 예측 기술자료(수식·입체 모델 그림)
     run(["node", os.path.join(DOCS, "ppt", "build_hw_deck.js"), rev, ym], env=env)            # 하드웨어 구성 기술자료
     run([sys.executable, os.path.join(DOCS, "fmea", "build_fmea.py"), rev, date])
     run([sys.executable, os.path.join(DOCS, "ppt", "add_ems_to_proposal.py"), rev])                 # 제안 발표 자료 EMS 보완본(원본이 있을 때만)          # FMEA·FTA 통합 분석 워크벤치(HTML)
