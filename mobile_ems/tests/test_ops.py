@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """군 운용 논리 시험: 주둔지(상전 연계·역송 없음·피크 억제·정전 자립 전환), 운용 태세(저소음·자립), 부하 자동 차단·복구, 자립 지속시간."""
+from dataclasses import replace
 import datetime as dtm, os, sys, time, unittest
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT); sys.path.insert(0, HERE)
@@ -64,14 +65,14 @@ class TestOpsLogic(unittest.TestCase):
         for hr in (3, 9.5, 11, 14, 20):
             for load in (40, 120, 260):
                 for pv in (0, 150, 380):
-                    r = om.garrison_step(s, g, hr, load, pv, 0, 0.6, 500, self_supply=True)
+                    r = om.garrison_step(s, replace(g, self_supply=True), hr, load, pv, 0, 0.6, 500)
                     self.assertAlmostEqual(r["grid"], g.import_min_kw, places=1, msg=(hr, load, pv)); self.assertEqual(r["short"], 0.0)
                     if load > pv + g.import_min_kw: self.assertGreater(r["ess"], 0); self.assertIn("자립 태세", r["why"])           # 모자라는 만큼 ESS 방전(시간대와 무관)
         n = om.garrison_step(s, g, 3, 120, 0, 0, 0.6, 500); self.assertLess(n["ess"], 0); self.assertGreater(n["grid"], 100)          # 평소 경부하 시간대: 상전으로 충전
-        r = om.garrison_step(s, g, 14, 120, 0, 0, 0.40, 500, self_supply=True); self.assertGreater(r["ess"], 100)                     # 정전 대비 하한(50%) 아래로도 방전(자립 태세)
-        r = om.garrison_step(s, g, 14, 120, 0, 0, s.soc_min + 0.05, 500, self_supply=True)                                            # ESS 가 바닥이면 상전을 쓰고 알린다
+        r = om.garrison_step(s, replace(g, self_supply=True), 14, 120, 0, 0, 0.40, 500); self.assertGreater(r["ess"], 100)                     # 정전 대비 하한(50%) 아래로도 방전(자립 태세)
+        r = om.garrison_step(s, replace(g, self_supply=True), 14, 120, 0, 0, s.soc_min + 0.05, 500)                                            # ESS 가 바닥이면 상전을 쓰고 알린다
         self.assertAlmostEqual(r["short"], 115.0, delta=1.0); self.assertIn("자체 전원 부족", r["why"]); self.assertAlmostEqual(r["grid"], 120.0, delta=1.0)
-        r = om.garrison_step(s, g, 14, 700, 0, 0, 0.6, 500, self_supply=True); self.assertAlmostEqual(r["ess"], 500.0, delta=1.0); self.assertAlmostEqual(r["short"], 195.0, delta=1.0)   # PCS 정격 초과분
+        r = om.garrison_step(s, replace(g, self_supply=True), 14, 700, 0, 0, 0.6, 500); self.assertAlmostEqual(r["ess"], 500.0, delta=1.0); self.assertAlmostEqual(r["short"], 195.0, delta=1.0)   # PCS 정격 초과분
 
     def test_autonomy_hours(self):
         a = om.autonomy(self.s, 0.9, 1000, 1500, (30, 40, 50))

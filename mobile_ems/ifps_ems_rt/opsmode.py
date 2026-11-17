@@ -35,10 +35,11 @@ class Garrison:
     gdg_tank_l: float = 5000.0        # 연료 탱크 용량(L, 대당) — 자립 지속시간 계산용
     gdg_l_per_kwh: float = 0.26       # 연료 소비율(L/kWh)
     gdg_min_run_s: float = 600.0      # 최소 운전 시간(초) — 한 번 켜면 이만큼은 돌린다
+    self_supply: bool = False         # 수전 최소화 운전(설정 파일 항목 아님 — 실행기가 상황에 따라 켠다: 복전 확인 중, 자립 태세인데 차단기 투입 상태)
 
     @classmethod
     def from_cfg(cls, c):
-        c = c or {}; names = {f.name for f in fields(cls)}; return cls(**{k: v for k, v in c.items() if k in names})
+        c = c or {}; names = {f.name for f in fields(cls)} - {"self_supply"}; return cls(**{k: v for k, v in c.items() if k in names})
 
     def band(self, hr):
         """시각 → 'peak' / 'off' / 'mid'"""
@@ -72,14 +73,15 @@ def _tou_target(g, band, net, soc, can, why):
     return target
 
 
-def garrison_step(site, g, hr, load_kw, pv_kw, elz_kw, soc, h2_nm3, self_supply=False):
+def garrison_step(site, g, hr, load_kw, pv_kw, elz_kw, soc, h2_nm3):
     """주둔지(상전 연계) 한 주기의 목표값. 역송 없음·피크 억제·시간대 충방전·정전 대비 충전율 유지.
 
-    self_supply: 주둔지 자립 태세는 전시·유사시 상전 상실을 뜻한다(수전 차단기가 열려 있으면 정전 논리로 운전한다). 이 값은 그 태세인데도
+    g.self_supply: 주둔지 자립 태세는 전시·유사시 상전 상실을 뜻한다(수전 차단기가 열려 있으면 정전 논리로 운전한다). 이 값은 그 태세인데도
     수전 차단기가 아직 투입되어 있을 때의 안전한 대체 동작이다 — 수전을 최소 수전 전력으로 묶고 태양광·ESS(충전율 하한 근처까지)로 공급한다.
     시간대 충전(상전으로 ESS 를 채우는 일)을 하지 않으며, 그래도 모자라 상전을 쓰게 되면 short(kW)로 알린다(실행기가 연료전지·디젤을 투입).
     반환: {grid: 목표 수전 kW, ess: ESS 지령 kW(+방전/−충전), pv_lim: PV 출력 제한 kW(0 = 제한 없음), elz: 수전해 기동 여부, why: 설명}
     """
+    self_supply = g.self_supply
     elz_on = elz_kw > 1.0                                           # 수전해 운전 중(소비 전력으로 판단)
     net = load_kw + elz_kw - pv_kw                                  # ESS 가 가만히 있을 때의 수전 전력(음수면 남는 전력)
     band = g.band(hr); why = []

@@ -17,6 +17,7 @@ from .. import modbus as mb, pointmap as pm
 from ..runtime import Runtime
 from ..simplant import Plant
 from .cfgedit import ConfigEditor
+from . import fuelwatch
 
 PRIO_TXT = {1: "긴급", 2: "높음", 3: "보통", 4: "낮음"}
 def _pkg_rev():
@@ -546,31 +547,11 @@ class Engine:
         A.set("soc.hi", soc > s.soc_max * 100 - 1, 4, "ESS", f"ESS 충전율 상한 근접 {soc:.1f}% — PV 출력 제한 가능")
         h2 = g("H2.nm3", s.h2_nm3)
         A.set("h2.lo", h2 < s.h2_nm3 * s.h2_min * 1.5, 2, "FC", f"수소 잔량 낮음 {h2:.0f}Nm³")
-        self._alarms_fuel()
+        fuelwatch.alarms(self)
         A.set("reserve", k["reserve_need"], 3, "EMS", f"N-1 순동 예비력 부족 {k['reserve_margin']:.0f}kW — 연료전지 병렬 필요")
         for n, d in rt.dev.items():
             A.set(f"man.{n}", d.manual, 4, n, f"{n} 현장 수동 모드 — EMS 지령 차단")
         A.set("auto.off", not self.auto, 4, "EMS", "자동 제어 해제 — 운용자 수동 지령 운전")
-
-    def fuel_status(self):
-        """디젤 연료 현황: [(장치, 이름, 잔량 %, 잔량 L, 정격 운전 기준 남은 시간)]. 남은 시간은 가장 빨리 줄어드는 경우(정격 연속 운전)로 계산한다."""
-        rt = self.rt; g = lambda k, d=0.0: rt.val.get(k, d); s = rt.site; gar = rt.gar; f = self.fuel_cfg; out = []
-        if "DG.fuel_l" in rt.val:
-            lit = g("DG.fuel_l"); out.append(("DG", "이동형 디젤발전기", 100.0 * lit / max(1.0, f["dg_tank_l"]), lit, lit / max(1e-6, s.dg_kw * s.dg_l_per_kwh)))
-        for n in rt.gdgs:
-            if f"{n}.fuel_pct" in rt.val:
-                pct = g(f"{n}.fuel_pct"); lit = pct / 100.0 * gar.gdg_tank_l; out.append((n, "주둔지 디젤발전기", pct, lit, lit / max(1e-6, gar.gdg_kw * gar.gdg_l_per_kwh)))
-        return out
-
-    def _alarms_fuel(self):
-        """연료 보충 경보: 잔량이 warn_pct(기본 50%) 이하이거나 정격 운전 기준 warn_h(기본 8시간) 이내로 떨어지면 올리고,
-        보충될 때까지 repeat_min 마다 다시 알린다(확인해도 조치 전에는 다시 울린다). 고갈 최소 8시간 전에 알리기 위한 것이다."""
-        f = self.fuel_cfg; A = self.alarms; now = time.time()
-        for n, nm, pct, lit, hrs in self.fuel_status():
-            low = pct <= f["warn_pct"] or hrs <= f["warn_h"]; urgent = hrs <= f["warn_h"]; key = f"fuel.{n}"
-            A.set(key, low, 1 if urgent else 2, n, f"{nm} 연료 {pct:.0f}%({lit:.0f}L) — 정격 운전 기준 약 {hrs:.1f}시간분. 연료 보충 요청" + (f" [긴급: {f['warn_h']:.0f}시간 이내 고갈]" if urgent else ""))
-            if not low: self._fuel_t.pop(n, None)
-            elif now - self._fuel_t.setdefault(n, now) >= 60.0 * f["repeat_min"]: A.renew(key); self._fuel_t[n] = now
 
     def _alarms_grid(self):
         """차단기·모선 경보(보호 IED 게이트웨이)."""

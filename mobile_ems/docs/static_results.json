@@ -1,6 +1,6 @@
 {
- "date": "2026-11-17 18:17",
- "unittest_s": 184.3,
+ "date": "2026-11-17 18:52",
+ "unittest_s": 205.7,
  "tests": [
   "test_backups_are_pruned_and_broken_backup_refused | ok",
   "test_pointmap_errors_block_save | ok",
@@ -82,7 +82,7 @@
   "test_R11_mutating_and_sensitive_routes_need_login | ok",
   "test_R13_set_only_setpoints_and_finite_values | ok",
   "test_R19_wrong_json_shapes_are_400_not_500 | ok",
-  "R-26: 주둔지 자립 태세 = 전시·유사시 상전 상실. 가상 장치에서는 자립을 고르면 수전 차단기가 열린 상태가 되고 정전 논리로 운전한다. | ERROR",
+  "R-26: 주둔지 자립 태세 = 전시·유사시 상전 상실. 가상 장치에서는 자립을 고르면 수전 차단기가 열린 상태가 되고 정전 논리로 운전한다. | ok",
   "장치마다 순서가 다른 현장을 모의: 32비트 점 3종 + 장치 기본 DCBA(16비트 지령까지 바이트 뒤집힘). | ok",
   "test_known_vectors | ok",
   "test_pointmap_order_column_and_device_default | ok",
@@ -111,17 +111,17 @@
   "test_check_scans_and_module_entry | ok"
  ],
  "n_tests": 107,
- "tests_ok": false,
- "coverage_pct": 92.2,
+ "tests_ok": true,
+ "coverage_pct": 93.2,
  "stmt": {
-  "n": 3220,
-  "hit": 3060,
-  "pct": 95.0
+  "n": 3231,
+  "hit": 3095,
+  "pct": 95.8
  },
  "branch": {
-  "n": 1126,
-  "hit": 948,
-  "pct": 84.2
+  "n": 1128,
+  "hit": 968,
+  "pct": 85.8
  },
  "coverage_files": [
   [
@@ -142,19 +142,11 @@
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
-   91.4,
-   792,
-   79.9,
-   298,
-   "26-27, 52-53, 64-69, 90-91, 100-104, 178-179, 296-297, 301, 310, 348, 357-365, 367-369, 371-375, 379-380, 383-386, 389-391, 463, 510-511, 569, 624-625, 748-749, 911-916, 928-929, 945-946"
-  ],
-  [
-   "ifps_ems_rt/runtime.py",
-   92.7,
-   288,
-   74.4,
-   86,
-   "226, 230, 239, 257, 277, 280, 287, 295, 311-312, 325, 331-332, 344, 348-349, 358-362"
+   92.1,
+   781,
+   80.7,
+   290,
+   "27-28, 53-54, 65-70, 91-92, 183-184, 301-302, 306, 315, 353, 362-370, 372-374, 376-380, 384-385, 388-391, 394-396, 468, 515-516, 609-610, 733-734, 896-901, 913-914, 930-931"
   ],
   [
    "ifps_ems_rt/diag.py",
@@ -227,6 +219,14 @@
    86.8,
    38,
    "134"
+  ],
+  [
+   "ifps_ems_rt/runtime.py",
+   99.0,
+   292,
+   93.0,
+   86,
+   "367-369"
   ],
   [
    "ifps_ems/forecast.py",
@@ -317,6 +317,14 @@
    ""
   ],
   [
+   "ifps_ems_rt/hmi/fuelwatch.py",
+   100.0,
+   16,
+   80.0,
+   10,
+   ""
+  ],
+  [
    "ifps_ems_rt/hmi/pin.py",
    100.0,
    6,
@@ -327,7 +335,7 @@
   [
    "ifps_ems_rt/opsmode.py",
    100.0,
-   120,
+   122,
    96.7,
    30,
    ""
@@ -351,7 +359,7 @@
  ],
  "pylint": {
   "E": 0,
-  "W": 15,
+  "W": 18,
   "by_id": [
    [
     "W0718 broad-exception-caught",
@@ -359,6 +367,10 @@
    ],
    [
     "W0613 unused-argument",
+    3
+   ],
+   [
+    "W0212 protected-access",
     3
    ],
    [
@@ -411,15 +423,39 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/runtime.py",
-    83,
+    84,
     "Runtime._read_parallel",
     "Catching too general exception Exception"
+   ],
+   [
+    "W0212",
+    "protected-access",
+    "ifps_ems_rt/hmi/fuelwatch.py",
+    23,
+    "alarms",
+    "Access to a protected member _fuel_t of a client class"
+   ],
+   [
+    "W0212",
+    "protected-access",
+    "ifps_ems_rt/hmi/fuelwatch.py",
+    24,
+    "alarms",
+    "Access to a protected member _fuel_t of a client class"
+   ],
+   [
+    "W0212",
+    "protected-access",
+    "ifps_ems_rt/hmi/fuelwatch.py",
+    24,
+    "alarms",
+    "Access to a protected member _fuel_t of a client class"
    ],
    [
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    178,
+    183,
     "SimDriver.loop",
     "Catching too general exception Exception"
    ],
@@ -427,7 +463,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    296,
+    301,
     "Engine._scan_loop",
     "Catching too general exception Exception"
    ],
@@ -435,7 +471,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    368,
+    373,
     "Engine.ai_train",
     "Catching too general exception Exception"
    ],
@@ -443,7 +479,7 @@
     "W1510",
     "subprocess-run-check",
     "ifps_ems_rt/hmi/engine.py",
-    365,
+    370,
     "Engine.ai_train",
     "'subprocess.run' used without explicitly defining the value for 'check'."
    ],
@@ -451,7 +487,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    440,
+    445,
     "Engine._compute_forecast",
     "Catching too general exception Exception"
    ],
@@ -459,7 +495,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    510,
+    515,
     "Engine._sup_loop",
     "Catching too general exception Exception"
    ],
@@ -467,7 +503,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    624,
+    609,
     "Engine._exec_loop",
     "Catching too general exception Exception"
    ],
@@ -490,7 +526,7 @@
   ]
  },
  "metrics": {
-  "n_func": 374,
+  "n_func": 375,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -498,48 +534,19 @@
    "depth": 5,
    "file": 1000
   },
-  "cc_max": 23,
+  "cc_max": 20,
   "len_max": 171,
-  "arg_max": 9,
+  "arg_max": 8,
   "depth_max": 5,
-  "file_max": 997,
+  "file_max": 982,
   "over": {
-   "cc": [
-    [
-     "ifps_ems_rt/runtime.py",
-     "fast_control",
-     212,
-     23,
-     29,
-     0,
-     3
-    ]
-   ],
+   "cc": [],
    "len": [],
-   "arg": [
-    [
-     "ifps_ems_rt/opsmode.py",
-     "garrison_step",
-     75,
-     10,
-     24,
-     9,
-     1
-    ]
-   ],
+   "arg": [],
    "depth": [],
    "file": []
   },
   "top_cc": [
-   [
-    "ifps_ems_rt/runtime.py",
-    "fast_control",
-    212,
-    23,
-    29,
-    0,
-    3
-   ],
    [
     "ifps_ems_rt/diag.py",
     "menu",
@@ -579,7 +586,7 @@
    [
     "ifps_ems_rt/hmi/engine.py",
     "step",
-    145,
+    150,
     20,
     29,
     0,
@@ -602,6 +609,15 @@
     30,
     5,
     3
+   ],
+   [
+    "ifps_ems_rt/opsmode.py",
+    "gdg_step",
+    103,
+    19,
+    23,
+    7,
+    1
    ]
   ],
   "top_len": [
@@ -626,7 +642,7 @@
    [
     "ifps_ems_rt/hmi/engine.py",
     "_compute_forecast",
-    400,
+    405,
     18,
     44,
     0,
@@ -635,7 +651,7 @@
    [
     "ifps_ems_rt/hmi/engine.py",
     "__init__",
-    209,
+    214,
     13,
     43,
     4,
@@ -671,7 +687,7 @@
    [
     "ifps_ems_rt/runtime.py",
     "__init__",
-    26,
+    27,
     18,
     34,
     4,
@@ -679,15 +695,6 @@
    ]
   ],
   "top_arg": [
-   [
-    "ifps_ems_rt/opsmode.py",
-    "garrison_step",
-    75,
-    10,
-    24,
-    9,
-    1
-   ],
    [
     "ifps_ems/dispatch.py",
     "rule_action",
@@ -735,8 +742,17 @@
    ],
    [
     "ifps_ems_rt/opsmode.py",
+    "garrison_step",
+    76,
+    10,
+    25,
+    8,
+    1
+   ],
+   [
+    "ifps_ems_rt/opsmode.py",
     "autonomy",
-    126,
+    128,
     2,
     14,
     8,
@@ -745,7 +761,7 @@
    [
     "ifps_ems_rt/opsmode.py",
     "want",
-    152,
+    154,
     18,
     13,
     8,
@@ -765,7 +781,7 @@
    [
     "ifps_ems_rt/hmi/engine.py",
     "_sup_loop",
-    497,
+    502,
     5,
     15,
     0,
@@ -792,7 +808,7 @@
    [
     "ifps_ems_rt/opsmode.py",
     "step",
-    166,
+    168,
     13,
     17,
     5,
@@ -801,7 +817,7 @@
    [
     "ifps_ems_rt/runtime.py",
     "_read_parallel",
-    73,
+    74,
     8,
     14,
     0,
@@ -818,18 +834,18 @@
    ],
    [
     "ifps_ems_rt/hmi/engine.py",
-    "ack",
-    114,
-    6,
-    10,
-    2,
+    "set",
+    85,
+    8,
+    17,
+    5,
     4
    ]
   ],
   "files": [
    [
     "ifps_ems_rt/hmi/engine.py",
-    997
+    982
    ],
    [
     "ifps_ems_rt/diag.py",
@@ -837,7 +853,7 @@
    ],
    [
     "ifps_ems_rt/runtime.py",
-    363
+    370
    ],
    [
     "ifps_ems_rt/hmi/cfgedit.py",
@@ -852,11 +868,11 @@
     216
    ],
    [
-    "ifps_ems_rt/modbus.py",
-    183
+    "ifps_ems_rt/opsmode.py",
+    185
    ],
    [
-    "ifps_ems_rt/opsmode.py",
+    "ifps_ems_rt/modbus.py",
     183
    ],
    [
@@ -920,6 +936,10 @@
     31
    ],
    [
+    "ifps_ems_rt/hmi/fuelwatch.py",
+    25
+   ],
+   [
     "ifps_ems_rt/hmi/pin.py",
     10
    ],
@@ -952,7 +972,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 3982,
+   "loc": 3997,
    "nosec": 0,
    "skipped_tests": 9
   },
@@ -971,7 +991,7 @@
    "B404",
    "LOW",
    "ifps_ems_rt/hmi/engine.py",
-   357,
+   362,
    "Consider possible security implications associated with the subprocess module.",
    "CWE-78"
   ],
@@ -979,7 +999,7 @@
    "B603",
    "LOW",
    "ifps_ems_rt/hmi/engine.py",
-   365,
+   370,
    "subprocess call - check for execution of untrusted input.",
    "CWE-78"
   ],
@@ -1032,23 +1052,17 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.6,
- "cc_n": 389,
+ "cc_avg": 5.59,
+ "cc_n": 390,
  "cc_rank": {
   "A": 246,
-  "B": 83,
-  "C": 59,
-  "D": 1,
+  "B": 84,
+  "C": 60,
+  "D": 0,
   "E": 0,
   "F": 0
  },
  "cc_top": [
-  [
-   "ifps_ems_rt/runtime.py",
-   "fast_control",
-   23,
-   "D"
-  ],
   [
    "ifps_ems_rt/pointmap.py",
    "validate",
@@ -1102,6 +1116,12 @@
    "gdg_step",
    19,
    "C"
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   "sim_action",
+   19,
+   "C"
   ]
  ],
  "mi": [
@@ -1117,7 +1137,7 @@
   ],
   [
    "ifps_ems_rt/runtime.py",
-   3.5,
+   3.3,
    "C"
   ],
   [
@@ -1157,7 +1177,7 @@
   ],
   [
    "ifps_ems_rt/opsmode.py",
-   41.4,
+   41.2,
    "A"
   ],
   [
@@ -1206,6 +1226,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/fuelwatch.py",
+   61.8,
+   "A"
+  ],
+  [
    "ifps_ems/solar.py",
    62.0,
    "A"
@@ -1247,9 +1272,9 @@
   ]
  ],
  "loc_py": {
-  "files": 28,
-  "sloc": 3354,
-  "comments": 441
+  "files": 29,
+  "sloc": 3366,
+  "comments": 443
  },
  "js": [
   [

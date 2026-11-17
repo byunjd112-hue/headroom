@@ -17,6 +17,7 @@ from ifps_ems.config import Site, SUP
 from . import pointmap as pm, modbus as mb
 from .hal import DeviceLink, RtCommander
 from . import opsmode as om
+from dataclasses import replace
 from ifps_ems.solar import clear_pv_kw
 
 HIST_COLS = ["ts", "load_kw", "load_p1", "load_p2", "load_p3", "pv_kw", "temp", "press", "rh", "plan", "mode"]
@@ -209,6 +210,20 @@ class Runtime:
         target = max(0.0, self.auto_target_h - (t - self.t_posture) / 3600.0) if self.posture == "자립" else self.auto_target_h
         return om.LoadShedder.want(s, self.posture, soc, avail, g("LOAD.p1_kw") + g("LOAD.p2_kw"), g("LOAD.kw"), self.auto_h, target)
 
+    def _garrison_control(self, tied, hr, soc):
+        """수전 차단기가 투입된 동안의 ESS·태양광 설정값(역송 방지·피크 억제·시간대 충방전). 반환: 한 일 목록.
+        복전 확인 중(tied 아님)에도 역송 방지는 곧바로 한다 — 기다리는 동안 태양광이 남으면 역전력 보호가 동작한다.
+        주둔지 자립 태세(상전 상실)인데 차단기가 아직 투입 상태일 때도 같다: 수전을 최소로 묶는다(경보로 분리 확인 요청)."""
+        g = lambda k, d=0.0: self.val.get(k, d); done = []
+        ss = self.posture == "자립" or not tied
+        load = g("LOAD.kw") - ((g("DG.kw") + g("FC.kw")) if ss else 0.0)     # 이때 돌리는 연료전지·디젤 출력은 부하에서 뺀다
+        r = om.garrison_step(self.site, replace(self.gar, self_supply=ss), hr, load, g("PV.kw"), g("ELZ.kw"), soc, g("H2.nm3")); self.gar_last = r
+        if self.posture == "저소음": r["why"] += " · 저소음 태세: 상전 연계 중에는 평시와 같음(발전기 정지 상태)"
+        if self.auto_enabled:
+            if self._write("ESS", "ESS.kw_set", r["ess"], 1.0): done.append(("ESS.kw_set", r["ess"]))
+            self._write("PV", "PV.lim_set", r["pv_lim"], 1.0)
+        return done
+
     def fast_control(self):
         """매 수집 주기(1초)에 도는 빠른 제어: 주둔지 ESS·PV 설정값(역송 방지·피크 억제), 부하 자동 차단·복구, 자립 지속시간.
         반환: 한 일 목록. 자동 제어가 꺼져 있으면 계산만 하고 쓰지 않는다."""
@@ -216,15 +231,7 @@ class Runtime:
         self._grid_watch(t); tied = self.tied(); soc = g("ESS.soc", 60.0) / 100
         self._autonomy_update(soc)
         phys = self.mode == "grid" and int(round(g("CB.GRID", 0))) == 1      # 수전 차단기가 실제로 투입되어 있는가(복전 확인 시간 중 포함)
-        if tied or phys:
-            ss = self.posture == "자립" or not tied                      # 복전 확인 중에도 역송 방지는 곧바로 한다(수전 최소화) — 기다리는 동안 태양광이 남으면 역전력 보호가 동작한다
-            # 주둔지 자립 태세(상전 상실)인데 수전 차단기가 아직 투입 상태일 때도 같다: 수전을 최소로 묶는다(경보로 분리 확인 요청)
-            load = g("LOAD.kw") - ((g("DG.kw") + g("FC.kw")) if ss else 0.0)     # 자립 태세에서 돌리는 연료전지·디젤 출력은 부하에서 뺀다
-            r = om.garrison_step(s, self.gar, hr, load, g("PV.kw"), g("ELZ.kw"), soc, g("H2.nm3"), self_supply=ss); self.gar_last = r
-            if self.posture == "저소음": r["why"] += " · 저소음 태세: 상전 연계 중에는 평시와 같음(발전기 정지 상태)"
-            if self.auto_enabled:
-                if self._write("ESS", "ESS.kw_set", r["ess"], 1.0): done.append(("ESS.kw_set", r["ess"]))
-                self._write("PV", "PV.lim_set", r["pv_lim"], 1.0)
+        if tied or phys: done += self._garrison_control(tied, hr, soc)
         else:
             self.gar_last = None
             if self.mode != "grid": self._w.pop("ESS.kw_set", None)
