@@ -11,7 +11,7 @@ const P_SCENARIOS = (() => {
   const metrics = {executed: "급전 판단 실행", writes: "쓰기 건수", tied: "상전 연계", outage: "정전 감지",
     DG: "디젤 목표", FC: "연료전지 목표", GDG: "예비 발전기 목표", ELZ: "수전해 목표", reserve: "예비력 규칙",
     ess_target: "ESS 목표 (kW)", grid_target: "수전 목표 (kW)", full_hours: "전 부하 자립 예상 (h)"};
-  const maxDrafts = 40, maxBatch = 20;
+  const maxDrafts = 40, maxBatch = 24;
   const isModeCase = item => item.steps.some(step => step.type === "policy");
   let cases;
   try { cases = JSON.parse(localStorage.getItem(key)); } catch (_) { /* use built-in presets */ }
@@ -123,7 +123,7 @@ const P_SCENARIOS = (() => {
     const ctx = {steps: scene().steps, rows: runOf()?.rows || [], stepIndex, describe: description, picked, part: pickedPart};
     return `<div class="sq-summary"><span>${ctx.steps.length}단계</span>${ctx.rows.length ? `<span class="sc-ok">통과 ${ctx.rows.filter(r => r.state === "pass").length}</span>${ctx.rows.some(r => r.state === "fail") ? `<span class="sc-fail">실패 ${ctx.rows.filter(r => r.state === "fail").length}</span>` : ""}` : '<span class="muted">아직 검증하지 않음</span>'}
         <span class="sc-spacer"></span><span class="sq-legend"><i class="l-call"></i>지령·입력 <i class="l-ret"></i>응답 판정 <i class="l-inj"></i>고장 주입 <i class="l-pow"></i>전력 흐름</span>
-        ${ScTopo.custom() ? button("layout-reset", "배치 초기화") : ""}</div>
+        ${button("extra", "설비 구성")}${ScTopo.custom() ? button("layout-reset", "배치 초기화") : ""}</div>
       <div class="tp-wrap">${ScTopo.html(ctx)}</div>${pickPanel()}`;
   }
 
@@ -275,6 +275,41 @@ const P_SCENARIOS = (() => {
     };
   }
 
+  // ── 설비 구성: 시나리오용 추가 설비(모의 급전선·변압기·보호 계전기)를 고친다. 실제 대응표는 바뀌지 않는다
+  const EX_COLS = {
+    feeders: [["id", "이름(영문)", "text", "L4"], ["name", "설명", "text", "정비고 부하"], ["kind", "종류", {load: "부하", src: "전원"}], ["bus", "모선", {A: "A", B: "B"}], ["kw", "전력 kW", "number", 40]],
+    transformers: [["id", "이름(영문)", "text", "TR2"], ["name", "설명", "text", "변압기"], ["on", "급전선", "feeder"], ["kva", "정격 kVA", "number", 500], ["pf", "역률", "number", 0.9]],
+    relays: [["id", "이름", "text", "51-L4"], ["name", "설명", "text", "과전류"], ["cb", "차단기", "breaker"], ["sum", "감시 급전선(쉼표로 구분)", "list", "L4"], ["pickup_kw", "정정 kW", "number", 60], ["delay_ms", "시간 ms", "number", 200], ["code", "고장 코드", "number", 51]]};
+  const EX_TITLE = {feeders: "급전선 (차단기 포함)", transformers: "변압기", relays: "보호 계전기 (정한시 과전류)"};
+  function extraDialog() {
+    if (!can("engineer")) return loginDialog();
+    const draft = structuredClone(config.extra || {feeders: [], transformers: [], relays: []});
+    const feeders = () => ["GRID", "PV", "DG", "FC", "GDG", "ESS", "L1", "L2", "L3", "ELZ", ...draft.feeders.map(f => f.id)], breakers = () => [...feeders().filter(x => x !== "ELZ"), "TIE", "G1"];
+    const cell = (key, i, [name, , type], item) => { const val = item[name], at = `data-ex="${key}.${i}.${name}"`;
+      if (typeof type === "object") return `<select class="in" ${at}>${Object.entries(type).map(([k, t]) => option(k, t, val)).join("")}</select>`;
+      if (type === "feeder" || type === "breaker") return `<select class="in" ${at}>${(type === "feeder" ? feeders() : breakers()).map(k => option(k, k, val)).join("")}</select>`;
+      return `<input class="in" ${at} ${type === "number" ? 'type="number" step="any"' : ""} value="${esc(type === "list" ? (val || []).join(", ") : val ?? "")}">`; };
+    const table = key => `<h4>${EX_TITLE[key]} <button type="button" class="btn sm" data-exadd="${key}">＋ 추가</button></h4>
+      ${draft[key].length ? `<table class="ex-tbl"><tr>${EX_COLS[key].map(c => `<th>${c[1]}</th>`).join("")}<th></th></tr>${draft[key].map((item, i) => `<tr>${EX_COLS[key].map(c => `<td>${cell(key, i, c, item)}</td>`).join("")}<td><button type="button" class="btn sm" data-exdel="${key}.${i}">삭제</button></td></tr>`).join("")}</table>` : '<p class="muted">없음</p>'}`;
+    const draw = box => { box.querySelector("#exBody").innerHTML = ["feeders", "transformers", "relays"].map(table).join(""); };
+    modal(`<div class="wide"><h3>설비 구성 — 시나리오용 추가 설비</h3>
+      <p class="muted">대응표에 아직 없는 급전선·차단기, 변압기, 보호 계전기를 가상 장치에만 추가합니다. 실제 대응표와 운전 설정은 바뀌지 않습니다. 정정값은 시험용 가정값이며 실제 값은 보호 협조 검토서로 정합니다.</p>
+      <div id="exBody"></div><p class="sc-fail" id="exWhy"></p>
+      <div class="sc-actions"><span class="sc-spacer"></span><button type="button" class="btn" id="exClose">닫기</button><button type="button" class="btn pri" id="exSave">저장</button></div></div>`, box => {
+      draw(box);
+      box.onchange = e => { const k = e.target.dataset.ex; if (!k) return; const [key, i, name] = k.split("."), col = EX_COLS[key].find(c => c[0] === name);
+        draft[key][i][name] = col[2] === "number" ? Number(e.target.value) : col[2] === "list" ? e.target.value.split(",").map(x => x.trim()).filter(Boolean) : e.target.value.trim();
+        if (name === "id") draw(box); };
+      box.onclick = async e => { const b = e.target.closest("button"); if (!b) return;
+        if (b.dataset.exadd) { const key = b.dataset.exadd; draft[key].push(Object.fromEntries(EX_COLS[key].map(([n, , t, dflt]) => [n, typeof t === "object" ? Object.keys(t)[0] : t === "feeder" ? "GRID" : t === "breaker" ? "L3" : t === "list" ? [dflt] : dflt]))); return draw(box); }
+        if (b.dataset.exdel) { const [key, i] = b.dataset.exdel.split("."); draft[key].splice(Number(i), 1); return draw(box); }
+        if (b.id === "exClose") return closeModal();
+        if (b.id === "exSave") { const r = await api("/api/scenarios/extra", {extra: draft});
+          if (r.ok === false) { box.querySelector("#exWhy").textContent = r.why || "저장하지 못했습니다"; return; }
+          config = await api("/api/scenarios/catalog"); ScTopo.configure(config.extra); output = null; revision++; closeModal(); toast("설비 구성을 저장했습니다", "ok"); paint(); } };
+    });
+  }
+
   function play(on) {
     clearInterval(playing); playing = null;
     if (!on) return;
@@ -366,6 +401,7 @@ const P_SCENARIOS = (() => {
       return paint();
     }
     if (d.sc === "layout-reset") { ScTopo.reset(); return paint(); }
+    if (d.sc === "extra") return extraDialog();
     if (d.case !== undefined || d.step !== undefined || d.jump) {
       play(false);
       if (d.case !== undefined) { active = Number(d.case); stepIndex = 0; }
@@ -445,7 +481,7 @@ const P_SCENARIOS = (() => {
     if (el.dataset.check !== undefined) {
       if (el.checked && selected.size >= maxBatch) {
         el.checked = false;
-        return toast("한 번에 최대 20개 시나리오를 검증할 수 있습니다", "bad");
+        return toast("한 번에 최대 24개 시나리오를 검증할 수 있습니다", "bad");
       }
       const i = Number(el.dataset.check);
       if (el.checked) selected.add(i); else selected.delete(i);
@@ -498,6 +534,7 @@ const P_SCENARIOS = (() => {
         root.textContent = "장비 목록을 불러오지 못했습니다. 화면을 다시 열어주세요.";
         return;
       }
+      ScTopo.configure(config.extra);
       if (!cases.length) {
         cases = config.presets.length ? structuredClone(config.presets) : [{name: "새 시나리오", steps: []}];
         selected = new Set(cases.slice(0, maxBatch).map((_, i) => i));

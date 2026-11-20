@@ -77,13 +77,13 @@ class ScenarioTests(unittest.TestCase):
         result = verify(presets, self.points, self.devices, improve=True, profile=root / "config/runtime.json")
         failed = [run for run in result["results"] if not run["ok"]]
         self.assertEqual(["고장 시험 · 디젤 기동 응답 지연"], [run["name"] for run in failed])
-        self.assertEqual(20, len(result["candidate"]))
+        self.assertEqual(len(presets), len(result["candidate"]))
         mode_cases = {case["name"] for case in presets if case["steps"] and any(step["type"] == "policy" for step in case["steps"])}
         self.assertEqual({f"{control} · {site} · {posture}" for control in ("AUTO", "MANUAL")
                           for site in ("작전지", "주둔지") for posture in ("평시", "저소음", "자립")}, mode_cases)
         self.assertTrue(all(run["ok"] for run in result["retest"]))
         reduced = [p for p in self.points if p["tag"] != "FLT.GRID"]
-        self.assertEqual(19, len(compatible_presets(presets, reduced, commands)))
+        self.assertEqual(len(presets) - 1, len(compatible_presets(presets, reduced, commands)))      # 그 신호를 쓰는 한 건만 빠진다
 
     def test_plan_restart_after_model_reload_invalidates_timestamp(self):
         plan = PlanPolicy.__new__(PlanPolicy)

@@ -1,5 +1,6 @@
 """Deterministic scenario tests against the existing in-memory plant model."""
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from copy import deepcopy
 import json
 import math
@@ -8,15 +9,16 @@ from pathlib import Path
 
 from .. import modbus, pointmap
 from ..simplant import Plant
+from . import scenextra
 from .scenario_policy import METRICS, ScenarioPolicy, run_policy_case
 
-MAX_CASES = 20
+MAX_CASES = 24
 MAX_STEPS = 30
 TICK_MS = 50
 MAX_MS = 10000
 # 구성도 재생용으로 단계마다 남기는 상태: 차단기·고장 코드·부하 차단·모선, 장비의 운전 상태·출력·충전율
 SNAP_PREFIX = ("CB.", "FLT.", "LDS.", "BUS.", "LOAD.")
-SNAP_SUFFIX = (".status", ".kw", ".soc")
+SNAP_SUFFIX = (".status", ".kw", ".soc", ".load_pct")
 OPS = {"eq": lambda a, b: math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9),
        "ge": operator.ge, "le": operator.le}
 
@@ -55,6 +57,9 @@ def number(step, key, lower, upper, default=None, integer=False):
 def evaluate(cases, pts, devices, profile=None):
     if not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES:
         raise ValueError(f"시나리오를 1~{MAX_CASES}개 선택하세요")
+    extra = scenextra.load(profile) if profile else scenextra.empty()      # 추가 설비(모의 급전선·변압기·계전기)
+    pts = scenextra.merge(pts, extra)
+    runner = partial(run_case, extra=extra)
     by_tag = {p["tag"]: p for p in pts}
     commands = catalog(pts, devices)["commands"]
     for case in cases:
@@ -73,8 +78,8 @@ def evaluate(cases, pts, devices, profile=None):
         if any(step["type"] == "policy" for step in case["steps"]):
             if profile is None:
                 raise ValueError("EMS 운전 정책 검증에는 runtime.json이 필요합니다")
-            return run_policy_case(run_case, case, pts, units, profile)
-        return run_case(case, pts, units)
+            return run_policy_case(runner, case, pts, units, profile)
+        return runner(case, pts, units)
 
     with ThreadPoolExecutor(max_workers=min(4, len(cases))) as pool:
         return list(pool.map(run, cases))
@@ -161,8 +166,9 @@ def _snapshot(plant, watch):
     return {tag: round(plant.get(tag), 2) for tag in watch}
 
 
-def run_case(case, pts, units, profile=None, directory=None):
+def run_case(case, pts, units, profile=None, directory=None, extra=None):
     plant = Plant(pts, units)
+    model = scenextra.Model(extra, plant)
     plant.slow["GDG"] = 5.0
     elapsed = 0
     sequences = {}
@@ -178,6 +184,7 @@ def run_case(case, pts, units, profile=None, directory=None):
             delta = min(TICK_MS, end - elapsed)
             elapsed += delta
             plant.tick(delta / 1000, now=elapsed / 1000)
+            model.tick(elapsed / 1000)
 
     try:
         for index, step in enumerate(case["steps"]):
@@ -313,4 +320,5 @@ def load_profile(path):
     path = Path(path)
     config = json.loads(path.read_text(encoding="utf-8"))
     devices = config["devices"]
-    return pointmap.load(path.parent / config["pointmap"], devices), devices
+    pts = pointmap.load(path.parent / config["pointmap"], devices)
+    return scenextra.merge(pts, scenextra.load(path)), devices

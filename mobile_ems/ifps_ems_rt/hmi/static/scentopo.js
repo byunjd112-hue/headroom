@@ -4,7 +4,7 @@
    모선 구성은 결선도 화면과 같다: 모선 A(상전·태양광·디젤·연료전지 / 1등급 부하·수전해) — 연결 차단기(TIE) — 모선 B(주둔지 발전기·ESS·복합전력 G1 / 2·3등급 부하). */
 const ScTopo = (() => {
   const KEY = "ems.scenario.layout.v1", U = 46, V = 23, BUS_GY = 4;
-  const BUS = {A: [-0.4, 6.6], B: [8.0, 13.4]}, TIE_GX = 7.3;
+  const BUS0 = {A: [-0.4, 6.6], B: [8.0, 13.4]}, TIE_GX = 7.3;
   // 종류 kind: src 전원(모선으로 공급) · load 부하(모선에서 받음) · ctl 제어·시험(전력선 없음)
   const NODES = {
     GRID: {name: "상전 수전", kind: "src", bus: "A", at: [0.4, 0.2], cb: "GRID", kw: "GRID.kw", c: "#b9c4d0", icon: "grid"},
@@ -19,15 +19,28 @@ const ScTopo = (() => {
     L2: {name: "2등급 중요 부하", kind: "load", bus: "B", at: [9.4, 7.9], cb: "L2", kw: "LOAD.p2_kw", c: "#ffc56b", photo: "l2"},
     L3: {name: "3등급 일반 부하", kind: "load", bus: "B", at: [11.8, 7.9], cb: "L3", kw: "LOAD.p3_kw", c: "#8fb7ff", photo: "l3"},
     EMS: {name: "EMS", kind: "ctl", at: [7.3, -2.8], c: "#f2d27a", photo: "ems"},
-    MTR: {name: "계측·배전 게이트웨이", kind: "ctl", at: [15.4, 4.4], c: "#a9d18e", photo: "dist"},
-    TEST: {name: "검증기", kind: "ctl", at: [-2.6, 5.6], c: "#c9a6c0", icon: "actor"},
+    MTR: {name: "계측·배전 게이트웨이", kind: "ctl", at: [14.0, 10.8], c: "#a9d18e", photo: "dist"},
+    TEST: {name: "검증기", kind: "ctl", at: [-0.6, 11.2], c: "#c9a6c0", icon: "actor"},
   };
+  // 시나리오용 추가 설비(scenario_extra.json): 급전선은 블록으로, 변압기는 급전선 위에, 보호 계전기는 차단기 옆에 정정값으로 보인다
+  const BASE = Object.keys(NODES), SLOT = {Aload: [-1.6, -1.8], Bload: [14.2, 1.8], Asrc: [-1.4, -1.8], Bsrc: [14.2, 1.8]};      // [첫 자리, 간격] — 같은 줄에서 모선 바깥쪽으로 이어 붙인다
+  let EXTRA = {feeders: [], transformers: [], relays: []};
+  function configure(extra) {
+    EXTRA = {feeders: extra?.feeders || [], transformers: extra?.transformers || [], relays: extra?.relays || []};
+    Object.keys(NODES).filter(k => !BASE.includes(k)).forEach(k => delete NODES[k]);
+    const used = {};
+    for (const f of EXTRA.feeders) { const key = f.bus + f.kind, n = used[key] = (used[key] || 0) + 1, [g0, step] = SLOT[key], gx = Math.round((g0 + step * (n - 1)) * 10) / 10;
+      NODES[f.id] = {name: f.name, kind: f.kind, bus: f.bus, at: [gx, f.kind === "load" ? 7.9 : 0.2], cb: f.id, kw: f.id + ".kw", c: f.kind === "load" ? "#c3a8ee" : "#9ad27a", extra: true}; }
+  }
   const CB_TEXT = {0: "개방", 1: "투입", 2: "트립"}, CB_COLOR = {0: "#8a97a5", 1: "#55d08a", 2: "#ff6b6b"};
   const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const P = (gx, gy) => [(gx - gy) * U, (gx + gy) * V];
   let layout = {};
   try { layout = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (_) { layout = {}; }
   const at = id => layout[id] || NODES[id].at;
+  // 모선 길이: 붙은 설비가 바깥으로 나가면 그만큼 늘어난다(A 는 왼쪽, B 는 오른쪽)
+  const BUS = new Proxy({}, {get: (_, k) => { const xs = Object.keys(NODES).filter(id => NODES[id].bus === k).map(id => at(id)[0]);
+    return k === "A" ? [Math.min(BUS0.A[0], Math.min(...xs) - 0.8), BUS0.A[1]] : [BUS0.B[0], Math.max(BUS0.B[1], Math.max(...xs) + 0.8)]; }});
   const foot = id => { const n = NODES[id], [a, b] = BUS[n.bus]; return [Math.max(a + 0.3, Math.min(b - 0.3, at(id)[0])), BUS_GY]; };   // 모선 위의 접속점
   const mid = (p, q, t = 0.5) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
   const pts = a => a.map(p => p.map(v => v.toFixed(1)).join(",")).join(" ");
@@ -40,6 +53,7 @@ const ScTopo = (() => {
     if (head === "LOAD") return {node: {p1_kw: "L1", p2_kw: "L2", p3_kw: "L3"}[tail] || "MTR"};
     if (head === "BUS") return {node: tail.startsWith("b") ? "BUSB" : "BUSA"};
     if (head === "H2") return {node: "FC"};
+    const tr = EXTRA.transformers.find(t => t.id === head); if (tr) return {node: tr.on};
     if (NODES[head]) return {node: head};
     return {node: NODES[device] ? device : "MTR"};
   }
@@ -82,12 +96,13 @@ const ScTopo = (() => {
     const live = {A: liveA, B: liveB}, kw = id => NODES[id].kw ? v(NODES[id].kw) : null;
 
     // 모선(배전반)과 연결 차단기
-    const bus = Object.entries(BUS).map(([k, [a, b]]) => { const p = P(a, BUS_GY), q = P(b, BUS_GY);
+    const bus = ["A", "B"].map(k => [k, BUS[k]]).map(([k, [a, b]]) => { const p = P(a, BUS_GY), q = P(b, BUS_GY);
       return `<g class="tp-bus ${live[k] ? "live" : ""} ${picked === "BUS" + k ? "picked" : ""}" data-node="BUS${k}"><line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" class="slab"/><line x1="${p[0]}" y1="${p[1] - 7}" x2="${q[0]}" y2="${q[1] - 7}" class="bar"/>
         <text x="${p[0] - 6}" y="${p[1] + 22}" text-anchor="end">주 배전반 ${k} · 모선 ${k}${snap ? (live[k] ? " · 급전 중" : " · 무전압") : ""}</text></g>`; }).join("");
     const breaker = (name, gp, ownerId) => { const s = cb(name), p = P(...gp), flt = v("FLT." + name);
       return `<g class="tp-cb ${picked === ownerId && ctx.part ? "picked" : ""}" data-node="${ownerId}" data-part="cb">${box(gp[0], gp[1], 0.3, 11, s === null ? "#5c6875" : CB_COLOR[s])}
-        <text class="tp-cbname" x="${p[0] + 18}" y="${p[1] - 12}">CB.${name}</text><text class="tp-cbst" x="${p[0] + 18}" y="${p[1] + 1}" fill="${s === null ? "#8a97a5" : CB_COLOR[s]}">${s === null ? "—" : CB_TEXT[s]}${s === 2 && flt ? " · 고장 " + flt : ""}</text></g>`; };
+        <text class="tp-cbname" x="${p[0] + 18}" y="${p[1] - 12}">CB.${name}</text><text class="tp-cbst" x="${p[0] + 18}" y="${p[1] + 1}" fill="${s === null ? "#8a97a5" : CB_COLOR[s]}">${s === null ? "—" : CB_TEXT[s]}${s === 2 && flt ? " · 고장 " + flt : ""}</text>
+        ${EXTRA.relays.filter(r => r.cb === name).map((r, i) => `<text class="tp-relay" x="${p[0] + 18}" y="${p[1] + 13 + i * 11}">${r.code} ▸ ${r.pickup_kw} kW · ${(r.delay_ms / 1000).toFixed(1)} s</text>`).join("")}</g>`; };
     const tieA = P(BUS.A[1], BUS_GY), tieB = P(BUS.B[0], BUS_GY);
     const tie = `<line class="tp-cable ${snap && cb("TIE") === 1 && (liveA || liveB) ? "live" : ""}" x1="${tieA[0]}" y1="${tieA[1] - 4}" x2="${tieB[0]}" y2="${tieB[1] - 4}"/>${breaker("TIE", [TIE_GX, BUS_GY], "TIE")}`;
 
@@ -98,6 +113,9 @@ const ScTopo = (() => {
       const d = toBus ? `M${a[0]} ${a[1] - 4}L${f[0]} ${f[1] - 4}` : `M${f[0]} ${f[1] - 4}L${a[0]} ${a[1] - 4}`;
       return `<path class="tp-cable ${snap && on && (n.kind === "src" ? running(id) : live[n.bus]) ? "live" : ""} ${snap && n.cb && cb(n.cb) === 2 ? "trip" : ""}" d="${d}"/>${flowing ? `<path class="tp-flow" d="${d}" style="--w:${Math.min(5, 1.6 + Math.abs(k) / 60).toFixed(1)}px;stroke:${n.c}"/>` : ""}`; }).join("");
     const cbs = order.filter(id => NODES[id].cb).map(id => breaker(NODES[id].cb, mid(at(id), foot(id)), id)).join("");
+    const trs = EXTRA.transformers.filter(t => NODES[t.on]).map(t => { const g = mid(at(t.on), foot(t.on), 0.24), p = P(...g), pct = v(t.id + ".load_pct");
+      return `<g class="tp-tr" data-node="${t.on}">${box(g[0], g[1], 0.26, 16, pct !== null && pct > 100 ? "#ff6b6b" : "#b9a37a")}<text class="tp-cbname" x="${p[0] - 16}" y="${p[1] - 20}" text-anchor="end">${esc(t.id)} · ${t.kva} kVA</text>
+        ${pct === null ? "" : `<text class="tp-cbst" x="${p[0] - 16}" y="${p[1] - 7}" text-anchor="end" fill="${pct > 100 ? "#ff6b6b" : "#e8dcc0"}">부하율 ${pct.toFixed(0)}%</text>`}</g>`; }).join("");
     const nodes = order.map(id => { const n = NODES[id], [gx, gy] = at(id), p = P(gx, gy), k = kw(id), run = snap && n.kind !== "ctl" ? running(id) : null;
       const cut = n.kind === "load" && n.cb && snap && cb(n.cb) !== 1;                 // 부하 차단기가 열려 있으면 급전되지 않는다(표시값은 부하 요구량)
       const chip = !snap || n.kind === "ctl" ? "" : cut ? `급전 차단${k ? " · 요구 " + k.toFixed(0) + " kW" : ""}` : [k === null ? "" : `${k.toFixed(k % 1 ? 1 : 0)} kW`, n.soc && v(n.soc) !== null ? `SOC ${v(n.soc)}%` : "", n.st ? (run ? "운전" : "정지") : ""].filter(Boolean).join(" · ");
@@ -106,7 +124,7 @@ const ScTopo = (() => {
             <text x="${p[0]}" y="${p[1] - 36}" text-anchor="middle" fill="${n.c}" class="tp-code">${id}</text>
             ${n.photo ? `<image href="photos/${n.photo}.jpg" x="${p[0] - 35}" y="${p[1] - 64}" width="70" height="46" preserveAspectRatio="xMidYMid slice" clip-path="inset(0 round 4px)" onerror="this.remove()"/>` : ""}</g>`;
       return `<g class="tp-node ${cut ? "off" : run === true ? "on" : run === false ? "off" : ""} ${picked === id && !ctx.part ? "picked" : ""}" data-node="${id}" tabindex="0" role="button" aria-label="${esc(n.name)}">
-        ${box(gx, gy, 0.52, 10, n.c)}${card}<text class="tp-name" x="${p[0]}" y="${p[1] - (chip ? 86 : 72)}" text-anchor="middle">${esc(n.name)}</text>
+        ${box(gx, gy, 0.52, 10, n.c)}${card}<text class="tp-name" x="${p[0]}" y="${p[1] - (chip ? 86 : 72)}" text-anchor="middle">${esc(n.name)}${n.extra ? " ＊" : ""}</text>
         ${chip ? `<text class="tp-chip" x="${p[0]}" y="${p[1] - 72}" text-anchor="middle">${esc(chip)}</text>` : ""}</g>`; }).join("");
 
     // 지금 단계의 신호 흐름
@@ -125,7 +143,7 @@ const ScTopo = (() => {
     const xs = Object.keys(NODES).map(id => P(...at(id))), minX = Math.min(...xs.map(p => p[0])) - 80, maxX = Math.max(...xs.map(p => p[0])) + 100, minY = Math.min(...xs.map(p => p[1])) - 120, maxY = Math.max(...xs.map(p => p[1])) + 50;
     return `<svg class="tp-svg" viewBox="${minX} ${minY} ${maxX - minX} ${maxY - minY}" role="img" aria-label="장비·배전반·차단기 구성도">
       <defs><marker id="tpHead" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="12" refX="12" refY="6" orient="auto" viewBox="0 0 10 9" preserveAspectRatio="none"><path d="M0 0L10 4.5L0 9z" fill="currentColor"/></marker></defs>
-      ${bus}${tie}${cables}${cbs}${nodes}${signal}</svg>
+      ${bus}${tie}${cables}${cbs}${trs}${nodes}${signal}</svg>
       ${snap ? "" : '<p class="muted tp-hint">검증을 실행하면 단계마다 차단기·운전 상태와 전력 흐름이 표시됩니다. 지금은 구성과 신호 방향만 보입니다.</p>'}`;
   }
 
@@ -156,5 +174,5 @@ const ScTopo = (() => {
   }
   function reset() { layout = {}; try { localStorage.removeItem(KEY); } catch (_) { /* 무시 */ } }
   const custom = () => Object.keys(layout).length > 0;
-  return {html, bind, reset, custom, tagsOf, title, owner};
+  return {html, bind, reset, custom, tagsOf, title, owner, configure, base: BASE};
 })();

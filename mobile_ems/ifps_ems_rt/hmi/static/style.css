@@ -760,3 +760,10 @@ td.nw, th.nw { white-space: nowrap; } table.tc td.ell { max-width: 120px; }
 .tp-tag {display:inline-flex;align-items:center;gap:3px;padding:2px 4px 2px 8px;border:1px solid var(--line);border-radius:14px}
 .tp-tag code {font-size:11px}.tp-tag .btn,.tp-quick .btn {padding:1px 7px;font-size:11px}
 @media (prefers-reduced-motion:reduce){.tp-flow,.tp-sig .ping,.tp-sig .spin{animation:none}}
+
+.tp-relay {fill:#ffd08a;font:9.5px var(--mono,monospace);paint-order:stroke;stroke:#0f1614;stroke-width:3px}
+.tp-tr {cursor:pointer}
+.ex-tbl {width:100%;border-collapse:collapse;margin:0 0 10px}
+.ex-tbl th {font-size:11px;text-align:left;color:var(--text2);font-weight:600;padding:2px 4px}
+.ex-tbl td {padding:2px 3px}.ex-tbl .in {width:100%;min-width:60px;padding:3px 6px;font-size:12px}
+#modalBox h4 {margin:12px 0 6px;display:flex;align-items:center;gap:8px}

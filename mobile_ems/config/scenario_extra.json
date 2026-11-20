@@ -1,0 +1,59 @@
+{
+ "feeders": [],
+ "transformers": [
+  {
+   "id": "TR1",
+   "name": "수전 변압기 22.9 kV / 380 V",
+   "on": "GRID",
+   "kva": 1000,
+   "pf": 0.9
+  }
+ ],
+ "relays": [
+  {
+   "id": "51-L1",
+   "name": "1등급 부하 과전류",
+   "cb": "L1",
+   "sum": [
+    "L1"
+   ],
+   "pickup_kw": 120,
+   "delay_ms": 400,
+   "code": 51
+  },
+  {
+   "id": "51-L2",
+   "name": "2등급 부하 과전류",
+   "cb": "L2",
+   "sum": [
+    "L2"
+   ],
+   "pickup_kw": 150,
+   "delay_ms": 300,
+   "code": 51
+  },
+  {
+   "id": "51-L3",
+   "name": "3등급 부하 과전류",
+   "cb": "L3",
+   "sum": [
+    "L3"
+   ],
+   "pickup_kw": 150,
+   "delay_ms": 200,
+   "code": 51
+  },
+  {
+   "id": "51-TIE",
+   "name": "모선 B 후비 과전류",
+   "cb": "TIE",
+   "sum": [
+    "L2",
+    "L3"
+   ],
+   "pickup_kw": 280,
+   "delay_ms": 700,
+   "code": 51
+  }
+ ]
+}

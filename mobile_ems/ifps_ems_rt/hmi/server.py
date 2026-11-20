@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from .. import modbus as mb
 from .engine import ROLES
-from . import scenarios
+from . import scenarios, scenextra
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_BODY = 128 * 1024
@@ -63,10 +63,7 @@ def make_handler(eng):
             try:
                 if p == "/api/scenarios/catalog":
                     if not eng.sim: return self._err(403, "시나리오는 가상 장치 모드에서 열 수 있습니다")
-                    data = scenarios.catalog(eng.rt.pts, eng.cfg["devices"])
-                    with open(os.path.join(STATIC, "scenario_presets.json"), encoding="utf-8") as source:
-                        data["presets"] = scenarios.compatible_presets(json.load(source), eng.rt.pts, data["commands"])
-                    return self._send(200, data)
+                    return self._send(200, scenextra.catalog(eng.rt.pts, eng.cfg["devices"], eng.cfg_path, os.path.join(STATIC, "scenario_presets.json")))
                 if p == "/api/snapshot":
                     s = self._sess(); d = eng.snapshot(); d["me"] = {"role": s["role"], "name": s["name"]}; return self._send(200, d)
                 if p == "/api/trend": return self._send(200, {"cols": ["t", "load", "pv", "dg", "fc", "ess", "soc", "h2", "reserve"], "rows": eng.trend_since(float(q.get("since", 0)))})
@@ -122,6 +119,11 @@ def make_handler(eng):
                 b = self._body()
                 if p == "/api/login": return self._send(200, eng.login(b.get("pin", ""), (b.get("name") or "운용자")[:24], self.client_address[0]))
                 if p == "/api/logout": return self._send(200, eng.logout(self.headers.get("X-EMS-Token")))
+                if p == "/api/scenarios/extra":                  # 시나리오용 추가 설비(모의 급전선·변압기·계전기) 저장 — 실제 대응표는 바꾸지 않는다
+                    if not eng.sim: return self._err(403, "시나리오는 가상 장치 모드에서 실행할 수 있습니다")
+                    s = self._sess("engineer")
+                    if not s: return
+                    return self._send(200, scenextra.store(eng, b.get("extra"), s["name"]))
                 if p in ("/api/scenarios/verify", "/api/scenarios/export"):
                     if not eng.sim: return self._err(403, "시나리오는 가상 장치 모드에서 실행할 수 있습니다")
                     if not self._sess("engineer"): return

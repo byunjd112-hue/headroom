@@ -50,7 +50,8 @@ FIND.forEach(x => { b.push(H2(`${x[0]}  ${x[1]}  [${x[2]} · ${x[3]}]`)); b.push
 b.push(H2("추가 검토  운영 시나리오 검증 기능  [낮음 · 조치]"));
 b.push(KV("현황", "시나리오 목록 조회(/api/scenarios/catalog), 검증 실행·회귀 시험 코드 내보내기(/api/scenarios/verify, /export)가 추가되었다. 검증은 요청 본문의 시나리오를 독립 가상 장치 모형에서 실행한다."));
 b.push(KV("조치·권고", "세 경로 모두 가상 장치 모드에서만 열리고(실장치 모드 403), 실행·내보내기는 엔지니어 세션을 요구한다. 동시에 한 건만 실행하며(진행 중이면 429), 건수 20·단계 30·시간 10초로 제한한다. 요청 본문 한도는 128 KB 다. 내보내기는 파이썬 시험 소스 문자열만 돌려주며 서버에 파일을 쓰지 않는다. 실행 대상은 실제 장치와 분리된 메모리 내 모형이다."));
-b.push(KV("확인", "test_scenarios(격리·거부·내보내기), test_R11_mutating_and_sensitive_routes_need_login. 외부 인증기관의 보안 시험 성적은 포함하지 않는다."));
+b.push(KV("추가 설비 저장", "시나리오용 추가 설비 저장(/api/scenarios/extra)도 가상 장치 모드의 엔지니어 세션에서만 받는다. 이름 형식·개수·범위를 검사한 뒤 설정 폴더의 scenario_extra.json 한 파일에만 쓰고(직전 파일 보관), 실제 대응표와 운전 설정은 바꾸지 않는다. 저장은 사건 기록에 남는다."));
+b.push(KV("확인", "test_scenextra(검사·대응표 불변·계전기 동작), test_scenarios(격리·거부·내보내기), test_R11_mutating_and_sensitive_routes_need_login. 외부 인증기관의 보안 시험 성적은 포함하지 않는다."));
 b.push(H1("5. 운용 전 필수 조치"));
 ["runtime.json의 hmi.pin_operator/pin_engineer 평문을 지우고 pin_*_hash(6자리 이상)로 교체", "run_mode를 '운용'으로 바꾸고 기동 시 보안 점검 통과 확인(평문·기본 PIN, 원격 바인드, 가상 장치 모드 거부)", "KCMVP 검증필 암호모듈로 CryptoProvider 교체(S-09)", "제어망 물리 분리와 장치 측 접속 허용 목록 설정, 가능 시 Modbus/TCP Security 또는 보안 게이트웨이(S-06)", "원격 운용이 필요하면 TLS 종단 프록시 뒤에 두고 hmi.allow_remote=true 설정(S-03)", "감사 기록 외부 반출 절차 수립(S-10), 노트북 OS 계정·디스크 암호화·USB 통제", "반입 패키지 해시 고정과 SBOM 첨부(S-14)"].forEach(t => b.push(NUM(t)));
 b.push(H1("6. 결론"));
