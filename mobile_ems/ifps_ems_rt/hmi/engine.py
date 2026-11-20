@@ -18,7 +18,7 @@ from ..runtime import Runtime
 from ..simplant import Plant
 from .cfgedit import ConfigEditor
 from ifps_ems.dataio import sky_from_clearness as dataio_sky
-from . import fuelwatch, fcstats
+from . import fuelwatch, fcstats, archwatch
 from .skywatch import SkyWatch
 
 PRIO_TXT = {1: "긴급", 2: "높음", 3: "보통", 4: "낮음"}
@@ -249,6 +249,7 @@ class Engine:
         self.fuel_cfg = dict({"dg_tank_l": 1000.0, "warn_pct": 50.0, "warn_h": 8.0, "repeat_min": 30.0}, **(self.cfg.get("fuel") or {})); self._fuel_t = {}
         self.ai_cfg = dict({"enabled": True, "retrain_h": 24.0, "sim_retrain_h": 2.0, "first_min": 3.0}, **(self.cfg.get("ai") or {}))
         self.skyw = SkyWatch(self)                                                      # 하늘 카메라(구름량 → 태양광 예측 입력)
+        self.archw = archwatch.ArchWatch(self)                                          # 기록 보관소(검침 누적값·상황 기록·점검 기록)
         self.ai_busy = False; self.ai_last = None; self.ai_next = time.time() + 60.0 * float(self.ai_cfg["first_min"])
         self._tag_dev = {p["tag"]: p["device"] for p in self.rt.pts}
         self.cfged = ConfigEditor(self.cfg_path, note=self.rt.note)                      # 설정 편집기(원본 설정 파일 대상, 재기동 후 적용)
@@ -297,7 +298,7 @@ class Engine:
         time.sleep(0.3)
         try: self.rt.save()
         finally:
-            self.rt.close()
+            self.archw.close(); self.rt.close()
             if self.plant: self.plant.stop()
 
     # ── 수집 주기
@@ -509,7 +510,7 @@ class Engine:
                 self.rt.note("오류", f"감시 주기 예외: {type(e).__name__}: {e}")
 
     def _post_scan(self):
-        k = self.kpi(); self._integrate(k)
+        k = self.kpi(); self._integrate(k); self.archw.step(self, k)
         self.trend.append([round(time.time() * 1000), round(k["load"], 2), round(k["pv"], 2), round(k["dg"], 2), round(k["fc"], 2), round(k["ess"], 2),
                            round(k["soc"], 2), round(k["h2"], 1), round(k["reserve_margin"], 1)])
         self._alarms_comm(); self._alarms_process(k); self._alarms_grid(); self._alarms_ops(); self._alarms_events()

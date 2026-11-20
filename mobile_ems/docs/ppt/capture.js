@@ -38,6 +38,11 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await p.click('.sp-dot[data-step="2"]').catch(() => {}); await p.waitForTimeout(900); await p.evaluate(() => document.querySelector(".tp-wrap")?.scrollIntoView({ block: "center" })); await p.waitForTimeout(400); await p.screenshot({ path: D + "scen_prot.png" });
   await p.click('[data-sc="extra"]').catch(() => {}); await p.waitForTimeout(1200); await p.screenshot({ path: D + "scen_extra.png" }); await p.evaluate(() => closeModal());
   await p.click('[data-view="seq"]').catch(() => {}); await p.evaluate(() => { try { localStorage.setItem("ems.scenario.view", "seq"); } catch (_) {} });
+  await go("archive", null, 2500); await p.screenshot({ path: D + "archive.png" });
+  await p.click('#arcTabs button[data-t="ess"]'); await p.waitForTimeout(1200); await p.screenshot({ path: D + "arch_ess.png" });
+  await p.click('#arcTabs button[data-t="device"]'); await p.waitForTimeout(1200); await p.click('[data-d="FC"]').catch(() => {}); await p.waitForTimeout(1200); await p.screenshot({ path: D + "arch_dev.png" });
+  await p.click('#arcTabs button[data-t="xfer"]'); await p.waitForTimeout(1000); await post("/api/archive/xfer/make", { from: new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10), to: new Date(Date.now() - 864e5).toISOString().slice(0, 10) }).then(r => r.row && post("/api/archive/xfer/mark", { id: r.row.id, note: "보안 USB → 주둔지 서버(캡처용 예시)" }));
+  await post("/api/archive/xfer/make", {}); await p.click('#arcTabs button[data-t="xfer"]'); await p.waitForTimeout(1500); await p.screenshot({ path: D + "arch_xfer.png" }); await p.click('#arcTabs button[data-t="meter"]');
   await go("energy", null, 9000); await p.click("#enAi"); await p.waitForTimeout(1500); await p.screenshot({ path: D + "ai_learn.png" }); await p.evaluate(() => closeModal());
   // 2) 고장: 2등급 급전선 과전류 트립 + 연료전지 통신 두절
   await sim({ action: "fault", target: "L2", code: 51 }); await sim({ action: "mute", target: "FC", on: true }); await p.waitForTimeout(6000);

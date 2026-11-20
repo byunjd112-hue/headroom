@@ -773,3 +773,20 @@ td.nw, th.nw { white-space: nowrap; } table.tc td.ell { max-width: 120px; }
 .ex-scroll {overflow-x:auto}
 .modal:has(> .xl),#modalBox:has(> .xl) {max-width:min(1500px,96vw);width:96vw}
 .modal:has(> .xl) {max-height:92vh;overflow:auto}
+
+/* ── 기록 · 보고서(archive.js) */
+.arc-bar .hd { gap: 8px; flex-wrap: wrap; } .arc-title { margin-left: 10px; font-size: 15px; } .arc-bar a.btn { text-decoration: none; }
+.arc-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 12px 0; }
+.arc-tile { border: 1px solid var(--line2); border-radius: 12px; padding: 10px 14px; background: var(--panel2); display: grid; grid-template-columns: 1fr auto; align-items: baseline; }
+.arc-tile span { grid-column: 1 / 3; color: var(--muted); font-size: 12px; } .arc-tile b { font-size: 22px; font-family: var(--mono); } .arc-tile i { font-style: normal; color: var(--muted); font-size: 12px; } .arc-tile em { grid-column: 1 / 3; font-style: normal; font-size: 11.5px; color: var(--text2); }
+.arc-grid { display: grid; grid-template-columns: 1.7fr 1fr; gap: 12px; margin-bottom: 12px; } .arc-note { padding: 8px 12px; } .arc-rules p { margin: 0 0 8px; line-height: 1.55; }
+.arc-svg { width: 100%; height: auto; display: block; } .arc-gl { stroke: var(--line); stroke-width: 1; } .arc-ax { fill: var(--muted); font-size: 11px; }
+.c-load { fill: var(--load, #e8b04a); background: var(--load, #e8b04a); } .c-pv { fill: var(--pv, #f2d24b); background: var(--pv, #f2d24b); } .c-gen { fill: var(--dg, #e2725b); background: var(--dg, #e2725b); } .c-grid { fill: var(--g1, #6fa8dc); background: var(--g1, #6fa8dc); }
+.arc-leg { font-size: 12px; color: var(--text2); } .arc-leg i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 10px; }
+.arc-table { max-height: 380px; } .arc-table.tall { max-height: 640px; } .arc-row { cursor: pointer; } .arc-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.arc-meter { height: 6px; border-radius: 3px; background: var(--line); margin-top: 5px; overflow: hidden; } .arc-meter i { display: block; height: 100%; background: var(--accent); }
+body.viewer { overflow: auto; } .viewer-wrap { max-width: 1500px; margin: 0 auto; padding: 14px 18px 40px; } .viewer-hd { font-size: 16px; padding: 4px 2px 10px; }
+.arc-tiles.four { grid-template-columns: repeat(4, 1fr); } .arc-devs { gap: 6px; flex-wrap: wrap; } .arc-chk { font-size: 12.5px; color: var(--text2); display: inline-flex; gap: 5px; align-items: center; }
+.c-band { fill: rgba(var(--acc, 120,170,220), .22); background: rgba(var(--acc, 120,170,220), .35); } .arc-line { fill: none; stroke: var(--load, #6fa8dc); stroke-width: 1.8; }
+.arc-miss { color: var(--muted); opacity: .6; } table.arc-ess th { white-space: nowrap; font-size: 11px; } th.arc-grp { text-align: center; border-left: 1px solid var(--line); } .arc-act { white-space: nowrap; } .arc-act .btn { margin-left: 4px; }
+table.arc-ess td { white-space: nowrap; }

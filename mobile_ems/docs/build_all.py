@@ -36,7 +36,7 @@ def clean(rev):
 
 # 문서 묶음의 폴더 구성(읽는 순서): (폴더, 설명, 파일 이름에 들어 있는 말들)
 LAYOUT = [("01_제안발표", "제안 발표 자료에 EMS 하드웨어·소프트웨어 4장을 넣은 보완본", ("IFPS_제안발표",)),
-          ("02_화면과운용", "화면 구성·운용 방안·사용 방법·디버깅·신뢰성 결과를 한 권으로 묶은 보고자료", ("화면구성_사용설명_보고자료",)),
+          ("02_화면과운용", "화면 구성·운용 방안·사용 방법·디버깅·신뢰성 결과를 한 권으로 묶은 보고자료, 화면에서 출력하는 운영 보고서의 견본(가상 장치 값)", ("화면구성_사용설명_보고자료", "운영보고서_예시")),
           ("03_하드웨어", "쉘터 탑재형 구성, 이동·충격·진동·PLS·EMP 설계, WBS 와 시판 참조 모델", ("하드웨어구성_기술자료",)),
           ("04_AI예측", "예측 수식·학습된 모델의 입체 그림·독립 검증(기술자료)과 같은 내용의 논문 초안", ("AI예측_기술자료", "AI예측_논문")),
           ("05_통신연동", "실장치 통신 연동 방안서(Modbus TCP 규약·설정·시운전 절차)", ("실장치통신연동방안서",)),
@@ -114,6 +114,7 @@ def main(argv=None):
     run(["node", os.path.join(DOCS, "ppt", "build_ai_deck.js"), rev, ym], env=env)            # AI 예측 기술자료(수식·입체 모델 그림)
     run(["node", os.path.join(DOCS, "ppt", "build_hw_deck.js"), rev, ym], env=env)            # 하드웨어 구성 기술자료
     run([sys.executable, os.path.join(DOCS, "fmea", "build_fmea.py"), rev, date])
+    run([sys.executable, "-m", "tools.sample_report", os.path.join(OUT, f"이동형전력체계EMS_운영보고서_예시_{rev}.docx")])   # 화면의 [보고서 출력]으로 나오는 문서의 견본(가상 장치 값)
     run([sys.executable, os.path.join(DOCS, "ppt", "add_ems_to_proposal.py"), rev])                 # 제안 발표 자료 EMS 보완본(원본이 있을 때만)          # FMEA·FTA 통합 분석 워크벤치(HTML)
     names = sorted(os.path.relpath(os.path.join(dp, f), OUT) for dp, _, fs in os.walk(OUT) for f in fs)
     bad = [n for n in names if rev not in n]

@@ -167,6 +167,14 @@
   "warn_h": 8,
   "repeat_min": 30
  },
+ "archive": {
+  "enabled": true,
+  "interval_min": 15,
+  "retain_years": 4,
+  "max_mb": 2048,
+  "server_url": "",
+  "outbox": ""
+ },
  "skycam": {
   "enabled": true,
   "path": "",

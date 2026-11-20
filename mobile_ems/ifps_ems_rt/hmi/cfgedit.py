@@ -11,6 +11,7 @@
 import csv, difflib, hashlib, io, json, math, os, re, tempfile, time
 from .. import pointmap as pm
 from .. import opsmode as om
+from .. import archive
 from ..modbus import NREG, ORDERS
 
 MASK = "********"; SECRET = re.compile(r"^(pin_|audit_key)"); KEEP = 20
@@ -121,6 +122,20 @@ def _check_sections(cfg, bad):
     if not isinstance(ai, dict): bad.append("ai: 객체여야 함"); ai = {}
     for k, (lo, hi) in AI_RANGE.items():
         if k in ai and not _in(ai[k], lo, hi): bad.append(f"ai.{k}: {lo}~{hi} 범위의 숫자")
+    _check_archive(cfg.get("archive"), bad)
+
+
+def _check_archive(ar, bad):
+    """기록 보관소: 저장 주기는 1·5·15·30·60분, 보관 기간은 1~5년."""
+    if ar is None: return
+    if not isinstance(ar, dict): bad.append("archive: 객체여야 함"); return
+    if "interval_min" in ar and ar["interval_min"] not in archive.INTERVALS: bad.append("archive.interval_min: 1·5·15·30·60 중 하나(분)")
+    if "retain_years" in ar and not (_in(ar["retain_years"], 1, 5) and float(ar["retain_years"]).is_integer()): bad.append("archive.retain_years: 1~5 의 정수(년)")
+    if "max_mb" in ar and not _in(ar["max_mb"], 16, 8192): bad.append("archive.max_mb: 16~8192 범위의 숫자(MB)")
+    if "enabled" in ar and not isinstance(ar["enabled"], bool): bad.append("archive.enabled: true 또는 false")
+    u = ar.get("server_url", "")
+    if not isinstance(u, str) or (u and not re.fullmatch(r"https?://[A-Za-z0-9.\-_]+(:\d{1,5})?(/[\w\-./]*)?", u)): bad.append("archive.server_url: 비우거나 http(s)://주소[:포트][/경로]")
+    if not isinstance(ar.get("outbox", ""), str): bad.append("archive.outbox: 문자열(묶음을 둘 폴더, 비우면 state/outbox)")
 
 
 def check_runtime(cfg):

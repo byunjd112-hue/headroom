@@ -1,0 +1,30 @@
+key,group,label,unit,tag
+room_temp,운영 환경,배터리실 온도,degC,ENV.temp
+room_rh,운영 환경,배터리실 습도,%,ENV.rh
+bat_v,배터리,배터리(랙) 전압,V,
+bat_a,배터리,배터리(랙) 전류,A,
+soc,배터리,충전율(SOC),%,ESS.soc
+soh,배터리,건전도(SOH),%,
+cell_v_max,배터리,셀 최고 전압,V,
+cell_v_min,배터리,셀 최저 전압,V,
+mod_t_max,배터리,모듈 최고 온도,degC,
+mod_t_min,배터리,모듈 최저 온도,degC,
+insul_kohm,배터리,절연저항,kΩ,
+pcs_status,PCS,운전 상태(1 = 운전),,ESS.status
+pcs_kw,PCS,유효전력(+ 방전),kW,ESS.kw
+pcs_dc_v,PCS,직류 전압,V,
+pcs_dc_a,PCS,직류 전류,A,
+pcs_ac_v,PCS,교류 전압,V,BUS.a_v
+pcs_ac_a,PCS,교류 전류,A,
+pcs_hz,PCS,주파수,Hz,BUS.hz
+gf_a,PCS,지락 전류,A,
+ev_ov,보호 이벤트,과전압,,
+ev_uv,보호 이벤트,저전압,,
+ev_oc,보호 이벤트,과전류,,
+ev_och,보호 이벤트,과충전,,
+ev_odc,보호 이벤트,과방전,,
+ev_ot,보호 이벤트,과온,,
+ev_gf,보호 이벤트,지락,,
+ev_estop,보호 이벤트,비상정지,,
+ev_fire,보호 이벤트,화재(연기·가스) 감지,,
+ev_supp,보호 이벤트,소화설비 동작,,

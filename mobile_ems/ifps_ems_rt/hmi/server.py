@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from .. import modbus as mb
 from .engine import ROLES
-from . import scenarios, scenextra
+from . import scenarios, scenextra, archwatch
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_BODY = 128 * 1024
@@ -96,6 +96,7 @@ def make_handler(eng):
                     rows = eng.trend_since(0); cols = "time,load_kw,pv_kw,dg_kw,fc_kw,ess_kw,soc_pct,h2_nm3,reserve_margin_kw\n"
                     body = cols + "".join(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(r[0] / 1000)) + "," + ",".join(str(x) for x in r[1:]) + "\n" for r in rows)
                     return self._send(200, "﻿" + body, "text/csv; charset=utf-8", {"Content-Disposition": "attachment; filename=ems_trend.csv"})
+                if p.startswith("/api/archive/") or p == "/api/report.docx": return archwatch.http_get(self, eng, eng.archw.store, p, q)
                 return self._static(p)
             except mb.ModbusError as e:
                 return self._send(200, {"ok": False, "why": f"통신 오류: {e}"})
@@ -177,13 +178,9 @@ def make_handler(eng):
                     s = self._sess("engineer")
                     if s: self._send(200, eng.mb_write(b, s["name"]))
                     return
-                if p == "/api/layout":
+                if p in ("/api/layout", "/api/layout/reset"):
                     s = self._sess("operator")
-                    if s: self._send(200, eng.save_layout(b, s["name"]))
-                    return
-                if p == "/api/layout/reset":
-                    s = self._sess("operator")
-                    if s: self._send(200, eng.reset_layout(s["name"]))
+                    if s: self._send(200, eng.reset_layout(s["name"]) if p.endswith("reset") else eng.save_layout(b, s["name"]))
                     return
                 if p in ("/api/ai/train", "/api/ai/rollback"):
                     s = self._sess("engineer")
@@ -198,6 +195,10 @@ def make_handler(eng):
                     if p.endswith("restore"): return self._send(200, eng.cfged.restore(b.get("name"), s["name"]))
                     if b.get("kind") not in ("runtime", "pointmap"): return self._err(400, "kind 는 runtime 또는 pointmap")
                     return self._send(200, eng.cfged.check(b["kind"], b) if p.endswith("check") else eng.cfged.save(b["kind"], b, s["name"]))
+                if p.startswith("/api/archive/"):                # 점검 기록 넣기 · 주둔지 서버 전달(묶음 만들기·보내기·완료 적기)
+                    s = self._sess("operator")
+                    if s: self._send(200, archwatch.http_post(eng.archw.store, p, b, s["name"], eng.rt.site.name))
+                    return
                 if p == "/api/sim":
                     s = self._sess("engineer")
                     if s: self._send(200, eng.sim_action(b, s["name"]))
