@@ -52,20 +52,58 @@ const P_SCENARIOS = (() => {
     save();
   }
 
+  // ── 시퀀스 다이어그램(UML 식): 머리에 실제 장비 사진, 생명선과 활성 막대, 호출은 실선·응답과 판정은 점선
+  const photo = {DG: "dg", FC: "fc", ESS: "ess", PV: "pv", MTR: "dist", GDG: "gdg", EMS: "ems", ELZ: "elz"};
+  const tint = {TEST: "#c9a6c0", EMS: "#f2d27a", DG: "#e59866", FC: "#7fc8c0", ESS: "#9aa8e8", PV: "#f0c05a", MTR: "#a9d18e", ELZ: "#8fd3ff", GDG: "#d7a86e"};
+  const SQ = {w: 138, row: 50, top: 14};
+  function route(step) {                                   // [보내는 쪽, 받는 쪽, 선 모양]
+    const dev = step.device || point(step.tag)?.device || "EMS";
+    if (step.type === "command") return ["EMS", dev, "call"];
+    if (step.type === "policy") return ["TEST", "EMS", "call"];
+    if (step.type === "policy_check") return ["EMS", "TEST", "return"];
+    if (step.type === "wait") return ["TEST", "TEST", "self"];
+    if (step.type === "set") return ["TEST", dev, "call"];
+    if (step.type === "response") return ["TEST", dev, "inject"];
+    return [dev, "TEST", "return"];                        // expect · branch: 장비 값을 읽어 판정
+  }
+  const runOf = () => output?.results.find(r => r.index === active);
+
   function sequence() {
-    const lanes = ["EMS", ...new Set(scene().steps.map(lane).filter(d => d !== "EMS"))];
-    const columns = `grid-template-columns:repeat(${lanes.length},minmax(135px,1fr))`;
-    return `<div class="sc-scroll"><div class="sc-grid" style="${columns}">
-      ${lanes.map((d, i) => `<div class="sc-lane" style="grid-column:${i + 1};grid-row:1"><b>${esc(d)}</b><small>${esc(deviceName(d))}</small></div>`).join("")}
-      ${lanes.map((_, i) => `<div class="sc-life" style="grid-column:${i + 1};grid-row:2 / ${scene().steps.length + 3}"></div>`).join("")}
-      ${scene().steps.map((s, i) => {
-        const end = lanes.indexOf(lane(s)) + 1, last = Math.max(2, end + 1);
-        const direction = s.type === "expect" || s.type === "branch" ? "back" : "forward";
-        const state = output?.results.find(r => r.index === active)?.rows.find(row => row.step === i)?.state || "";
-        return `<button type="button" class="sc-message ${end === 1 ? "local" : direction} ${state} ${i === stepIndex ? "chosen" : ""}" data-step="${i}" style="grid-column:1 / ${last};grid-row:${i + 2}" aria-pressed="${i === stepIndex}">
-          <span>${i + 1}. ${esc(description(s))}</span><i aria-hidden="true"></i>
-        </button>`;
-      }).join("")}</div></div>`;
+    const steps = scene().steps, routes = steps.map(route), rows = runOf()?.rows || [];
+    const lanes = ["TEST", "EMS", ...new Set(routes.flatMap(r => [r[0], r[1]]).filter(d => d !== "TEST" && d !== "EMS"))];
+    const x = d => lanes.indexOf(d) * SQ.w + SQ.w / 2, y = i => SQ.top + i * SQ.row + 30, width = lanes.length * SQ.w, height = SQ.top + Math.max(1, steps.length) * SQ.row + 18;
+    const state = i => rows.find(row => row.step === i);
+    const heads = lanes.map(d => `<div class="sq-head" style="--c:${tint[d] || "#9fb0ad"}">
+      ${d === "TEST" ? `<svg viewBox="0 0 40 44" class="sq-actor" aria-hidden="true"><circle cx="20" cy="9" r="6.5"/><path d="M20 16v15M7 22h26M20 31l-9 12M20 31l9 12"/></svg>`
+        : `<span class="sq-photo"><img src="photos/${photo[d] || d.toLowerCase()}.jpg" alt="" loading="lazy" onerror="this.remove()"><em>${esc(d)}</em></span>`}
+      <b>${d === "TEST" ? "검증기" : esc(d)}</b><small>${d === "TEST" ? "시험 입력 · 판정" : esc(deviceName(d))}</small></div>`).join("");
+    const life = lanes.map(d => `<line class="sq-life" x1="${x(d)}" x2="${x(d)}" y1="0" y2="${height}"/>`).join("");
+    const bars = lanes.map(d => {                           // 활성 막대: 그 장비가 관여한 연속 구간
+      const used = steps.map((_, i) => i).filter(i => routes[i][0] === d || routes[i][1] === d), out = [];
+      for (let k = 0; k < used.length; k++) { let e = k; while (e + 1 < used.length && used[e + 1] - used[e] <= 1) e++; out.push([used[k], used[e]]); k = e; }
+      return out.map(([a, b]) => `<rect class="sq-bar" x="${x(d) - 5}" y="${y(a) - 13}" width="10" height="${y(b) - y(a) + 26}" rx="2" fill="${tint[d] || "#9fb0ad"}"/>`).join("");
+    }).join("");
+    const arrows = steps.map((s, i) => {
+      const [from, to, kind] = routes[i], row = state(i), st = row?.state || "", yy = y(i), a = x(from), b = x(to), dir = b >= a ? 1 : -1;
+      const text = `${i + 1}. ${description(s)}`, seen = row ? [row.actual !== undefined && row.expected !== undefined ? `관측 ${row.actual}` : "", row.elapsed !== undefined ? `${row.elapsed} ms` : ""].filter(Boolean).join(" · ") : "";
+      const mark = st === "pass" ? "✓" : st === "fail" ? "✕" : st === "skip" ? "–" : "";
+      if (kind === "self") return `<g class="sq-msg ${st}"><path d="M${a + 6} ${yy - 8}h26v16h-22" marker-end="url(#sqOpen)"/><text x="${a + 40}" y="${yy + 4}">${esc(text)}</text>${mark ? `<text class="sq-mark" x="${a - 16}" y="${yy + 5}">${mark}</text>` : ""}</g>`;
+      const mid = (a + b) / 2;
+      return `<g class="sq-msg ${kind} ${st}"><line x1="${a + 6 * dir}" x2="${b - 7 * dir}" y1="${yy}" y2="${yy}" marker-end="url(#${kind === "return" ? "sqOpen" : "sqFill"})"/>
+        <text x="${mid}" y="${yy - 7}" text-anchor="middle">${kind === "inject" ? "⚡ " : ""}${esc(text)}</text>
+        ${seen || row?.why ? `<text class="sq-seen" x="${mid}" y="${yy + 14}" text-anchor="middle">${esc(st === "fail" && row.why ? row.why : seen)}</text>` : ""}
+        ${mark ? `<text class="sq-mark" x="${Math.min(a, b) - 16}" y="${yy + 5}">${mark}</text>` : ""}</g>`;
+    }).join("");
+    const hit = steps.map((s, i) => `<div class="sq-row ${i === stepIndex ? "chosen" : ""} ${state(i)?.state || ""}" role="button" tabindex="0" draggable="true" data-step="${i}" style="top:${SQ.top + i * SQ.row}px;height:${SQ.row}px" aria-pressed="${i === stepIndex}" aria-label="${i + 1}단계 ${esc(description(s))}">
+      ${i === stepIndex ? `<span class="sq-tools">${button("up", "↑", "", i === 0)}${button("down", "↓", "", i === steps.length - 1)}${button("dup", "복제", "", steps.length >= 30)}${button("remove", "삭제")}</span>` : ""}</div>`).join("");
+    const done = rows.length, pass = rows.filter(r => r.state === "pass").length, fail = rows.filter(r => r.state === "fail").length, ms = rows.length ? rows[rows.length - 1].elapsed : 0;
+    return `<div class="sq-summary"><span>${steps.length}단계</span>${done ? `<span class="sc-ok">통과 ${pass}</span>${fail ? `<span class="sc-fail">실패 ${fail}</span>` : ""}<span>${ms} ms</span>` : '<span class="muted">아직 검증하지 않음</span>'}
+        <span class="sc-spacer"></span><span class="sq-legend"><i class="l-call"></i>지령·입력 <i class="l-ret"></i>응답 판정 <i class="l-inj"></i>고장 주입</span></div>
+      <div class="sc-scroll sq-wrap"><div class="sq-heads" style="width:${width}px">${heads}</div>
+      <div class="sq-body" style="width:${width}px;height:${height}px"><svg width="${width}" height="${height}" aria-hidden="true">
+        <defs><marker id="sqFill" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0 0L9 4L0 8z" fill="context-stroke"/></marker>
+        <marker id="sqOpen" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0 0L9 4L0 8" fill="none" stroke="context-stroke"/></marker></defs>
+        ${life}${bars}${arrows}</svg>${hit}${steps.length ? "" : '<p class="muted sq-empty">왼쪽 장비의 신호를 누르거나 끌어다 놓으면 단계가 생깁니다.</p>'}</div></div>`;
   }
 
   function inspector() {
@@ -167,13 +205,13 @@ const P_SCENARIOS = (() => {
             <select class="in" id="scAdd" aria-label="추가할 단계">${Object.entries(labels).map(([id, name]) => option(id, name)).join("")}</select>
             ${button("add", "＋ 단계")}</div>
           ${scene().note ? `<p class="sc-note">${esc(scene().note)}</p>` : ""}
-          <p class="muted">장비 목록의 신호를 클릭하거나 이 영역으로 끌어오세요.</p>${sequence()}
+          <p class="muted">신호를 누르거나 끌어다 놓아 단계를 만들고, 단계를 끌어 순서를 바꿉니다. 키보드: ↑↓ 선택 · Alt+↑↓ 이동 · Delete 삭제.</p>${sequence()}
         </section>
         <aside class="sc-panel"><h3>단계 설정 ${scene().steps.length ? "· " + (stepIndex + 1) : ""}</h3>${inspector()}</aside>
       </div>
       <section class="sc-panel sc-bottom"><h3>검증 결과</h3><div aria-live="polite">${busy ? '<p>독립 가상 장치에서 검증 중입니다.</p>' : results()}</div></section>`;
     root.ondragstart = e => {
-      const item = e.target.closest("[data-point],[data-device]");
+      const item = e.target.closest("[data-point],[data-device],[data-step]");
       if (item) e.dataTransfer.setData("application/x-ems-scenario", JSON.stringify(item.dataset));
     };
     const drop = $("#scDrop");
@@ -182,7 +220,24 @@ const P_SCENARIOS = (() => {
       const data = e.dataTransfer.getData("application/x-ems-scenario");
       if (!data) return;
       e.preventDefault();
-      try { addPalette(JSON.parse(data)); } catch (_) { /* ignore other drag data */ }
+      const over = e.target.closest("[data-step]"), at = over ? Number(over.dataset.step) : scene().steps.length - 1;
+      try {
+        const item = JSON.parse(data);
+        if (item.step !== undefined) move(Number(item.step), at); else addPalette(item, at + 1);      // 단계를 끌면 순서 이동, 신호를 끌면 그 단계 다음에 삽입
+      } catch (_) { /* ignore other drag data */ }
+    };
+    root.onkeydown = e => {
+      const row = e.target.closest?.("[data-step]");
+      if (!row) return;
+      const i = Number(row.dataset.step), n = scene().steps.length, go = to => { e.preventDefault(); stepIndex = to; paint(); $(`.sq-row[data-step="${to}"]`)?.focus(); };
+      if (e.key === "Enter" || e.key === " ") return go(i);
+      if (e.key === "Delete") { e.preventDefault(); stepIndex = i; scene().steps.splice(i, 1); stepIndex = Math.max(0, Math.min(i, n - 2)); changed(); return paint(); }
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        const to = i + (e.key === "ArrowUp" ? -1 : 1);
+        if (to < 0 || to >= n) return;
+        if (e.altKey) { e.preventDefault(); move(i, to); return $(`.sq-row[data-step="${to}"]`)?.focus(); }
+        go(to);
+      }
     };
   }
 
@@ -203,18 +258,28 @@ const P_SCENARIOS = (() => {
     return base;
   }
 
-  function append(step) {
+  function append(step, at) {
     if (!step) return;
     if (scene().steps.length >= 30) return toast("시나리오당 최대 30단계입니다", "bad");
-    scene().steps.push(step);
-    stepIndex = scene().steps.length - 1;
+    const steps = scene().steps, index = at === undefined ? steps.length : Math.max(0, Math.min(at, steps.length));
+    steps.splice(index, 0, step);
+    stepIndex = index;
     changed();
     paint();
   }
 
-  function addPalette(data) {
-    if (config.commands.includes(data.device)) append(make("command", null, data.device));
-    if (point(data.point)) append(make(point(data.point).rw === "w" ? "set" : "expect", data.point));
+  function move(from, to) {
+    const steps = scene().steps;
+    if (from === to || from < 0 || to < 0 || from >= steps.length || to >= steps.length) return;
+    steps.splice(to, 0, steps.splice(from, 1)[0]);
+    stepIndex = to;
+    changed();
+    paint();
+  }
+
+  function addPalette(data, at) {
+    if (config.commands.includes(data.device)) append(make("command", null, data.device), at);
+    if (point(data.point)) append(make(point(data.point).rw === "w" ? "set" : "expect", data.point), at);
   }
 
   async function run(action) {
@@ -242,7 +307,7 @@ const P_SCENARIOS = (() => {
   }
 
   function click(e) {
-    const el = e.target.closest("button");
+    const el = e.target.closest("button,[data-step]");
     if (!el) return;
     const d = el.dataset;
     if (d.case !== undefined || d.step !== undefined || d.jump) {
@@ -290,6 +355,11 @@ const P_SCENARIOS = (() => {
       selected = new Set([...selected].filter(i => i !== active).map(i => i > active ? i - 1 : i));
       active = Math.min(active, cases.length - 1);
       stepIndex = 0;
+    }
+    if (action === "dup") {
+      if (scene().steps.length >= 30) return toast("시나리오당 최대 30단계입니다", "bad");
+      scene().steps.splice(stepIndex + 1, 0, structuredClone(scene().steps[stepIndex]));
+      stepIndex++;
     }
     if (action === "remove") {
       scene().steps.splice(stepIndex, 1);

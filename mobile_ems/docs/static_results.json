@@ -1,6 +1,6 @@
 {
- "date": "2026-11-20 11:17",
- "unittest_s": 268.7,
+ "date": "2026-11-20 12:08",
+ "unittest_s": 280.6,
  "tests": [
   "test_backups_are_pruned_and_broken_backup_refused | ok",
   "test_pointmap_errors_block_save | ok",
@@ -1535,7 +1535,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/scenarios.js",
-   390,
+   460,
    true
   ],
   [
