@@ -31,6 +31,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await p.click('[data-act="layedit"]'); await p.waitForTimeout(600);
   // 지속 학습 상태 창(학습 한 번 돌린 뒤)
   await post("/api/ai/train", {}); for (let i = 0; i < 80; i++) { await p.waitForTimeout(3000); const a = await p.evaluate(async () => (await fetch("/api/ai")).json()); if (!a.busy && a.history.length) break; }
+  await go("scenarios", null, 2500); await p.click('[data-sc="mode-pack"]').catch(() => {}); await p.waitForTimeout(900); await p.click('[data-sc="mode-select"]').catch(() => {}); await p.waitForTimeout(600); await p.click('[data-sc="verify"]').catch(() => {}); await p.waitForTimeout(3500); await p.screenshot({ path: D + "scenarios.png" });
   await go("energy", null, 9000); await p.click("#enAi"); await p.waitForTimeout(1500); await p.screenshot({ path: D + "ai_learn.png" }); await p.evaluate(() => closeModal());
   // 2) 고장: 2등급 급전선 과전류 트립 + 연료전지 통신 두절
   await sim({ action: "fault", target: "L2", code: 51 }); await sim({ action: "mute", target: "FC", on: true }); await p.waitForTimeout(6000);

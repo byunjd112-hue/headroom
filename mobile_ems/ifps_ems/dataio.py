@@ -10,7 +10,7 @@ HIST_COLS = ["ts", "load_kw", "load_p1", "load_p2", "load_p3", "pv_kw", "temp", 
 
 def _f(x, d=np.nan):
     try:
-        v = float(x); return v if v == v else d
+        v = float(x); return v if math.isfinite(v) else d
     except (TypeError, ValueError):
         return d
 
@@ -44,6 +44,8 @@ def load_csv(path, site):
          "load": col("load_kw"), "load_p": np.stack([col("load_p1"), col("load_p2"), col("load_p3")], 1) if n else np.zeros((0, 3)),
          "pv": col("pv_kw"), "temp": col("temp"), "press": col("press"), "rh": col("rh"), "plan": col("plan"), "mode": col("mode"),
          "sky": np.clip(col("sky"), 0.0, 1.0)}                # 하늘 카메라 구름량(0~1). 없는 칸(미설치·야간·고장)은 비워 둔다(앞 값으로 채우지 않는다)
+    for k in ("load", "pv"):
+        d[k + "_observed"] = np.isfinite(d[k]) & (d[k] >= 0)
     for k in ("load", "pv", "temp", "press", "rh", "plan", "mode"):
         d[k] = _ffill(d[k])
     if n: d["load_p"] = np.stack([_ffill(d["load_p"][:, i]) for i in range(3)], 1)

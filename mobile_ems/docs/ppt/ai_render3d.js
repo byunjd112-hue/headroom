@@ -8,7 +8,7 @@ const srv = http.createServer((q, r) => { const u = decodeURIComponent(q.url.spl
   if (!(f.startsWith(THREE_DIR) || f.startsWith(__dirname)) || !fs.existsSync(f)) { r.writeHead(404); return r.end(); }
   r.writeHead(200, { "Content-Type": TYPES[path.extname(f)] || "application/octet-stream" }); fs.createReadStream(f).pipe(r); });
 srv.listen(0, "127.0.0.1", async () => { const B = `http://127.0.0.1:${srv.address().port}/`, b = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
-  for (const s of ["arch", "ridge", "attn", "imp", "band", "alpha"]) { const p = await b.newPage({ viewport: { width: 1600, height: 900 } }); const errs = []; p.on("pageerror", e => errs.push(String(e))); p.on("console", m => m.type() === "error" && errs.push(m.text()));
+  for (const s of (process.argv[3] ? process.argv[3].split(",") : ["arch", "ridge", "attn", "imp", "band", "alpha", "now"])) { const p = await b.newPage({ viewport: { width: 1600, height: 900 } }); const errs = []; p.on("pageerror", e => errs.push(String(e))); p.on("console", m => m.type() === "error" && errs.push(m.text()));
     await p.goto(B + "?s=" + s); await p.waitForFunction("window.__done === true", null, { timeout: 180000 }).catch(() => {}); await p.waitForTimeout(400);
     await p.screenshot({ path: path.join(__dirname, "img", `ai3d_m_${s}.png`) }); console.log(s, errs.length ? errs.slice(0, 3) : "ok"); await p.close(); }
   await b.close(); srv.close(); });

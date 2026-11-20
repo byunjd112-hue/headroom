@@ -106,7 +106,7 @@ class TestHmi(unittest.TestCase):
 
     def test_7_forecast_accuracy_and_energy(self):
         t0 = time.monotonic()
-        while time.monotonic() - t0 < 20:
+        while time.monotonic() - t0 < 180:                                   # 첫 기동에는 별도 프로세스의 학습이 끝난 뒤에 예측이 나온다
             f = self.req("/api/forecast")[1]
             if f.get("ok"): break
             time.sleep(0.5)

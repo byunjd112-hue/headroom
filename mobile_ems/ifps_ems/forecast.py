@@ -17,6 +17,10 @@ HS = (1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 80, 96)     # 학습 선행시�
 BUCKET = (4, 8, 16, 32, 64, 96)                            # 선행시간 구간 상한
 W_MODEL = 0.8                                              # 모델 가중(나머지는 전일 동시각)
 CAL_ROWS = 7 * 96
+DRIFT_ROWS = 2 * 96                                        # 변동 여유를 재는 최근 구간(2일)
+DRIFT_SCALES = (1.0, 1.15, 1.3, 1.5, 1.75, 2.0, 2.5)       # 구간을 넓히는 배율 후보
+DRIFT_TARGET = 0.80                                        # 목표 포함률
+DRIFT_FLOOR = 0.75                                         # 최근 포함률이 이보다 낮을 때만 구간을 넓힌다
 
 
 def bucket_of(h):
@@ -34,16 +38,16 @@ class _Base:
     MIN_O = 672
 
     def __init__(self, site):
-        self.site = site; self.models = [None] * len(BUCKET); self.q = np.tile([-0.15, 0.15], (len(BUCKET), 1)); self.trained = False
+        self.site = site; self.models = [None] * len(BUCKET); self.q = np.tile([-0.15, 0.15], (len(BUCKET), 1)); self.trained = False; self.cal_scale = 1.0
 
     def to_arrays(self):
-        a = {"trained": np.array([int(self.trained)]), "q": self.q}
+        a = {"trained": np.array([int(self.trained)]), "q": self.q, "cal_scale": np.array([self.cal_scale])}
         for i, m in enumerate(self.models):
             if m is not None: a.update(m.to_arrays(f"b{i}_"))
         return a
 
     def from_arrays(self, a):
-        self.trained = bool(int(a["trained"][0])); self.q = a["q"]
+        self.trained = bool(int(a["trained"][0])); self.q = a["q"]; self.cal_scale = float(a["cal_scale"][0]) if "cal_scale" in a else 1.0
         self.models = [Ridge().from_arrays(a, f"b{i}_") if f"b{i}_w" in a else None for i in range(len(BUCKET))]
 
     # 하위 클래스가 정의한다
@@ -74,15 +78,35 @@ class _Base:
     def _post_fit(self, d, cut): pass
 
     def calibrate(self, d):
-        """예측 구간(10~90%)을 최근 자료의 오차로 다시 맞춘다. 모델 가중치는 그대로 둔다(지속 학습이 모델을 유지할 때도 구간은 새로 맞춘다)."""
+        """예측 구간(10~90%)을 최근 자료의 오차로 다시 맞춘다. 모델 가중치는 그대로 둔다(지속 학습이 모델을 유지할 때도 구간은 새로 맞춘다).
+        변동 여유: 날씨·부하의 성질이 바뀌면 지난 오차로 만든 구간이 좁게 나온다. 보정 구간의 앞 5일로 만든 구간이 뒤 2일을 목표 비율(80%)만큼
+        덮도록 하는 배율 s(1~2.5)를 구해 전체 7일 분위수에 곱한다. 최근에 구간이 잘 맞았으면 s = 1 이다."""
         n = d["n"]; cut = n - CAL_ROWS - HORIZON
         if cut < self.MIN_O: raise ValueError(f"보정 자료 부족: {n}행")
-        Xc, Yc, Oc = self._samples(d, range(cut, n - 1, 2))
+        Xc, Yc, Oc = self._samples(d, range(cut, n - 1, 2)); res = []; late = []
         for b in range(len(BUCKET)):
-            if not Xc[b]: continue
             pred = np.array([self._point(d, o, h, x) for (o, h), x in zip(Oc[b], Xc[b])])
-            self.q[b] = quantiles(np.array(Yc[b]) - pred)
+            res.append(np.array(Yc[b], dtype=float) - pred if Xc[b] else np.zeros(0)); late.append(np.array([o + h >= n - DRIFT_ROWS for o, h in Oc[b]], dtype=bool))
+        self.cal_scale = _drift_scale(res, late)
+        for b in range(len(BUCKET)):
+            if len(res[b]): self.q[b] = np.array(quantiles(res[b])) * self.cal_scale
         return self
+
+
+def _drift_scale(res, late):
+    """보정 구간 앞부분의 분위수에 곱했을 때 뒷부분(가장 최근) 오차의 80% 이상을 덮는 가장 작은 배율.
+    최근 포함률이 허용 하한(75%) 이상이면 넓히지 않는다 — 표본 수가 적어 생기는 흔들림으로 구간을 넓히지 않기 위해서다."""
+    def cover(s):
+        hit = tot = 0
+        for r, m in zip(res, late):
+            if m.sum() < 5 or (~m).sum() < 10: continue
+            q = np.array(quantiles(r[~m])) * s; hit += int(np.sum((r[m] >= q[0]) & (r[m] <= q[1]))); tot += int(m.sum())
+        return hit / tot if tot else None
+    c = cover(1.0)
+    if c is None or c >= DRIFT_FLOOR: return 1.0
+    for s in DRIFT_SCALES[1:]:
+        if cover(s) >= DRIFT_TARGET: return s
+    return DRIFT_SCALES[-1]
 
 
 class LoadForecaster(_Base):

@@ -27,6 +27,17 @@ const bk = D.data.buckets.map(b => "≤ " + b + "시간"), P = D.pv, out = {
   fc_pv: fc("태양광 24시간 예측의 한 예", D.sample.pv, COL.att, "출력 (kW)"), fc_load: fc("부하 24시간 예측의 한 예", D.sample.load, COL.ridge, "부하 (kW)"),
   att_w: frame("주의집중 가중치 분포 — 한 번의 예측", `${D.sample.pv.issued} 발행 · 가중치 큰 순 40건 · 위 10건의 합 ${D.sample.top10_share}% · 유효 기억 수 1/Σw² = ${D.sample.eff_n}`, Math.ceil(D.sample.weights[0] * 1.2 * 10) / 10, 4, "기억 순위(가중치 큰 순)", "가중치 wᵢ (%)",
     Y => D.sample.weights.map((w, i) => `<rect x="${M.l + 8 + i * ((W - M.l - M.r - 16) / 40)}" y="${Y(w)}" width="${(W - M.l - M.r - 16) / 40 - 5}" height="${Y(0) - Y(w)}" rx="3" fill="${COL.att}"/>`).join("") + [1, 10, 20, 30, 40].map(k => `<text x="${M.l + 8 + (k - .5) * ((W - M.l - M.r - 16) / 40)}" y="${H - M.b + 24}" text-anchor="middle" font-size="16" fill="${COL.ink}">${k}</text>`).join(""), [[COL.att, "가중치 wᵢ"]]) };
+// 독립 시험(시드별): 범주가 시드인 묶음 막대
+function seedBars(title, sub, rows, series, ymax, yl, line) {
+  const iw = W - M.l - M.r, gw = iw / rows.length, bw = Math.min(40, (gw - 26) / series.length);
+  return frame(title, sub, ymax, 5, "합성 자료 시드 · 대상", yl, Y => (line ? `<line x1="${M.l}" x2="${W - M.r}" y1="${Y(line)}" y2="${Y(line)}" stroke="#b0392b" stroke-width="2" stroke-dasharray="7 5"/><text x="${W - M.r - 4}" y="${Y(line) - 7}" text-anchor="end" font-size="14.5" fill="#b0392b">목표 ${line}%</text>` : "") +
+    rows.map((r, i) => series.map(([col, , get], k) => { const v = get(r), x = M.l + gw * i + (gw - bw * series.length - 4 * (series.length - 1)) / 2 + k * (bw + 4);
+      return `<rect x="${x}" y="${Y(v)}" width="${bw}" height="${Y(0) - Y(v)}" rx="4" fill="${col}"/><text x="${x + bw / 2}" y="${Y(v) - 6}" text-anchor="middle" font-size="13" fill="${COL.ink}">${v.toFixed(v >= 10 ? 0 : 2)}</text>`; }).join("") +
+      `<text x="${M.l + gw * (i + .5)}" y="${H - M.b + 22}" text-anchor="middle" font-size="15" fill="${COL.ink}">${r.seed} · ${r.kind === "pv" ? "태양광" : "부하"}</text>`).join(""), series.map(([c, t]) => [c, t]));
+}
+const BR = [...D.bench.rows].sort((a, b) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0));
+out.bench15 = seedBars("단기 실측 앙상블 — 15분 앞 예측 오차", `독립 시험 ${D.bench.seeds.length}세트 × 2대상 · 학습 ${D.bench.fit_days}일, 가중치 선택 ${D.bench.tune_days}일, 시험 ${D.bench.test_days}일 · 합성 카메라 열 제외`, BR, [[COL.base, "적용 전", r => r.nmae["15m"][0]], [COL.att, "적용 후", r => r.nmae["15m"][1]]], 5, "15분 NMAE (%)");
+out.cov24 = seedBars("예측 구간 포함률 — 24시간 전체", "80% 구간에 실제 값이 든 비율 · 학습 때 한 번 보정한 구간과, 운용처럼 매일 보정하고 변동 여유를 준 구간", BR, [[COL.base, "한 번 보정", r => r.cov24_static], [COL.cam, "매일 보정 + 변동 여유", r => r.cov["24h"][1]]], 100, "포함률 (%)", 80);
 (async () => { const b = await chromium.launch(), p = await b.newPage({ viewport: { width: W, height: H } });
   for (const [k, svg] of Object.entries(out)) { await p.setContent(`<body style="margin:0">${svg}</body>`); await p.screenshot({ path: path.join(__dirname, "img", `aich_${k}.png`) }); console.log(k); }
   await b.close(); })();

@@ -18,7 +18,7 @@ from ..runtime import Runtime
 from ..simplant import Plant
 from .cfgedit import ConfigEditor
 from ifps_ems.dataio import sky_from_clearness as dataio_sky
-from . import fuelwatch
+from . import fuelwatch, fcstats
 from .skywatch import SkyWatch
 
 PRIO_TXT = {1: "긴급", 2: "높음", 3: "보통", 4: "낮음"}
@@ -376,7 +376,7 @@ class Engine:
         if self.ai_busy: return {"ok": False, "why": "학습이 이미 진행 중"}
         self.ai_busy = True; rec = {"adopted": False, "why": ""}; md = self._models_dir()
         try:
-            site = self.rt.site; hist, md, src = self._forecast_source(site)
+            site = self.rt.site; hist, md, src = self._forecast_source(site, training=True)
             opt = os.path.join(self.rt.state_dir, "ai_train.json")
             with open(opt, "w", encoding="utf-8") as f: json.dump({"site": site.to_dict(), "ai": {k: v for k, v in self.ai_cfg.items() if k in learner.DEFAULTS}, "source": src}, f, ensure_ascii=False)
             r = subprocess.run([sys.executable, "-m", "ifps_ems.learner", hist, md, opt], capture_output=True, text=True, timeout=900,   # nosec B603 — 고정 인자, shell 미사용
@@ -418,38 +418,18 @@ class Engine:
         try:
             import numpy as np
             from ifps_ems import dataio
-            from ifps_ems.forecast import LoadForecaster, PVForecaster, BUCKET, bucket_of
+            from ifps_ems.forecast import LoadForecaster, PVForecaster
             site = self.rt.site; hist, md, src = self._forecast_source(site)
             d = dataio.load_csv(hist, site); n = d["n"]
             fl, fp = LoadForecaster(site), PVForecaster(site); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp) and fp.trained
             from ifps_ems import learner
             meta = learner.active(md); o = n - 1                                # 적용 중인 모델 정보(최근 오차 보정을 켤지 포함)
             l50, llo, lhi, bl = learner.predict(fl, d, o, "load", site, meta); p50, plo, phi, bp = learner.predict(fp, d, o, "pv", site, meta)
-            # 백테스트: 마지막 7일, 6시간 간격 발행
-            el = {b: [] for b in range(len(BUCKET))}; ep = {b: [] for b in range(len(BUCKET))}; cl = []; cp = []; mean_l = float(np.mean(d["load"][-7 * 96:]))
-            day_l, day_p, pts = [], [], []
-            for oo in range(n - 7 * 96 - 1, n - 97, 24):
-                a, alo, ahi, _ = fl.predict(d, oo); b, blo, bhi, _ = fp.predict(d, oo)
-                yl = d["load"][oo + 1:oo + 97]; yp = d["pv"][oo + 1:oo + 97]; day_m = d["clear"][oo + 1:oo + 97] > 0.05 * site.pv_kwp
-                for h in range(96):
-                    bb = bucket_of(h + 1); el[bb].append(abs(a[h] - yl[h]) / mean_l)
-                    if day_m[h]: ep[bb].append(abs(b[h] - yp[h]) / site.pv_kwp); cp.append(blo[h] <= yp[h] <= bhi[h])
-                    cl.append(alo[h] <= yl[h] <= ahi[h])
-                day_l.append(abs(a.sum() - yl.sum()) / yl.sum()); day_p.append(abs(b.sum() - yp.sum()) / max(yp.sum(), 1))
-                pts += [[float(a[h]), float(yl[h])] for h in range(0, 96, 8)]
-            mk = lambda e: [round(float(np.mean(e[b])) * 100, 2) if e[b] else None for b in range(len(BUCKET))]
-            ts = d["ts"]; dates = sorted(set(t[:10] for t in ts))[-14:]; daily = []
-            for dd in dates:
-                m = np.array([t.startswith(dd) for t in ts])
-                daily.append({"d": dd, "load": round(float(d["load"][m].sum() * 0.25), 1), "pv": round(float(d["pv"][m].sum() * 0.25), 1),
-                              "clear": round(float(d["clear"][m].sum() * 0.25), 1), "peak": round(float(d["load"][m].max()), 1)})
-            r = lambda a: [round(float(x), 2) for x in a]
+            acc, daily = fcstats.backtest(d, fl, fp, site, meta)
+            r = lambda a: [round(float(x), 2) for x in a]; ts = d["ts"]
             out = {"ok": True, "source": src, "trained": {"load": tl, "pv": tp}, "issued": ts[-1], "hist_ts": ts[-96:], "load_act": r(d["load"][-96:]), "pv_act": r(d["pv"][-96:]),
                    "clear_hist": r(d["clear"][-96:]), "load": r(l50), "load_lo": r(llo), "load_hi": r(lhi), "pv": r(p50), "pv_lo": r(plo), "pv_hi": r(phi),
-                   "acc": {"load_nmae": round(float(np.mean(sum(el.values(), []))) * 100, 2), "pv_nmae": round(float(np.mean(sum(ep.values(), []))) * 100, 2),
-                           "load_cov": round(float(np.mean(cl)) * 100, 1), "pv_cov": round(float(np.mean(cp)) * 100, 1) if cp else None,
-                           "load_day": round(float(np.mean(day_l)) * 100, 2), "pv_day": round(float(np.mean(day_p)) * 100, 2),
-                           "buckets": list(BUCKET), "load_by_h": mk(el), "pv_by_h": mk(ep), "n_issue": len(day_l), "scatter": pts[:400], "limit": 15.0},
+                   "acc": acc,
                    "daily": daily, "_t": time.time(), "_slot": self._slot_now(), "calc_s": None,
                    "ai": {"ver": meta.get("ver"), "t": meta.get("t"), "bias_load": None if bl is None else round(bl, 2), "bias_pv": None if bp is None else round(bp, 3)},
                    "sky": self.skyw.status(), "pv_ai": fp.explain(d, o)}
@@ -460,7 +440,7 @@ class Engine:
         finally:
             self._fc_busy = False
 
-    def _forecast_source(self, site):
+    def _forecast_source(self, site, training=False):
         """예측에 쓸 이력 파일을 고른다. 반환: (이력 경로, 모델 폴더, 출처 설명)"""
         hist = os.path.join(self.rt.state_dir, "history.csv"); md = self.plan_dir or os.path.join(os.path.dirname(self.cfg_path), "..", "results")
         rows = 0
@@ -474,7 +454,9 @@ class Engine:
         if self.sim:
             live = self._live_demo(md, site, rows); src = f"합성 현장 자료 + 가상 장치 실측 {max(rows, 0)}구간(지금 시각까지 이어 붙임)"
             from ifps_ems import learner
-            if not learner.active(md) and not self.ai_busy: self.ai_next = min(self.ai_next, time.time())      # 시연 첫 기동: 곧바로 한 번 학습·검증한다(별도 프로세스 — 제어 주기를 방해하지 않게)
+            if not learner.active(md) and self.ai_cfg.get("enabled") and self.ai_last is None:      # 시연 첫 기동: 곧바로 한 번 학습·검증한다(별도 프로세스 — 제어 주기를 방해하지 않게)
+                if not self.ai_busy: self.ai_next = min(self.ai_next, time.time())
+                if not training: raise ValueError("첫 기동 학습 중입니다(1분 안팎). 끝나면 지금 자료에 맞춘 예측을 표시합니다")     # 다른 자료로 만든 기본 모델의 수치를 보여 주지 않는다
             return live, md, src
         return hist, md, "합성 현장 자료(실측 8일 미만)"
 

@@ -36,8 +36,8 @@ class Plant:
         return mb.decode(regs, p["type"], p["scale"], p.get("order", "ABCD"))
 
     # 장치 거동
-    def tick(self, dt):
-        now = time.monotonic()
+    def tick(self, dt, *, now=None):
+        now = time.monotonic() if now is None else now
         for dev in self.units:
             if f"{dev}.hb" in self.by_tag: self.set(f"{dev}.hb", (int(round(self.get(f"{dev}.hb"))) + 1) % 60000)   # 지령 없는 장치(ESS)도 생존 계수는 올린다
             if f"{dev}.cmd" in self.by_tag: self._tick_cmd(dev, now)

@@ -64,7 +64,7 @@ class Runtime:
         # 군 운용: 운용 장소(작전지 island / 주둔지 grid), 운용 태세(평시·저소음·자립), 자동 부하 차단, 주둔지 설정
         self.gar = om.Garrison.from_cfg(self.cfg.get("garrison")); self.posture = "평시"; self.auto_enabled = True; self.shedder = om.LoadShedder()
         self.auto_h = None; self.auto_target_h = float(self.cfg.get("autonomy_target_h", 72.0)); self.t_posture = self.now(); self.pv_day_kwh = None
-        self.grid_lost = False; self.t_grid_ok = None; self.t_outage = None; self.gdg_last = None; self.gar_last = None; self._gdg_t0 = None; self._w = {}; self._pvday = (None, 0.0)
+        self.grid_lost = False; self.t_grid_ok = None; self.t_outage = None; self._grid_reset_pending = False; self.gdg_last = None; self.gar_last = None; self._gdg_t0 = None; self._w = {}; self._pvday = (None, 0.0)
         self._load_ops()
         ok, why = security.crypto_gate(self.audit.c, self.cfg.get("run_mode", "개발"))
         if not ok: raise RuntimeError(why)
@@ -161,7 +161,7 @@ class Runtime:
         if mode is not None:
             if mode not in om.PLACES: raise ValueError(f"운용 장소 오류: {mode}")
             if mode == "grid" and "GRID.kw" not in self.val and not any(p["tag"] == "GRID.kw" for p in self.pts): raise ValueError("주둔지 운전에는 수전점 계측(GRID.kw, CB.GRID)이 필요합니다")
-            if mode != self.mode: self.mode = mode; self.grid_lost = False; self.t_grid_ok = None; self.note("운용", f"운용 장소 변경 → {'주둔지(상전 연계)' if mode == 'grid' else '작전지(자립 운전)'}", actor=who)
+            if mode != self.mode: self.mode = mode; self.grid_lost = False; self.t_grid_ok = None; self._grid_reset_pending = False; self.note("운용", f"운용 장소 변경 → {'주둔지(상전 연계)' if mode == 'grid' else '작전지(자립 운전)'}", actor=who)
         if posture is not None:
             if posture not in om.POSTURES: raise ValueError(f"운용 태세 오류: {posture}")
             if posture != self.posture: self.posture = posture; self.t_posture = self.now(); self.note("운용", f"운용 태세 변경 → {posture}", actor=who)
@@ -179,8 +179,16 @@ class Runtime:
         closed = int(round(self.val.get("CB.GRID", 0))) == 1
         if not closed:
             self.t_grid_ok = None
-            if not self.grid_lost: self.grid_lost = True; self.t_outage = t; self.note("운용", "상전 정전(수전 차단기 개방) — 자립 운전으로 전환"); self._write("ESS", "ESS.kw_set", 0.0, 0.5); self._write("PV", "PV.lim_set", 0.0, 0.5)
+            if not self.grid_lost:
+                self.grid_lost = True; self.t_outage = t
+                self.note("운용", "상전 정전(수전 차단기 개방) — 자립 운전으로 전환")
+                self._grid_reset_pending = True
+            if self.auto_enabled and self._grid_reset_pending:
+                self._grid_reset_pending = False
+                self._write("ESS", "ESS.kw_set", 0.0, 0.5)
+                self._write("PV", "PV.lim_set", 0.0, 0.5)
         elif self.grid_lost:
+            self._grid_reset_pending = False
             if self.t_grid_ok is None: self.t_grid_ok = t
             if t - self.t_grid_ok >= self.gar.restore_s: self.grid_lost = False; self.note("운용", f"상전 복전 {self.gar.restore_s:.0f}초 안정 — 주둔지 운전 복귀")
 

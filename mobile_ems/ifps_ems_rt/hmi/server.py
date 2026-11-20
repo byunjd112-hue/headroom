@@ -9,12 +9,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from .. import modbus as mb
 from .engine import ROLES
+from . import scenarios
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-MAX_BODY = 64 * 1024
+MAX_BODY = 128 * 1024
 
 
 def make_handler(eng):
+    scenario_slot = threading.BoundedSemaphore(1)
+
     class H(BaseHTTPRequestHandler):
         server_version = "IFPS-EMS-HMI"; sys_version = ""; timeout = 15        # 느린 연결(slowloris) 차단
 
@@ -58,6 +61,12 @@ def make_handler(eng):
         def do_GET(self):
             u = urlparse(self.path); q = {k: v[0] for k, v in parse_qs(u.query).items()}; p = u.path
             try:
+                if p == "/api/scenarios/catalog":
+                    if not eng.sim: return self._err(403, "시나리오는 가상 장치 모드에서 열 수 있습니다")
+                    data = scenarios.catalog(eng.rt.pts, eng.cfg["devices"])
+                    with open(os.path.join(STATIC, "scenario_presets.json"), encoding="utf-8") as source:
+                        data["presets"] = scenarios.compatible_presets(json.load(source), eng.rt.pts, data["commands"])
+                    return self._send(200, data)
                 if p == "/api/snapshot":
                     s = self._sess(); d = eng.snapshot(); d["me"] = {"role": s["role"], "name": s["name"]}; return self._send(200, d)
                 if p == "/api/trend": return self._send(200, {"cols": ["t", "load", "pv", "dg", "fc", "ess", "soc", "h2", "reserve"], "rows": eng.trend_since(float(q.get("since", 0)))})
@@ -113,6 +122,18 @@ def make_handler(eng):
                 b = self._body()
                 if p == "/api/login": return self._send(200, eng.login(b.get("pin", ""), (b.get("name") or "운용자")[:24], self.client_address[0]))
                 if p == "/api/logout": return self._send(200, eng.logout(self.headers.get("X-EMS-Token")))
+                if p in ("/api/scenarios/verify", "/api/scenarios/export"):
+                    if not eng.sim: return self._err(403, "시나리오는 가상 장치 모드에서 실행할 수 있습니다")
+                    if not self._sess("engineer"): return
+                    if not scenario_slot.acquire(blocking=False):
+                        return self._err(429, "시나리오 검증이 진행 중입니다")
+                    try:
+                        pts, devices = eng.rt.pts, eng.cfg["devices"]
+                        if p.endswith("/export"):
+                            return self._send(200, {"source": scenarios.regression_source(b["cases"], pts, devices, eng.cfg_path)})
+                        return self._send(200, scenarios.verify(b["cases"], pts, devices, b.get("improve") is True, eng.cfg_path))
+                    finally:
+                        scenario_slot.release()
                 if p == "/api/select":
                     s = self._sess("operator")
                     if s: self._send(200, eng.select(b["dev"], b["cmd"], s["name"], b.get("tag"), b.get("value")))

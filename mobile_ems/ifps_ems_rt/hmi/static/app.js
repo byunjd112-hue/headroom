@@ -518,7 +518,7 @@ function regsView(regs, ord) {
   if (ord === "CDAB" || ord === "DCBA") w = w.slice().reverse();
   const dv = new DataView(new ArrayBuffer(2 * w.length)); w.forEach((x, k) => dv.setUint16(2 * k, x)); return dv;
 }
-const PAGES = { overview: P_OV, sld: P_SLD, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG };
+const PAGES = { overview: P_OV, sld: P_SLD, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG, scenarios: P_SCENARIOS };
 let mounted = null;
 function render() {
   if (!S.snap) return; const p = PAGES[S.page] ? S.page : "overview";

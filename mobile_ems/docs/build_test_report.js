@@ -63,6 +63,19 @@ b.push(GAP()); b.push(P("전 장치·경로(6대 × 2경로)를 병렬로 읽으
 b.push(H2("3.6 감사 기록 무결성"));
 b.push(P(`시험 중 생성된 감사 기록 ${D.audit.seq}건의 연쇄 HMAC 검증 결과: ${D.audit.verify[1]}. 중간 행 변조·삭제 검출은 단위 시험 test_audit_detects_tampering으로 확인했다.`));
 
+b.push(H2("3.7 운전 시나리오 검증"));
+{ const SC = JSON.parse(fs.readFileSync(__dirname + "/scenario_results.json", "utf8")), ch = SC.changes[0];
+  b.push(P(`화면의 운영 시나리오 검증기(가상 장치 모드 전용)로 기본 시나리오 ${SC.total}건을 돌렸다. 앞 ${SC.mode_total}건은 운전 모드 조합(자동·수동 × 작전지·주둔지 × 평시·저소음·자립), 나머지는 장비 시나리오다. 건마다 독립된 가상 장치와 가상 시각을 써서 시험끼리 상태가 섞이지 않는다.`));
+  b.push(TBL(["구분", "결과"], [["운전 모드 조합", `${SC.mode_pass} / ${SC.mode_total} 통과`], ["전체(최초 실행)", `${SC.first_pass} / ${SC.total} 통과`], ["대기 시간 조정 후 재시험", `${SC.retest_pass} / ${SC.total} 통과`]], [40, 60], { bold: [0] })); b.push(GAP());
+  b.push(TBL(["번호", "시나리오", "단계 수", "최초", "재시험"], SC.results.map((r, i) => [i + 1, r.name, r.steps, r.ok ? "통과" : { t: `실패(단계 ${r.fail_step + 1})`, c: "C00000" }, SC.retest[i].ok ? "통과" : { t: "실패", c: "C00000" }]), [8, 52, 12, 16, 12], { center: [0, 2, 3, 4] })); b.push(GAP());
+  b.push(P(ch ? `최초 실행에서 실패한 한 건(${ch.name})은 일부러 넣은 고장 시험이다. 장치의 상태 전환을 늦춘 뒤 지령의 '수용 응답(seq_ack)'과 '운전 완료(status)'를 따로 판정하며, 대기 ${ch.before} ms 에서 실패하고 검증기가 제안한 ${ch.after} ms 로 다시 돌려 통과했다. 이 값은 가상 시험의 대기 시간일 뿐이며 현장의 보호 설정이나 완료 한도(done_s)에 그대로 쓰지 않는다.` : "실패한 시나리오는 없었다."));
+  b.push(P("검증 범위: 모의 시험은 화면부의 급전 판단과 가상 장치의 응답을 대상으로 한다. 실장비의 통신·절체 성능은 FAT·SAT 결과가 필요하다. 재현: python -m tools.scenario_report")); }
+b.push(H2("3.8 예측 독립 시험"));
+{ const FB = JSON.parse(fs.readFileSync(__dirname + "/forecast_benchmark.json", "utf8")), g = (k, h, i) => { const v = FB.runs.map(r => r.targets[k][i ? "enhanced" : "baseline"][h]); return [Math.min(...v.map(x => x.nmae_pct)), Math.max(...v.map(x => x.nmae_pct)), Math.min(...v.map(x => x.coverage_pct)), Math.max(...v.map(x => x.coverage_pct))]; }, r2 = (a, i) => `${a[i].toFixed(2)} ~ ${a[i + 1].toFixed(2)}`;
+  b.push(P(`합성 자료 ${FB.runs.length}세트(세트마다 학습 ${FB.fit_days}일, 가중치 선택 ${FB.tune_days}일, 시험 ${FB.test_days}일)로 단기 실측 앙상블 적용 전후를 비교했다. 합성 하늘 카메라 열은 미래 정보를 담고 있어 이 시험에서는 뺐다. 예측 구간은 운용과 같이 하루에 한 번 다시 보정했다.`));
+  b.push(TBL(["대상", "15분 NMAE(%) 적용 전", "적용 후", "24시간 NMAE(%) 적용 전", "적용 후", "24시간 포함률(%)"], [["부하", r2(g("load", "15m", 0), 0), r2(g("load", "15m", 1), 0), r2(g("load", "24h", 0), 0), r2(g("load", "24h", 1), 0), r2(g("load", "24h", 1), 2)], ["태양광", r2(g("pv", "15m", 0), 0), r2(g("pv", "15m", 1), 0), r2(g("pv", "24h", 0), 0), r2(g("pv", "24h", 1), 0), r2(g("pv", "24h", 1), 2)]], [12, 19, 16, 20, 16, 17], { bold: [0], center: [1, 2, 3, 4, 5] })); b.push(GAP());
+  b.push(P("값은 세트별 최소 ~ 최대다. 세부 수치와 해석은 AI 예측 논문 5.4절에 있다. 재현: python -m tools.forecast_benchmark --out docs/forecast_benchmark.json")); }
+
 b.push(H1("4. 정적 시험")); b.push(H2("4.1 결함·보안 약점"));
 b.push(TBL(["도구", "결과", "비고"], [["pyflakes", `${S.pyflakes.length}건`, S.pyflakes.length ? S.pyflakes.join("; ") : "미사용 import 5건 수정 후 0건"],
   ["bandit", `${S.bandit.results.length}건`, `코드 ${S.bandit.totals.loc}행 검사. 사유를 기재한 예외(nosec) ${S.bandit_nosec.length}건: ` + S.bandit_nosec.map(r => `${r[0]} ${r[2]}:${r[3]}`).join(", ")],

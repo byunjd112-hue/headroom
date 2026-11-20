@@ -133,6 +133,23 @@ const SC = {
     title("태양광 예측 모델의 전체 구조 — 블록 수가 실제 개수", `학습되는 값: 릿지 ${C.params_ridge} + 중요도 ${C.params_att} + 비율 ${C.params_alpha} = ${C.params_ridge + C.params_att + C.params_alpha}개 · 모델 파일 ${C.pv_kb} KB · 학습 ${C.train_pv_s}초 · 예측 ${C.predict_s}초(노트북 CPU)`);
     cam.position.set(0.6, 12.5, 24.5); cam.lookAt(0.3, 0.6, 0);
   },
+  now() {                                                                 // ⑦ 단기 실측 앙상블의 보정량 응답면: 실제 결합 함수(nowcast.blend)에 채택 가중치를 넣어 계산한 값
+    const N = D.viz.nowcast, HS = 2.3 / 50, draw = (S, x0, col, name, tap) => { const nx = 16, nz = S.diffs.length, W = 6.6, DZ = 4.6, P = (i, j) => V3(x0 + i / (nx - 1) * W, 3.0 + S.grid[j][i] * HS, (j / (nz - 1) - 0.5) * DZ);
+      const pos = [], colr = [], c0 = new THREE.Color(0x3a4656), c1 = new THREE.Color(col);
+      for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) for (const [a, b] of [[i, j], [i + 1, j], [i + 1, j + 1], [i, j], [i + 1, j + 1], [i, j + 1]]) { const p = P(a, b); pos.push(p.x, p.y, p.z); const t = Math.min(1, Math.abs(S.grid[b][a]) / 50), c = c0.clone().lerp(c1, 0.25 + 0.75 * t); colr.push(c.r, c.g, c.b); }
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(colr, 3)); g.computeVertexNormals();
+      const m = new THREE.Mesh(g, new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.25, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.15, flatShading: true, side: THREE.DoubleSide, emissive: new THREE.Color(col), emissiveIntensity: 0.12 })); m.castShadow = true; scene.add(m);
+      const z0 = new THREE.Mesh(new THREE.PlaneGeometry(W, DZ), new THREE.MeshBasicMaterial({ color: 0x8fa0b5, transparent: true, opacity: 0.13, side: THREE.DoubleSide })); z0.rotation.x = -Math.PI / 2; z0.position.set(x0 + W / 2, 3.0, 0); scene.add(z0);
+      for (const b of [4, 8]) rod(V3(x0 + (b - 0.5) / (nx - 1) * W, 0.4, -DZ / 2), V3(x0 + (b - 0.5) / (nx - 1) * W, 0.4, DZ / 2), 0.012, glow(0x8fa0b5, 0.9));
+      const o = V3(x0, 0.4, DZ / 2 + 0.25); axis(o, V3(x0 + W + 0.5, 0.4, DZ / 2 + 0.25), "선행시간 h (15분 ~ 4시간)", -230, 10); axis(V3(x0 - 0.2, 0.4, DZ / 2), V3(x0 - 0.2, 0.4, -DZ / 2 - 0.5), "R − ŷ (−50 ~ +50 kW)", -40, -26); axis(V3(x0 - 0.2, 0.4, DZ / 2), V3(x0 - 0.2, 5.9, DZ / 2), "보정량 δ (kW)", 10, -14);
+      ["0~1h", "1~2h", "2~4h"].forEach((t, k) => label(`${t}<br><small>w = ${S.w[k]}</small>`, V3(x0 + [1.5, 5.5, 11.5][k] / (nx - 1) * W, 0.4, DZ / 2 + 0.25), "tag", -30, 34));
+      label(name + (tap ? "<br><small>첫 1시간 감쇠 t = 1, 0.6, 0.3, 0.15</small>" : "<br><small>감쇠 없음 (t = 1)</small>"), V3(x0 + W / 2, 5.9, -DZ / 2), "tag hot", -110, -40);
+      label("δ = " + S.grid[nz - 1][0] + " kW", P(0, nz - 1), "num", 8, -26); };
+    draw(N.load, -7.9, TEAL, "부하", false); draw(N.pv, 1.3, AMBER, "태양광", true);
+    title("단기 실측 앙상블 — 보정량의 응답면", "기존 예측 ŷ = 100 kW 일 때, 실측 참조 R 과의 차이와 선행시간에 따라 예측을 얼마나 옮기는가 · 실제 결합 함수에 채택된 가중치를 넣어 계산 · 회색 면 = 보정 0");
+    formula("δₕ = Mₕ · w_b · tₕ · (Rₕ − ŷₕ) ,   ŷ′ₕ = clip(ŷₕ + δₕ, 0, 상한) ,   4시간 이후 w = 0", 60, 790);
+    cam.position.set(0.3, 9.2, 19.5); cam.lookAt(0.2, 2.5, 0.2);
+  },
 };
 SC[name](); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
 const comp = new EffectComposer(renderer); comp.setSize(W, H); comp.addPass(new RenderPass(scene, cam)); comp.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), bloom, 0.5, 0.9)); comp.addPass(new OutputPass());

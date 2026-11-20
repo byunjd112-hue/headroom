@@ -6,6 +6,7 @@
 자료가 모자라거나 연산이 실패하면 규칙 운전으로 넘어간다(supervisor.guarded와 같은 원칙).
 """
 import os, time
+from threading import RLock
 import numpy as np
 from ifps_ems import dataio, dispatch as dp
 from ifps_ems.config import HORIZON
@@ -19,15 +20,16 @@ class PlanPolicy:
     """demo_csv: 실측 이력이 모자랄 때 대신 쓸 합성 자료(가상 장치 시연 전용). 실장치 운전에서는 주지 않는다 — 이력이 쌓일 때까지 규칙 운전한다."""
 
     def __init__(self, site, hist_csv, model_dir, days_since_deploy=30, demo_csv=None, clock=time.monotonic):
-        self.site, self.hist, self.demo = site, hist_csv, demo_csv; self.md = model_dir; self.reload()
+        self.site, self.hist, self.demo = site, hist_csv, demo_csv; self.md = model_dir; self._lock = RLock(); self.reload()
         self.pl = dp.Planner(site); self.kappa = dp.kappa_for(days_since_deploy); self.clock = clock
         self.V = None; self.k = 0; self.rows = 0; self.fc = None; self.note = ""; self.t_plan = None; self.src = ""; self.sh = None
 
     def reload(self):
         """적용 중인 예측 모델을 다시 읽는다(지속 학습이 새 모델을 적용했을 때)."""
-        self.fl, self.fp = LoadForecaster(self.site), PVForecaster(self.site)
-        dataio.load_model(os.path.join(self.md, "model_load.npz"), self.fl); dataio.load_model(os.path.join(self.md, "model_pv.npz"), self.fp)
-        self.meta = learner.active(self.md); self.t_plan = None
+        with self._lock:
+            self.fl, self.fp = LoadForecaster(self.site), PVForecaster(self.site)
+            dataio.load_model(os.path.join(self.md, "model_load.npz"), self.fl); dataio.load_model(os.path.join(self.md, "model_pv.npz"), self.fp)
+            self.meta = learner.active(self.md); self.t_plan = None
 
     def _history(self):
         """쓸 이력을 고른다: 실측이 8일 이상이면 실측, 아니면 시연용 합성 자료(있을 때만)."""
@@ -52,13 +54,14 @@ class PlanPolicy:
         self.fc = {"load": l50, "load_hi": lhi, "pv": p50, "pv_lo": plo}
 
     def __call__(self, val, hr):
-        g = lambda k, dflt=0.0: val.get(k, dflt)
-        try:
-            if self.V is None or self.clock() - self.t_plan >= 3600.0: self.replan(hr)                 # 1시간마다 다시 계획
-            else: self.k = min(int((self.clock() - self.t_plan) // 900), HORIZON - 1)                   # 그 사이는 15분 칸을 따라간다
-            lp = np.array([g("LOAD.p1_kw"), g("LOAD.p2_kw"), g("LOAD.p3_kw")])
-            a = self.pl.act(self.V[self.k + 1], g("ESS.soc", 60.0) / 100, g("H2.nm3", self.site.h2_nm3 * 0.7), int(g("DG.status")), g("LOAD.kw"), g("PV.kw"), lp, hr)
-            self.note = f"계획 운전({self.src})"; return a
-        except Exception as e:                                           # 어떤 실패든 운전은 이어 간다
-            self.note = f"계획 실패({type(e).__name__}: {e}) → 규칙 운전"
-            return dp.rule_action(self.site, g("ESS.soc", 60.0) / 100, g("H2.nm3", self.site.h2_nm3 * 0.7), int(g("DG.status")), int(g("FC.status")), g("LOAD.kw"), g("PV.kw"), hr)
+        with self._lock:
+            g = lambda k, dflt=0.0: val.get(k, dflt)
+            try:
+                if self.V is None or self.t_plan is None or self.clock() - self.t_plan >= 3600.0: self.replan(hr)                 # 1시간마다 다시 계획
+                else: self.k = min(int((self.clock() - self.t_plan) // 900), HORIZON - 1)                   # 그 사이는 15분 칸을 따라간다
+                lp = np.array([g("LOAD.p1_kw"), g("LOAD.p2_kw"), g("LOAD.p3_kw")])
+                a = self.pl.act(self.V[self.k + 1], g("ESS.soc", 60.0) / 100, g("H2.nm3", self.site.h2_nm3 * 0.7), int(g("DG.status")), g("LOAD.kw"), g("PV.kw"), lp, hr)
+                self.note = f"계획 운전({self.src})"; return a
+            except Exception as e:                                           # 어떤 실패든 운전은 이어 간다
+                self.note = f"계획 실패({type(e).__name__}: {e}) → 규칙 운전"
+                return dp.rule_action(self.site, g("ESS.soc", 60.0) / 100, g("H2.nm3", self.site.h2_nm3 * 0.7), int(g("DG.status")), int(g("FC.status")), g("LOAD.kw"), g("PV.kw"), hr)

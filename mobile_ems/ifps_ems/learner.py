@@ -16,7 +16,7 @@
 """
 import json, os, shutil, sys, time
 import numpy as np
-from . import dataio
+from . import dataio, nowcast
 from .config import Site, HORIZON
 from .forecast import LoadForecaster, PVForecaster, BUCKET, CAL_ROWS
 
@@ -54,7 +54,28 @@ def predict(f, d, o, kind, site, meta=None):
     if m.get("bias_on"):
         bias = recent_bias(f, d, o, kind, site, int((meta or {}).get("bias_slots", DEFAULTS["bias_slots"])))
         p50, lo, hi = apply_bias(kind, bias, (meta or {}).get("bias_tau", DEFAULTS["bias_tau"]), p50, lo, hi)
+    weights = m.get("nowcast_weights")
+    if weights and any(weights):
+        ref, valid = nowcast.reference(d, o, kind, site)
+        p50, lo, hi = nowcast.blend(p50, lo, hi, ref, valid, weights, kind, site)
     return p50, lo, hi, bias
+
+
+def select_nowcast(f, d, origins, kind, site, meta):
+    def observations():
+        for o in origins:
+            if o + HORIZON >= d["n"]:
+                continue
+            p50, lo, hi, _ = predict(f, d, o, kind, site, meta)
+            ref, valid = nowcast.reference(d, o, kind, site)
+            sl = slice(o + 1, o + HORIZON + 1)
+            observed = d.get(kind + "_observed")
+            if observed is not None:
+                valid &= observed[sl]
+            if kind == "pv":
+                valid &= d["clear"][sl] > 0.05 * site.pv_kwp
+            yield p50, lo, hi, ref, valid, d[kind][sl]
+    return nowcast.select(observations(), kind)
 
 
 def score(f, d, origins, kind, site, cfg, with_bias=False):
@@ -68,6 +89,9 @@ def score(f, d, origins, kind, site, cfg, with_bias=False):
         y = d[kind][o + 1:o + 1 + HORIZON]
         if kind == "load": e = np.abs(p50 - y) / mean_l; ok = np.ones(HORIZON, bool)
         else: e = np.abs(p50 - y) / site.pv_kwp; ok = d["clear"][o + 1:o + 1 + HORIZON] > 0.05 * site.pv_kwp
+        observed = d.get(kind + "_observed")
+        if observed is not None:
+            ok &= observed[o + 1:o + 1 + HORIZON]
         e_all += list(e[ok]); e_near += [float(e[h]) for h in range(BUCKET[1]) if ok[h]]
     pct = lambda a: round(float(np.mean(a)) * 100, 2) if len(a) else None
     return {"nmae": pct(e_all), "near": pct(e_near), "n": len(e_all)}
@@ -82,7 +106,13 @@ def quality(d, cfg):
     """학습 자료 점검. 반환: (통과 여부, 설명)"""
     n = d["n"]
     if n < MIN_FIT + cfg["holdout_days"] * 96: return False, f"자료 {n}구간 — 학습에는 {MIN_FIT + cfg['holdout_days'] * 96}구간({(MIN_FIT + cfg['holdout_days'] * 96) // 96}일) 이상 필요"
-    load = d["load"][-min(n, 30 * 96):]; bad = float(np.mean(~np.isfinite(load)))
+    length = min(n, 30 * 96)
+    load = d["load"][-length:]
+    bad_load = float(np.mean(~d.get("load_observed", np.isfinite(d["load"]))[-length:]))
+    day = d["clear"][-length:] > 0
+    pv_seen = d.get("pv_observed", np.isfinite(d["pv"]))[-length:]
+    bad_pv = float(np.mean(~pv_seen[day])) if day.any() else 0.0
+    bad = max(bad_load, bad_pv)
     flat = float(np.mean(np.abs(np.diff(load)) < 1e-9)) if len(load) > 1 else 1.0          # 값이 멈춘 구간(결측을 앞 값으로 채운 흔적)
     if bad > cfg["max_gap"] or flat > max(cfg["max_gap"], 0.5): return False, f"자료 품질 미달 — 비정상 {bad * 100:.0f}%, 값 고정 {flat * 100:.0f}%"
     return True, f"자료 {n}구간({n // 96}일), 값 고정 {flat * 100:.0f}%"
@@ -147,7 +177,13 @@ def _judge(what, md, data, site, cfg):
     bias_on = s_bias["near"] is not None and s_use["near"] is not None and s_bias["near"] < s_use["near"]          # 보정이 holdout 에서 오차를 줄일 때만 켠다
     gain = None if s_ch["nmae"] is None or s_new["nmae"] is None else round(s_ch["nmae"] - s_new["nmae"], 2)
     rec = {"current": s_ch["nmae"], "new": s_new["nmae"], "gain": gain, "near": s_use["near"], "near_bias": s_bias["near"], "bias_on": bias_on, "better": win, "n": s_new["n"]}
-    return rec, {"nmae": s_use["nmae"], "near": s_bias["near"] if bias_on else s_use["near"], "bias_on": bias_on}
+    tuning = {"bias_slots": cfg["bias_slots"], "bias_tau": cfg["bias_tau"], kind: {"bias_on": bias_on}}
+    # Use denser issuance for short horizons while keeping all targets in the holdout.
+    dense = range(origins[0], origins[-1] + 1, 8) if origins else ()
+    weights = select_nowcast(use, d, dense, kind, site, tuning)
+    rec["nowcast_weights"] = weights
+    return rec, {"nmae": s_use["nmae"], "near": s_bias["near"] if bias_on else s_use["near"],
+                 "bias_on": bias_on, "nowcast_weights": weights}
 
 
 def _adopt(md, d, site, cfg, rec, meta):

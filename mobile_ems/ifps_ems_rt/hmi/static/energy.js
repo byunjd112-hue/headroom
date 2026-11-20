@@ -101,6 +101,7 @@ const P_EN = {
         <span class="k">학습 자료</span><span class="v" style="font-family:var(--sans);font-size:11.5px">${act.rows ? act.rows + "구간(" + Math.floor(act.rows / 96) + "일) · " + esc(act.source || "") : "—"}</span>
         <span class="k">검증 오차 (부하 / 태양광)</span><span class="v ${a.degraded ? "badc" : ""}">${n(act.load && act.load.nmae)}% / ${n(act.pv && act.pv.nmae)}% <span class="muted">(한도 ${a.limit}%)</span></span>
         <span class="k">최근 오차 보정</span><span class="v">${act.load ? (act.load.bias_on ? "부하 켬" : "부하 끔") + " · " + (act.pv && act.pv.bias_on ? "태양광 켬" : "태양광 끔") : "—"}${this.fc && this.fc.ai && this.fc.ai.bias_load !== null && this.fc.ai.bias_load !== undefined ? ` <span class="muted">(지금 부하 ${this.fc.ai.bias_load > 0 ? "+" : ""}${this.fc.ai.bias_load} kW)</span>` : ""}</span>
+        <span class="k">0~4시간 실측 앙상블</span><span class="v">부하 ${(act.load?.nowcast_weights || []).slice(0, 3).map(x => F.n(Number(x) * 100, 0)).join(" / ") || "—"} · 태양광 ${(act.pv?.nowcast_weights || []).slice(0, 3).map(x => F.n(Number(x) * 100, 0)).join(" / ") || "—"} %</span>
         <span class="k">다음 학습</span><span class="v">${a.busy ? "지금 학습 중…" : a.enabled ? Math.floor(a.next_s / 60) + "분 뒤 (주기 " + a.retrain_h + "시간)" : "꺼짐"}</span>
         <span class="k">운전 반영</span><span class="v ${a.degraded ? "badc" : "okc"}">${a.degraded ? "정확도 저하 — 규칙 운전 중" : "예측 계획 운전에 사용"}</span>
       </div>

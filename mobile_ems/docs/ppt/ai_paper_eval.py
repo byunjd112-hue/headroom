@@ -8,7 +8,7 @@
 import json, os, sys, tempfile, time
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.join(HERE, "..", ".."))
-from ifps_ems import dataio, learner, attn
+from ifps_ems import dataio, learner, attn, nowcast
 from ifps_ems.config import Site, HORIZON
 from ifps_ems.forecast import LoadForecaster, PVForecaster, BUCKET, bucket_of
 
@@ -51,6 +51,36 @@ def viz(fp, dtr, d, o, site):
     return {"ridge": ridge, "att": att}
 
 
+def bench(site):
+    """독립 시험(tools/forecast_benchmark.py 결과 — 시드별 98일 학습·8일 가중치 선택·14일 시험, 합성 카메라 열 제외)을 문서용으로 간추린다.
+    구간은 두 방식으로 잰 결과를 함께 싣는다: 학습 때 한 번 보정(static) / 운용처럼 매일 보정 + 변동 여유(daily)."""
+    rd = lambda n: json.load(open(os.path.join(HERE, "..", n), encoding="utf-8")); B = rd("forecast_benchmark.json"); S = rd("forecast_benchmark_static.json")
+    stat = {(r["seed"], k): t for r in S["runs"] for k, t in r["targets"].items()}; rows = []
+    for r in B["runs"]:
+        for k, t in r["targets"].items():
+            b, e = t["baseline"], t["enhanced"]; s0 = stat.get((r["seed"], k))
+            rows.append({"seed": r["seed"], "kind": k, "w": t["weights"][:3], "bias": t["bias"], "scale": t["interval_scale_mean"], "ms": t["median_ms"],
+                         "nmae": {h: [b[h]["nmae_pct"], e[h]["nmae_pct"]] for h in ("15m", "1h", "4h", "24h")}, "cov": {h: [b[h]["coverage_pct"], e[h]["coverage_pct"]] for h in ("15m", "1h", "4h", "24h")},
+                         "cov24_static": None if s0 is None else s0["enhanced"]["24h"]["coverage_pct"]})
+    agg = {}
+    for k in ("load", "pv"):
+        rr = [x for x in rows if x["kind"] == k]; cut = [100 * (1 - x["nmae"]["15m"][1] / x["nmae"]["15m"][0]) for x in rr]
+        agg[k] = {"n": len(rr), "cut15_min": round(min(cut), 1), "cut15_max": round(max(cut), 1), "cut15_mean": round(float(np.mean(cut)), 1), "used": sum(any(x["w"]) for x in rr),
+                  "nmae15": [round(float(np.mean([x["nmae"]["15m"][i] for x in rr])), 2) for i in (0, 1)], "nmae1h": [round(float(np.mean([x["nmae"]["1h"][i] for x in rr])), 2) for i in (0, 1)],
+                  "nmae24": [round(float(np.mean([x["nmae"]["24h"][i] for x in rr])), 2) for i in (0, 1)],
+                  "cov24": [round(min(x["cov"]["24h"][1] for x in rr), 1), round(max(x["cov"]["24h"][1] for x in rr), 1), round(float(np.mean([x["cov"]["24h"][1] for x in rr])), 1)],
+                  "cov24_static": [round(min(x["cov24_static"] for x in rr), 1), round(max(x["cov24_static"] for x in rr), 1), round(float(np.mean([x["cov24_static"] for x in rr])), 1)],
+                  "scale": [round(min(x["scale"] for x in rr), 2), round(max(x["scale"] for x in rr), 2)]}
+    # 결합 함수의 응답면: 기존 예측 100 kW, 실측 참조와의 차이 −50~+50 kW, 선행 15분~4시간. 첫 시드에서 채택된 가중치를 실제 nowcast.blend 에 넣어 계산한다.
+    surf = {}; diffs = list(range(-50, 51, 10))
+    for k in ("load", "pv"):
+        w = next(x["w"] for x in rows if x["kind"] == k) + [0.0, 0.0, 0.0]; grid = []
+        for dk in diffs:
+            p = np.full(HORIZON, 100.0); mid, _, _ = nowcast.blend(p, p - 10, p + 10, p + dk, np.ones(HORIZON, bool), w, k, site); grid.append([round(float(v - 100.0), 2) for v in mid[:16]])
+        surf[k] = {"w": w[:3], "diffs": diffs, "grid": grid}
+    return {"fit_days": B["fit_days"], "tune_days": B["tune_days"], "test_days": B["test_days"], "origins": B["runs"][0]["test_origins"], "seeds": [r["seed"] for r in B["runs"]], "rows": rows, "agg": agg, "surface": surf}
+
+
 def main():
     site = Site(); td = tempfile.mkdtemp(); p = os.path.join(td, "a.csv"); dataio.gen_sample(site, p); d = dataio.load_csv(p, site); n = d["n"]
     ntr = n - TEST_DAYS * 96; dtr = learner.cut(d, ntr); origins = list(range(ntr, n - HORIZON - 1, 8)); mean_l = float(np.mean(d["load"][ntr:]))
@@ -65,7 +95,7 @@ def main():
     out["sample"] = {"load": sample_day(fl, d, o, "load"), "pv": sample_day(fp, d, o, "pv"), "refs": fp.att.explain(d, o, fp._idx(d), site.pv_kwp, top=5)}
     w = fp.att._query(d, o, fp._idx(d), site.pv_kwp); ww = fp.att._weights(w[0], w[3], 0)[0]; ww = np.sort(ww / ww.sum())[::-1]
     out["sample"]["weights"] = [round(float(x) * 100, 2) for x in ww[:40]]; out["sample"]["top10_share"] = round(float(ww[:10].sum()) * 100, 1); out["sample"]["eff_n"] = round(float(1.0 / np.sum(ww ** 2)), 1)
-    out["viz"] = viz(fp, dtr, d, o, site)
+    out["viz"] = viz(fp, dtr, d, o, site); out["bench"] = bench(site); out["viz"]["nowcast"] = out["bench"].pop("surface")
     dataio.save_model(os.path.join(td, "l.npz"), fl); dataio.save_model(os.path.join(td, "p.npz"), fp)
     t0 = time.time(); fl.predict(d, n - 200); fp.predict(d, n - 200); t_pred = time.time() - t0
     out["cost"] = {"train_load_s": round(t_load, 1), "train_pv_s": pv[-1]["sec"], "predict_s": round(t_pred, 2), "load_kb": round(os.path.getsize(os.path.join(td, "l.npz")) / 1024, 1), "pv_kb": round(os.path.getsize(os.path.join(td, "p.npz")) / 1024, 1),

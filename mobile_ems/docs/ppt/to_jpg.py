@@ -4,5 +4,5 @@ import os
 from PIL import Image
 D = os.path.join(os.path.dirname(os.path.abspath(__file__)), "img")
 for f in sorted(os.listdir(D)):
-    if f.endswith(".png"):
+    if f.endswith(".png") and not f.startswith("aich_"):          # 그래프(aich_*.png)는 글자가 번지지 않게 PNG 그대로 둔다
         Image.open(os.path.join(D, f)).convert("RGB").save(os.path.join(D, f[:-4] + ".jpg"), quality=90); os.remove(os.path.join(D, f)); print(f)

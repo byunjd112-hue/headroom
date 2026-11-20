@@ -1,0 +1,1583 @@
+[
+  {
+    "name": "AUTO · 작전지 · 평시",
+    "note": "ESS 저충전 상태에서 디젤·연료전지 보강 결정과 가상 기동 완료를 확인합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 20
+      },
+      {
+        "type": "set",
+        "tag": "H2.nm3",
+        "value": 700
+      },
+      {
+        "type": "policy",
+        "mode": "island",
+        "posture": "평시",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "executed",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "DG",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "FC",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "DG.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 1000,
+        "limit": 1000
+      },
+      {
+        "type": "expect",
+        "tag": "FC.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 1000,
+        "limit": 1000
+      }
+    ]
+  },
+  {
+    "name": "MANUAL · 작전지 · 평시",
+    "note": "정기 자동 급전은 멈추되, 화면의 ‘제어 즉시 실행’을 요청하면 급전 판단과 모의 기동이 수행되는지 확인합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 0
+      },
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 20
+      },
+      {
+        "type": "policy",
+        "mode": "island",
+        "posture": "평시",
+        "control": "manual",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "tied",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "executed",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "writes",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy",
+        "mode": "island",
+        "posture": "평시",
+        "control": "immediate",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "executed",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "DG",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "DG.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 1000,
+        "limit": 1000
+      }
+    ]
+  },
+  {
+    "name": "AUTO · 작전지 · 저소음",
+    "note": "같은 저충전 조건에서 디젤을 억제하고 연료전지와 3등급 부하 차단으로 대응합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 20
+      },
+      {
+        "type": "set",
+        "tag": "H2.nm3",
+        "value": 700
+      },
+      {
+        "type": "policy",
+        "mode": "island",
+        "posture": "저소음",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "DG",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "FC",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "FC.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 1000,
+        "limit": 1000
+      },
+      {
+        "type": "wait",
+        "ms": 3500
+      },
+      {
+        "type": "policy",
+        "mode": "island",
+        "posture": "저소음",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L3",
+        "value": 0,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "DG.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L1",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "MANUAL · 작전지 · 저소음",
+    "note": "같은 부하·충전율 상황에서 자동 급전과 자동 쓰기가 생략되고 발전기와 급전선 상태가 유지되는지 확인합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 0
+      },
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 20
+      },
+      {
+        "type": "policy",
+        "mode": "island",
+        "posture": "저소음",
+        "control": "manual",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "tied",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "executed",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "writes",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "DG.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "FC.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L1",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L3",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "AUTO · 작전지 · 자립",
+    "note": "자립 목표 대비 자원 부족 상황에서 중요 부하를 유지하고 2·3등급을 차단하는지 확인합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 16
+      },
+      {
+        "type": "set",
+        "tag": "H2.nm3",
+        "value": 0
+      },
+      {
+        "type": "set",
+        "tag": "DG.fuel_l",
+        "value": 0
+      },
+      {
+        "type": "set",
+        "tag": "LOAD.p1_kw",
+        "value": 80
+      },
+      {
+        "type": "set",
+        "tag": "LOAD.p2_kw",
+        "value": 100
+      },
+      {
+        "type": "set",
+        "tag": "LOAD.p3_kw",
+        "value": 90
+      },
+      {
+        "type": "set",
+        "tag": "LOAD.kw",
+        "value": 270
+      },
+      {
+        "type": "policy",
+        "mode": "island",
+        "posture": "자립",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "full_hours",
+        "value": 72,
+        "op": "le"
+      },
+      {
+        "type": "wait",
+        "ms": 3500
+      },
+      {
+        "type": "policy",
+        "mode": "island",
+        "posture": "자립",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L3",
+        "value": 0,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L2",
+        "value": 0,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L1",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "MANUAL · 작전지 · 자립",
+    "note": "같은 부하·충전율 상황에서 자동 급전과 자동 쓰기가 생략되고 발전기와 급전선 상태가 유지되는지 확인합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 0
+      },
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 20
+      },
+      {
+        "type": "policy",
+        "mode": "island",
+        "posture": "자립",
+        "control": "manual",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "tied",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "executed",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "writes",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "DG.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "FC.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L1",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L3",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "AUTO · 주둔지 · 평시",
+    "note": "피크에는 수전을 최소 5 kW까지 낮추고, 경부하에는 ESS를 충전하되 수전 150 kW 목표를 지키는지 비교합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 1
+      },
+      {
+        "type": "set",
+        "tag": "LOAD.kw",
+        "value": 220
+      },
+      {
+        "type": "set",
+        "tag": "PV.kw",
+        "value": 0
+      },
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 75
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "평시",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "tied",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "DG",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "GDG",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "ess_target",
+        "value": 215,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "grid_target",
+        "value": 5,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "GRID.kw",
+        "value": 5,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "set",
+        "tag": "LOAD.kw",
+        "value": 80
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "평시",
+        "control": "auto",
+        "hour": 2
+      },
+      {
+        "type": "policy_check",
+        "metric": "ess_target",
+        "value": -70,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "GRID.kw",
+        "value": 150,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      }
+    ]
+  },
+  {
+    "name": "MANUAL · 주둔지 · 평시",
+    "note": "같은 부하·충전율 상황에서 자동 급전과 자동 쓰기가 생략되고 발전기와 급전선 상태가 유지되는지 확인합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 1
+      },
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 20
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "평시",
+        "control": "manual",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "tied",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "executed",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "writes",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "DG.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "FC.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L1",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L3",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "AUTO · 주둔지 · 저소음",
+    "note": "상전 연계에서는 발전기를 대기시키고, 상전 상실 후에는 디젤 대신 연료전지와 우선부하 관리를 사용합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 1
+      },
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 20
+      },
+      {
+        "type": "set",
+        "tag": "H2.nm3",
+        "value": 700
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "저소음",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "tied",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "DG",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "FC",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "GDG",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 0
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "저소음",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "outage",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "DG",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "GDG",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "FC",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "FC.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 1000,
+        "limit": 1000
+      },
+      {
+        "type": "wait",
+        "ms": 3500
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "저소음",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L3",
+        "value": 0,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L1",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "MANUAL · 주둔지 · 저소음",
+    "note": "같은 부하·충전율 상황에서 자동 급전과 자동 쓰기가 생략되고 발전기와 급전선 상태가 유지되는지 확인합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 1
+      },
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 20
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "저소음",
+        "control": "manual",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "tied",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "executed",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "writes",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "DG.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "FC.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L1",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L3",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "AUTO · 주둔지 · 자립",
+    "note": "저충전 정전 상태에서 주둔지 발전기 인수를 검증하고, 복전 안정 30초를 확인한 뒤 발전기를 정지합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 0
+      },
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 30
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "자립",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "outage",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "GDG",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "GDG.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 6500,
+        "limit": 6500
+      },
+      {
+        "type": "expect",
+        "tag": "CB.GDG",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 1
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "자립",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "tied",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "wait",
+        "ms": 10000
+      },
+      {
+        "type": "wait",
+        "ms": 10000
+      },
+      {
+        "type": "wait",
+        "ms": 10000
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "자립",
+        "control": "auto",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "tied",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "GDG",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "expect",
+        "tag": "GDG.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 6500,
+        "limit": 6500
+      }
+    ]
+  },
+  {
+    "name": "MANUAL · 주둔지 · 자립",
+    "note": "정전은 감지하지만 자동 지령은 보내지 않습니다. 이어서 별도 수동 기동 명령으로 가상 예비발전기의 응답을 확인합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 0
+      },
+      {
+        "type": "set",
+        "tag": "ESS.soc",
+        "value": 20
+      },
+      {
+        "type": "policy",
+        "mode": "grid",
+        "posture": "자립",
+        "control": "manual",
+        "hour": 11
+      },
+      {
+        "type": "policy_check",
+        "metric": "tied",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "executed",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "writes",
+        "value": 0,
+        "op": "eq"
+      },
+      {
+        "type": "policy_check",
+        "metric": "outage",
+        "value": 1,
+        "op": "eq"
+      },
+      {
+        "type": "command",
+        "device": "GDG",
+        "value": 1
+      },
+      {
+        "type": "expect",
+        "tag": "GDG.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 6500,
+        "limit": 6500
+      },
+      {
+        "type": "expect",
+        "tag": "CB.GDG",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "작전지 · PV·ESS 정상 자립",
+    "note": "부하 80 kW, PV 40 kW의 정상 상태에서 ESS가 부족분 40 kW를 공급하는지 확인합니다. 모선 판정 범위는 시뮬레이터 시험 기준입니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 0
+      },
+      {
+        "type": "set",
+        "tag": "LOAD.kw",
+        "value": 80
+      },
+      {
+        "type": "set",
+        "tag": "PV.kw",
+        "value": 40
+      },
+      {
+        "type": "wait",
+        "ms": 100
+      },
+      {
+        "type": "expect",
+        "tag": "ESS.kw",
+        "value": 40,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "BUS.a_v",
+        "value": 418,
+        "op": "ge",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "BUS.a_v",
+        "value": 462,
+        "op": "le",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "BUS.hz",
+        "value": 59.5,
+        "op": "ge",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "BUS.hz",
+        "value": 60.5,
+        "op": "le",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "작전지 · PV 급감과 디젤 인수",
+    "note": "일사 급감 직후 ESS가 전력 부족분을 부담하는지 확인한 뒤 디젤의 지령 수용·기동·출력을 순서대로 점검합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "LOAD.kw",
+        "value": 100
+      },
+      {
+        "type": "set",
+        "tag": "PV.kw",
+        "value": 10
+      },
+      {
+        "type": "wait",
+        "ms": 100
+      },
+      {
+        "type": "expect",
+        "tag": "ESS.kw",
+        "value": 90,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "command",
+        "device": "DG",
+        "value": 1
+      },
+      {
+        "type": "expect",
+        "tag": "DG.seq_ack",
+        "value": 1,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "DG.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 600,
+        "limit": 600
+      },
+      {
+        "type": "expect",
+        "tag": "DG.kw",
+        "value": 90,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "ESS.kw",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "고장 시험 · 디젤 기동 응답 지연",
+    "note": "수용 응답과 실제 운전 상태를 따로 검사합니다. 상태 전환을 800 ms 지연시켜 기본 검증에서 의도적으로 실패시키고, 1,500 ms 내 대기 시간 변경 후보를 확인합니다.",
+    "steps": [
+      {
+        "type": "response",
+        "device": "DG",
+        "ms": 800
+      },
+      {
+        "type": "command",
+        "device": "DG",
+        "value": 1
+      },
+      {
+        "type": "expect",
+        "tag": "DG.seq_ack",
+        "value": 1,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "DG.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 500,
+        "limit": 1500
+      }
+    ]
+  },
+  {
+    "name": "작전지 · 연료전지 출력 분담",
+    "note": "수소 잔량을 확인한 뒤 연료전지의 지령 수용과 45 kW 목표 출력을 점검합니다. 부하 80 kW와 PV 20 kW를 기준으로 ESS 분담은 15 kW입니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "LOAD.kw",
+        "value": 80
+      },
+      {
+        "type": "set",
+        "tag": "PV.kw",
+        "value": 20
+      },
+      {
+        "type": "expect",
+        "tag": "H2.nm3",
+        "value": 200,
+        "op": "ge",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "set",
+        "tag": "FC.kw_set",
+        "value": 45
+      },
+      {
+        "type": "command",
+        "device": "FC",
+        "value": 1
+      },
+      {
+        "type": "expect",
+        "tag": "FC.seq_ack",
+        "value": 1,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "FC.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 600,
+        "limit": 600
+      },
+      {
+        "type": "expect",
+        "tag": "FC.kw",
+        "value": 45,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "ESS.kw",
+        "value": 15,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "작전지 · PV 잉여와 수전해 투입",
+    "note": "부하 80 kW에 PV 250 kW를 가정합니다. 수전해 투입 전후 ESS 충전 분담과 수소 생산 표시를 비교하고 정지 후 소비전력 0 kW를 확인합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "LOAD.kw",
+        "value": 80
+      },
+      {
+        "type": "set",
+        "tag": "PV.kw",
+        "value": 250
+      },
+      {
+        "type": "wait",
+        "ms": 100
+      },
+      {
+        "type": "expect",
+        "tag": "ESS.kw",
+        "value": -170,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "command",
+        "device": "ELZ",
+        "value": 1
+      },
+      {
+        "type": "expect",
+        "tag": "ELZ.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 600,
+        "limit": 600
+      },
+      {
+        "type": "expect",
+        "tag": "ELZ.kw",
+        "value": 150,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "ELZ.h2_rate",
+        "value": 30,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "ESS.kw",
+        "value": -20,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "command",
+        "device": "ELZ",
+        "value": 2
+      },
+      {
+        "type": "expect",
+        "tag": "ELZ.status",
+        "value": 0,
+        "op": "eq",
+        "ms": 600,
+        "limit": 600
+      },
+      {
+        "type": "expect",
+        "tag": "ELZ.kw",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "배전 · 우선순위 부하 차단·복구",
+    "note": "3등급부터 차단하고 2등급부터 복구하는 지령 순서를 확인합니다. 각 차단 시 1등급 차단기 투입 상태를 검증합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "LDS.L3",
+        "value": 2
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L3",
+        "value": 0,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L1",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "set",
+        "tag": "LDS.L2",
+        "value": 2
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L2",
+        "value": 0,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L1",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "set",
+        "tag": "LDS.L2",
+        "value": 1
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L2",
+        "value": 1,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L3",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "set",
+        "tag": "LDS.L3",
+        "value": 1
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L3",
+        "value": 1,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "CB.L1",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "주둔지 · 정전·예비 발전기·복전",
+    "note": "상전 개방을 모의 입력하고 ESS 공급, 주둔지 발전기 기동, 상전 복구 후 발전기 출력 해제를 확인합니다. 상전 재투입은 시험 입력으로 재현합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "LOAD.kw",
+        "value": 100
+      },
+      {
+        "type": "set",
+        "tag": "PV.kw",
+        "value": 20
+      },
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 1
+      },
+      {
+        "type": "wait",
+        "ms": 100
+      },
+      {
+        "type": "expect",
+        "tag": "GRID.kw",
+        "value": 80,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 0
+      },
+      {
+        "type": "wait",
+        "ms": 100
+      },
+      {
+        "type": "expect",
+        "tag": "GRID.kw",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "ESS.kw",
+        "value": 80,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "command",
+        "device": "GDG",
+        "value": 1
+      },
+      {
+        "type": "expect",
+        "tag": "GDG.seq_ack",
+        "value": 1,
+        "op": "eq",
+        "ms": 500,
+        "limit": 500
+      },
+      {
+        "type": "expect",
+        "tag": "GDG.status",
+        "value": 1,
+        "op": "eq",
+        "ms": 6000,
+        "limit": 6000
+      },
+      {
+        "type": "expect",
+        "tag": "CB.GDG",
+        "value": 1,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "GDG.kw",
+        "value": 80,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "ESS.kw",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 1
+      },
+      {
+        "type": "wait",
+        "ms": 100
+      },
+      {
+        "type": "expect",
+        "tag": "CB.GDG",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "GDG.kw",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "GRID.kw",
+        "value": 80,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "name": "보호 모의 · 상전 역송 검출",
+    "note": "PV 잉여 상황에서 상전 역송이 발생하도록 시험해 가상 장치의 역전력 트립 코드 32와 수전 차단기 상태를 확인합니다.",
+    "steps": [
+      {
+        "type": "set",
+        "tag": "LOAD.kw",
+        "value": 80
+      },
+      {
+        "type": "set",
+        "tag": "PV.kw",
+        "value": 160
+      },
+      {
+        "type": "set",
+        "tag": "CB.GRID",
+        "value": 1
+      },
+      {
+        "type": "wait",
+        "ms": 100
+      },
+      {
+        "type": "expect",
+        "tag": "GRID.kw",
+        "value": -80,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "expect",
+        "tag": "CB.GRID",
+        "value": 2,
+        "op": "eq",
+        "ms": 3500,
+        "limit": 3500
+      },
+      {
+        "type": "expect",
+        "tag": "FLT.GRID",
+        "value": 32,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      },
+      {
+        "type": "wait",
+        "ms": 50
+      },
+      {
+        "type": "expect",
+        "tag": "GRID.kw",
+        "value": 0,
+        "op": "eq",
+        "ms": 0,
+        "limit": 0
+      }
+    ]
+  }
+]

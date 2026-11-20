@@ -121,7 +121,7 @@ class TestForecastWithoutSampleFiles(unittest.TestCase):
         td = tempfile.mkdtemp()
         try:
             for f in ("runtime.json", "pointmap.csv"): shutil.copy(os.path.join(ROOT, "config", f), td)
-            empty = os.path.join(td, "results"); eng = Engine(os.path.join(td, "runtime.json"), sim=True, plan_dir=empty)
+            empty = os.path.join(td, "results"); eng = Engine(os.path.join(td, "runtime.json"), sim=True, plan_dir=empty); eng.ai_cfg["enabled"] = False      # 엔진을 기동하지 않는 시험: 첫 기동 학습(별도 프로세스)을 기다리지 않는다
             try:
                 eng._compute_forecast(); fc = eng.fc_cache; self.assertTrue(fc["ok"], fc.get("why")); self.assertEqual(len(fc["load"]), 96); self.assertIn("합성", fc["source"])
                 self.assertTrue(all(os.path.exists(os.path.join(empty, n)) for n in ("sample_site_data.csv", "model_load.npz", "model_pv.npz")))

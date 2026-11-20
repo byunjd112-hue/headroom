@@ -73,7 +73,7 @@ S07_3 = [  # FM, D' 전제 감시항목, 대응 태그, 판정, 조치, 관련
  ["C-02", "게이트웨이 품질 표시", "없음", "미확보", "품질 레지스터 또는 예외 0B 요구", "FM-10"],
 ]
 S07_4 = [  # No, 한쪽 기술 내용, 다른 쪽 내용, 조치 권고
- [1, "보안성 검토 결과 문서: Rev18 이전 기능 기준", "현 소프트웨어: 주둔지 운용·기존 발전기 연동·모의 시각 기능 추가", "보안성 검토 문서를 현 기능 기준으로 갱신(FM-50 조치 포함)"],
+ [1, "보안성 검토 결과 문서: 주요 평가는 Rev18 이전 기능 기준(이후 기능은 절을 추가해 설명)", "현 소프트웨어: 주둔지 운용·기존 발전기 연동·모의 시각·설정 편집·시나리오 검증 기능 추가", "보안성 검토 문서를 현 기능 기준으로 갱신(FM-50 조치 포함)"],
  [2, "신뢰성 시험 결과서: 판정 기준을 잠정값으로 적용", "군 SW 신뢰성 시험 등급별 목표값(발주처 기준) 미확인", "발주처 적용 등급·목표값 확인 후 판정 갱신"],
  [3, "주둔지 발전기 안내서: EMS 가 기동·정지 지령", "기존 설비: 자동 기동반이 정전을 자체 감지해 기동(일반적)", "기동 주체 결정(C-05), 설정으로 선택 가능하게 구현"],
  [4, "EMS 표준안: PV.lim_set 0 = 제한 없음", "인버터 관례: 0 = 출력 0 인 제품 있음", "제작사 회신으로 확정, 다르면 EMS 가 정격값을 쓰도록 변경(FM-27)"],
@@ -157,6 +157,12 @@ S09 = [  # No, FM, 현 예방대책, 구현 위치, 검증 시험, 판정
  [15, "FM-36·37·38", "규칙 운전 대체·이력 정리", "ifps_ems(forecast·plan)", "test_plan_policy_decides_from_history_and_falls_back, test_R18_history_with_gap_and_torn_row_is_regridded, test_accuracy_on_sample_site", "시험 확인(합성 자료)"],
  [21, "FM-36·38", "지속 학습: 검증 후 적용·자료 점검·최근 오차 보정·되돌리기", "ifps_ems/learner.py, hmi/engine.py(ai_train)", "test_first_training_adopts_and_records, test_worse_challenger_is_rejected_and_rollback_restores, test_each_kind_is_judged_separately, test_bad_or_short_data_is_not_learned, test_recent_error_correction", "시험 확인(합성 자료)"],
  [22, "FM-36", "태양광 예측 보강: 하늘 카메라 구름량·주의집중 예측(미래 자료 미사용, 검증된 비율만 섞음, 카메라 고장 시 대체)", "ifps_ems/skycam.py·attn.py·forecast.py, hmi/skywatch.py", "test_cloud_cover_follows_the_picture, test_bad_or_stale_picture_gives_no_value, test_attention_never_uses_memories_that_end_after_the_issue_time, test_blend_ratio_is_validated_and_model_survives_save_and_load, test_works_without_camera_and_with_old_model_file, test_old_history_header_is_migrated_and_rows_still_read", "시험 확인(합성 자료 — 실제 카메라 사진으로는 미검증)"],
+ [23, "FM-36", "단기 실측 앙상블: 최근 실측으로 만든 참조값을 검증을 통과한 구간(4시간 이내)에만 결합. 실측이 없거나 보완값이면 기존 예측 그대로", "ifps_ems/nowcast.py, learner.py(predict·select_nowcast), dataio.py(원시 관측 표시)", "test_reference_depends_only_on_available_measurements, test_weight_gate_and_long_horizon_fallback, test_legacy_prediction_works_without_model_metadata", "시험 확인(합성 자료)"],
+ [24, "FM-36", "예측 구간 변동 여유: 최근 2일의 포함률이 75% 아래면 80%를 덮도록 구간을 넓힘(운전 계획의 보수적 여유가 좁아지지 않게)", "ifps_ems/forecast.py(calibrate·_drift_scale)", "test_scale_grows_only_when_recent_errors_escape_the_interval, test_calibration_keeps_scale_in_model_file_and_old_files_still_load", "시험 확인(합성 자료)"],
+ [25, "FM-36·37", "예측 모델을 다시 읽은 뒤 운전 계획을 반드시 다시 계산(계획 시각 무효화), 계획 호출 직렬화", "ifps_ems_rt/planlink.py(reload·__call__)", "test_plan_restart_after_model_reload_invalidates_timestamp", "시험 확인"],
+ [26, "FM-13·14", "지령의 수용 응답과 운전 완료를 따로 판정(응답 지연 주입 시험). 가상 시험의 대기 시간 조정값은 현장 보호 설정에 쓰지 않음", "ifps_ems_rt/hmi/scenarios.py(check_expectation·verify)", "test_built_in_cases_and_expected_fault, test_no_ack_blocks_candidate_and_reports_injected_failure", "시험 확인(가상 장치)"],
+ [27, "FM-17", "수동(MANUAL) 운전에서는 감시를 계속하되 자동 지령 쓰기 0건. 운전 모드 12종(AUTO·MANUAL × 작전지·주둔지 × 평시·저소음·자립) 모의 검증", "ifps_ems_rt/runtime.py(auto_enabled), hmi/scenario_policy.py", "test_built_in_cases_and_expected_fault, test_mode_matrix_every_place_and_posture_behaves_as_defined", "시험 확인(가상 장치)"],
+ [28, "— (시험 도구)", "시나리오 검증기의 격리: 건마다 독립 가상 장치·가상 시각을 써서 시험끼리 상태가 섞이지 않음. 가상 장치 모드의 엔지니어 세션에서만 실행", "ifps_ems_rt/hmi/scenarios.py(run_case), server.py(/api/scenarios)", "test_parallel_runs_are_isolated_and_improvement_retests_batch, test_malformed_threshold_is_rejected, test_branch_and_generated_source", "시험 확인"],
  [16, "FM-43·44", "감사 기록 연쇄·격리·회전", "ifps_ems_rt/audit", "test_R02_rotation_keeps_chain_and_detects_tamper, test_R07_torn_tail_is_quarantined_and_chain_continues, test_R02_audit_write_failure_does_not_raise", "시험 확인"],
  [17, "FM-24·45", "운용 상태 보존·검증", "runtime.py(set_ops)", "test_ops_persist_and_validation", "시험 확인(상호 검증은 미구현)"],
  [18, "FM-10·28", "없음(현 리비전 미구현)", "—", "—", "미구현 — 보완설계 대상"],

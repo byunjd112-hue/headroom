@@ -106,3 +106,11 @@ python -m ifps_ems_rt.hmi.pin                               # PIN 해시 생성(
 - `docs/out/IFPS_EMS_AI예측_기술자료_<Rev>.pptx` — 예측 수식과 학습된 모델의 입체 그림, 검증 결과.
 - `docs/out/이동형전력체계EMS_AI예측_논문_<Rev>.docx` — 같은 내용을 논문 형식으로 정리한 초안(심사 전).
 - 입체 그림은 꾸민 그림이 아니라 학습된 값(가중치·거리·중요도·섞는 비율)을 3차원에 그대로 놓고 그린 것이다. 다시 만들려면: `python docs/ppt/ai_paper_eval.py` → `node docs/ppt/ai_render3d.js <node_modules/three 경로>` → `node docs/ppt/ai_charts.js` → `python docs/build_all.py`.
+
+## 단기 실측 앙상블 · 운영 시나리오 검증 · 예측 구간 보정 (Rev32~33)
+
+- **단기 실측 앙상블**(`ifps_ems/nowcast.py`): 방금 잰 부하·발전으로 만든 참조값을 4시간 이내 구간에만, 검증을 통과한 비율로 기존 예측에 섞는다. 실측이 없으면 기존 예측 그대로다.
+- **예측 구간 변동 여유**(`ifps_ems/forecast.py`): 최근 2일의 포함률이 낮으면 구간을 넓혀 80% 부근으로 맞춘다. 운전 계획의 보수적 여유가 좁아지지 않게 한다.
+- **운영 시나리오 검증**(화면 왼쪽 메뉴, 가상 장치 모드 전용): 입력값·지령·판정 조건을 단계로 적어 독립 가상 장치에서 돌려 본다. 운전 모드 12종과 장비 시나리오 8건이 기본으로 들어 있다.
+- 재현: `python -m tools.forecast_benchmark --out docs/forecast_benchmark.json`, `python -m tools.scenario_report`.
+- 문서 묶음 zip 은 `00_IFPS_EMS_문서안내_<Rev>.html` 부터 열면 된다(읽는 순서대로 01~08 폴더).
