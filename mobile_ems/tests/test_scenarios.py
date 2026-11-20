@@ -38,6 +38,13 @@ class ScenarioTests(unittest.TestCase):
         self.assertTrue(all(run["ok"] for run in result["retest"]))
         self.assertIn("candidate", result)
 
+    def test_rows_carry_plant_state_for_topology_playback(self):
+        case = {"name": "snap", "steps": [{"type": "set", "tag": "CB.L3", "value": 2}, {"type": "command", "device": "DG", "value": 1},
+                                           {"type": "expect", "tag": "DG.status", "value": 1, "op": "eq", "ms": 500, "limit": 1500}]}
+        rows = verify([case], self.points, self.devices)["results"][0]["rows"]
+        self.assertEqual(rows[0]["snap"]["CB.L3"], 2); self.assertEqual(rows[0]["snap"]["DG.status"], 0); self.assertEqual(rows[2]["snap"]["DG.status"], 1)
+        self.assertTrue(all(key in rows[2]["snap"] for key in ("CB.GRID", "ESS.soc", "PV.kw", "LOAD.p1_kw", "FLT.L3")))
+
     def test_no_ack_blocks_candidate_and_reports_injected_failure(self):
         self.delayed["steps"][0]["ms"] = -1
         result = verify([self.delayed], self.points, self.devices, improve=True)

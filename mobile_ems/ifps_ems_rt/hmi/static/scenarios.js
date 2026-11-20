@@ -19,6 +19,8 @@ const P_SCENARIOS = (() => {
   let active = 0, stepIndex = 0, config = null, selected = new Set(), presetIndex = "0";
   cases.slice(0, maxBatch).forEach((_, i) => selected.add(i));
   let output = null, busy = false, mountId = 0, revision = 0, search = "";
+  let view = "seq", picked = "", pickedPart = "", playing = null;      // 보기(시퀀스·구성도), 구성도에서 고른 블록, 단계 자동 재생 타이머
+  try { view = localStorage.getItem("ems.scenario.view") === "topo" ? "topo" : "seq"; } catch (_) { /* 기본값 사용 */ }
 
   const scene = () => cases[active];
   const point = tag => config.points.find(p => p.tag === tag);
@@ -104,6 +106,36 @@ const P_SCENARIOS = (() => {
         <defs><marker id="sqFill" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0 0L9 4L0 8z" fill="context-stroke"/></marker>
         <marker id="sqOpen" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0 0L9 4L0 8" fill="none" stroke="context-stroke"/></marker></defs>
         ${life}${bars}${arrows}</svg>${hit}${steps.length ? "" : '<p class="muted sq-empty">왼쪽 장비의 신호를 누르거나 끌어다 놓으면 단계가 생깁니다.</p>'}</div></div>`;
+  }
+
+  // 단계 표시줄: 번호를 눌러 이동, 재생하면 한 단계씩 넘어간다(두 보기 공통)
+  function stepper() {
+    const steps = scene().steps, rows = runOf()?.rows || [], cur = steps[stepIndex], row = rows.find(r => r.step === stepIndex);
+    if (!steps.length) return "";
+    const dots = steps.map((_, i) => `<button type="button" class="sp-dot ${rows.find(r => r.step === i)?.state || ""} ${i === stepIndex ? "on" : ""}" data-step="${i}" aria-label="${i + 1}단계" aria-pressed="${i === stepIndex}">${i + 1}</button>`).join("");
+    const seen = row ? (row.state === "fail" && row.why ? row.why : [row.actual !== undefined && row.expected !== undefined ? `기준 ${row.expected} · 관측 ${row.actual}` : "", `${row.elapsed} ms`].filter(Boolean).join(" · ")) : "";
+    return `<div class="sp-bar"><div class="sp-ctl">${button("first", "⟲", "", stepIndex === 0)}${button("prev", "◀", "", stepIndex === 0)}${button("play", playing ? "⏸ 멈춤" : "▶ 재생", "pri")}${button("next", "▶", "", stepIndex >= steps.length - 1)}</div>
+      <div class="sp-dots">${dots}</div><span class="sp-count">${stepIndex + 1} / ${steps.length} 단계</span></div>
+      <div class="sp-now ${row?.state || ""}"><b>${stepIndex + 1}. ${esc(labels[cur.type])}</b> ${esc(description(cur))}${seen ? ` <span>— ${esc(seen)}</span>` : ""}</div>`;
+  }
+
+  function topology() {
+    const ctx = {steps: scene().steps, rows: runOf()?.rows || [], stepIndex, describe: description, picked, part: pickedPart};
+    return `<div class="sq-summary"><span>${ctx.steps.length}단계</span>${ctx.rows.length ? `<span class="sc-ok">통과 ${ctx.rows.filter(r => r.state === "pass").length}</span>${ctx.rows.some(r => r.state === "fail") ? `<span class="sc-fail">실패 ${ctx.rows.filter(r => r.state === "fail").length}</span>` : ""}` : '<span class="muted">아직 검증하지 않음</span>'}
+        <span class="sc-spacer"></span><span class="sq-legend"><i class="l-call"></i>지령·입력 <i class="l-ret"></i>응답 판정 <i class="l-inj"></i>고장 주입 <i class="l-pow"></i>전력 흐름</span>
+        ${ScTopo.custom() ? button("layout-reset", "배치 초기화") : ""}</div>
+      <div class="tp-wrap">${ScTopo.html(ctx)}</div>${pickPanel()}`;
+  }
+
+  // 구성도에서 블록(장비·차단기·배전반)을 누르면 그 블록의 신호로 단계를 바로 넣는다
+  function pickPanel() {
+    if (!picked) return '<p class="muted tp-pick">블록을 누르면 그 장비·차단기의 신호로 단계를 바로 넣을 수 있습니다. 블록을 끌면 배치가 바뀌고 이 브라우저에 저장됩니다.</p>';
+    const tags = ScTopo.tagsOf(picked, config.points).filter(p => !pickedPart || /^(CB|FLT|LDS)\./.test(p.tag)), dev = config.commands.includes(picked) && !pickedPart;
+    const quick = pickedPart && tags.some(p => p.tag.startsWith("CB.")) ? `<span class="tp-quick">${[[1, "투입"], [0, "개방"], [2, "트립"]].map(([v, t]) => `<button type="button" class="btn sm" data-topo="set" data-tag="${esc(tags.find(p => p.tag.startsWith("CB.")).tag)}" data-value="${v}">＋ ${t} 입력</button>`).join("")}</span>` : "";
+    return `<div class="tp-pick"><b>${esc(ScTopo.title(picked))}${pickedPart ? " · 차단기" : ""}</b>
+      ${dev ? `<button type="button" class="btn sm" data-topo="command" data-device="${esc(picked)}" data-value="1">＋ 기동 지령</button><button type="button" class="btn sm" data-topo="command" data-device="${esc(picked)}" data-value="2">＋ 정지 지령</button><button type="button" class="btn sm" data-topo="response" data-device="${esc(picked)}">＋ 응답 지연 주입</button>` : ""}${quick}
+      <span class="tp-tags">${tags.map(p => `<span class="tp-tag"><code>${esc(p.tag)}</code><button type="button" class="btn sm" data-topo="set" data-tag="${esc(p.tag)}">입력</button><button type="button" class="btn sm" data-topo="expect" data-tag="${esc(p.tag)}">판정</button></span>`).join("") || '<span class="muted">대응표에 등록된 신호가 없습니다.</span>'}</span>
+      <button type="button" class="btn sm" data-topo="close">닫기</button></div>`;
   }
 
   function inspector() {
@@ -194,18 +226,19 @@ const P_SCENARIOS = (() => {
       <div class="sc-tabs" aria-label="시나리오 선택">${cases.map((c, i) => `<div class="sc-tab ${i === active ? "on" : ""}">
         <input type="checkbox" data-check="${i}" aria-label="${esc(c.name)} 검증 선택" ${selected.has(i) ? "checked" : ""}>
         <button class="btn sm" type="button" data-case="${i}" aria-pressed="${i === active}">${esc(c.name || "이름 없음")}</button></div>`).join("")}</div>
-      <div class="sc-layout">
-        <aside class="sc-panel"><h3>장비·신호</h3>
+      <div class="sc-layout ${view === "topo" ? "wide" : ""}">
+        <aside class="sc-panel sc-palette"><h3>장비·신호</h3>
           <input class="in" id="scSearch" aria-label="장비·신호 검색" placeholder="장비 또는 신호 검색" value="${esc(search)}">
           <div id="scPalette">${palette()}</div>
         </aside>
         <section class="sc-panel" id="scDrop">
           <label class="sc-name">시나리오 이름 <input class="in" id="scName" maxlength="80" value="${esc(scene().name)}"></label>
-          <div class="sc-actions"><h3>시퀀스</h3><span class="sc-spacer"></span>
+          <div class="sc-actions"><div class="sc-view" role="tablist" aria-label="보기"><button type="button" role="tab" class="btn sm ${view === "seq" ? "pri" : ""}" data-view="seq" aria-selected="${view === "seq"}">시퀀스</button><button type="button" role="tab" class="btn sm ${view === "topo" ? "pri" : ""}" data-view="topo" aria-selected="${view === "topo"}">구성도</button></div><span class="sc-spacer"></span>
             <select class="in" id="scAdd" aria-label="추가할 단계">${Object.entries(labels).map(([id, name]) => option(id, name)).join("")}</select>
             ${button("add", "＋ 단계")}</div>
           ${scene().note ? `<p class="sc-note">${esc(scene().note)}</p>` : ""}
-          <p class="muted">신호를 누르거나 끌어다 놓아 단계를 만들고, 단계를 끌어 순서를 바꿉니다. 키보드: ↑↓ 선택 · Alt+↑↓ 이동 · Delete 삭제.</p>${sequence()}
+          ${stepper()}
+          ${view === "topo" ? topology() : `<p class="muted">신호를 누르거나 끌어다 놓아 단계를 만들고, 단계를 끌어 순서를 바꿉니다. 키보드: ↑↓ 선택 · Alt+↑↓ 이동 · Delete 삭제.</p>${sequence()}`}
         </section>
         <aside class="sc-panel"><h3>단계 설정 ${scene().steps.length ? "· " + (stepIndex + 1) : ""}</h3>${inspector()}</aside>
       </div>
@@ -214,6 +247,7 @@ const P_SCENARIOS = (() => {
       const item = e.target.closest("[data-point],[data-device],[data-step]");
       if (item) e.dataTransfer.setData("application/x-ems-scenario", JSON.stringify(item.dataset));
     };
+    ScTopo.bind(root, (id, part) => { picked = picked === id && pickedPart === part ? "" : id; pickedPart = picked ? part : ""; paint(); }, paint);
     const drop = $("#scDrop");
     drop.ondragover = e => { if (e.dataTransfer.types.includes("application/x-ems-scenario")) e.preventDefault(); };
     drop.ondrop = e => {
@@ -239,6 +273,16 @@ const P_SCENARIOS = (() => {
         go(to);
       }
     };
+  }
+
+  function play(on) {
+    clearInterval(playing); playing = null;
+    if (!on) return;
+    if (stepIndex >= scene().steps.length - 1) stepIndex = 0;
+    playing = setInterval(() => {
+      if (!$("#scWorkspace") || stepIndex >= scene().steps.length - 1) { clearInterval(playing); playing = null; if ($("#scWorkspace")) paint(); return; }
+      stepIndex++; paint();
+    }, 1500);
   }
 
   function make(type, tag, device) {
@@ -310,7 +354,20 @@ const P_SCENARIOS = (() => {
     const el = e.target.closest("button,[data-step]");
     if (!el) return;
     const d = el.dataset;
+    if (d.view) { view = d.view; picked = ""; try { localStorage.setItem("ems.scenario.view", view); } catch (_) { /* 무시 */ } return paint(); }
+    if (d.topo) {
+      if (d.topo === "close") { picked = pickedPart = ""; return paint(); }
+      const step = make(d.topo, d.tag, d.device);
+      if (step && d.value !== undefined) step.value = Number(d.value);
+      return append(step, scene().steps.length ? stepIndex + 1 : 0);
+    }
+    if (["first", "prev", "next", "play"].includes(d.sc)) {
+      if (d.sc === "play") play(!playing); else { play(false); stepIndex = d.sc === "first" ? 0 : Math.max(0, Math.min(scene().steps.length - 1, stepIndex + (d.sc === "prev" ? -1 : 1))); }
+      return paint();
+    }
+    if (d.sc === "layout-reset") { ScTopo.reset(); return paint(); }
     if (d.case !== undefined || d.step !== undefined || d.jump) {
+      play(false);
       if (d.case !== undefined) { active = Number(d.case); stepIndex = 0; }
       if (d.step !== undefined) stepIndex = Number(d.step);
       if (d.jump) [active, stepIndex] = d.jump.split(":").map(Number);

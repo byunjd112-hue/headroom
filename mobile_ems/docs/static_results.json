@@ -1,6 +1,6 @@
 {
- "date": "2026-11-20 12:08",
- "unittest_s": 280.6,
+ "date": "2026-11-20 14:23",
+ "unittest_s": 259.0,
  "tests": [
   "test_backups_are_pruned_and_broken_backup_refused | ok",
   "test_pointmap_errors_block_save | ok",
@@ -111,6 +111,7 @@
   "test_no_ack_blocks_candidate_and_reports_injected_failure | ok",
   "test_parallel_runs_are_isolated_and_improvement_retests_batch | ok",
   "test_plan_restart_after_model_reload_invalidates_timestamp | ok",
+  "test_rows_carry_plant_state_for_topology_playback | ok",
   "test_attention_context_falls_back_when_sky_missing | ok",
   "test_attention_never_uses_memories_that_end_after_the_issue_time | ok",
   "test_blend_ratio_is_validated_and_model_survives_save_and_load | ok",
@@ -130,13 +131,13 @@
   "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
   "test_check_scans_and_module_entry | ok"
  ],
- "n_tests": 127,
+ "n_tests": 128,
  "tests_ok": true,
  "coverage_pct": 93.1,
  "stmt": {
-  "n": 3983,
-  "hit": 3818,
-  "pct": 95.9
+  "n": 3991,
+  "hit": 3825,
+  "pct": 95.8
  },
  "branch": {
   "n": 1422,
@@ -178,11 +179,11 @@
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
-   93.2,
-   234,
-   83.3,
+   93.8,
+   242,
+   84.3,
    108,
-   "54, 59, 62, 72, 82, 84, 86, 98, 102, 116, 125, 130, 198, 244, 247, 255"
+   "57, 62, 65, 75, 85, 87, 89, 101, 105, 119, 128, 133, 210, 257, 260"
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
@@ -209,20 +210,20 @@
    "70-72"
   ],
   [
+   "ifps_ems/learner.py",
+   96.5,
+   173,
+   86.7,
+   60,
+   "59-60, 68, 158, 163, 251"
+  ],
+  [
    "ifps_ems/__main__.py",
    97.6,
    41,
    75.0,
    8,
    "53"
-  ],
-  [
-   "ifps_ems/learner.py",
-   97.7,
-   173,
-   88.3,
-   60,
-   "68, 158, 163, 251"
   ],
   [
    "ifps_ems/security.py",
@@ -694,7 +695,7 @@
   ]
  },
  "metrics": {
-  "n_func": 447,
+  "n_func": 449,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -754,9 +755,9 @@
    [
     "ifps_ems_rt/hmi/scenarios.py",
     "run_case",
-    153,
+    164,
     20,
-    57,
+    59,
     5,
     4
    ],
@@ -810,9 +811,9 @@
    [
     "ifps_ems_rt/hmi/scenarios.py",
     "run_case",
-    153,
+    164,
     20,
-    57,
+    59,
     5,
     4
    ],
@@ -855,7 +856,7 @@
    [
     "ifps_ems_rt/hmi/scenarios.py",
     "check_expectation",
-    212,
+    225,
     11,
     37,
     4,
@@ -1025,7 +1026,7 @@
    ],
    [
     "ifps_ems_rt/hmi/scenarios.py",
-    304
+    317
    ],
    [
     "ifps_ems_rt/hmi/cfgedit.py",
@@ -1168,7 +1169,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 4955,
+   "loc": 4963,
    "nosec": 0,
    "skipped_tests": 9
   },
@@ -1248,10 +1249,10 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.52,
- "cc_n": 461,
+ "cc_avg": 5.51,
+ "cc_n": 463,
  "cc_rank": {
-  "A": 289,
+  "A": 291,
   "B": 104,
   "C": 68,
   "D": 0,
@@ -1343,7 +1344,7 @@
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
-   12.7,
+   15.5,
    "B"
   ],
   [
@@ -1504,8 +1505,8 @@
  ],
  "loc_py": {
   "files": 36,
-  "sloc": 4155,
-  "comments": 501
+  "sloc": 4163,
+  "comments": 502
  },
  "js": [
   [
@@ -1535,7 +1536,12 @@
   ],
   [
    "ifps_ems_rt/hmi/static/scenarios.js",
-   460,
+   517,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/scentopo.js",
+   160,
    true
   ],
   [

@@ -14,6 +14,9 @@ MAX_CASES = 20
 MAX_STEPS = 30
 TICK_MS = 50
 MAX_MS = 10000
+# 구성도 재생용으로 단계마다 남기는 상태: 차단기·고장 코드·부하 차단·모선, 장비의 운전 상태·출력·충전율
+SNAP_PREFIX = ("CB.", "FLT.", "LDS.", "BUS.", "LOAD.")
+SNAP_SUFFIX = (".status", ".kw", ".soc")
 OPS = {"eq": lambda a, b: math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9),
        "ge": operator.ge, "le": operator.le}
 
@@ -150,6 +153,14 @@ def _send_command(plant, step, sequences):
     return seq
 
 
+def _watch(pts):
+    return [p["tag"] for p in pts if p["tag"].startswith(SNAP_PREFIX) or p["tag"].endswith(SNAP_SUFFIX)]
+
+
+def _snapshot(plant, watch):
+    return {tag: round(plant.get(tag), 2) for tag in watch}
+
+
 def run_case(case, pts, units, profile=None, directory=None):
     plant = Plant(pts, units)
     plant.slow["GDG"] = 5.0
@@ -158,6 +169,7 @@ def run_case(case, pts, units, profile=None, directory=None):
     policy = ScenarioPolicy(profile, plant, sequences, lambda: elapsed / 1000, directory) if profile else None
     rows = []
     skip = 0
+    watch = _watch(pts)
 
     def advance(ms):
         nonlocal elapsed
@@ -199,6 +211,7 @@ def run_case(case, pts, units, profile=None, directory=None):
             elif kind == "expect":
                 row.update(check_expectation(plant, step, advance, sequences))
             row["elapsed"] = elapsed
+            row["snap"] = _snapshot(plant, watch)
             rows.append(row)
             if row["state"] == "fail":
                 break
