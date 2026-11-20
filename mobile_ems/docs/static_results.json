@@ -1,6 +1,6 @@
 {
- "date": "2026-11-20 15:06",
- "unittest_s": 263.2,
+ "date": "2026-11-20 15:30",
+ "unittest_s": 276.4,
  "tests": [
   "test_backups_are_pruned_and_broken_backup_refused | ok",
   "test_pointmap_errors_block_save | ok",
@@ -113,6 +113,8 @@
   "test_plan_restart_after_model_reload_invalidates_timestamp | ok",
   "test_rows_carry_plant_state_for_topology_playback | ok",
   "test_definition_is_checked | ok",
+  "test_extra_feeder_can_count_in_the_load_seen_by_ems | ok",
+  "test_inverse_time_ground_fault_undervoltage_and_breaker_failure | ok",
   "test_relays_trip_selectively_and_backup_acts_only_when_needed | ok",
   "test_shipped_definition_and_presets_are_valid | ok",
   "test_virtual_points_do_not_touch_the_real_point_map | ok",
@@ -135,18 +137,18 @@
   "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
   "test_check_scans_and_module_entry | ok"
  ],
- "n_tests": 132,
+ "n_tests": 134,
  "tests_ok": true,
- "coverage_pct": 92.8,
+ "coverage_pct": 93.0,
  "stmt": {
-  "n": 4109,
-  "hit": 3932,
-  "pct": 95.7
+  "n": 4166,
+  "hit": 3992,
+  "pct": 95.8
  },
  "branch": {
-  "n": 1472,
-  "hit": 1249,
-  "pct": 84.9
+  "n": 1496,
+  "hit": 1273,
+  "pct": 85.1
  },
  "coverage_files": [
   [
@@ -174,14 +176,6 @@
    "27-28, 32-33, 55"
   ],
   [
-   "ifps_ems_rt/hmi/scenextra.py",
-   91.7,
-   108,
-   84.1,
-   44,
-   "82, 121-124, 129-132"
-  ],
-  [
    "ifps_ems_rt/diag.py",
    93.2,
    293,
@@ -190,20 +184,28 @@
    "74, 126-127, 260-261, 306, 318-319, 342, 355, 359, 361, 363, 388-393, 423"
   ],
   [
-   "ifps_ems_rt/hmi/engine.py",
-   93.9,
-   775,
-   79.7,
-   286,
-   "29-30, 55-56, 67-72, 93-94, 182, 187, 192-193, 311-312, 316, 325, 369, 385-386, 400-403, 406-408, 461, 508-509, 602-603, 726-727, 889-894, 906-907, 923-924"
-  ],
-  [
    "ifps_ems_rt/hmi/scenarios.py",
    94.0,
    250,
    84.3,
    108,
    "59, 67, 70, 80, 90, 92, 94, 106, 110, 124, 133, 138, 217, 264, 267"
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   94.1,
+   775,
+   80.1,
+   286,
+   "29-30, 55-56, 67-72, 93-94, 187, 192-193, 311-312, 316, 325, 369, 385-386, 400-403, 406-408, 461, 508-509, 602-603, 726-727, 889-894, 906-907, 923-924"
+  ],
+  [
+   "ifps_ems_rt/hmi/scenextra.py",
+   94.5,
+   165,
+   86.8,
+   68,
+   "111, 154-157, 162-165"
   ],
   [
    "ifps_ems/nowcast.py",
@@ -222,20 +224,20 @@
    "70-72"
   ],
   [
-   "ifps_ems/learner.py",
-   96.5,
-   173,
-   86.7,
-   60,
-   "59-60, 68, 158, 163, 251"
-  ],
-  [
    "ifps_ems/__main__.py",
    97.6,
    41,
    75.0,
    8,
    "53"
+  ],
+  [
+   "ifps_ems/learner.py",
+   97.7,
+   173,
+   88.3,
+   60,
+   "68, 158, 163, 251"
   ],
   [
    "ifps_ems/security.py",
@@ -707,7 +709,7 @@
   ]
  },
  "metrics": {
-  "n_func": 467,
+  "n_func": 475,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1053,6 +1055,10 @@
     248
    ],
    [
+    "ifps_ems_rt/hmi/scenextra.py",
+    241
+   ],
+   [
     "ifps_ems/forecast.py",
     236
    ],
@@ -1067,10 +1073,6 @@
    [
     "ifps_ems_rt/simplant.py",
     165
-   ],
-   [
-    "ifps_ems_rt/hmi/scenextra.py",
-    163
    ],
    [
     "ifps_ems/supervisor.py",
@@ -1185,7 +1187,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 5099,
+   "loc": 5168,
    "nosec": 0,
    "skipped_tests": 9
   },
@@ -1265,12 +1267,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.5,
- "cc_n": 481,
+ "cc_avg": 5.52,
+ "cc_n": 489,
  "cc_rank": {
-  "A": 302,
-  "B": 109,
-  "C": 70,
+  "A": 305,
+  "B": 113,
+  "C": 71,
   "D": 0,
   "E": 0,
   "F": 0
@@ -1364,6 +1366,11 @@
    "B"
   ],
   [
+   "ifps_ems_rt/hmi/scenextra.py",
+   25.3,
+   "A"
+  ],
+  [
    "ifps_ems/forecast.py",
    27.4,
    "A"
@@ -1386,11 +1393,6 @@
   [
    "ifps_ems/nowcast.py",
    36.8,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/hmi/scenextra.py",
-   37.1,
    "A"
   ],
   [
@@ -1526,8 +1528,8 @@
  ],
  "loc_py": {
   "files": 37,
-  "sloc": 4282,
-  "comments": 516
+  "sloc": 4341,
+  "comments": 528
  },
  "js": [
   [
@@ -1557,12 +1559,12 @@
   ],
   [
    "ifps_ems_rt/hmi/static/scenarios.js",
-   554,
+   593,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/scentopo.js",
-   178,
+   186,
    true
   ],
   [

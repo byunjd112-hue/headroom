@@ -50,6 +50,38 @@ class TestScenarioExtra(unittest.TestCase):
         self.assertTrue(r["ok"])                                                                                # 정한 시간 안에 내려가면 동작하지 않는다
         self.assertIn("CB.L4", r["rows"][-1]["snap"]); self.assertIn("TR9.load_pct", r["rows"][-1]["snap"])
 
+    def _run(self, extra, steps, profile=None):
+        self.assertEqual(scenextra.save(self.cfg, extra, self.base), []); pts, dev = scenarios.load_profile(self.cfg)
+        return scenarios.verify([{"name": "t", "steps": steps}], pts, dev, profile=self.cfg)["results"][0]
+
+    def test_inverse_time_ground_fault_undervoltage_and_breaker_failure(self):
+        inv = {"feeders": [], "transformers": [], "relays": [{"id": "51", "kind": "oc", "cb": "L3", "sum": ["L3"], "pickup": 50, "curve": "vi", "tms": 0.05}]}
+        t = []
+        for kw in (75, 150):                                                # 반한시: 넘는 정도가 클수록 빨리 동작한다(강반한시 1.5배 1.35초, 3배 0.34초)
+            r = self._run(inv, [{"type": "set", "tag": "LOAD.p3_kw", "value": kw}, EX("CB.L3", 2, 3000)]); self.assertTrue(r["ok"]); t.append(r["rows"][-1]["elapsed"])
+        self.assertGreater(t[0], 1200); self.assertLess(t[0], 1500); self.assertGreater(t[1], 250); self.assertLess(t[1], 450)
+        gf = {"feeders": [], "transformers": [], "relays": [{"id": "64", "kind": "gf", "cb": "L2", "on": "L2", "pickup": 30, "delay_ms": 100}]}
+        r = self._run(gf, [{"type": "set", "tag": "GF.L2", "value": 20}, {"type": "wait", "ms": 400}, EX("CB.L2", 1), {"type": "set", "tag": "GF.L2", "value": 45}, EX("CB.L2", 2, 300), EX("FLT.L2", 64), EX("CB.L3", 1)])
+        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] == "fail"])
+        uv = {"feeders": [], "transformers": [], "relays": [{"id": "27", "kind": "uv", "cb": "L3", "bus": "B", "pickup": 300, "delay_ms": 300}]}
+        dead = [{"type": "set", "tag": t2, "value": 0} for t2 in ("CB.TIE", "CB.ESS", "CB.G1")]
+        r = self._run(uv, dead + [{"type": "wait", "ms": 800}, EX("BUS.b_v", 0), EX("CB.L3", 1)]); self.assertTrue(r["ok"])                   # 정상 전압을 본 적이 없으면 동작하지 않는다
+        r = self._run(uv, [{"type": "wait", "ms": 200}] + dead + [EX("CB.L3", 2, 600), EX("FLT.L3", 27)]); self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] == "fail"])
+        bf = {"feeders": [], "transformers": [], "relays": [{"id": "51", "kind": "oc", "cb": "L3", "sum": ["L3"], "pickup": 50, "delay_ms": 100, "backup": "TIE", "bf_ms": 300}]}
+        r = self._run(bf, [{"type": "set", "tag": "STK.L3", "value": 1}, {"type": "set", "tag": "LOAD.p3_kw", "value": 90}, {"type": "wait", "ms": 250}, EX("CB.L3", 1), EX("FLT.L3", 51), EX("CB.TIE", 1), EX("CB.TIE", 2, 400), EX("FLT.TIE", 50)])
+        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] == "fail"])
+        r = self._run(bf, [{"type": "set", "tag": "LOAD.p3_kw", "value": 90}, EX("CB.L3", 2, 300), {"type": "wait", "ms": 600}, EX("CB.TIE", 1)]); self.assertTrue(r["ok"])     # 차단기가 정상이면 후비는 동작하지 않는다
+        bad = {"feeders": [], "transformers": [], "relays": [{"id": "x", "kind": "uv", "cb": "L3", "bus": "B", "pickup": 300, "curve": "si"}, {"id": "y", "kind": "oc", "cb": "L3", "sum": ["L3"], "pickup": 50, "backup": "L3"}, {"id": "z", "kind": "zz", "cb": "L3"}]}
+        self.assertEqual(len(scenextra.check(bad, self.base)), 3)
+
+    def test_extra_feeder_can_count_in_the_load_seen_by_ems(self):
+        ex = {"feeders": [{"id": "L4", "name": "정비고", "kind": "load", "bus": "B", "kw": 40, "ems": True, "photo": "l3"}, {"id": "G9", "name": "임시 전원", "kind": "src", "bus": "A", "kw": 15, "ems": True},
+                          {"id": "L5", "name": "수급 제외", "kind": "load", "bus": "B", "kw": 99}], "transformers": [], "relays": []}
+        r = self._run(ex, [{"type": "wait", "ms": 100}, EX("LOAD.kw", 105), {"type": "set", "tag": "CB.L4", "value": 0}, {"type": "wait", "ms": 100}, EX("LOAD.kw", 65),      # 80 + 40 − 15, 차단기를 열면 빠진다
+                           {"type": "set", "tag": "LOAD.kw", "value": 200}, {"type": "set", "tag": "CB.L4", "value": 1}, {"type": "wait", "ms": 100}, EX("LOAD.kw", 225)])         # 시험이 새 값을 넣으면 그 값이 기준
+        self.assertTrue(r["ok"], [(x["step"], x.get("actual")) for x in r["rows"] if x["state"] == "fail"])
+        bad = json.loads(json.dumps(ex)); bad["feeders"][0]["photo"] = "../x"; bad["feeders"][1]["ems"] = "yes"; self.assertEqual(len(scenextra.check(bad, self.base)), 2)
+
     def test_shipped_definition_and_presets_are_valid(self):
         base = [p for p in scenarios.load_profile(ROOT / "config/runtime.json")[0] if not p.get("virtual")]
         shipped = json.loads((ROOT / "config" / scenextra.FILE).read_text(encoding="utf-8")); self.assertEqual(scenextra.check(shipped, base), [])

@@ -69,7 +69,7 @@ b.push(H2("3.7 운전 시나리오 검증"));
   b.push(TBL(["구분", "결과"], [["운전 모드 조합", `${SC.mode_pass} / ${SC.mode_total} 통과`], ["전체(최초 실행)", `${SC.first_pass} / ${SC.total} 통과`], ["대기 시간 조정 후 재시험", `${SC.retest_pass} / ${SC.total} 통과`]], [40, 60], { bold: [0] })); b.push(GAP());
   b.push(TBL(["번호", "시나리오", "단계 수", "최초", "재시험"], SC.results.map((r, i) => [i + 1, r.name, r.steps, r.ok ? "통과" : { t: `실패(단계 ${r.fail_step + 1})`, c: "C00000" }, SC.retest[i].ok ? "통과" : { t: "실패", c: "C00000" }]), [8, 52, 12, 16, 12], { center: [0, 2, 3, 4] })); b.push(GAP());
   b.push(P(ch ? `최초 실행에서 실패한 한 건(${ch.name})은 일부러 넣은 고장 시험이다. 장치의 상태 전환을 늦춘 뒤 지령의 '수용 응답(seq_ack)'과 '운전 완료(status)'를 따로 판정하며, 대기 ${ch.before} ms 에서 실패하고 검증기가 제안한 ${ch.after} ms 로 다시 돌려 통과했다. 이 값은 가상 시험의 대기 시간일 뿐이며 현장의 보호 설정이나 완료 한도(done_s)에 그대로 쓰지 않는다.` : "실패한 시나리오는 없었다."));
-  b.push(P("보호 협조 시나리오는 시나리오용 추가 설비(config/scenario_extra.json — 수전 변압기 1대, 과전류 계전기 4개)로 돌린다. 계전기 정정값은 시험용 가정값이며 실제 값은 보호 협조 검토서로 정한다."));
+  b.push(P("보호 협조 시나리오는 시나리오용 추가 설비(config/scenario_extra.json — 수전 변압기 1대, 계전기 6개: 과전류 4·지락 1·부족전압 1)로 돌린다. 반한시 특성은 IEC 60255 의 표준·강·초 반한시 식을 쓰고, 차단 실패는 차단기가 열리지 않는 상태를 모사해 후비 차단기의 동작을 본다. 계전기 정정값은 시험용 가정값이며 실제 값은 보호 협조 검토서로 정한다."));
   b.push(P("검증 범위: 모의 시험은 화면부의 급전 판단과 가상 장치의 응답을 대상으로 한다. 실장비의 통신·절체 성능은 FAT·SAT 결과가 필요하다. 재현: python -m tools.scenario_report")); }
 b.push(H2("3.8 예측 독립 시험"));
 { const FB = JSON.parse(fs.readFileSync(__dirname + "/forecast_benchmark.json", "utf8")), g = (k, h, i) => { const v = FB.runs.map(r => r.targets[k][i ? "enhanced" : "baseline"][h]); return [Math.min(...v.map(x => x.nmae_pct)), Math.max(...v.map(x => x.nmae_pct)), Math.min(...v.map(x => x.coverage_pct)), Math.max(...v.map(x => x.coverage_pct))]; }, r2 = (a, i) => `${a[i].toFixed(2)} ~ ${a[i + 1].toFixed(2)}`;

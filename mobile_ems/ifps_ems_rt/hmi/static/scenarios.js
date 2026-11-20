@@ -11,7 +11,7 @@ const P_SCENARIOS = (() => {
   const metrics = {executed: "급전 판단 실행", writes: "쓰기 건수", tied: "상전 연계", outage: "정전 감지",
     DG: "디젤 목표", FC: "연료전지 목표", GDG: "예비 발전기 목표", ELZ: "수전해 목표", reserve: "예비력 규칙",
     ess_target: "ESS 목표 (kW)", grid_target: "수전 목표 (kW)", full_hours: "전 부하 자립 예상 (h)"};
-  const maxDrafts = 40, maxBatch = 24;
+  const maxDrafts = 48, maxBatch = 32;
   const isModeCase = item => item.steps.some(step => step.type === "policy");
   let cases;
   try { cases = JSON.parse(localStorage.getItem(key)); } catch (_) { /* use built-in presets */ }
@@ -20,7 +20,7 @@ const P_SCENARIOS = (() => {
   cases.slice(0, maxBatch).forEach((_, i) => selected.add(i));
   let output = null, busy = false, mountId = 0, revision = 0, search = "";
   let view = "seq", picked = "", pickedPart = "", playing = null;      // 보기(시퀀스·구성도), 구성도에서 고른 블록, 단계 자동 재생 타이머
-  try { view = localStorage.getItem("ems.scenario.view") === "topo" ? "topo" : "seq"; } catch (_) { /* 기본값 사용 */ }
+  try { const saved = localStorage.getItem("ems.scenario.view"); view = ["topo", "live"].includes(saved) ? saved : "seq"; } catch (_) { /* 기본값 사용 */ }
 
   const scene = () => cases[active];
   const point = tag => config.points.find(p => p.tag === tag);
@@ -117,6 +117,21 @@ const P_SCENARIOS = (() => {
     return `<div class="sp-bar"><div class="sp-ctl">${button("first", "⟲", "", stepIndex === 0)}${button("prev", "◀", "", stepIndex === 0)}${button("play", playing ? "⏸ 멈춤" : "▶ 재생", "pri")}${button("next", "▶", "", stepIndex >= steps.length - 1)}</div>
       <div class="sp-dots">${dots}</div><span class="sp-count">${stepIndex + 1} / ${steps.length} 단계</span></div>
       <div class="sp-now ${row?.state || ""}"><b>${stepIndex + 1}. ${esc(labels[cur.type])}</b> ${esc(description(cur))}${seen ? ` <span>— ${esc(seen)}</span>` : ""}</div>`;
+  }
+
+  // 실시간 보기: 지금 장치에서 읽은 값으로 구성도를 그린다(실장비 모드에서도 열린다 — 표시 전용, 지령은 나가지 않는다)
+  const liveSnap = () => Object.fromEntries(Object.entries(S.snap?.values || {}).map(([k, o]) => [k, o && typeof o === "object" ? o.v : o]).filter(([, v]) => typeof v === "number"));
+  function liveView() {
+    const html = ScTopo.html({steps: [], rows: [{step: 0, snap: liveSnap()}], stepIndex: 0, describe: description, picked: "", part: "", live: true});
+    return `<div class="sq-summary"><span>실시간 상태</span><span class="muted">${S.snap?.sim ? "가상 장치" : "실장비"} · 1초마다 갱신 · 표시 전용(지령 없음)</span><span class="sc-spacer"></span>
+        <span class="sq-legend"><i class="l-pow"></i>전력 흐름</span>${ScTopo.custom() ? button("layout-reset", "배치 초기화") : ""}</div><div class="tp-wrap" id="tpLive">${html}</div>
+      <p class="muted tp-pick">차단기 색: 초록 투입 · 회색 개방 · 빨강 트립. 값이 없는 신호(대응표에 없거나 통신 두절)는 회색으로 보입니다.${S.snap?.sim ? "" : " 시나리오 편집·실행과 추가 설비는 가상 장치 모드에서만 쓸 수 있습니다."}</p>`;
+  }
+  function refreshLive() {
+    const box = $("#tpLive");
+    if (!box || ScTopo.dragging()) return;
+    box.innerHTML = ScTopo.html({steps: [], rows: [{step: 0, snap: liveSnap()}], stepIndex: 0, describe: description, picked: "", part: "", live: true});
+    ScTopo.bind(box, () => {}, refreshLive);
   }
 
   function topology() {
@@ -226,19 +241,19 @@ const P_SCENARIOS = (() => {
       <div class="sc-tabs" aria-label="시나리오 선택">${cases.map((c, i) => `<div class="sc-tab ${i === active ? "on" : ""}">
         <input type="checkbox" data-check="${i}" aria-label="${esc(c.name)} 검증 선택" ${selected.has(i) ? "checked" : ""}>
         <button class="btn sm" type="button" data-case="${i}" aria-pressed="${i === active}">${esc(c.name || "이름 없음")}</button></div>`).join("")}</div>
-      <div class="sc-layout ${view === "topo" ? "wide" : ""}">
+      <div class="sc-layout ${view === "topo" ? "wide" : view === "live" ? "wide live" : ""}">
         <aside class="sc-panel sc-palette"><h3>장비·신호</h3>
           <input class="in" id="scSearch" aria-label="장비·신호 검색" placeholder="장비 또는 신호 검색" value="${esc(search)}">
           <div id="scPalette">${palette()}</div>
         </aside>
         <section class="sc-panel" id="scDrop">
           <label class="sc-name">시나리오 이름 <input class="in" id="scName" maxlength="80" value="${esc(scene().name)}"></label>
-          <div class="sc-actions"><div class="sc-view" role="tablist" aria-label="보기"><button type="button" role="tab" class="btn sm ${view === "seq" ? "pri" : ""}" data-view="seq" aria-selected="${view === "seq"}">시퀀스</button><button type="button" role="tab" class="btn sm ${view === "topo" ? "pri" : ""}" data-view="topo" aria-selected="${view === "topo"}">구성도</button></div><span class="sc-spacer"></span>
+          <div class="sc-actions"><div class="sc-view" role="tablist" aria-label="보기"><button type="button" role="tab" class="btn sm ${view === "seq" ? "pri" : ""}" data-view="seq" aria-selected="${view === "seq"}">시퀀스</button><button type="button" role="tab" class="btn sm ${view === "topo" ? "pri" : ""}" data-view="topo" aria-selected="${view === "topo"}">구성도</button><button type="button" role="tab" class="btn sm ${view === "live" ? "pri" : ""}" data-view="live" aria-selected="${view === "live"}">실시간</button></div><span class="sc-spacer"></span>
             <select class="in" id="scAdd" aria-label="추가할 단계">${Object.entries(labels).map(([id, name]) => option(id, name)).join("")}</select>
             ${button("add", "＋ 단계")}</div>
           ${scene().note ? `<p class="sc-note">${esc(scene().note)}</p>` : ""}
-          ${stepper()}
-          ${view === "topo" ? topology() : `<p class="muted">신호를 누르거나 끌어다 놓아 단계를 만들고, 단계를 끌어 순서를 바꿉니다. 키보드: ↑↓ 선택 · Alt+↑↓ 이동 · Delete 삭제.</p>${sequence()}`}
+          ${view === "live" ? "" : stepper()}
+          ${view === "live" ? liveView() : view === "topo" ? topology() : `<p class="muted">신호를 누르거나 끌어다 놓아 단계를 만들고, 단계를 끌어 순서를 바꿉니다. 키보드: ↑↓ 선택 · Alt+↑↓ 이동 · Delete 삭제.</p>${sequence()}`}
         </section>
         <aside class="sc-panel"><h3>단계 설정 ${scene().steps.length ? "· " + (stepIndex + 1) : ""}</h3>${inspector()}</aside>
       </div>
@@ -247,7 +262,8 @@ const P_SCENARIOS = (() => {
       const item = e.target.closest("[data-point],[data-device],[data-step]");
       if (item) e.dataTransfer.setData("application/x-ems-scenario", JSON.stringify(item.dataset));
     };
-    ScTopo.bind(root, (id, part) => { picked = picked === id && pickedPart === part ? "" : id; pickedPart = picked ? part : ""; paint(); }, paint);
+    if (view === "live") ScTopo.bind(root, () => {}, refreshLive);
+    else ScTopo.bind(root, (id, part) => { picked = picked === id && pickedPart === part ? "" : id; pickedPart = picked ? part : ""; paint(); }, paint);
     const drop = $("#scDrop");
     drop.ondragover = e => { if (e.dataTransfer.types.includes("application/x-ems-scenario")) e.preventDefault(); };
     drop.ondrop = e => {
@@ -277,34 +293,53 @@ const P_SCENARIOS = (() => {
 
   // ── 설비 구성: 시나리오용 추가 설비(모의 급전선·변압기·보호 계전기)를 고친다. 실제 대응표는 바뀌지 않는다
   const EX_COLS = {
-    feeders: [["id", "이름(영문)", "text", "L4"], ["name", "설명", "text", "정비고 부하"], ["kind", "종류", {load: "부하", src: "전원"}], ["bus", "모선", {A: "A", B: "B"}], ["kw", "전력 kW", "number", 40]],
+    feeders: [["id", "이름(영문)", "text", "L4"], ["name", "설명", "text", "정비고 부하"], ["kind", "종류", {load: "부하", src: "전원"}], ["bus", "모선", {A: "A", B: "B"}], ["kw", "전력 kW", "number", 40],
+      ["ems", "EMS 수급 반영", {false: "아니오", true: "예"}], ["photo", "사진", "photo"]],
     transformers: [["id", "이름(영문)", "text", "TR2"], ["name", "설명", "text", "변압기"], ["on", "급전선", "feeder"], ["kva", "정격 kVA", "number", 500], ["pf", "역률", "number", 0.9]],
-    relays: [["id", "이름", "text", "51-L4"], ["name", "설명", "text", "과전류"], ["cb", "차단기", "breaker"], ["sum", "감시 급전선(쉼표로 구분)", "list", "L4"], ["pickup_kw", "정정 kW", "number", 60], ["delay_ms", "시간 ms", "number", 200], ["code", "고장 코드", "number", 51]]};
-  const EX_TITLE = {feeders: "급전선 (차단기 포함)", transformers: "변압기", relays: "보호 계전기 (정한시 과전류)"};
-  function extraDialog() {
+    relays: [["id", "이름", "text", "51-L4"], ["name", "설명", "text", "과전류"], ["kind", "요소", {oc: "과전류(kW)", gf: "지락(A)", uv: "부족전압(V)"}], ["cb", "차단기", "breaker"],
+      ["target", "감시 대상", "text", "L4"], ["pickup", "정정값", "number", 60], ["curve", "시간 특성", {dt: "정한시", si: "표준 반한시", vi: "강반한시", ei: "초반한시"}], ["delay_ms", "시간 ms(정한시)", "number", 200],
+      ["tms", "배율(반한시)", "number", 0.1], ["code", "고장 코드", "number", 51], ["backup", "후비 차단기", "backup"], ["bf_ms", "후비 시간 ms", "number", 300]]};
+  const EX_TITLE = {feeders: "급전선 (차단기 포함)", transformers: "변압기", relays: "보호 계전기 — 과전류 · 지락 · 부족전압, 정한시 · 반한시, 차단 실패 후비"};
+  // 저장 형식 ↔ 편집 형식: 계전기의 감시 대상은 요소에 따라 급전선 목록(과전류)·급전선(지락)·모선(부족전압)이다
+  const relayIn = r => { const kind = r.kind || "oc"; return {id: r.id, name: r.name || "", kind, cb: r.cb, target: kind === "oc" ? (r.sum || []).join(", ") : kind === "gf" ? r.on || "" : r.bus || "B",
+    pickup: r.pickup ?? r.pickup_kw, curve: r.curve || "dt", delay_ms: r.delay_ms ?? 0, tms: r.tms ?? 0.1, code: r.code ?? {oc: 51, gf: 64, uv: 27}[kind], backup: r.backup || "", bf_ms: r.bf_ms ?? 300}; };
+  const relayOut = r => { const o = {id: r.id, name: r.name, kind: r.kind, cb: r.cb, pickup: r.pickup, curve: r.curve, delay_ms: r.delay_ms, tms: r.tms, code: r.code, bf_ms: r.bf_ms};
+    if (r.kind === "oc") o.sum = String(r.target).split(",").map(x => x.trim()).filter(Boolean); else if (r.kind === "gf") o.on = String(r.target).trim(); else o.bus = String(r.target).trim().toUpperCase();
+    if (r.backup) o.backup = r.backup; return o; };
+  let photoNames = null;
+  async function extraDialog() {
     if (!can("engineer")) return loginDialog();
-    const draft = structuredClone(config.extra || {feeders: [], transformers: [], relays: []});
+    if (!photoNames) { try { photoNames = ((await api("/api/photos")).files || []).map(n => n.replace(/\.[a-z]+$/i, "")); } catch (_) { photoNames = []; } }
+    const src = config.extra || {feeders: [], transformers: [], relays: []};
+    const draft = {feeders: structuredClone(src.feeders).map(f => ({...f, ems: String(!!f.ems), photo: f.photo || ""})), transformers: structuredClone(src.transformers), relays: src.relays.map(relayIn)};
     const feeders = () => ["GRID", "PV", "DG", "FC", "GDG", "ESS", "L1", "L2", "L3", "ELZ", ...draft.feeders.map(f => f.id)], breakers = () => [...feeders().filter(x => x !== "ELZ"), "TIE", "G1"];
+    const pick = (list, val, at) => `<select class="in" ${at}>${list.map(k => option(k, k || "—", val)).join("")}</select>`;
     const cell = (key, i, [name, , type], item) => { const val = item[name], at = `data-ex="${key}.${i}.${name}"`;
-      if (typeof type === "object") return `<select class="in" ${at}>${Object.entries(type).map(([k, t]) => option(k, t, val)).join("")}</select>`;
-      if (type === "feeder" || type === "breaker") return `<select class="in" ${at}>${(type === "feeder" ? feeders() : breakers()).map(k => option(k, k, val)).join("")}</select>`;
-      return `<input class="in" ${at} ${type === "number" ? 'type="number" step="any"' : ""} value="${esc(type === "list" ? (val || []).join(", ") : val ?? "")}">`; };
+      if (typeof type === "object") return `<select class="in" ${at}>${Object.entries(type).map(([k, t]) => option(k, t, String(val))).join("")}</select>`;
+      if (type === "feeder") return pick(feeders(), val, at);
+      if (type === "breaker") return pick(breakers(), val, at);
+      if (type === "backup") return pick(["", ...breakers()], val, at);
+      if (type === "photo") return pick(["", ...photoNames], val, at);
+      return `<input class="in" ${at} ${type === "number" ? 'type="number" step="any"' : ""} value="${esc(val ?? "")}">`; };
     const table = key => `<h4>${EX_TITLE[key]} <button type="button" class="btn sm" data-exadd="${key}">＋ 추가</button></h4>
-      ${draft[key].length ? `<table class="ex-tbl"><tr>${EX_COLS[key].map(c => `<th>${c[1]}</th>`).join("")}<th></th></tr>${draft[key].map((item, i) => `<tr>${EX_COLS[key].map(c => `<td>${cell(key, i, c, item)}</td>`).join("")}<td><button type="button" class="btn sm" data-exdel="${key}.${i}">삭제</button></td></tr>`).join("")}</table>` : '<p class="muted">없음</p>'}`;
+      ${draft[key].length ? `<div class="ex-scroll"><table class="ex-tbl"><tr>${EX_COLS[key].map(c => `<th>${c[1]}</th>`).join("")}<th></th></tr>${draft[key].map((item, i) => `<tr>${EX_COLS[key].map(c => `<td>${cell(key, i, c, item)}</td>`).join("")}<td><button type="button" class="btn sm" data-exdel="${key}.${i}">삭제</button></td></tr>`).join("")}</table></div>` : '<p class="muted">없음</p>'}`;
     const draw = box => { box.querySelector("#exBody").innerHTML = ["feeders", "transformers", "relays"].map(table).join(""); };
-    modal(`<div class="wide"><h3>설비 구성 — 시나리오용 추가 설비</h3>
-      <p class="muted">대응표에 아직 없는 급전선·차단기, 변압기, 보호 계전기를 가상 장치에만 추가합니다. 실제 대응표와 운전 설정은 바뀌지 않습니다. 정정값은 시험용 가정값이며 실제 값은 보호 협조 검토서로 정합니다.</p>
+    const fresh = key => Object.fromEntries(EX_COLS[key].map(([n, , t, dflt]) => [n, typeof t === "object" ? Object.keys(t)[0] : t === "feeder" ? "GRID" : t === "breaker" ? "L3" : t === "backup" || t === "photo" ? "" : dflt]));
+    modal(`<div class="wide xl"><h3>설비 구성 — 시나리오용 추가 설비</h3>
+      <p class="muted">대응표에 아직 없는 급전선·차단기, 변압기, 보호 계전기를 가상 장치에만 추가합니다. 실제 대응표와 운전 설정은 바뀌지 않습니다. 정정값은 시험용 가정값이며 실제 값은 보호 협조 검토서로 정합니다.<br>
+      감시 대상: 과전류는 급전선 이름(여럿이면 쉼표), 지락은 급전선 이름 하나, 부족전압은 모선 A 또는 B. 지락 전류는 GF.&lt;급전선&gt;, 차단 실패는 STK.&lt;차단기&gt; = 1 로 시나리오에서 넣습니다.</p>
       <div id="exBody"></div><p class="sc-fail" id="exWhy"></p>
       <div class="sc-actions"><span class="sc-spacer"></span><button type="button" class="btn" id="exClose">닫기</button><button type="button" class="btn pri" id="exSave">저장</button></div></div>`, box => {
       draw(box);
       box.onchange = e => { const k = e.target.dataset.ex; if (!k) return; const [key, i, name] = k.split("."), col = EX_COLS[key].find(c => c[0] === name);
-        draft[key][i][name] = col[2] === "number" ? Number(e.target.value) : col[2] === "list" ? e.target.value.split(",").map(x => x.trim()).filter(Boolean) : e.target.value.trim();
-        if (name === "id") draw(box); };
+        draft[key][i][name] = col[2] === "number" ? Number(e.target.value) : e.target.value.trim();
+        if (name === "id" || name === "kind") { if (key === "relays" && name === "kind") { draft[key][i].target = {oc: "L3", gf: "L3", uv: "B"}[e.target.value]; draft[key][i].code = {oc: 51, gf: 64, uv: 27}[e.target.value]; if (e.target.value === "uv") draft[key][i].curve = "dt"; } draw(box); } };
       box.onclick = async e => { const b = e.target.closest("button"); if (!b) return;
-        if (b.dataset.exadd) { const key = b.dataset.exadd; draft[key].push(Object.fromEntries(EX_COLS[key].map(([n, , t, dflt]) => [n, typeof t === "object" ? Object.keys(t)[0] : t === "feeder" ? "GRID" : t === "breaker" ? "L3" : t === "list" ? [dflt] : dflt]))); return draw(box); }
+        if (b.dataset.exadd) { draft[b.dataset.exadd].push(fresh(b.dataset.exadd)); return draw(box); }
         if (b.dataset.exdel) { const [key, i] = b.dataset.exdel.split("."); draft[key].splice(Number(i), 1); return draw(box); }
         if (b.id === "exClose") return closeModal();
-        if (b.id === "exSave") { const r = await api("/api/scenarios/extra", {extra: draft});
+        if (b.id === "exSave") { const out = {feeders: draft.feeders.map(f => { const o = {...f, ems: f.ems === "true" || f.ems === true}; if (!o.photo) delete o.photo; return o; }), transformers: draft.transformers, relays: draft.relays.map(relayOut)};
+          const r = await api("/api/scenarios/extra", {extra: out});
           if (r.ok === false) { box.querySelector("#exWhy").textContent = r.why || "저장하지 못했습니다"; return; }
           config = await api("/api/scenarios/catalog"); ScTopo.configure(config.extra); output = null; revision++; closeModal(); toast("설비 구성을 저장했습니다", "ok"); paint(); } };
     });
@@ -481,7 +516,7 @@ const P_SCENARIOS = (() => {
     if (el.dataset.check !== undefined) {
       if (el.checked && selected.size >= maxBatch) {
         el.checked = false;
-        return toast("한 번에 최대 24개 시나리오를 검증할 수 있습니다", "bad");
+        return toast("한 번에 최대 32개 시나리오를 검증할 수 있습니다", "bad");
       }
       const i = Number(el.dataset.check);
       if (el.checked) selected.add(i); else selected.delete(i);
@@ -522,9 +557,13 @@ const P_SCENARIOS = (() => {
   return {
     async mount(main) {
       const id = ++mountId;
-      main.innerHTML = `<div class="pagehd"><h1>운영 시나리오</h1><div class="sub">가상 장치에서 운전 순서를 편집하고 여러 시험을 비교합니다.</div></div>
-        <div id="scWorkspace"><p>${S.snap.sim ? "장비·신호 불러오는 중…" : "이 기능은 가상 장치 모드(run_sim)에서 사용할 수 있습니다."}</p></div>`;
-      if (!S.snap.sim) return;
+      main.innerHTML = `<div class="pagehd"><h1>운영 시나리오</h1><div class="sub">${S.snap.sim ? "가상 장치에서 운전 순서를 편집하고 여러 시험을 비교합니다." : "실장비 모드 — 구성도로 현재 상태를 봅니다(표시 전용)."}</div></div>
+        <div id="scWorkspace"><p>장비·신호 불러오는 중…</p></div>`;
+      if (!S.snap.sim) {                                  // 실장비 모드: 구성도로 현재 상태만 보여 준다
+        const box = $("#scWorkspace"); ScTopo.configure(null);
+        box.innerHTML = `<section class="sc-panel">${liveView()}</section>`; box.onclick = e => { if (e.target.closest('[data-sc="layout-reset"]')) { ScTopo.reset(); refreshLive(); } };
+        return ScTopo.bind(box, () => {}, refreshLive);
+      }
       try { config ||= await api("/api/scenarios/catalog"); }
       catch (_) { config = null; }
       const root = $("#scWorkspace");
@@ -549,6 +588,6 @@ const P_SCENARIOS = (() => {
       };
       paint();
     },
-    update() {}
+    update() { refreshLive(); }
   };
 })();

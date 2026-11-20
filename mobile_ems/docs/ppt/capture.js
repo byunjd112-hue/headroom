@@ -36,7 +36,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await p.evaluate(() => { const el = [...document.querySelectorAll("[data-case]")].find(x => x.textContent.includes("3등급 과부하 선택 차단")); const box = el && el.parentElement.querySelector("input"); if (box && !box.checked) box.click(); }); await p.waitForTimeout(500);
   await p.click('[data-sc="verify"]').catch(() => {}); await p.waitForTimeout(6500); await p.evaluate(() => { const el = [...document.querySelectorAll("[data-case]")].find(x => x.textContent.includes("3등급 과부하 선택 차단")); el && el.click(); }); await p.waitForTimeout(600);
   await p.click('.sp-dot[data-step="2"]').catch(() => {}); await p.waitForTimeout(900); await p.evaluate(() => document.querySelector(".tp-wrap")?.scrollIntoView({ block: "center" })); await p.waitForTimeout(400); await p.screenshot({ path: D + "scen_prot.png" });
-  await p.click('[data-sc="extra"]').catch(() => {}); await p.waitForTimeout(800); await p.screenshot({ path: D + "scen_extra.png" }); await p.evaluate(() => closeModal());
+  await p.click('[data-sc="extra"]').catch(() => {}); await p.waitForTimeout(1200); await p.screenshot({ path: D + "scen_extra.png" }); await p.evaluate(() => closeModal());
   await p.click('[data-view="seq"]').catch(() => {}); await p.evaluate(() => { try { localStorage.setItem("ems.scenario.view", "seq"); } catch (_) {} });
   await go("energy", null, 9000); await p.click("#enAi"); await p.waitForTimeout(1500); await p.screenshot({ path: D + "ai_learn.png" }); await p.evaluate(() => closeModal());
   // 2) 고장: 2등급 급전선 과전류 트립 + 연료전지 통신 두절

@@ -30,12 +30,18 @@ const ScTopo = (() => {
     Object.keys(NODES).filter(k => !BASE.includes(k)).forEach(k => delete NODES[k]);
     const used = {};
     for (const f of EXTRA.feeders) { const key = f.bus + f.kind, n = used[key] = (used[key] || 0) + 1, [g0, step] = SLOT[key], gx = Math.round((g0 + step * (n - 1)) * 10) / 10;
-      NODES[f.id] = {name: f.name, kind: f.kind, bus: f.bus, at: [gx, f.kind === "load" ? 7.9 : 0.2], cb: f.id, kw: f.id + ".kw", c: f.kind === "load" ? "#c3a8ee" : "#9ad27a", extra: true}; }
+      NODES[f.id] = {name: f.name, kind: f.kind, bus: f.bus, at: [gx, f.kind === "load" ? 7.9 : 0.2], cb: f.id, kw: f.id + ".kw", c: f.kind === "load" ? "#c3a8ee" : "#9ad27a", extra: true, photo: f.photo || undefined, ems: !!f.ems}; }
+  }
+  // 차단기 옆에 적는 계전기 정정: 요소 번호 ▸ 정정값 · 시간 특성 (→ 후비 차단기)
+  function relayText(r) {
+    const kind = r.kind || "oc", pick = r.pickup ?? r.pickup_kw, curve = r.curve || "dt", code = r.code ?? {oc: 51, gf: 64, uv: 27}[kind];
+    const what = kind === "gf" ? `${pick} A` : kind === "uv" ? `< ${pick} V` : `${pick} kW`, time = curve === "dt" ? `${((r.delay_ms || 0) / 1000).toFixed(1)} s` : `${{si: "표준", vi: "강", ei: "초"}[curve]}반한시 ×${r.tms ?? 0.1}`;
+    return `${code} ▸ ${what} · ${time}${r.backup ? " → 후비 " + r.backup : ""}`;
   }
   const CB_TEXT = {0: "개방", 1: "투입", 2: "트립"}, CB_COLOR = {0: "#8a97a5", 1: "#55d08a", 2: "#ff6b6b"};
   const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const P = (gx, gy) => [(gx - gy) * U, (gx + gy) * V];
-  let layout = {};
+  let layout = {}, busy = false;                              // busy: 블록을 끄는 중(실시간 보기는 그동안 다시 그리지 않는다)
   try { layout = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (_) { layout = {}; }
   const at = id => layout[id] || NODES[id].at;
   // 모선 길이: 붙은 설비가 바깥으로 나가면 그만큼 늘어난다(A 는 왼쪽, B 는 오른쪽)
@@ -48,7 +54,8 @@ const ScTopo = (() => {
   // 신호가 어느 블록에 속하는지: CB.L3 → 차단기 L3, LOAD.p2_kw → L2, GRID.kw → 상전, DG.status → 디젤 …
   function owner(tag, device) {
     const [head, tail = ""] = String(tag || "").split(".");
-    if (head === "CB" || head === "FLT") return {node: Object.keys(NODES).find(k => NODES[k].cb === tail) || (tail === "TIE" ? "TIE" : "MTR"), part: head === "CB" ? "cb" : "flt"};
+    if (head === "GF") return {node: NODES[tail] ? tail : "MTR"};
+    if (head === "CB" || head === "FLT" || head === "STK") return {node: Object.keys(NODES).find(k => NODES[k].cb === tail) || (tail === "TIE" ? "TIE" : "MTR"), part: head === "CB" ? "cb" : "flt"};
     if (head === "LDS") return {node: tail, part: "cb"};
     if (head === "LOAD") return {node: {p1_kw: "L1", p2_kw: "L2", p3_kw: "L3"}[tail] || "MTR"};
     if (head === "BUS") return {node: tail.startsWith("b") ? "BUSB" : "BUSA"};
@@ -93,21 +100,22 @@ const ScTopo = (() => {
     const running = id => { const n = NODES[id]; return id === "GRID" ? cb("GRID") === 1 : n.st ? v(n.st) > 0.5 : Math.abs(v(n.kw) || 0) > 0.5; };
     const feeds = bus => Object.keys(NODES).some(id => NODES[id].kind === "src" && NODES[id].bus === bus && id !== "PV" && running(id) && cb(NODES[id].cb) === 1);
     let liveA = !!snap && feeds("A"), liveB = !!snap && feeds("B"); if (snap && cb("TIE") === 1) liveA = liveB = liveA || liveB;
+    const known = !!snap && Object.keys(snap).some(t => t.startsWith("CB."));          // 차단기 값이 하나도 없으면(통신 두절) 급전 여부를 말하지 않는다
     const live = {A: liveA, B: liveB}, kw = id => NODES[id].kw ? v(NODES[id].kw) : null;
 
     // 모선(배전반)과 연결 차단기
     const bus = ["A", "B"].map(k => [k, BUS[k]]).map(([k, [a, b]]) => { const p = P(a, BUS_GY), q = P(b, BUS_GY);
       return `<g class="tp-bus ${live[k] ? "live" : ""} ${picked === "BUS" + k ? "picked" : ""}" data-node="BUS${k}"><line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" class="slab"/><line x1="${p[0]}" y1="${p[1] - 7}" x2="${q[0]}" y2="${q[1] - 7}" class="bar"/>
-        <text x="${p[0] - 6}" y="${p[1] + 22}" text-anchor="end">주 배전반 ${k} · 모선 ${k}${snap ? (live[k] ? " · 급전 중" : " · 무전압") : ""}</text></g>`; }).join("");
+        <text x="${p[0] - 6}" y="${p[1] + 22}" text-anchor="end">주 배전반 ${k} · 모선 ${k}${snap ? (known ? (live[k] ? " · 급전 중" : " · 무전압") : " · 값 없음") : ""}</text></g>`; }).join("");
     const breaker = (name, gp, ownerId) => { const s = cb(name), p = P(...gp), flt = v("FLT." + name);
       return `<g class="tp-cb ${picked === ownerId && ctx.part ? "picked" : ""}" data-node="${ownerId}" data-part="cb">${box(gp[0], gp[1], 0.3, 11, s === null ? "#5c6875" : CB_COLOR[s])}
-        <text class="tp-cbname" x="${p[0] + 18}" y="${p[1] - 12}">CB.${name}</text><text class="tp-cbst" x="${p[0] + 18}" y="${p[1] + 1}" fill="${s === null ? "#8a97a5" : CB_COLOR[s]}">${s === null ? "—" : CB_TEXT[s]}${s === 2 && flt ? " · 고장 " + flt : ""}</text>
-        ${EXTRA.relays.filter(r => r.cb === name).map((r, i) => `<text class="tp-relay" x="${p[0] + 18}" y="${p[1] + 13 + i * 11}">${r.code} ▸ ${r.pickup_kw} kW · ${(r.delay_ms / 1000).toFixed(1)} s</text>`).join("")}</g>`; };
+        <text class="tp-cbname" x="${p[0] + 18}" y="${p[1] - 12}">CB.${name}</text><text class="tp-cbst" x="${p[0] + 18}" y="${p[1] + 1}" fill="${s === null ? "#8a97a5" : CB_COLOR[s]}">${s === null ? "—" : CB_TEXT[s]}${s === 2 && flt ? " · 고장 " + flt : ""}${v("STK." + name) === 1 ? " · 차단 실패" + (s === 1 && flt ? "(고장 " + flt + ")" : "") : ""}${v("GF." + name) > 0 ? " · 지락 " + v("GF." + name) + " A" : ""}</text>
+        ${EXTRA.relays.filter(r => r.cb === name).map((r, i) => `<text class="tp-relay" x="${p[0] + 18}" y="${p[1] + 13 + i * 11}">${esc(relayText(r))}</text>`).join("")}</g>`; };
     const tieA = P(BUS.A[1], BUS_GY), tieB = P(BUS.B[0], BUS_GY);
     const tie = `<line class="tp-cable ${snap && cb("TIE") === 1 && (liveA || liveB) ? "live" : ""}" x1="${tieA[0]}" y1="${tieA[1] - 4}" x2="${tieB[0]}" y2="${tieB[1] - 4}"/>${breaker("TIE", [TIE_GX, BUS_GY], "TIE")}`;
 
     // 급전선·차단기·장비
-    const order = Object.keys(NODES).sort((a, b) => (at(a)[0] + at(a)[1]) - (at(b)[0] + at(b)[1]));          // 뒤에 있는 것부터 그린다
+    const order = Object.keys(NODES).filter(id => !(ctx.live && id === "TEST")).sort((a, b) => (at(a)[0] + at(a)[1]) - (at(b)[0] + at(b)[1]));          // 뒤에 있는 것부터 그린다
     const cables = order.filter(id => NODES[id].kind !== "ctl").map(id => { const n = NODES[id], a = P(...at(id)), f = P(...foot(id)), k = kw(id) || 0, on = n.cb ? cb(n.cb) === 1 : true;
       const flowing = snap && on && Math.abs(k) > 0.5 && (n.kind === "src" || live[n.bus]), toBus = n.kind === "src" ? k > 0 : false;          // ESS 는 충전(음수)이면 모선 → 장비
       const d = toBus ? `M${a[0]} ${a[1] - 4}L${f[0]} ${f[1] - 4}` : `M${f[0]} ${f[1] - 4}L${a[0]} ${a[1] - 4}`;
@@ -116,15 +124,15 @@ const ScTopo = (() => {
     const trs = EXTRA.transformers.filter(t => NODES[t.on]).map(t => { const g = mid(at(t.on), foot(t.on), 0.24), p = P(...g), pct = v(t.id + ".load_pct");
       return `<g class="tp-tr" data-node="${t.on}">${box(g[0], g[1], 0.26, 16, pct !== null && pct > 100 ? "#ff6b6b" : "#b9a37a")}<text class="tp-cbname" x="${p[0] - 16}" y="${p[1] - 20}" text-anchor="end">${esc(t.id)} · ${t.kva} kVA</text>
         ${pct === null ? "" : `<text class="tp-cbst" x="${p[0] - 16}" y="${p[1] - 7}" text-anchor="end" fill="${pct > 100 ? "#ff6b6b" : "#e8dcc0"}">부하율 ${pct.toFixed(0)}%</text>`}</g>`; }).join("");
-    const nodes = order.map(id => { const n = NODES[id], [gx, gy] = at(id), p = P(gx, gy), k = kw(id), run = snap && n.kind !== "ctl" ? running(id) : null;
-      const cut = n.kind === "load" && n.cb && snap && cb(n.cb) !== 1;                 // 부하 차단기가 열려 있으면 급전되지 않는다(표시값은 부하 요구량)
-      const chip = !snap || n.kind === "ctl" ? "" : cut ? `급전 차단${k ? " · 요구 " + k.toFixed(0) + " kW" : ""}` : [k === null ? "" : `${k.toFixed(k % 1 ? 1 : 0)} kW`, n.soc && v(n.soc) !== null ? `SOC ${v(n.soc)}%` : "", n.st ? (run ? "운전" : "정지") : ""].filter(Boolean).join(" · ");
+    const nodes = order.map(id => { const n = NODES[id], [gx, gy] = at(id), p = P(gx, gy), k = kw(id), seen = id === "GRID" ? cb("GRID") !== null : v(n.st || n.kw) !== null, run = snap && n.kind !== "ctl" && seen ? running(id) : null;
+      const cut = n.kind === "load" && n.cb && snap && cb(n.cb) !== null && cb(n.cb) !== 1;                 // 부하 차단기가 열려 있으면 급전되지 않는다(표시값은 부하 요구량)
+      const chip = !snap || n.kind === "ctl" ? "" : !seen && k === null ? "값 없음" : cut ? `급전 차단${k ? " · 요구 " + k.toFixed(0) + " kW" : ""}` : [k === null ? "" : `${k.toFixed(k % 1 ? 1 : 0)} kW`, n.soc && v(n.soc) !== null ? `SOC ${v(n.soc)}%` : "", n.st ? (run ? "운전" : "정지") : ""].filter(Boolean).join(" · ");
       const card = n.icon ? `<g transform="translate(${p[0]} ${p[1] - 40})" stroke="${n.c}" fill="none" class="tp-icon"><circle r="27" fill="#16201e" stroke-width="2"/>${ICON[n.icon]}</g>`
         : `<g class="tp-card"><rect x="${p[0] - 37}" y="${p[1] - 66}" width="74" height="50" rx="6" fill="#16201e" stroke="${n.c}" stroke-width="2"/>
             <text x="${p[0]}" y="${p[1] - 36}" text-anchor="middle" fill="${n.c}" class="tp-code">${id}</text>
             ${n.photo ? `<image href="photos/${n.photo}.jpg" x="${p[0] - 35}" y="${p[1] - 64}" width="70" height="46" preserveAspectRatio="xMidYMid slice" clip-path="inset(0 round 4px)" onerror="this.remove()"/>` : ""}</g>`;
       return `<g class="tp-node ${cut ? "off" : run === true ? "on" : run === false ? "off" : ""} ${picked === id && !ctx.part ? "picked" : ""}" data-node="${id}" tabindex="0" role="button" aria-label="${esc(n.name)}">
-        ${box(gx, gy, 0.52, 10, n.c)}${card}<text class="tp-name" x="${p[0]}" y="${p[1] - (chip ? 86 : 72)}" text-anchor="middle">${esc(n.name)}${n.extra ? " ＊" : ""}</text>
+        ${box(gx, gy, 0.52, 10, n.c)}${card}<text class="tp-name" x="${p[0]}" y="${p[1] - (chip ? 86 : 72)}" text-anchor="middle">${esc(n.name)}${n.extra ? (n.ems ? " ＊수급" : " ＊") : ""}</text>
         ${chip ? `<text class="tp-chip" x="${p[0]}" y="${p[1] - 72}" text-anchor="middle">${esc(chip)}</text>` : ""}</g>`; }).join("");
 
     // 지금 단계의 신호 흐름
@@ -140,7 +148,7 @@ const ScTopo = (() => {
           <circle cx="${b[0]}" cy="${b[1]}" r="20" fill="none" stroke="${col}" class="ping"/>
           <text class="tp-say" x="${lab[0]}" y="${lab[1]}" text-anchor="middle">${esc(text)}</text>${seen ? `<text class="tp-seen ${st}" x="${lab[0]}" y="${lab[1] + 16}" text-anchor="middle">${esc(seen)}</text>` : ""}</g>`; } }
 
-    const xs = Object.keys(NODES).map(id => P(...at(id))), minX = Math.min(...xs.map(p => p[0])) - 80, maxX = Math.max(...xs.map(p => p[0])) + 100, minY = Math.min(...xs.map(p => p[1])) - 120, maxY = Math.max(...xs.map(p => p[1])) + 50;
+    const xs = order.map(id => P(...at(id))), minX = Math.min(...xs.map(p => p[0])) - 80, maxX = Math.max(...xs.map(p => p[0])) + 100, minY = Math.min(...xs.map(p => p[1])) - 120, maxY = Math.max(...xs.map(p => p[1])) + 50;
     return `<svg class="tp-svg" viewBox="${minX} ${minY} ${maxX - minX} ${maxY - minY}" role="img" aria-label="장비·배전반·차단기 구성도">
       <defs><marker id="tpHead" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="12" refX="12" refY="6" orient="auto" viewBox="0 0 10 9" preserveAspectRatio="none"><path d="M0 0L10 4.5L0 9z" fill="currentColor"/></marker></defs>
       ${bus}${tie}${cables}${cbs}${trs}${nodes}${signal}</svg>
@@ -160,19 +168,19 @@ const ScTopo = (() => {
   // 끌어서 배치 바꾸기(화면 좌표 → 격자 좌표, 0.1 칸 단위)
   function bind(root, onPick, onMoved) {
     const svg = root.querySelector(".tp-svg"); if (!svg) return;
-    let drag = null;
+    let drag = null; busy = false;
     svg.onpointerdown = e => { const g = e.target.closest("[data-node]"); if (!g) return; const id = g.dataset.node;
-      drag = {id, part: g.dataset.part || "", x: e.clientX, y: e.clientY, moved: false, start: NODES[id] && !g.dataset.part ? [...at(id)] : null}; svg.setPointerCapture(e.pointerId); };
+      drag = {id, part: g.dataset.part || "", x: e.clientX, y: e.clientY, moved: false, start: NODES[id] && !g.dataset.part ? [...at(id)] : null}; busy = true; svg.setPointerCapture(e.pointerId); };
     svg.onpointermove = e => { if (!drag?.start) return; const m = svg.getScreenCTM(), dx = (e.clientX - drag.x) / m.a, dy = (e.clientY - drag.y) / m.d;
       if (Math.abs(dx) + Math.abs(dy) < 6 && !drag.moved) return; drag.moved = true;
       const gx = drag.start[0] + (dx / U + dy / V) / 2, gy = drag.start[1] + (dy / V - dx / U) / 2; layout[drag.id] = [Math.round(gx * 10) / 10, Math.round(gy * 10) / 10];
       const g = svg.querySelector(`.tp-node[data-node="${drag.id}"]`), p0 = P(...drag.start), p1 = P(...layout[drag.id]); if (g) g.setAttribute("transform", `translate(${p1[0] - p0[0]} ${p1[1] - p0[1]})`); };
-    svg.onpointerup = e => { if (!drag) return; const d = drag; drag = null;
+    svg.onpointerup = e => { if (!drag) return; const d = drag; drag = null; busy = false;
       if (d.moved) { try { localStorage.setItem(KEY, JSON.stringify(layout)); } catch (_) { /* 저장 실패는 무시(배치만 초기 상태로 돌아간다) */ } return onMoved(); }
       onPick(d.id, d.part); };
     svg.onkeydown = e => { const g = e.target.closest?.("[data-node]"); if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onPick(g.dataset.node, g.dataset.part || ""); } };
   }
   function reset() { layout = {}; try { localStorage.removeItem(KEY); } catch (_) { /* 무시 */ } }
   const custom = () => Object.keys(layout).length > 0;
-  return {html, bind, reset, custom, tagsOf, title, owner, configure, base: BASE};
+  return {html, bind, reset, custom, tagsOf, title, owner, configure, base: BASE, dragging: () => busy};
 })();

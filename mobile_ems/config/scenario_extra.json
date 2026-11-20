@@ -13,47 +13,79 @@
   {
    "id": "51-L1",
    "name": "1등급 부하 과전류",
+   "kind": "oc",
    "cb": "L1",
    "sum": [
     "L1"
    ],
-   "pickup_kw": 120,
+   "pickup": 120,
+   "curve": "dt",
    "delay_ms": 400,
    "code": 51
   },
   {
    "id": "51-L2",
-   "name": "2등급 부하 과전류",
+   "name": "2등급 부하 과전류(반한시)",
+   "kind": "oc",
    "cb": "L2",
    "sum": [
     "L2"
    ],
-   "pickup_kw": 150,
-   "delay_ms": 300,
+   "pickup": 150,
+   "curve": "si",
+   "tms": 0.02,
    "code": 51
   },
   {
    "id": "51-L3",
    "name": "3등급 부하 과전류",
+   "kind": "oc",
    "cb": "L3",
    "sum": [
     "L3"
    ],
-   "pickup_kw": 150,
+   "pickup": 150,
+   "curve": "dt",
    "delay_ms": 200,
-   "code": 51
+   "code": 51,
+   "backup": "TIE",
+   "bf_ms": 300
   },
   {
    "id": "51-TIE",
    "name": "모선 B 후비 과전류",
+   "kind": "oc",
    "cb": "TIE",
    "sum": [
     "L2",
     "L3"
    ],
-   "pickup_kw": 280,
+   "pickup": 280,
+   "curve": "dt",
    "delay_ms": 700,
    "code": 51
+  },
+  {
+   "id": "51N-L3",
+   "name": "3등급 급전선 지락",
+   "kind": "gf",
+   "cb": "L3",
+   "on": "L3",
+   "pickup": 30,
+   "curve": "dt",
+   "delay_ms": 100,
+   "code": 64
+  },
+  {
+   "id": "27-B",
+   "name": "모선 B 부족전압 시 3등급 차단",
+   "kind": "uv",
+   "cb": "L3",
+   "bus": "B",
+   "pickup": 300,
+   "curve": "dt",
+   "delay_ms": 500,
+   "code": 27
   }
  ]
 }
