@@ -54,7 +54,10 @@
     "ms": 1000,
     "limit": 1000
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "MANUAL · 작전지 · 평시",
@@ -122,7 +125,10 @@
     "ms": 1000,
     "limit": 1000
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "AUTO · 작전지 · 저소음",
@@ -200,7 +206,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "MANUAL · 작전지 · 저소음",
@@ -273,7 +282,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "AUTO · 작전지 · 자립",
@@ -362,7 +374,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "MANUAL · 작전지 · 자립",
@@ -435,7 +450,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "AUTO · 주둔지 · 평시",
@@ -532,7 +550,10 @@
     "ms": 500,
     "limit": 500
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "MANUAL · 주둔지 · 평시",
@@ -605,7 +626,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "AUTO · 주둔지 · 저소음",
@@ -728,7 +752,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "MANUAL · 주둔지 · 저소음",
@@ -801,7 +828,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "AUTO · 주둔지 · 자립",
@@ -909,7 +939,10 @@
     "ms": 6500,
     "limit": 6500
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "MANUAL · 주둔지 · 자립",
@@ -977,7 +1010,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 운전 모드",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "작전지 · PV·ESS 정상 자립",
@@ -1042,7 +1078,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 장비 시퀀스",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "작전지 · PV 급감과 디젤 인수",
@@ -1107,7 +1146,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 장비 시퀀스",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "고장 시험 · 디젤 기동 응답 지연",
@@ -1139,7 +1181,10 @@
     "ms": 500,
     "limit": 1500
    }
-  ]
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-14",
+  "fat": "장치별 기동 시간 실측표와 설정값 대조(회귀 시험 R-09a)"
  },
  {
   "name": "작전지 · 연료전지 출력 분담",
@@ -1205,7 +1250,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 장비 시퀀스",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "작전지 · PV 잉여와 수전해 투입",
@@ -1291,7 +1339,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 장비 시퀀스",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "배전 · 우선순위 부하 차단·복구",
@@ -1381,7 +1432,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 장비 시퀀스",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "주둔지 · 정전·예비 발전기·복전",
@@ -1517,7 +1571,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-33",
+  "fat": "복전 시험 3회: 절차 순서와 인터록 동작 기록"
  },
  {
   "name": "보호 모의 · 상전 역송 검출",
@@ -1578,7 +1635,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-29",
+  "fat": "부하 50% 급감 시험에서 역송 0, 계전기 부동작 확인"
  },
  {
   "name": "보호 협조 · 3등급 과부하 선택 차단",
@@ -1641,7 +1701,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "보호 협조 (FAT 시험 항목)",
+  "ref": "",
+  "fat": "실장비에서는 보호 협조 검토서의 정정값으로 계전기 시험을 한다(이 값은 시험용 가정값)"
  },
  {
   "name": "보호 협조 · 모선 B 합계 과부하 후비 차단",
@@ -1701,7 +1764,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "보호 협조 (FAT 시험 항목)",
+  "ref": "",
+  "fat": "실장비에서는 보호 협조 검토서의 정정값으로 계전기 시험을 한다(이 값은 시험용 가정값)"
  },
  {
   "name": "주둔지 · 수전 변압기 부하율",
@@ -1750,7 +1816,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "정상 운전 · 장비 시퀀스",
+  "ref": "",
+  "fat": ""
  },
  {
   "name": "보호 협조 · 반한시 과전류(2등급)",
@@ -1797,7 +1866,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "보호 협조 (FAT 시험 항목)",
+  "ref": "",
+  "fat": "실장비에서는 보호 협조 검토서의 정정값으로 계전기 시험을 한다(이 값은 시험용 가정값)"
  },
  {
   "name": "보호 협조 · 지락 검출(3등급)",
@@ -1840,7 +1912,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "보호 협조 (FAT 시험 항목)",
+  "ref": "",
+  "fat": "실장비에서는 보호 협조 검토서의 정정값으로 계전기 시험을 한다(이 값은 시험용 가정값)"
  },
  {
   "name": "보호 협조 · 부족전압 시 3등급 차단",
@@ -1901,7 +1976,10 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "보호 협조 (FAT 시험 항목)",
+  "ref": "",
+  "fat": "실장비에서는 보호 협조 검토서의 정정값으로 계전기 시험을 한다(이 값은 시험용 가정값)"
  },
  {
   "name": "보호 협조 · 차단 실패 후비 동작",
@@ -1953,6 +2031,701 @@
     "ms": 0,
     "limit": 0
    }
-  ]
+  ],
+  "cat": "보호 협조 (FAT 시험 항목)",
+  "ref": "FM-22",
+  "fat": "실장비에서는 보호 협조 검토서의 정정값으로 계전기 시험을 한다(이 값은 시험용 가정값)"
+ },
+ {
+  "name": "고장 대응 · 디젤 지령 무응답 → 연료전지 대체",
+  "note": "디젤이 기동 지령에 답하지 않는 상황을 만들고, 운전 상태가 바뀌지 않았음을 확인한 뒤 연료전지를 대신 기동해 ESS 부담이 줄어드는지 봅니다. EMS 의 자동 재지령·대체 전원 순서는 회귀 시험에서 따로 확인합니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 100
+   },
+   {
+    "type": "set",
+    "tag": "PV.kw",
+    "value": 10
+   },
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "response",
+    "device": "DG",
+    "ms": -1
+   },
+   {
+    "type": "command",
+    "device": "DG",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "command",
+    "device": "FC",
+    "value": 1
+   },
+   {
+    "type": "expect",
+    "tag": "FC.seq_ack",
+    "value": 1,
+    "op": "eq",
+    "ms": 500,
+    "limit": 500
+   },
+   {
+    "type": "expect",
+    "tag": "FC.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "wait",
+    "ms": 200
+   },
+   {
+    "type": "expect",
+    "tag": "FC.kw",
+    "value": 0,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "ESS.kw",
+    "value": 90,
+    "op": "le",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-13",
+  "fat": "응답 없음 모의 시 재지령 → 취소 → 대체 전원 순서 확인"
+ },
+ {
+  "name": "고장 대응 · 디젤 현장 수동 중 저충전",
+  "note": "디젤이 현장 수동(EMS 지령을 받지 않음)인 채 충전율이 낮아진 상황입니다. EMS 가 디젤과 연료전지를 모두 필요로 판단하고, 받을 수 있는 연료전지가 기동하며 디젤은 정지로 남는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "set",
+    "tag": "DG.mode",
+    "value": 1
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "executed",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "FC",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "FC.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "C-05",
+  "fat": "결정된 방식으로 정전 시험, 중복 지령 0건"
+ },
+ {
+  "name": "고장 대응 · 수소 부족 시 디젤 단독 투입",
+  "note": "수소가 하한 아래라 연료전지를 쓸 수 없을 때 저충전이 오면 디젤만 기동하는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 100
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "FC",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "FC.status",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-25",
+  "fat": "정기 기동 시험 기록(월 1회), 하한 경보 임계 확인"
+ },
+ {
+  "name": "고장 대응 · 저소음 태세 자원 고갈과 단계 차단",
+  "note": "저소음 태세에서 충전율과 수소가 모두 바닥일 때 디젤을 켜지 않고 3등급 → 2등급 순으로 부하를 끊으며 1등급은 지키는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 17
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 100
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "저소음",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "FC",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "wait",
+    "ms": 3500
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "저소음",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L3",
+    "value": 0,
+    "op": "eq",
+    "ms": 500,
+    "limit": 500
+   },
+   {
+    "type": "wait",
+    "ms": 3500
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "저소음",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L2",
+    "value": 0,
+    "op": "eq",
+    "ms": 500,
+    "limit": 500
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L1",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-23",
+  "fat": "저소음 태세 모의에서 단계별 사전 경보 발생 확인"
+ },
+ {
+  "name": "고장 대응 · 예비력 부족 시 연료전지 병렬",
+  "note": "1·2등급 부하가 커서 가장 큰 전원 하나가 빠지면 감당하지 못하는 상황입니다. 예비력 규칙이 동작해 연료전지를 병렬로 올리는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 300
+   },
+   {
+    "type": "set",
+    "tag": "LOAD.p1_kw",
+    "value": 150
+   },
+   {
+    "type": "set",
+    "tag": "LOAD.p2_kw",
+    "value": 120
+   },
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 60
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "reserve",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "FC",
+    "value": 1,
+    "op": "eq"
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-20",
+  "fat": "전원별 최대 출력 실측표와 설정 대조, 최대 전원 강제 탈락 시험에서 1·2등급 유지"
+ },
+ {
+  "name": "고장 대응 · 부하 급증과 저충전 시 재판단",
+  "note": "정상 상태에서는 발전기를 켜지 않다가, 부하가 60 kW 늘고 충전율이 떨어지면 다음 판단에서 디젤을 기동하는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 40
+   },
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 80
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 140
+   },
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "executed",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-19",
+  "fat": "부하 60 kW 급증 모의 시 5초 안에 재판단 실행"
+ },
+ {
+  "name": "고장 대응 · 정전 중 주둔지 발전기 사용 불가",
+  "note": "상전이 끊겼는데 주둔지 발전기가 수동 모드라 쓸 수 없고 충전율도 낮은 상황입니다. ESS 가 부하를 이어 받고 이동형 디젤·연료전지로 대신하는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 100
+   },
+   {
+    "type": "set",
+    "tag": "PV.kw",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "CB.GRID",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "policy",
+    "mode": "grid",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "tied",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "set",
+    "tag": "CB.GRID",
+    "value": 0
+   },
+   {
+    "type": "set",
+    "tag": "GDG.mode",
+    "value": 1
+   },
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "policy",
+    "mode": "grid",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "outage",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "ESS.kw",
+    "value": 80,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "policy_check",
+    "metric": "GDG",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "FC",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "FC.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "GDG.status",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-31",
+  "fat": "발전기 수동 모드에서 정전 모의 시 이동형 전원 대체 확인"
+ },
+ {
+  "name": "고장 대응 · 짧은 정전과 복전 확인 대기",
+  "note": "상전이 잠깐 끊겼다 돌아오는 상황입니다. 짧은 정전에는 발전기를 켜지 않고 ESS 로 버티며, 차단기가 다시 닫힌 직후에는 안정 확인이 끝날 때까지 정전 판단을 유지하는지(성급한 재연계 방지) 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 100
+   },
+   {
+    "type": "set",
+    "tag": "PV.kw",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "CB.GRID",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "policy",
+    "mode": "grid",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "tied",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "set",
+    "tag": "CB.GRID",
+    "value": 0
+   },
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "policy",
+    "mode": "grid",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "outage",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "GDG",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "ESS.kw",
+    "value": 80,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "BUS.a_v",
+    "value": 300,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "set",
+    "tag": "CB.GRID",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "policy",
+    "mode": "grid",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "outage",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "GDG",
+    "value": 0,
+    "op": "eq"
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-30",
+  "fat": "차단기 상태만 왜곡 주입 시 불일치 경보, 오전환 없음 확인"
+ },
+ {
+  "name": "고장 대응 · 태양광 잉여 전력 처리",
+  "note": "충전율이 상한 근처인데 태양광이 남는 상황입니다. 남는 전력을 받도록 수전해를 올리는지 봅니다. 태양광 출력 제한 지령은 이 검증기에서 다루지 않습니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 89
+   },
+   {
+    "type": "set",
+    "tag": "PV.kw",
+    "value": 300
+   },
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 60
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 12
+   },
+   {
+    "type": "policy_check",
+    "metric": "ELZ",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "ELZ.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-28",
+  "fat": "충전율 95%·태양광 과잉 모의에서 출력 제한 동작과 주파수 유지 확인"
  }
 ]

@@ -12,7 +12,7 @@ from ..simplant import Plant
 from . import scenextra
 from .scenario_policy import METRICS, ScenarioPolicy, run_policy_case
 
-MAX_CASES = 32
+MAX_CASES = 48
 MAX_STEPS = 30
 TICK_MS = 50
 MAX_MS = 10000

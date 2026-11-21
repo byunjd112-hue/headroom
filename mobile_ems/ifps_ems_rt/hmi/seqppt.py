@@ -139,7 +139,8 @@ def export(cases, results=None, rev="", site=""):
     g.box(0.35, 5.95, 12.6, 1.2, "예) 판정 | DG.status | = | 1 | 600  →  디젤이 600 ms 안에 운전 상태가 되는지 본다.\n검증 한계: 단계는 시나리오마다 30개, 시간은 10,000 ms 까지. 신호·장비 이름은 대응표에 있는 것만 쓴다(틀리면 그 시나리오는 반영하지 않고 이유를 알려 준다).", 11, False, GRAY, valign="t")
     for n, c in enumerate(cases):
         r = res.get(c["name"]); times = timeline(c, r); state = "" if r is None else ("  —  검증 통과" if r["ok"] else "  —  검증 실패"); rows = {x["step"]: x for x in (r or {}).get("rows", [])}
-        s = d.slide(); s.box(0.35, 0.25, 12.6, 0.55, f"{n + 1}. {c['name']}{state}", 22, True, BROWN if r is None or r["ok"] else RED).box(0.35, 0.82, 12.6, 0.55, c.get("note", ""), 11, False, GRAY, valign="t"); _diagram(s, c, r, times)
+        tag = " · ".join(x for x in (c.get("cat", ""), c.get("ref", "")) if x); fat = f"  ▸ 실장비 시험(FAT)에서 확인할 것: {c['fat']}" if c.get("fat") else ""
+        s = d.slide(); s.box(0.35, 0.25, 12.6, 0.55, f"{n + 1}. {c['name']}{state}", 22, True, BROWN if r is None or r["ok"] else RED).box(0.35, 0.82, 12.6, 0.55, (f"[{tag}] " if tag else "") + c.get("note", "") + fat, 10.5, False, GRAY, valign="t"); _diagram(s, c, r, times)
         body = []
         for i, st in enumerate(c["steps"]):
             x = rows.get(i); out = "" if x is None else (RESULT[x["state"]] + (f" · 관측 {x['actual']}" if x.get("actual") is not None else ""))

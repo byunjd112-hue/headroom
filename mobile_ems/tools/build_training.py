@@ -84,7 +84,7 @@ def build(out, rev):
         try:
             c = Client(f"http://127.0.0.1:{httpd.server_address[1]}"); c.tok = c.call("/api/login", {"pin": eng.cfg["hmi"].get("pin_engineer", ""), "name": "교육생"})["token"]; time.sleep(6)
             sc, sel = scenes(c); glob = {_key(p): c.call(p) for p in GLOBAL_GET}; cat = glob["/api/scenarios/catalog"]; cases = cat.get("presets") or []
-            ver = {r["name"]: r for r in c.call("/api/scenarios/verify", {"cases": cases[:32]}).get("results", [])} if cases else {}
+            ver = {r["name"]: r for r in c.call("/api/scenarios/verify", {"cases": cases[:48]}).get("results", [])} if cases else {}
         finally:
             httpd.shutdown(); eng.stop()
         files = {}

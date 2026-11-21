@@ -109,11 +109,14 @@ def _scenarios(doc, eng):
         try: res = scenarios.verify(cases, eng.rt.pts, eng.cfg["devices"], profile=eng.cfg_path)["results"]
         except (ValueError, OSError) as e: doc.p(f"시나리오 검증을 실행하지 못했다: {e}", color="C00000")
     doc.h2(f"4.3 운영 시나리오 {len(cases)}건" + (" — 가상 장치 검증 결과" if res else " — 단계 정의"))
-    if res: doc.table(["번호", "시나리오", "단계 수", "결과"], [[i + 1, r["name"], len(r["rows"]), "통과" if r["ok"] else "실패"] for i, r in enumerate(res)], [8, 62, 14, 16])
-    else: doc.p("실장비 모드에서는 시나리오를 실행하지 않는다. 아래는 단계 정의이며, 검증은 가상 장치 모드에서 한다.")
+    doc.p("시나리오는 정상 운전(운전 모드 · 장비 시퀀스), 고장 대응(FMEA 의 고장 모드에 대응), 보호 협조로 나뉜다. 고장 대응에는 근거가 되는 FMEA 번호를 적었다.")
+    if res: doc.table(["번호", "분류", "시나리오", "근거", "단계 수", "결과"], [[i + 1, c.get("cat", ""), r["name"], c.get("ref", ""), len(r["rows"]), "통과" if r["ok"] else "실패"] for i, (r, c) in enumerate(zip(res, cases))], [6, 22, 44, 8, 9, 11], 16)
+    else: doc.table(["번호", "분류", "시나리오", "근거", "단계 수"], [[i + 1, c.get("cat", ""), c["name"], c.get("ref", ""), len(c["steps"])] for i, c in enumerate(cases)], [6, 24, 50, 9, 11], 16)
+    if not res: doc.p("실장비 모드에서는 시나리오를 실행하지 않는다. 아래는 단계 정의이며, 검증은 가상 장치 모드에서 한다.")
     for i, c in enumerate(cases):
         doc.p(f"({i + 1}) {c['name']}", bold=True)
         if c.get("note"): doc.p(c["note"], size=17, color="595959")
+        if c.get("fat"): doc.p("실장비 시험(FAT)에서 확인할 것: " + c["fat"], size=17, color="7B5A1E")
         rows = {r["step"]: r for r in res[i]["rows"]} if res else {}
         doc.table(["단계", "종류", "내용", "결과", "관측", "시간 ms"], [[j + 1, KIND.get(s["type"], s["type"]), describe(s), RESULT.get(rows.get(j, {}).get("state"), ""),
                                                              "" if rows.get(j, {}).get("actual") is None else rows[j]["actual"], rows.get(j, {}).get("elapsed", "")] for j, s in enumerate(c["steps"])], [8, 14, 46, 10, 10, 12], 16)

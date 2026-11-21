@@ -11,8 +11,8 @@ const P_SCENARIOS = (() => {
   const metrics = {executed: "급전 판단 실행", writes: "쓰기 건수", tied: "상전 연계", outage: "정전 감지",
     DG: "디젤 목표", FC: "연료전지 목표", GDG: "예비 발전기 목표", ELZ: "수전해 목표", reserve: "예비력 규칙",
     ess_target: "ESS 목표 (kW)", grid_target: "수전 목표 (kW)", full_hours: "전 부하 자립 예상 (h)"};
-  const maxDrafts = 48, maxBatch = 32;
-  const isModeCase = item => item.steps.some(step => step.type === "policy");
+  const maxDrafts = 96, maxBatch = 48;
+  const isModeCase = item => (item.cat || "").endsWith("운전 모드") || (!item.cat && /^(AUTO|MANUAL) · /.test(item.name));
   let cases;
   try { cases = JSON.parse(localStorage.getItem(key)); } catch (_) { /* use built-in presets */ }
   if (!Array.isArray(cases)) cases = [];
@@ -231,17 +231,12 @@ const P_SCENARIOS = (() => {
       ${button("export", "Python 회귀시험 저장", "", busy || !selected.size)}
       ${button("pptx", "시퀀스 PPT 내보내기", "", busy || !selected.size)}${button("pptx-in", "고친 PPT 올리기", "", busy)}
       </div>
-      ${config.presets.length ? `<div class="sc-actions sc-presets">
-        <label for="scPreset">기본 운전 시나리오</label>
-        <select class="in" id="scPreset">${config.presets.map((preset, i) => option(String(i), preset.name, presetIndex)).join("")}</select>
-        ${button("preset", "편집본으로 추가", "", cases.length >= maxDrafts)}
-        ${button("mode-pack", "운전 모드 기본안 전체 추가", "", !config.presets.some(p => isModeCase(p) && !cases.some(c => c.name === p.name)) || cases.length >= maxDrafts)}
-        ${button("mode-select", "모드 시나리오 선택", "", !cases.some(isModeCase))}
-        <span class="muted">${selected.size}/${maxBatch}개 선택</span>
-      </div>` : ""}
-      <div class="sc-tabs" aria-label="시나리오 선택">${cases.map((c, i) => `<div class="sc-tab ${i === active ? "on" : ""}">
-        <input type="checkbox" data-check="${i}" aria-label="${esc(c.name)} 검증 선택" ${selected.has(i) ? "checked" : ""}>
-        <button class="btn sm" type="button" data-case="${i}" aria-pressed="${i === active}">${esc(c.name || "이름 없음")}</button></div>`).join("")}</div>
+      <div class="sc-actions sc-pickbar">
+        ${button("pick", "시나리오 고르기 ▾", "pri")}${button("prev-case", "◀", "", cases.length < 2)}${button("next-case", "▶", "", cases.length < 2)}
+        <span class="sc-cur"><b>${esc(scene().name || "이름 없음")}</b> <span class="pill ${catClass(scene())}">${esc(catOf(scene()))}</span>${scene().ref ? ` <span class="pill info" title="FMEA 고장 모드">${esc(scene().ref)}</span>` : ""}</span>
+        <span class="sc-spacer"></span><span class="muted">${active + 1} / ${cases.length}건 · 검증 선택 ${selected.size}/${maxBatch} · ${CATS.map(c => `${c.split(" (")[0].replace("정상 운전 · ", "")} ${cases.filter(x => catOf(x) === c).length}`).join(" · ")}</span>
+      </div>
+      ${scene().fat ? `<p class="sc-fat"><b>실장비 시험(FAT)에서 확인할 것</b> ${esc(scene().fat)}</p>` : ""}
       <div class="sc-layout ${view === "topo" ? "wide" : view === "live" ? "wide live" : ""}">
         <aside class="sc-panel sc-palette"><h3>장비·신호</h3>
           <input class="in" id="scSearch" aria-label="장비·신호 검색" placeholder="장비 또는 신호 검색" value="${esc(search)}">
@@ -461,6 +456,47 @@ const P_SCENARIOS = (() => {
     pick.click();
   }
 
+  /* ── 시나리오 분류와 고르기 창: 정상 운전(운전 모드 · 장비 시퀀스), 고장 대응(FMEA), 보호 협조(FAT 시험 항목), 내가 만든 것 */
+  const CATS = ["정상 운전 · 운전 모드", "정상 운전 · 장비 시퀀스", "고장 대응 (FMEA)", "보호 협조 (FAT 시험 항목)", "내가 만든 것"];
+  const catOf = c => c.cat || (config && config.presets.find(p => p.name === c.name) || {}).cat || CATS[4];
+  const catClass = c => ({[CATS[2]]: "bad", [CATS[3]]: "warn", [CATS[4]]: "info"}[catOf(c)] || "ok");
+  const adopt = preset => { if (cases.length >= maxDrafts) { toast("편집본이 가득 찼습니다", "bad"); return -1; } cases.push(structuredClone(preset)); return cases.length - 1; };
+  let pickCat = "", pickQ = "";
+  function picker() {
+    const rows = () => [...cases.map((c, i) => ({c, i})), ...config.presets.filter(q => !cases.some(c => c.name === q.name)).map(c => ({c, i: -1}))]
+      .filter(x => (!pickCat || catOf(x.c) === pickCat) && (!pickQ || (x.c.name + " " + (x.c.ref || "") + " " + (x.c.note || "")).includes(pickQ)));
+    const body = () => {
+      const list = rows(), count = k => cases.filter(c => catOf(c) === k).length + config.presets.filter(q => catOf(q) === k && !cases.some(c => c.name === q.name)).length;
+      return `<h3>시나리오 고르기</h3><p class="sub">분류를 고르고, 이름을 누르면 그 시나리오를 연다. 표시(✔)한 것이 [선택 병렬 검증]과 [시퀀스 PPT 내보내기]의 대상이다(최대 ${maxBatch}건).</p>
+        <div class="sc-pk-bar"><div class="seg">${["", ...CATS].map(k => `<button data-pk-cat="${esc(k)}" class="${k === pickCat ? "on" : ""}">${esc(k || "전체")}${k ? ` <small>${count(k)}</small>` : ""}</button>`).join("")}</div>
+          <input class="in" id="pkQ" placeholder="이름 · FMEA 번호로 찾기" value="${esc(pickQ)}" style="width:190px"></div>
+        <div class="sc-pk-bar"><button class="btn sm" data-pk="all">보이는 것 모두 표시</button><button class="btn sm" data-pk="only">보이는 것만 표시</button><button class="btn sm" data-pk="none">표시 모두 해제</button><span class="sc-spacer"></span><span class="muted">표시 ${selected.size}/${maxBatch} · 보이는 것 ${list.length}건</span></div>
+        <div class="scroll sc-pk-list"><table class="t"><thead><tr><th style="width:34px">검증</th><th>시나리오</th><th>분류</th><th>근거</th><th class="n">단계</th><th>실장비 시험(FAT)에서 확인할 것</th></tr></thead><tbody>
+        ${list.map((x, k) => `<tr class="${x.i === active ? "sel" : ""}"><td><input type="checkbox" data-pk-check="${k}" ${x.i >= 0 && selected.has(x.i) ? "checked" : ""}></td><td><a class="sc-pk-name" data-pk-open="${k}">${esc(x.c.name)}</a>${x.i < 0 ? ' <span class="pill info">기본안 · 아직 안 가져옴</span>' : ""}${x.c.note ? `<div class="sub">${esc(x.c.note)}</div>` : ""}</td>
+          <td><span class="pill ${catClass(x.c)}">${esc(catOf(x.c))}</span></td><td class="mono">${esc(x.c.ref || "")}</td><td class="n">${x.c.steps.length}</td><td class="sub">${esc(x.c.fat || "")}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">해당하는 시나리오가 없습니다</td></tr>'}</tbody></table></div>
+        <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn pri" data-pk="close">닫기</button></div>`;
+    };
+    const idx = x => x.i >= 0 ? x.i : (x.i = adopt(x.c));
+    const mark = (x, on) => { const i = on ? idx(x) : x.i; if (i < 0) return; if (on) { if (selected.size >= maxBatch && !selected.has(i)) return toast(`한 번에 최대 ${maxBatch}건을 검증할 수 있습니다`, "bad"); selected.add(i); } else selected.delete(i); };
+    const done = () => { save(); revision++; output = null; };
+    const bind = box => {
+      const list = rows(); box.classList.add("wide");
+      box.querySelectorAll("[data-pk-cat]").forEach(b => b.onclick = () => { pickCat = b.dataset.pkCat; redraw(box); });
+      box.querySelector("#pkQ").onchange = e => { pickQ = e.target.value.trim(); redraw(box); };
+      box.querySelectorAll("[data-pk-check]").forEach(c => c.onchange = () => { mark(list[+c.dataset.pkCheck], c.checked); done(); redraw(box); });
+      box.querySelectorAll("[data-pk-open]").forEach(a => a.onclick = () => { const i = idx(list[+a.dataset.pkOpen]); if (i < 0) return; active = i; stepIndex = 0; done(); box.classList.remove("wide"); closeModal(); paint(); });
+      box.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => {
+        const k = b.dataset.pk; if (k === "close") { box.classList.remove("wide"); closeModal(); return paint(); }
+        if (k !== "all") selected.clear(); if (k !== "none") list.forEach(x => mark(x, true)); done(); redraw(box);
+      });
+    };
+    const redraw = box => { box.innerHTML = body(); bind(box); };
+    play(false); modal(body(), bind);
+  }
+  /* 다른 스크립트(화면 캡처·교육)에서 이름이나 분류로 고를 때 쓴다 */
+  function use(name) { let i = cases.findIndex(c => c.name === name); if (i < 0) { const q = config.presets.find(x => x.name === name); if (q) i = adopt(q); } if (i < 0) return false; active = i; stepIndex = 0; selected.add(i); save(); paint(); return true; }
+  function choose(test) { config.presets.filter(test).forEach(q => { if (!cases.some(c => c.name === q.name)) adopt(q); }); selected = new Set(cases.map((c, i) => test(c) ? i : -1).filter(i => i >= 0).slice(0, maxBatch)); save(); revision++; output = null; paint(); return selected.size; }
+
   function click(e) {
     const el = e.target.closest("button,[data-step]");
     if (!el) return;
@@ -489,6 +525,8 @@ const P_SCENARIOS = (() => {
     const action = d.sc;
     if (!action) return;
     if (["verify", "improve", "export"].includes(action)) return run(action);
+    if (action === "pick") return picker();
+    if (action === "prev-case" || action === "next-case") { play(false); active = (active + (action === "prev-case" ? -1 : 1) + cases.length) % cases.length; stepIndex = 0; return paint(); }
     if (action === "pptx") return pptxOut();
     if (action === "pptx-in") return pptxIn();
     if (action === "add") return append(make($("#scAdd").value));
@@ -559,7 +597,7 @@ const P_SCENARIOS = (() => {
     if (el.dataset.check !== undefined) {
       if (el.checked && selected.size >= maxBatch) {
         el.checked = false;
-        return toast("한 번에 최대 32개 시나리오를 검증할 수 있습니다", "bad");
+        return toast(`한 번에 최대 ${maxBatch}건을 검증할 수 있습니다`, "bad");
       }
       const i = Number(el.dataset.check);
       if (el.checked) selected.add(i); else selected.delete(i);
@@ -571,7 +609,7 @@ const P_SCENARIOS = (() => {
     if (el.id === "scName") {
       scene().name = el.value.trim();
       changed();
-      const tab = $(`[data-case="${active}"]`);
+      const tab = $(".sc-cur b");
       if (tab) tab.textContent = scene().name || "이름 없음";
       const tick = $(`[data-check="${active}"]`);
       if (tick) tick.setAttribute("aria-label", (scene().name || "이름 없음") + " 검증 선택");
@@ -631,6 +669,7 @@ const P_SCENARIOS = (() => {
       };
       paint();
     },
-    update() { refreshLive(); }
+    update() { refreshLive(); },
+    use, choose, cats: () => CATS
   };
 })();

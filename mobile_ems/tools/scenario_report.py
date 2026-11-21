@@ -23,7 +23,7 @@ def main(argv=None):
     with open(os.path.join(ROOT, "ifps_ems_rt", "hmi", "static", "scenario_presets.json"), encoding="utf-8") as f: cases = json.load(f)
     r = scenarios.verify(cases, pts, devices, improve=True, profile=cfg); first = [brief(x) for x in r["results"]]; retest = [brief(x) for x in r.get("retest", r["results"])]
     res = {"total": len(first), "first_pass": sum(x["ok"] for x in first), "mode_total": N_MODE, "mode_pass": sum(x["ok"] for x in first[:N_MODE]), "retest_pass": sum(x["ok"] for x in retest),
-           "results": first, "retest": retest, "changes": [dict(c, name=cases[c["case"]]["name"]) for c in r.get("changes", [])], "notes": {c["name"]: c.get("note", "") for c in cases}}
+           "results": [dict(x, cat=c.get("cat", ""), ref=c.get("ref", ""), fat=c.get("fat", "")) for x, c in zip(first, cases)], "retest": retest, "cats": {k: [sum(1 for c in cases if c.get("cat") == k), sum(1 for x, c in zip(retest, cases) if c.get("cat") == k and x["ok"])] for k in dict.fromkeys(c.get("cat", "") for c in cases)}, "changes": [dict(c, name=cases[c["case"]]["name"]) for c in r.get("changes", [])], "notes": {c["name"]: c.get("note", "") for c in cases}}
     with open(out, "w", encoding="utf-8") as f: json.dump(res, f, ensure_ascii=False, indent=1)
     print(f"시나리오 {res['total']}건: 최초 {res['first_pass']}건 통과(운전 모드 {res['mode_pass']}/{N_MODE}), 대기 시간 조정 후 {res['retest_pass']}건 통과 → {out}")
     return 0

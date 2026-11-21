@@ -78,7 +78,10 @@ class ScenarioTests(unittest.TestCase):
         failed = [run for run in result["results"] if not run["ok"]]
         self.assertEqual(["고장 시험 · 디젤 기동 응답 지연"], [run["name"] for run in failed])
         self.assertEqual(len(presets), len(result["candidate"]))
-        mode_cases = {case["name"] for case in presets if case["steps"] and any(step["type"] == "policy" for step in case["steps"])}
+        mode_cases = {case["name"] for case in presets if case["cat"] == "정상 운전 · 운전 모드"}
+        self.assertEqual(mode_cases, {case["name"] for case in presets[:12]})                       # 운전 모드 12건은 맨 앞(결과 요약이 앞 12건을 운전 모드로 센다)
+        cats = [case["cat"] for case in presets]; self.assertEqual({c: cats.count(c) for c in dict.fromkeys(cats)}, {"정상 운전 · 운전 모드": 12, "정상 운전 · 장비 시퀀스": 6, "고장 대응 (FMEA)": 12, "보호 협조 (FAT 시험 항목)": 6})
+        self.assertTrue(all(case["ref"] and case["fat"] for case in presets if case["cat"] == "고장 대응 (FMEA)"))      # 고장 대응에는 FMEA 번호와 FAT 확인 항목이 있어야 한다
         self.assertEqual({f"{control} · {site} · {posture}" for control in ("AUTO", "MANUAL")
                           for site in ("작전지", "주둔지") for posture in ("평시", "저소음", "자립")}, mode_cases)
         self.assertTrue(all(run["ok"] for run in result["retest"]))
