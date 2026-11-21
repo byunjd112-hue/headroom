@@ -5,12 +5,13 @@ function siteState(s) {
   const k = s.kpi, D = s.devices, gw = D.MTR && D.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? 1) : 1;
   const lost = n => D[n] && D[n].link === "두절";
   const r = (st, v, t) => ({ st, v, t });
+  const gone = n => D[n].absent ? r("idle", "—", "미설치") : r("bad", "####", "통신 두절");          // 켠 뒤 한 번도 응답하지 않은 장치는 설치되지 않은 것으로 본다(자동 인식)
   const out = {
-    G1: cb("G1") === 2 || cb("DG") === 2 ? r("bad", `DG ${F.kw(k.dg)} kW`, "차단기 트립") : lost("DG") ? r("bad", "####", "통신 두절")
+    G1: cb("G1") === 2 || cb("DG") === 2 ? r("bad", `DG ${F.kw(k.dg)} kW`, "차단기 트립") : lost("DG") ? gone("DG")
       : r((D.DG || {}).on ? "ok" : "ok", (D.DG || {}).on ? `DG ${F.kw(k.dg)} kW` : "계통 형성 100 kW", (D.DG || {}).on ? "디젤 운전" : "계통 형성"),
-    ESS: cb("ESS") === 2 ? r("bad", "0 kW", "트립") : lost("ESS") ? r("bad", "####", "통신 두절") : r(Math.abs(k.ess) > 0.5 ? "ok" : "idle", `${k.ess < 0 ? "▲" : "▼"} ${F.kw(Math.abs(k.ess))} kW · ${F.n(k.soc, 0)}%`, k.ess < -0.5 ? "충전" : k.ess > 0.5 ? "방전" : "대기"),
+    ESS: cb("ESS") === 2 ? r("bad", "0 kW", "트립") : lost("ESS") ? gone("ESS") : r(Math.abs(k.ess) > 0.5 ? "ok" : "idle", `${k.ess < 0 ? "▲" : "▼"} ${F.kw(Math.abs(k.ess))} kW · ${F.n(k.soc, 0)}%`, k.ess < -0.5 ? "충전" : k.ess > 0.5 ? "방전" : "대기"),
     PV: !gw ? r("bad", "####", "게이트웨이 두절") : cb("PV") === 2 ? r("bad", "0 kW", "트립") : r(k.pv > 0.5 ? "ok" : "idle", `${F.kw(k.pv)} kW`, k.pv > 0.5 ? "발전" : "발전 없음"),
-    FC: cb("FC") === 2 ? r("bad", "0 kW", "트립") : lost("FC") ? r("bad", "####", "통신 두절") : r((D.FC || {}).on ? "ok" : "idle", `${F.kw(k.fc)} kW · H₂ ${F.n(k.h2, 0)}`, (D.FC || {}).on ? "운전" : "정지"),
+    FC: cb("FC") === 2 ? r("bad", "0 kW", "트립") : lost("FC") ? gone("FC") : r((D.FC || {}).on ? "ok" : "idle", `${F.kw(k.fc)} kW · H₂ ${F.n(k.h2, 0)}`, (D.FC || {}).on ? "운전" : "정지"),
     DIST: !gw ? r("bad", "####", "게이트웨이 두절") : r((val("BUS.a_v") || 0) > 300 && (val("BUS.b_v") || 0) > 300 ? "ok" : "bad", `${F.n(val("BUS.a_v"), 0)} V · ${F.n(val("BUS.hz"), 2)} Hz`, cb("TIE") === 1 ? "모선 연계" : "연계 개방"),
     EMS: r(s.alarm_cnt[1].act ? "bad" : "ok", `${s.auto ? "AUTO" : "MANUAL"} · ${F.n(s.stats.last_ms, 0)} ms`, s.alarm_cnt[1].act ? `긴급 경보 ${s.alarm_cnt[1].act}` : "정상"),
   };
@@ -99,7 +100,7 @@ function layCables(items) {
 }
 function mapEqSt(s, it) {
   const k = s.kpi, D = s.devices, lost = n => D[n] && D[n].link === "두절", b = it.bind;
-  if (it.kind === "FSU") return { on: true };
+  if (it.kind === "FSU") { const m = /(\d+)/.exec(it.name || ""), v = m ? val(`FSU${m[1]}.v`) : null; return { on: v == null ? true : v >= 300 }; }      // 이름의 번호(FSU-3)로 구간분전함 전압을 본다
   const gw = D.MTR && D.MTR.link !== "두절", cbF = { G1: "G1", ESS: "ESS", PV: "PV", FC: "FC", L1: "L1", L2: "L2", L3: "L3" }[b];
   const c = cbF && gw ? Math.round(val("CB." + cbF) ?? 1) : 1;
   if (c === 2) return { on: false, fault: true };                      // 차단기 트립 → 고장 표시

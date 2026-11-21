@@ -2,7 +2,7 @@
 """시나리오용 추가 설비: 정의 검사, 실제 대응표를 건드리지 않는 모의 신호, 보호 계전기의 선택 차단, 저장·되읽기."""
 import json, os, shutil, tempfile, unittest
 from pathlib import Path
-from ifps_ems_rt.hmi import scenarios, scenextra, scenring
+from ifps_ems_rt.hmi import scenarios, scenextra
 
 ROOT = Path(__file__).resolve().parents[1]
 EX = lambda tag, value, ms=0, op="eq": {"type": "expect", "tag": tag, "value": value, "op": op, "ms": ms, "limit": ms}
@@ -35,7 +35,7 @@ class TestScenarioExtra(unittest.TestCase):
         self.assertEqual(Path(self.td, "pointmap.csv").read_bytes(), mine); self.assertEqual((ROOT / "config" / "pointmap.csv").read_bytes(), before)
         pts, _ = scenarios.load_profile(self.cfg); tags = {p["tag"]: p for p in pts}
         self.assertTrue(all(t in tags for t in ("CB.L4", "FLT.L4", "L4.kw", "TR9.load_pct"))); self.assertTrue(tags["CB.L4"]["virtual"])
-        used = {(p["device"], p["fc"], p["addr"]) for p in self.base}; self.assertFalse(any((p["device"], p["fc"], p["addr"]) in used for p in pts if p.get("virtual")))   # 주소가 겹치지 않는다
+        used = {(p["device"], p["fc"], p["addr"]) for p in self.base if not p.get("virtual")}; self.assertFalse(any((p["device"], p["fc"], p["addr"]) in used for p in pts if p.get("virtual")))   # 주소가 겹치지 않는다
         self.assertEqual(len(scenextra.merge(pts, self.extra)), len(pts))                                                                                       # 여러 번 합쳐도 같다
         self.assertEqual(scenextra.save(self.cfg, scenextra.empty(), self.base), []); self.assertTrue(os.path.exists(scenextra.path_for(self.cfg) + ".bak"))
 
@@ -88,34 +88,27 @@ class TestScenarioExtra(unittest.TestCase):
         self.assertEqual(scenextra.load(os.path.join(self.td, "없는폴더", "runtime.json")), scenextra.empty())
 
 
-    # ── 환망(고리 모양 배전): 구간 단선 → 구간 차단 → 상시 개방점 투입
-    def _ring(self, steps, **over):
-        ring = dict(scenring.DEFAULT, **over); self.assertEqual(scenextra.save(self.cfg, {"feeders": [], "transformers": [], "relays": [], "ring": ring}, self.base), [])
+    # ── 환망: 구간분전함(FSU)·분전반(PPDU) 신호는 실제 대응표에 있고, 단선 입력(BRK)만 모의 신호다
+    def _ring(self, steps):
         pts, devices = scenarios.load_profile(self.cfg); return scenarios.verify([{"name": "환망", "steps": steps}], pts, devices, profile=self.cfg)["results"][0]
 
-    def test_ring_definition_and_points(self):
-        bad = []; scenring.check(scenring.DEFAULT, {"L1", "L2", "L3"}, bad); self.assertEqual(bad, [])
-        for change in ({"open": "S9"}, {"sections": ["S1", "S2"]}, {"nodes": [{"id": "N1", "feeder": "없음"}], "sections": ["S1", "S2"], "open": "S1"}, {"trip_ms": -1}, {"sections": ["S1", "S1", "S3", "S4"]}):
-            bad = []; scenring.check(dict(scenring.DEFAULT, **change), {"L1", "L2", "L3"}, bad); self.assertTrue(bad, change)
-        tags = {p["tag"] for p in scenextra.points({"feeders": [], "transformers": [], "relays": [], "ring": scenring.DEFAULT})}
-        self.assertTrue({"RING.S1", "BRK.S3", "RN.N2", "RING.auto", "RING.ok"} <= tags); self.assertFalse(any(t.startswith("RING") for t in {p["tag"] for p in self.base}))      # 실제 대응표에는 없다
-        self.assertEqual(scenextra.points({"feeders": [], "transformers": [], "relays": [], "ring": None}), [])
+    def test_ring_points_are_real_and_break_inputs_are_virtual(self):
+        real = {p["tag"] for p in self.base if not p.get("virtual")}; self.assertTrue({"RING.sw0", "RING.auto", "FSU1.id", "FSU7.sw", "FSU4.v", "PPDU1.id", "PPDU3.kw"} <= real)      # 대응표에 있다 → EMS 가 감시한다
+        extra = scenextra.load(self.cfg); self.assertEqual(len(extra["ring"]["fsu"]), 7); virt = {p["tag"] for p in scenextra.points(extra)}
+        self.assertTrue({"BRK.0", "BRK.7", "RING.ok"} <= virt); self.assertFalse(virt & real)
 
     def test_ring_break_is_isolated_and_fed_from_the_other_side(self):
         SET = lambda tag, value: {"type": "set", "tag": tag, "value": value}
-        r = self._ring([{"type": "wait", "ms": 100}, EX("RING.ok", 1), EX("RING.S3", 0), SET("BRK.S2", 1), EX("RN.N2", 0, 100), EX("RING.S2", 2, 300), EX("RING.S3", 1, 800), EX("RN.N1", 1), EX("RN.N2", 1), EX("RN.N3", 1), EX("RING.ok", 1), EX("CB.L2", 1), EX("LOAD.p2_kw", 1, 0, "ge")])
-        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] != "pass"]); cut = next(x for x in r["rows"] if x["step"] == 5); self.assertLessEqual(cut["elapsed"], 400)      # 구간 차단은 정한 시간(150 ms) 근처
+        r = self._ring([{"type": "wait", "ms": 100}, EX("RING.ok", 1), EX("FSU4.sw", 0), SET("BRK.2", 1), EX("FSU3.v", 50, 100, "le"), EX("PPDU2.v", 50, 0, "le"), EX("PPDU2.kw", 0), EX("FSU2.sw", 2, 2000), EX("FSU4.sw", 1, 3000),
+                        EX("FSU3.v", 300, 0, "ge"), EX("PPDU1.v", 300, 0, "ge"), EX("PPDU2.v", 300, 0, "ge"), EX("PPDU3.v", 300, 0, "ge"), EX("RING.ok", 1), EX("CB.L2", 1), EX("PPDU2.kw", 1, 0, "ge")])
+        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] != "pass"]); done = r["rows"][-1]["elapsed"]; self.assertLessEqual(done, 5000)      # 끊어진 뒤 다시 공급되기까지 5초 이내(PPDU-20 자료의 우회 시간)
 
     def test_ring_manual_switching_and_double_break(self):
         SET = lambda tag, value: {"type": "set", "tag": tag, "value": value}
-        r = self._ring([SET("RING.auto", 0), {"type": "wait", "ms": 100}, SET("BRK.S2", 1), {"type": "wait", "ms": 1000}, EX("RING.S2", 1), EX("RN.N2", 0), EX("LOAD.p2_kw", 0), SET("RING.S2", 0), SET("RING.S3", 1), EX("RN.N2", 1, 200), EX("RING.ok", 1)])
-        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] != "pass"])                                  # 자동이 꺼져 있으면 사람이 열고 닫을 때까지 그 마디는 정전
-        r = self._ring([{"type": "wait", "ms": 100}, SET("BRK.S2", 1), SET("BRK.S3", 1), {"type": "wait", "ms": 1500}, EX("RN.N2", 0), EX("RN.N1", 1), EX("RN.N3", 1), EX("RING.ok", 0)])
-        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] != "pass"])                                  # 두 구간이 함께 끊어지면 가운데 마디는 고립된다
-
-    def test_ring_survives_equipment_dialog_save(self):
-        self._ring([{"type": "wait", "ms": 50}]); self.assertEqual(scenextra.save(self.cfg, {"feeders": [], "transformers": [], "relays": []}, self.base), [])
-        self.assertEqual(scenextra.load(self.cfg)["ring"]["open"], "S3")                                           # 설비 구성 창은 환망을 다루지 않지만 저장해도 환망 정의가 남는다
+        r = self._ring([SET("RING.auto", 0), {"type": "wait", "ms": 100}, SET("BRK.2", 1), {"type": "wait", "ms": 1000}, EX("FSU2.sw", 1), EX("FSU3.v", 50, 0, "le"), EX("PPDU2.kw", 0), SET("FSU2.sw", 0), SET("FSU4.sw", 1), EX("FSU3.v", 300, 200, "ge"), EX("RING.ok", 1)])
+        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] != "pass"])                                  # 자동이 꺼져 있으면 사람이 열고 닫을 때까지 그 뒤쪽은 정전
+        r = self._ring([{"type": "wait", "ms": 100}, SET("BRK.2", 1), SET("BRK.3", 1), {"type": "wait", "ms": 5000}, EX("FSU3.v", 50, 0, "le"), EX("FSU2.v", 300, 0, "ge"), EX("FSU4.v", 300, 0, "ge"), EX("RING.ok", 0)])
+        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] != "pass"])                                  # 두 구간이 함께 끊어지면 가운데 구간분전함은 고립된다
 
 
 if __name__ == "__main__":

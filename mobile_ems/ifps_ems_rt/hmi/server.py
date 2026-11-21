@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from .. import modbus as mb
 from .engine import ROLES
-from . import scenarios, scenextra, archwatch, archcfg, seqppt
+from . import scenarios, scenextra, archwatch, archcfg, seqppt, ringwatch
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_BODY = 128 * 1024
@@ -96,7 +96,7 @@ def make_handler(eng):
                     rows = eng.trend_since(0); cols = "time,load_kw,pv_kw,dg_kw,fc_kw,ess_kw,soc_pct,h2_nm3,reserve_margin_kw\n"
                     body = cols + "".join(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(r[0] / 1000)) + "," + ",".join(str(x) for x in r[1:]) + "\n" for r in rows)
                     return self._send(200, "﻿" + body, "text/csv; charset=utf-8", {"Content-Disposition": "attachment; filename=ems_trend.csv"})
-                if p.startswith("/api/archive/") or p == "/api/report.docx": return archwatch.http_get(self, eng, eng.archw.store, p, q)
+                if p.startswith("/api/archive/") or p == "/api/report.docx": return self._send(200, eng.ringw.view(eng)) if p == "/api/archive/ring" else archwatch.http_get(self, eng, eng.archw.store, p, q)
                 return self._static(p)
             except mb.ModbusError as e:
                 return self._send(200, {"ok": False, "why": f"통신 오류: {e}"})
@@ -196,6 +196,7 @@ def make_handler(eng):
                     if p.endswith("restore"): return self._send(200, eng.cfged.restore(b.get("name"), s["name"]))
                     if b.get("kind") not in ("runtime", "pointmap"): return self._err(400, "kind 는 runtime 또는 pointmap")
                     return self._send(200, eng.cfged.check(b["kind"], b) if p.endswith("check") else eng.cfged.save(b["kind"], b, s["name"]))
+                if p == "/api/ring": return (lambda s: s and self._send(200, ringwatch.http_post(eng, b, s)))(self._sess("operator"))      # 환망: 분전반 구성(운용자) · ID 확정과 가상 장치 조작(엔지니어)
                 if p.startswith("/api/archive/"):                # 점검 기록 넣기 · 주둔지 서버 전달(묶음 만들기·보내기·완료 적기)
                     s = self._sess("engineer" if p.endswith("/collect") else "operator")      # 수집 항목 관리는 관리자(엔지니어)만
                     if s: self._send(200, archcfg.save(eng, b, s["name"]) if p.endswith("/collect") else archwatch.http_post(eng.archw.store, p, b, s["name"], eng.rt.site.name))

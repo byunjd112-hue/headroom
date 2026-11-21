@@ -37,9 +37,11 @@ def load(profile):
     """설정 폴더의 추가 설비 정의를 읽는다. 없거나 잘못됐으면 빈 구성(기본 설비만)."""
     try:
         with open(path_for(profile), encoding="utf-8") as f: extra = json.load(f)
-        return extra if not check(extra, None) else empty()
+        extra = extra if not check(extra, None) else empty()
     except (OSError, ValueError):
-        return empty()
+        extra = empty()
+    extra["ring"] = scenring.config(profile)                      # 환망 정의는 운전 설정(runtime.json 의 ring)에서 온다
+    return extra
 
 
 def empty():
@@ -114,7 +116,6 @@ def check(extra, pts):
     feeders = set(BUILTIN) | seen
     _check_transformers(extra.get("transformers", []), feeders, taken, bad)
     _check_relays(extra.get("relays", []), feeders, (feeders - {"ELZ"}) | {"TIE", "G1"}, bad)
-    scenring.check(extra.get("ring"), feeders, bad)
     return bad
 
 
@@ -147,7 +148,6 @@ def save(profile, extra, pts):
     bad = check(extra, pts)
     if bad: return bad
     clean = {k: extra.get(k, []) for k in MAX}; pth = path_for(profile); tmp = pth + ".tmp"
-    clean["ring"] = extra["ring"] if "ring" in extra else load(profile).get("ring")          # 화면의 설비 구성 창은 환망을 다루지 않는다 — 있던 정의를 지우지 않는다
     with open(tmp, "w", encoding="utf-8") as f: json.dump(clean, f, ensure_ascii=False, indent=1)
     if os.path.exists(pth): os.replace(pth, pth + ".bak")
     os.replace(tmp, pth)
@@ -179,7 +179,7 @@ class Model:
         self.kw = dict(BUILTIN); self.kw.update({f["id"]: f"{f['id']}.kw" for f in self.x["feeders"]})
         for f in self.x["feeders"]:
             if f"CB.{f['id']}" in plant.by_tag: plant.set(f"CB.{f['id']}", 1); plant.set(f"{f['id']}.kw", f["kw"])
-        self.ring = scenring.Ring(self.x.get("ring"), plant, self.kw)
+        self.ring = scenring.Ring(self.x.get("ring"), plant)
 
     def _has(self, tag): return tag in self.p.by_tag
     def _is(self, tag, value): return self._has(tag) and int(round(self.p.get(tag))) == value

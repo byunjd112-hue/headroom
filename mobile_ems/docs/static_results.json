@@ -1,6 +1,6 @@
 {
- "date": "2026-11-21 07:07",
- "unittest_s": 315.5,
+ "date": "2026-11-21 08:58",
+ "unittest_s": 467.1,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -111,6 +111,15 @@
   "test_R13_set_only_setpoints_and_finite_values | ok",
   "test_R19_wrong_json_shapes_are_400_not_500 | ok",
   "R-26: 주둔지 자립 태세 = 전시·유사시 상전 상실. 가상 장치에서는 자립을 고르면 수전 차단기가 열린 상태가 되고 정전 논리로 운전한다. | ok",
+  "test_never_answered_device_is_treated_as_not_installed | ok",
+  "test_alarms_priority_follows_vital_load | ok",
+  "test_auto_layout_follows_ids | ok",
+  "test_fixed_layout_reports_swapped_units | ok",
+  "test_ppdu_circuits_overload_ground_and_trip | ok",
+  "test_settings_and_check | ok",
+  "test_status_normal_cut_and_isolated | ok",
+  "test_monitor_break_discover_and_configure | ok",
+  "test_units_removed_added_and_shuffled_without_any_setting | ok",
   "장치마다 순서가 다른 현장을 모의: 32비트 점 3종 + 장치 기본 DCBA(16비트 지령까지 바이트 뒤집힘). | ok",
   "test_known_vectors | ok",
   "test_pointmap_order_column_and_device_default | ok",
@@ -140,9 +149,8 @@
   "test_inverse_time_ground_fault_undervoltage_and_breaker_failure | ok",
   "test_relays_trip_selectively_and_backup_acts_only_when_needed | ok",
   "test_ring_break_is_isolated_and_fed_from_the_other_side | ok",
-  "test_ring_definition_and_points | ok",
   "test_ring_manual_switching_and_double_break | ok",
-  "test_ring_survives_equipment_dialog_save | ok",
+  "test_ring_points_are_real_and_break_inputs_are_virtual | ok",
   "test_shipped_definition_and_presets_are_valid | ok",
   "test_virtual_points_do_not_touch_the_real_point_map | ok",
   "test_attention_context_falls_back_when_sky_missing | ok",
@@ -164,18 +172,18 @@
   "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
   "test_check_scans_and_module_entry | ok"
  ],
- "n_tests": 161,
+ "n_tests": 169,
  "tests_ok": true,
  "coverage_pct": 90.7,
  "stmt": {
-  "n": 5370,
-  "hit": 5033,
-  "pct": 93.7
+  "n": 5679,
+  "hit": 5334,
+  "pct": 93.9
  },
  "branch": {
-  "n": 1906,
-  "hit": 1565,
-  "pct": 82.1
+  "n": 2036,
+  "hit": 1665,
+  "pct": 81.8
  },
  "coverage_files": [
   [
@@ -204,11 +212,11 @@
   ],
   [
    "ifps_ems_rt/hmi/server.py",
-   77.0,
-   217,
-   67.6,
-   142,
-   "65-66, 80-82, 87-88, 105-106, 125-128, 130-138, 140, 154-156, 187-192, 194-198, 200-202, 212-213, 232-239"
+   77.1,
+   218,
+   67.4,
+   144,
+   "65-66, 80-82, 87-88, 105-106, 125-128, 130-138, 140, 154-156, 187-192, 194-198, 201-203, 213-214, 233-240"
   ],
   [
    "ifps_ems_rt/hmi/archwatch.py",
@@ -233,6 +241,14 @@
    100.0,
    2,
    "33-34, 48-50"
+  ],
+  [
+   "ifps_ems_rt/hmi/ringwatch.py",
+   87.6,
+   105,
+   63.2,
+   68,
+   "103-108, 133-139"
   ],
   [
    "ifps_ems_rt/hmi/__main__.py",
@@ -267,14 +283,6 @@
    "74, 126-127, 260-261, 306, 318-319, 342, 355, 359, 361, 363, 388-393, 423"
   ],
   [
-   "ifps_ems_rt/hmi/engine.py",
-   93.8,
-   776,
-   80.4,
-   286,
-   "29-30, 55-56, 67-72, 93-94, 192-193, 312-313, 317, 326, 370, 386-387, 401-404, 407-409, 462, 505-507, 509-510, 603-604, 727-728, 890-895, 907-908, 924-925"
-  ],
-  [
    "ifps_ems_rt/hmi/scenarios.py",
    94.0,
    250,
@@ -283,12 +291,20 @@
    "59, 67, 70, 80, 90, 92, 94, 106, 110, 124, 133, 138, 217, 264, 267"
   ],
   [
+   "ifps_ems_rt/hmi/engine.py",
+   94.5,
+   776,
+   81.5,
+   286,
+   "29-30, 55-56, 67-72, 187, 192-193, 312-313, 326, 370, 386-387, 401-404, 407-409, 462, 509-510, 603-604, 727-728, 890-895, 907-908, 924-925"
+  ],
+  [
    "ifps_ems_rt/hmi/scenextra.py",
    94.7,
    170,
    86.8,
    68,
-   "113, 159-162, 167-170"
+   "115, 159-162, 167-170"
   ],
   [
    "ifps_ems_rt/archxfer.py",
@@ -390,7 +406,7 @@
    "ifps_ems_rt/simplant.py",
    98.5,
    134,
-   94.0,
+   92.0,
    50,
    "130-131"
   ],
@@ -515,6 +531,14 @@
    ""
   ],
   [
+   "ifps_ems_rt/hmi/autodev.py",
+   100.0,
+   9,
+   100.0,
+   0,
+   ""
+  ],
+  [
    "ifps_ems_rt/hmi/fcstats.py",
    100.0,
    28,
@@ -549,9 +573,9 @@
   [
    "ifps_ems_rt/hmi/scenring.py",
    100.0,
-   57,
-   94.1,
-   34,
+   17,
+   83.3,
+   6,
    ""
   ],
   [
@@ -577,11 +601,19 @@
    100.0,
    14,
    ""
+  ],
+  [
+   "ifps_ems_rt/ring.py",
+   100.0,
+   234,
+   92.0,
+   88,
+   ""
   ]
  ],
  "pylint": {
   "E": 1,
-  "W": 37,
+  "W": 38,
   "by_id": [
    [
     "W0718 broad-exception-caught",
@@ -600,11 +632,11 @@
     5
    ],
    [
-    "W0640 cell-var-from-loop",
-    2
+    "W0106 expression-not-assigned",
+    3
    ],
    [
-    "W0106 expression-not-assigned",
+    "W0640 cell-var-from-loop",
     2
    ],
    [
@@ -724,6 +756,14 @@
     94,
     "Runtime._read_parallel",
     "Catching too general exception Exception"
+   ],
+   [
+    "W0106",
+    "expression-not-assigned",
+    "ifps_ems_rt/ring.py",
+    285,
+    "Model._one",
+    "Expression \"[P.set(f'{i}.ch{n}', 1) for n in range(1, 7)]\" is assigned to nothing"
    ],
    [
     "W0108",
@@ -929,14 +969,14 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/server.py",
-    212,
+    213,
     "make_handler.H.do_POST",
     "Catching too general exception Exception"
    ]
   ]
  },
  "metrics": {
-  "n_func": 631,
+  "n_func": 677,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -945,7 +985,7 @@
    "file": 1000
   },
   "cc_max": 20,
-  "len_max": 198,
+  "len_max": 199,
   "arg_max": 8,
   "depth_max": 5,
   "file_max": 976,
@@ -976,6 +1016,15 @@
     3
    ],
    [
+    "ifps_ems_rt/ring.py",
+    "alarms",
+    209,
+    20,
+    22,
+    2,
+    2
+   ],
+   [
     "ifps_ems_rt/simplant.py",
     "_tick_power",
     70,
@@ -1003,6 +1052,15 @@
     2
    ],
    [
+    "ifps_ems_rt/hmi/ringwatch.py",
+    "configure",
+    85,
+    20,
+    13,
+    3,
+    4
+   ],
+   [
     "ifps_ems_rt/hmi/scenarios.py",
     "run_case",
     169,
@@ -1010,24 +1068,6 @@
     61,
     6,
     4
-   ],
-   [
-    "ifps_ems_rt/diag.py",
-    "check_path",
-    91,
-    19,
-    28,
-    7,
-    3
-   ],
-   [
-    "ifps_ems_rt/hal.py",
-    "send",
-    99,
-    19,
-    30,
-    5,
-    3
    ]
   ],
   "top_len": [
@@ -1036,7 +1076,7 @@
     "make_handler",
     18,
     1,
-    198,
+    199,
     1,
     0
    ],
@@ -1045,7 +1085,7 @@
     "do_POST",
     117,
     1,
-    97,
+    98,
     0,
     4
    ],
@@ -1266,6 +1306,10 @@
     390
    ],
    [
+    "ifps_ems_rt/ring.py",
+    348
+   ],
+   [
     "ifps_ems_rt/hmi/scenarios.py",
     325
    ],
@@ -1279,7 +1323,7 @@
    ],
    [
     "ifps_ems_rt/hmi/server.py",
-    250
+    251
    ],
    [
     "ifps_ems_rt/hmi/scenextra.py",
@@ -1334,6 +1378,10 @@
     151
    ],
    [
+    "ifps_ems_rt/hmi/ringwatch.py",
+    140
+   ],
+   [
     "ifps_ems_rt/hmi/archwatch.py",
     136
    ],
@@ -1364,10 +1412,6 @@
    [
     "ifps_ems/nowcast.py",
     99
-   ],
-   [
-    "ifps_ems_rt/hmi/scenring.py",
-    89
    ],
    [
     "ifps_ems_rt/hmi/archapi.py",
@@ -1422,6 +1466,10 @@
     41
    ],
    [
+    "ifps_ems_rt/hmi/scenring.py",
+    35
+   ],
+   [
     "ifps_ems/models.py",
     34
    ],
@@ -1432,6 +1480,10 @@
    [
     "ifps_ems_rt/hmi/fuelwatch.py",
     25
+   ],
+   [
+    "ifps_ems_rt/hmi/autodev.py",
+    21
    ],
    [
     "ifps_ems_rt/hmi/pin.py",
@@ -1466,7 +1518,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 6717,
+   "loc": 7096,
    "nosec": 0,
    "skipped_tests": 21
   },
@@ -1642,12 +1694,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.72,
- "cc_n": 643,
+ "cc_avg": 5.84,
+ "cc_n": 689,
  "cc_rank": {
-  "A": 389,
-  "B": 154,
-  "C": 100,
+  "A": 412,
+  "B": 167,
+  "C": 110,
   "D": 0,
   "E": 0,
   "F": 0
@@ -1672,6 +1724,12 @@
    "C"
   ],
   [
+   "ifps_ems_rt/ring.py",
+   "alarms",
+   20,
+   "C"
+  ],
+  [
    "ifps_ems_rt/hmi/scenarios.py",
    "run_case",
    20,
@@ -1680,6 +1738,12 @@
   [
    "ifps_ems_rt/hmi/engine.py",
    "step",
+   20,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/hmi/ringwatch.py",
+   "configure",
    20,
    "C"
   ],
@@ -1698,18 +1762,6 @@
   [
    "ifps_ems_rt/hal.py",
    "send",
-   19,
-   "C"
-  ],
-  [
-   "ifps_ems_rt/simplant.py",
-   "_tick_bus",
-   19,
-   "C"
-  ],
-  [
-   "ifps_ems_rt/opsmode.py",
-   "gdg_step",
    19,
    "C"
   ]
@@ -1736,6 +1788,11 @@
    "C"
   ],
   [
+   "ifps_ems_rt/ring.py",
+   3.3,
+   "C"
+  ],
+  [
    "ifps_ems_rt/hmi/scenarios.py",
    16.5,
    "B"
@@ -1752,7 +1809,7 @@
   ],
   [
    "ifps_ems_rt/hmi/scenextra.py",
-   25.3,
+   25.5,
    "A"
   ],
   [
@@ -1776,6 +1833,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/ringwatch.py",
+   31.6,
+   "A"
+  ],
+  [
    "ifps_ems_rt/simplant.py",
    33.5,
    "A"
@@ -1787,7 +1849,7 @@
   ],
   [
    "ifps_ems_rt/hmi/server.py",
-   37.1,
+   37.3,
    "A"
   ],
   [
@@ -1866,11 +1928,6 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/scenring.py",
-   50.3,
-   "A"
-  ],
-  [
    "ifps_ems/security.py",
    50.8,
    "A"
@@ -1936,8 +1993,18 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/scenring.py",
+   83.2,
+   "A"
+  ],
+  [
    "ifps_ems_rt/hmi/pin.py",
    88.1,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/autodev.py",
+   91.0,
    "A"
   ],
   [
@@ -1967,9 +2034,9 @@
   ]
  ],
  "loc_py": {
-  "files": 50,
-  "sloc": 5620,
-  "comments": 682
+  "files": 53,
+  "sloc": 5936,
+  "comments": 732
  },
  "js": [
   [
@@ -2008,8 +2075,13 @@
    true
   ],
   [
+   "ifps_ems_rt/hmi/static/ring.js",
+   97,
+   true
+  ],
+  [
    "ifps_ems_rt/hmi/static/scenarios.js",
-   686,
+   681,
    true
   ],
   [
@@ -2019,7 +2091,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/site.js",
-   223,
+   224,
    true
   ],
   [
@@ -2029,7 +2101,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/train.js",
-   166,
+   170,
    true
   ],
   [

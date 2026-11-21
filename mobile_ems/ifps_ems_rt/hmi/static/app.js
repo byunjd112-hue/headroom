@@ -19,7 +19,7 @@ const val = tag => kv(S.snap && S.snap.values[tag], "v");
 function renderHeader() {
   const s = S.snap; if (!s) return;
   $("#site").textContent = `${s.site} · ${s.sim ? "SIMULATION" : "LIVE PLANT"}`;
-  const m = MODE_TXT[s.mode] || [s.mode, s.mode]; const devs = Object.values(s.devices); const nOk = devs.filter(d => d.link === "정상").length; const nLost = devs.filter(d => d.link === "두절").length;
+  const m = MODE_TXT[s.mode] || [s.mode, s.mode]; const devs = Object.values(s.devices); const nOk = devs.filter(d => d.link === "정상").length; const nLost = devs.filter(d => d.link === "두절" && !d.absent).length;
   $("#chips").innerHTML = [
     opsChip(s),
     `<span class="chip ${s.auto ? "ok" : "warn"}"><span class="dot"></span>${s.auto ? (S.lang === "ko" ? "자동 제어" : "AUTO DISPATCH") : (S.lang === "ko" ? "수동 운전" : "MANUAL")}</span>`,
@@ -207,14 +207,14 @@ const P_CTL = {
       const on = u.id === "EMS" ? true : u.id === "G1" ? cb("G1") === 1 : u.id === "GRID" ? (garr && cb("GRID") === 1) : u.id === "MTR" ? !lost : !!(d && d.on);
       lp.className = "lamp " + (lost ? "lost" : on ? "on" : "");
       const lk = $("#lk-" + u.id);
-      if (d) { lk.className = "pill " + LINK_CLS[d.link]; lk.textContent = linkTxt(d.link); }
+      if (d) { lk.className = "pill " + (d.absent ? "" : LINK_CLS[d.link]); lk.textContent = d.absent ? "미설치" : linkTxt(d.link); }
       else if (u.id === "EMS") { lk.className = "pill " + (s.alarm_cnt[1].act ? "bad" : "ok"); lk.textContent = s.alarm_cnt[1].act ? `긴급 ${s.alarm_cnt[1].act}` : "정상"; }
       else if (u.id === "GRID" && !lost) { const g2 = s.ops || {}, t2 = g2.mode !== "grid" ? "미연계" : g2.outage ? "정전" : "연계"; lk.className = "pill " + (t2 === "정전" ? "bad" : t2 === "연계" ? "ok" : "info"); lk.textContent = t2; }
       else { lk.className = "pill " + (lost ? "bad" : "info"); lk.textContent = lost ? "게이트웨이 두절" : "미계측"; }
       const big = u.id === "EMS" ? `${F.n(s.stats.last_ms, 0)}<small>ms</small>` : u.id === "G1" ? `100<small>kW 형성</small>` : `${lost ? "####" : F.kw(val(u.kw))}<small>kW</small>`;
       $("#kw2-" + u.id).innerHTML = big;
       const c = { G1: cb("G1"), PV: cb("PV"), DG: cb("DG"), FC: cb("FC"), ESS: cb("ESS"), GRID: cb("GRID"), GDG: lost ? -1 : Math.round(val("CB.GDG") ?? -1) }[u.id];
-      $("#sx-" + u.id).innerHTML = lost ? `<span class="badc">통신 두절</span>` : c === 2 ? `<span class="badc">차단기 트립</span>`
+      $("#sx-" + u.id).innerHTML = d && d.absent ? `<span class="sub">미설치 (자동 인식)</span>` : lost ? `<span class="badc">통신 두절</span>` : c === 2 ? `<span class="badc">차단기 트립</span>`
         : u.id === "GRID" ? (!garr ? `<span class="muted">미연계(작전지)</span>` : o.outage ? `<span class="badc">정전</span>` : `<span class="okc">수전 중</span>`)
         : u.id === "GDG" ? (on ? `<span class="okc">운전 중</span>` : `<span class="muted">${garr ? "대기" : "미사용"}</span>`)
         : u.id === "MTR" ? `<span class="okc">계측 중</span>` : u.id === "EMS" ? `<span class="okc">${s.auto ? "자동 제어" : "수동 운전"}</span>`
@@ -342,7 +342,7 @@ const P_CM = {
   },
   update(s) {
     $("#cmRows").innerHTML = Object.entries(s.devices).map(([n, d]) => Object.entries(d.paths).map(([k, p], i) => `<tr>
-      ${i === 0 ? `<td rowspan="2"><b>${n}</b></td><td rowspan="2"><span class="pill ${LINK_CLS[d.link]}">${linkTxt(d.link)}</span></td><td rowspan="2" class="mono">${F.dur(d.since)}</td>` : ""}
+      ${i === 0 ? `<td rowspan="2"><b>${n}</b></td><td rowspan="2"><span class="pill ${d.absent ? "" : LINK_CLS[d.link]}" title="${d.absent ? "켠 뒤 한 번도 응답하지 않음 — 설치되지 않은 장치로 봄(자동 인식)" : ""}">${d.absent ? "미설치" : linkTxt(d.link)}</span></td><td rowspan="2" class="mono">${F.dur(d.since)}</td>` : ""}
       <td><b class="mono">${k}</b></td><td class="mono">${esc(p.host)}</td><td class="mono">${p.unit}</td><td>${p.alive ? `<span class="okc">● 응답</span>` : `<span class="badc">○ 무응답</span>`}</td><td class="n">${F.n(p.rtt, 2)}</td><td class="n">${p.ok}</td><td class="n">${p.err}</td>
       <td class="n">${F.n(p.ok + p.err ? p.err / (p.ok + p.err) * 100 : 0, 2)}%</td><td class="n">${F.n(p.age, 1)}s</td><td class="muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.last_err)}">${esc(p.last_err)}</td></tr>`).join("")).join("");
     const st = s.stats; $("#scKv").innerHTML = `<span class="k">주기</span><span class="v">${F.n(st.scan_s * 1000, 0)} ms</span><span class="k">최근 / 평균</span><span class="v">${F.n(st.last_ms, 1)} / ${F.n(st.avg_ms, 1)} ms</span><span class="k">p95 / 최대</span><span class="v">${F.n(st.p95_ms, 1)} / ${F.n(st.max_ms, 1)} ms</span><span class="k">주기 수 / 초과</span><span class="v">${st.n_scan} / <span class="${st.n_over ? "warnc" : ""}">${st.n_over}</span></span><span class="k">추적 프레임</span><span class="v">${st.trace_n}</span><span class="k">가동 시간</span><span class="v">${F.dur(s.uptime)}</span>`;
@@ -520,7 +520,7 @@ function regsView(regs, ord) {
   if (ord === "CDAB" || ord === "DCBA") w = w.slice().reverse();
   const dv = new DataView(new ArrayBuffer(2 * w.length)); w.forEach((x, k) => dv.setUint16(2 * k, x)); return dv;
 }
-const PAGES = { overview: P_OV, sld: P_SLD, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG, scenarios: P_SCENARIOS, archive: P_ARCHIVE, help: P_HELP };
+const PAGES = { overview: P_OV, sld: P_SLD, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG, scenarios: P_SCENARIOS, archive: P_ARCHIVE, help: P_HELP, ring: P_RING };
 let mounted = null;
 function render() {
   if (!S.snap) return; const p = PAGES[S.page] ? S.page : "overview";

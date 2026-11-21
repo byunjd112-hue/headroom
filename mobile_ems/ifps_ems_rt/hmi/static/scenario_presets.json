@@ -2730,7 +2730,7 @@
  },
  {
   "name": "환망 · 구간 단선 → 구간 차단 → 반대쪽 공급",
-  "note": "고리 모양 배전(환망)의 가운데 구간이 끊어진 상황입니다. 끊어진 구간을 양 끝에서 떼어 내고(구간 차단) 상시 개방점을 닫아 반대쪽에서 전기를 보내, 모든 부하 마디에 다시 전기가 들어오고 부하 차단기는 닫힌 채 유지되는지 봅니다.",
+  "note": "환망에서 구간분전함 FSU2 와 FSU3 사이 구간이 끊어진 상황입니다. 끊어진 구간을 떼어 내고(구간 차단) 상시 개방점(FSU4 다음 구간)을 닫아 반대쪽에서 전기를 보내, 5초 안에 모든 구간분전함과 휴대용 배전체계(PPDU)에 다시 전기가 들어오고 PPDU 의 회로별 전력이 되살아나는지 봅니다.",
   "steps": [
    {
     "type": "wait",
@@ -2746,68 +2746,116 @@
    },
    {
     "type": "expect",
-    "tag": "RING.S3",
+    "tag": "FSU4.sw",
     "value": 0,
     "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU2.kw",
+    "value": 1,
+    "op": "ge",
     "ms": 0,
     "limit": 0
    },
    {
     "type": "set",
-    "tag": "BRK.S2",
+    "tag": "BRK.2",
     "value": 1
    },
    {
     "type": "expect",
-    "tag": "RN.N2",
-    "value": 0,
-    "op": "eq",
+    "tag": "FSU3.v",
+    "value": 50,
+    "op": "le",
     "ms": 100,
     "limit": 100
    },
    {
     "type": "expect",
-    "tag": "RING.S2",
+    "tag": "PPDU2.v",
+    "value": 50,
+    "op": "le",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU2.kw",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "FSU2.sw",
     "value": 2,
     "op": "eq",
-    "ms": 300,
-    "limit": 300
+    "ms": 2000,
+    "limit": 2000
    },
    {
     "type": "expect",
-    "tag": "RING.S3",
+    "tag": "FSU4.sw",
     "value": 1,
     "op": "eq",
-    "ms": 800,
-    "limit": 800
+    "ms": 3000,
+    "limit": 3000
    },
    {
     "type": "expect",
-    "tag": "RN.N1",
-    "value": 1,
-    "op": "eq",
+    "tag": "FSU3.v",
+    "value": 300,
+    "op": "ge",
     "ms": 0,
     "limit": 0
    },
    {
     "type": "expect",
-    "tag": "RN.N2",
-    "value": 1,
-    "op": "eq",
+    "tag": "PPDU1.v",
+    "value": 300,
+    "op": "ge",
     "ms": 0,
     "limit": 0
    },
    {
     "type": "expect",
-    "tag": "RN.N3",
-    "value": 1,
-    "op": "eq",
+    "tag": "PPDU2.v",
+    "value": 300,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU3.v",
+    "value": 300,
+    "op": "ge",
     "ms": 0,
     "limit": 0
    },
    {
     "type": "expect",
     "tag": "RING.ok",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU2.kw",
+    "value": 1,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU2.mccb",
     "value": 1,
     "op": "eq",
     "ms": 0,
@@ -2828,30 +2876,6 @@
     "op": "eq",
     "ms": 0,
     "limit": 0
-   },
-   {
-    "type": "expect",
-    "tag": "CB.L3",
-    "value": 1,
-    "op": "eq",
-    "ms": 0,
-    "limit": 0
-   },
-   {
-    "type": "expect",
-    "tag": "LOAD.p2_kw",
-    "value": 1,
-    "op": "ge",
-    "ms": 0,
-    "limit": 0
-   },
-   {
-    "type": "expect",
-    "tag": "BUS.b_v",
-    "value": 300,
-    "op": "ge",
-    "ms": 0,
-    "limit": 0
    }
   ],
   "cat": "고장 대응 (FMEA)",
@@ -2860,7 +2884,7 @@
  },
  {
   "name": "환망 · 전원 쪽 첫 구간 단선",
-  "note": "전원에서 나가는 첫 구간이 끊어진 상황입니다. 그 구간을 떼어 내고 상시 개방점을 닫으면 모든 마디가 반대쪽 끝에서 공급받는지 봅니다.",
+  "note": "전원에서 나가는 첫 구간(전원 ─ FSU1)이 끊어진 상황입니다. 그 구간을 떼어 내고 상시 개방점을 닫으면 5초 안에 모든 구간분전함이 반대쪽 끝에서 공급받는지 봅니다.",
   "steps": [
    {
     "type": "wait",
@@ -2876,46 +2900,46 @@
    },
    {
     "type": "set",
-    "tag": "BRK.S1",
+    "tag": "BRK.0",
     "value": 1
    },
    {
     "type": "expect",
-    "tag": "RING.S1",
+    "tag": "RING.sw0",
     "value": 2,
     "op": "eq",
-    "ms": 300,
-    "limit": 300
+    "ms": 2000,
+    "limit": 2000
    },
    {
     "type": "expect",
-    "tag": "RING.S3",
+    "tag": "FSU4.sw",
     "value": 1,
     "op": "eq",
-    "ms": 800,
-    "limit": 800
+    "ms": 3000,
+    "limit": 3000
    },
    {
     "type": "expect",
-    "tag": "RN.N1",
-    "value": 1,
-    "op": "eq",
+    "tag": "FSU1.v",
+    "value": 300,
+    "op": "ge",
     "ms": 0,
     "limit": 0
    },
    {
     "type": "expect",
-    "tag": "RN.N2",
-    "value": 1,
-    "op": "eq",
+    "tag": "FSU4.v",
+    "value": 300,
+    "op": "ge",
     "ms": 0,
     "limit": 0
    },
    {
     "type": "expect",
-    "tag": "RN.N3",
-    "value": 1,
-    "op": "eq",
+    "tag": "PPDU1.v",
+    "value": 300,
+    "op": "ge",
     "ms": 0,
     "limit": 0
    },
@@ -2934,7 +2958,7 @@
  },
  {
   "name": "환망 · 자동 절체 불능 시 수동 구간 개방·투입",
-  "note": "자동 구간 차단·절체를 쓸 수 없을 때입니다. 단선 뒤 해당 마디가 정전된 것을 확인하고, 운용자가 고장 구간을 열고 상시 개방점을 닫아 공급을 되살리는 순서를 봅니다.",
+  "note": "자동 구간 차단·절체를 쓸 수 없을 때입니다. 단선 뒤 그 뒤쪽 구간분전함과 휴대용 배전체계(PPDU)가 정전된 것을 확인하고, 운용자가 고장 구간을 열고 상시 개방점을 닫아 공급을 되살리는 순서를 봅니다.",
   "steps": [
    {
     "type": "set",
@@ -2947,7 +2971,7 @@
    },
    {
     "type": "set",
-    "tag": "BRK.S2",
+    "tag": "BRK.2",
     "value": 1
    },
    {
@@ -2956,15 +2980,7 @@
    },
    {
     "type": "expect",
-    "tag": "RN.N2",
-    "value": 0,
-    "op": "eq",
-    "ms": 0,
-    "limit": 0
-   },
-   {
-    "type": "expect",
-    "tag": "RN.N1",
+    "tag": "FSU2.sw",
     "value": 1,
     "op": "eq",
     "ms": 0,
@@ -2972,37 +2988,69 @@
    },
    {
     "type": "expect",
-    "tag": "RN.N3",
-    "value": 1,
+    "tag": "FSU3.v",
+    "value": 50,
+    "op": "le",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "FSU4.v",
+    "value": 50,
+    "op": "le",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU2.v",
+    "value": 50,
+    "op": "le",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU2.kw",
+    "value": 0,
     "op": "eq",
     "ms": 0,
     "limit": 0
    },
    {
     "type": "expect",
-    "tag": "LOAD.p2_kw",
-    "value": 0,
-    "op": "eq",
+    "tag": "FSU2.v",
+    "value": 300,
+    "op": "ge",
     "ms": 0,
     "limit": 0
    },
    {
     "type": "set",
-    "tag": "RING.S2",
+    "tag": "FSU2.sw",
     "value": 0
    },
    {
     "type": "set",
-    "tag": "RING.S3",
+    "tag": "FSU4.sw",
     "value": 1
    },
    {
     "type": "expect",
-    "tag": "RN.N2",
-    "value": 1,
-    "op": "eq",
+    "tag": "FSU3.v",
+    "value": 300,
+    "op": "ge",
     "ms": 200,
     "limit": 200
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU2.v",
+    "value": 300,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
    },
    {
     "type": "expect",
@@ -3014,7 +3062,7 @@
    },
    {
     "type": "expect",
-    "tag": "LOAD.p2_kw",
+    "tag": "PPDU2.kw",
     "value": 1,
     "op": "ge",
     "ms": 0,
@@ -3027,7 +3075,7 @@
  },
  {
   "name": "환망 · 두 구간 동시 단선(마디 고립)",
-  "note": "두 구간이 함께 끊어져 가운데 마디에 어느 쪽으로도 보낼 수 없는 상황입니다. 고립된 마디만 정전되고 나머지 마디는 계속 공급되는지 봅니다. 고립 마디의 복구는 케이블 수리나 임시 전원이 필요합니다.",
+  "note": "두 구간(FSU2 ─ FSU3, FSU3 ─ FSU4)이 함께 끊어져 FSU3 에 어느 쪽으로도 보낼 수 없는 상황입니다. 고립된 구간분전함만 정전되고 나머지 구간분전함과 휴대용 배전체계(PPDU)는 계속 공급되는지 봅니다. 고립된 곳의 복구는 케이블 수리나 임시 전원이 필요합니다.",
   "steps": [
    {
     "type": "wait",
@@ -3035,21 +3083,21 @@
    },
    {
     "type": "set",
-    "tag": "BRK.S2",
+    "tag": "BRK.2",
     "value": 1
    },
    {
     "type": "set",
-    "tag": "BRK.S3",
+    "tag": "BRK.3",
     "value": 1
    },
    {
     "type": "wait",
-    "ms": 1500
+    "ms": 5000
    },
    {
     "type": "expect",
-    "tag": "RING.S2",
+    "tag": "FSU2.sw",
     "value": 2,
     "op": "eq",
     "ms": 0,
@@ -3057,25 +3105,49 @@
    },
    {
     "type": "expect",
-    "tag": "RN.N2",
-    "value": 0,
-    "op": "eq",
+    "tag": "FSU3.v",
+    "value": 50,
+    "op": "le",
     "ms": 0,
     "limit": 0
    },
    {
     "type": "expect",
-    "tag": "RN.N1",
-    "value": 1,
-    "op": "eq",
+    "tag": "FSU2.v",
+    "value": 300,
+    "op": "ge",
     "ms": 0,
     "limit": 0
    },
    {
     "type": "expect",
-    "tag": "RN.N3",
-    "value": 1,
-    "op": "eq",
+    "tag": "FSU4.v",
+    "value": 300,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU1.v",
+    "value": 300,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU2.v",
+    "value": 300,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU3.v",
+    "value": 300,
+    "op": "ge",
     "ms": 0,
     "limit": 0
    },
@@ -3369,5 +3441,91 @@
   "cat": "고장 대응 (FMEA)",
   "ref": "FM-34",
   "fat": "한 달 운전 자료로 피크 초과 횟수 확인"
+ },
+ {
+  "name": "휴대용 배전체계 · 회로 트립과 주 차단기 유지",
+  "note": "휴대용 배전체계(PPDU-20)의 3등급 회로 하나가 트립한 상황입니다. 그 회로만 전력이 0 이 되고 주 차단기와 1등급 회로는 그대로 공급되는지(회로별 보호) 봅니다.",
+  "steps": [
+   {
+    "type": "wait",
+    "ms": 200
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU1.mccb",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU1.ch3_kw",
+    "value": 0.1,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "set",
+    "tag": "PPDU1.ch6",
+    "value": 2
+   },
+   {
+    "type": "wait",
+    "ms": 200
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU1.ch6_kw",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU1.mccb",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU1.ch3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU1.ch3_kw",
+    "value": 0.1,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU1.lamp",
+    "value": 2,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "PPDU2.lamp",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "C-09",
+  "fat": "협조 검토서 승인, 저주파·역전력 모의 시험"
  }
 ]

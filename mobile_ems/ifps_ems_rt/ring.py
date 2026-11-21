@@ -1,0 +1,347 @@
+# -*- coding: utf-8 -*-
+"""환망(고리 모양 배전) 감시: 구간분전함(FSU)과 휴대용 배전체계(PPDU)의 신호로 구간·마디 상태를 판단하고, 자리마다 읽은 장치 ID 로 배치를 스스로 알아낸다.
+
+  자동 인식(auto, 기본): 작전지마다 장치를 놓는 자리와 대수가 달라지므로, 화면 조작 없이 EMS 가 배치를 알아낸다.
+  · 자리(FSU1‥, PPDU1‥)는 통신 순서 = 고리에서 전원에 가까운 순서다. 자리마다 읽은 ID 가 그 자리에 놓인 장치다 — 이름·회로 구성은 ID 를 따라간다.
+  · ID 가 0 인 자리는 비어 있는 것으로 보고 화면·경보에서 뺀다(대수가 달라도 된다). 처음 보는 ID 는 새 장치로 바로 넣는다.
+  · 배전체계가 어느 구간분전함에 물렸는지는 PPDUk.up(상위 구간분전함의 ID)으로 안다. 이 신호가 없으면 목록의 값(at)을 쓴다.
+  · ID 의 윗자리(0x46 = FSU, 0x50 = PPDU)로 종류를 가린다. ID 체계와 PPDUk.up 신호는 가정이다 — 실제 장치의 사양이 정해지면 맞춘다.
+
+  전원(배전반) ─[RING.sw0]─ FSU1 ─[FSU1.sw]─ FSU2 ─[FSU2.sw]─ … ─ FSUn ─[FSUn.sw]─ 전원
+  · FSU(구간분전함): 고리의 마디. 신호 FSUk.id(장치 ID) · FSUk.v(마디 전압) · FSUk.sw(다음 구간으로 나가는 개폐기: 0 개방 · 1 투입 · 2 차단)
+  · PPDU(20 kW급 초경량 휴대용 배전체계, PPDU-20): FSU 에서 받아 시설 부하로 나누어 준다(전력 흐름: ⑥ 배전체계 → FSU → PPDU → 6회로 → 시설 부하).
+    주 차단기(MCCB 40 A) 아래 분기 6회로 — CH1·CH2 3상 16 A(10.5 kW), CH3~CH6 단상 20 A(4.4 kW). CH2 는 PPDU 끼리의 환상 연결용.
+    신호 PPDUk.id · .v · .kw · .mccb(주 차단기) · .gnd(접지저항 Ω) · .lamp(상태등 0 정상·1 경보·2 고장) · .ch1~.ch6(회로 차단기) · .ch1_kw~.ch6_kw.
+    어느 FSU 에 붙이는지, 회로마다 어떤 시설을 물리고 몇 등급 부하인지는 현장에서 고른다(1등급이 물린 PPDU 가 중요 부하).
+  · 평소에는 한 구간(상시 개방점, open = 구간 번호)을 열어 둔다. 한 구간이 끊어지면 그 구간을 떼어 내고 상시 개방점을 닫아 반대쪽에서 보낸다.
+실제 구간 차단·절체는 보호·배전 자동화 장치가 한다. EMS 는 대응표의 신호로 상태를 감시하고 경보를 낸다.
+이 파일은 통신을 하지 않는 계산 함수와, 가상 장치에서 환망을 흉내 내는 Model 을 담는다.
+"""
+import re
+
+ID = re.compile(r"^(FSU|PPDU)[1-9][0-9]?$")
+V_LIVE = 300.0                   # 이 전압(V) 이상이면 그 마디에 전기가 들어온 것으로 본다
+MAX_FSU, MAX_PPDU = 12, 12
+KIND = {0x46: "FSU", 0x50: "PPDU"}       # 장치 ID 의 윗자리로 종류를 가린다(가정)
+KNAME = {"FSU": "구간분전함", "PPDU": "배전체계"}
+RATED_KW = 20.0                  # PPDU-20 정격
+LOAD_REF = 60.0                  # 가상 장치: 등급별 부하가 이 값(kW)일 때 회로가 정격의 90% 를 쓴다고 본다
+GND_LIMIT = 100.0                # 접지저항이 이 값(Ω)을 넘으면 주회로 투입 금지(인터록 IL-1)
+CH_SPEC = (("3상 16 A", 10.5), ("3상 16 A", 10.5), ("단상 20 A", 4.4), ("단상 20 A", 4.4), ("단상 20 A", 4.4), ("단상 20 A", 4.4))      # CH1~CH6 정격(형식, kW)
+CH_DEFAULT = ((3, ""), (0, "환상 연결"), (1, ""), (1, ""), (2, ""), (3, ""))                                                              # 기본 부하 등급(0 = 환상 연결용·미사용)
+
+
+def _ch(names):
+    return [{"name": n or d[1], "cls": d[0]} for n, d in zip(names, CH_DEFAULT)]
+
+
+DEFAULT = {"enabled": True, "auto": True, "fsu_slots": 7, "ppdu_slots": 8, "name": "부하 환망", "open": 4, "trip_ms": 1500, "close_ms": 2500,
+           "fsu": [{"id": f"FSU{k}", "code": 0x4600 + k, "name": f"구간분전함 {k}"} for k in range(1, 8)],
+           "ppdu": [{"id": "PPDU1", "code": 0x5001, "at": "FSU2", "name": "지휘·통신 배전", "ch": _ch(("예비 동력", "", "지휘소", "통신소", "상황실 조명", "생활 전열"))},
+                    {"id": "PPDU2", "code": 0x5002, "at": "FSU4", "name": "의무·조명 배전", "ch": _ch(("의무 장비", "", "수술·처치", "의무 통신", "경계 조명", "생활 전열"))},
+                    {"id": "PPDU3", "code": 0x5003, "at": "FSU6", "name": "정비·작업 배전", "ch": _ch(("정비 동력", "", "정비 통신", "공구 충전", "작업 조명", "생활 전열"))}]}
+
+
+def settings(cfg):
+    """설정을 채운다. 없으면 환망을 쓰지 않는다(None)."""
+    if not isinstance(cfg, dict) or not cfg.get("enabled", True) or not cfg.get("fsu"): return None
+    r = dict(DEFAULT, **cfg)
+    for p in r["ppdu"]:
+        ch = p.get("ch") if isinstance(p.get("ch"), list) else []
+        p["ch"] = [{"name": str((ch[i] if i < len(ch) else {}).get("name", d[1]))[:20], "cls": (ch[i] if i < len(ch) else {}).get("cls", d[0])} for i, d in enumerate(CH_DEFAULT)]
+    return r
+
+
+def _check_units(fsu, ppdu, bad):
+    """장치 이름·붙는 곳·부하·ID 검사."""
+    ids = [x.get("id") for x in fsu + ppdu]; names = {x.get("id") for x in fsu}
+    if any(not isinstance(i, str) or not ID.fullmatch(i) for i in ids) or len(set(ids)) != len(ids): bad.append("ring: 장치 이름은 FSU1·PPDU1 꼴이고 겹치지 않아야 함")
+    for p in ppdu:
+        if p.get("at") not in names: bad.append(f"ring.ppdu {p.get('id')}: 붙는 곳(at)은 FSU 중 하나")
+        ch = p.get("ch", [])
+        if not isinstance(ch, list) or len(ch) > 6 or any(not isinstance(c, dict) or c.get("cls", 0) not in (0, 1, 2, 3) for c in ch): bad.append(f"ring.ppdu {p.get('id')}: 회로(ch)는 6개까지, 등급(cls)은 0~3")
+    for x in fsu + ppdu:
+        c = x.get("code", 0)
+        if isinstance(c, bool) or not isinstance(c, int) or not 0 <= c <= 65535: bad.append(f"ring {x.get('id')}: 장치 ID(code)는 0~65535 의 정수")
+
+
+def _int_in(v, lo, hi):
+    return not isinstance(v, bool) and isinstance(v, (int, float)) and lo <= v <= hi
+
+
+def check(cfg, bad):
+    """runtime.json 의 ring 검사."""
+    if cfg is None: return
+    if not isinstance(cfg, dict): bad.append("ring: 객체여야 함"); return
+    fsu, ppdu = cfg.get("fsu", []), cfg.get("ppdu", [])
+    if not isinstance(fsu, list) or not isinstance(ppdu, list) or len(fsu) > MAX_FSU or len(ppdu) > MAX_PPDU or not all(isinstance(x, dict) for x in fsu + ppdu): bad.append(f"ring: fsu 는 {MAX_FSU}개, ppdu 는 {MAX_PPDU}개까지의 목록"); return
+    _check_units(fsu, ppdu, bad)
+    if fsu and not (isinstance(cfg.get("open", 0), int) and _int_in(cfg.get("open", 0), 0, len(fsu))): bad.append("ring.open: 상시 개방점은 0 ~ FSU 개수 사이의 구간 번호")
+    for k, hi in (("trip_ms", 5000), ("close_ms", 10000)):
+        if not _int_in(cfg.get(k, 0), 0, hi): bad.append(f"ring.{k}: 0~{hi} ms")
+    if not isinstance(cfg.get("auto", True), bool) or not _int_in(cfg.get("fsu_slots", 1), 1, MAX_FSU) or not _int_in(cfg.get("ppdu_slots", 1), 1, MAX_PPDU): bad.append(f"ring: auto 는 참·거짓, 자리 수(fsu_slots·ppdu_slots)는 1~{MAX_FSU}")
+
+
+def _slot_units(r, g, kind, n):
+    """자리마다 읽은 ID 로 그 자리에 놓인 장치를 정한다. 반환: (장치 목록, 빈 자리 목록).
+    값이 아직 없는 자리는 목록의 그 순서 장치를 그대로 둔다(seen 거짓). ID 0 은 빈 자리. 목록에 없는 ID 는 새 장치(new)."""
+    lst = r[kind.lower()]; cat = {x.get("code"): x for x in lst}; out = []; empty = []; used = set()
+    for k in range(1, n + 1):
+        sid = f"{kind}{k}"; raw = g(f"{sid}.id")
+        if raw is None:
+            if k <= len(lst): out.append(dict(lst[k - 1], id=sid, slot=k, seen=False, new=False, bad=""))
+            continue
+        code = int(round(raw))
+        if code == 0: empty.append(sid); continue
+        other = KIND.get(code >> 8); bad = "같은 ID 가 다른 자리에도 있음" if code in used else f"{KNAME[other]}의 ID — 종류가 다른 장치" if other not in (None, kind) else ""
+        used.add(code); base = cat.get(code) or {"name": f"{KNAME[kind]} (ID {code})"}
+        out.append(dict(base, id=sid, slot=k, code=code, seen=True, new=code not in cat, bad=bad))
+    return out, empty
+
+
+def layout(r, g):
+    """지금 놓인 배치(자동 인식). 설정 r 의 fsu·ppdu 는 '아는 장치 목록'이고, 반환값의 fsu·ppdu 는 자리 순서대로 지금 있는 장치다."""
+    if r.get("eff") or not r.get("auto", True): return r
+    fsu, e1 = _slot_units(r, g, "FSU", r.get("fsu_slots", len(r["fsu"]))); ppdu, e2 = _slot_units(r, g, "PPDU", r.get("ppdu_slots", len(r["ppdu"])))
+    by = {f["code"]: f["id"] for f in fsu if f["seen"]}; ids = {f["id"] for f in fsu}
+    for p in ppdu:
+        up = g(f"{p['id']}.up") if p["seen"] else None
+        if up is not None: p["at"] = by.get(int(round(up)), ""); p["at_auto"] = True
+        elif p.get("at") not in ids: p["at"] = ""
+        if not isinstance(p.get("ch"), list): p["ch"] = _ch(("",) * 6)
+    sw = ["RING.sw0"] + [f"{f['id']}.sw" for f in fsu]; want = f"FSU{r['open']}.sw" if r["open"] else "RING.sw0"
+    op = sw.index(want) if want in sw else next((i for i, t in enumerate(sw) if g(t) is not None and int(round(g(t))) == 0), len(sw) - 1)     # 상시 개방점 자리가 비었으면 지금 열려 있는 구간을 개방점으로 본다
+    return dict(r, fsu=fsu, ppdu=ppdu, open=op, eff=True, empty=e1 + e2)
+
+
+def sw_tags(r):
+    """구간 개폐기 신호 이름: 구간 0 은 전원 쪽(RING.sw0), 구간 k 는 FSUk 다음(FSUk.sw)."""
+    return ["RING.sw0"] + [f"{f['id']}.sw" for f in r["fsu"]]
+
+
+def tags(r):
+    """환망이 쓰는 신호 이름 전부(대응표에 있어야 EMS 가 본다)."""
+    out = sw_tags(r) + ["RING.auto"]
+    for f in r["fsu"]: out += [f"{f['id']}.id", f"{f['id']}.v"]
+    for p in r["ppdu"]: out += [f"{p['id']}.{k}" for k in ("id", "v", "kw", "mccb", "gnd", "lamp") + (("up",) if p.get("at_auto") else ())] + [f"{p['id']}.ch{n}{x}" for n in range(1, 7) for x in ("", "_kw")]
+    return out
+
+
+def _fed(ok, n):
+    """구간이 이어졌는지(ok)로 마디마다 전원까지 닿는지: 왼쪽으로든 오른쪽으로든 닿으면 참."""
+    return [all(ok[:k + 1]) or all(ok[k + 1:]) for k in range(n)]
+
+
+def _unit(x, g, fed=None):
+    """장치 하나의 읽은 값: 전압·공급 여부·ID."""
+    v = g(f"{x['id']}.v"); idr = g(f"{x['id']}.id"); idr = None if idr is None else int(round(idr))
+    ok = None if idr is None else (not x["bad"] if "seen" in x else idr == x.get("code", 0))                # 자동 인식이면 읽은 ID 가 곧 그 장치다(겹치거나 종류가 다를 때만 문제)
+    return {"id": x["id"], "name": x.get("name", x["id"]), "v": v, "live": None if v is None else v >= V_LIVE, "id_read": idr, "code": x.get("code", 0), "id_ok": ok, "fed": fed, "new": bool(x.get("new")), "bad": x.get("bad", "")}
+
+
+def _ppdus(r, g, fsu_live):
+    """배전체계(PPDU)들의 읽은 값: 주 차단기·접지저항·상태등·회로 6개, 붙은 구간분전함이 살아 있는지."""
+    out = []
+    for p in r["ppdu"]:
+        st = lambda t, i=p["id"]: None if g(f"{i}.{t}") is None else int(round(g(f"{i}.{t}")))
+        ch = [{"n": n + 1, "name": c["name"], "cls": c["cls"], "type": CH_SPEC[n][0], "limit": CH_SPEC[n][1], "cb": st(f"ch{n + 1}"), "kw": g(f"{p['id']}.ch{n + 1}_kw")} for n, c in enumerate(p["ch"])]
+        kw = g(f"{p['id']}.kw"); gnd = g(f"{p['id']}.gnd")
+        out.append(dict(_unit(p, g), at=p["at"], at_auto=bool(p.get("at_auto")), kw=kw, mccb=st("mccb"), gnd=gnd, lamp=st("lamp"), ch=ch, vital=any(c["cls"] == 1 for c in p["ch"]), at_live=fsu_live.get(p["at"]),
+                        over=None if kw is None else kw > RATED_KW, gnd_bad=None if gnd is None else gnd > GND_LIMIT))
+    return out
+
+
+def _recog(r, units):
+    """자동 인식 요약: 쓰는지, 빈 자리, 처음 보는 장치."""
+    return {"auto": bool(r.get("eff")), "empty": r.get("empty", []), "new": [x["id"] for x in units if x["new"]]}
+
+
+def status(r, val, lost=False):
+    """지금 상태. val: 신호 값(없으면 None). lost: 그 신호를 가져오는 통신이 끊겼는지.
+    반환: {sections: [{i, tag, state, open}], fsu: [{id, name, v, live, id_read, id_ok, fed}], ppdu: [...], ok, switched, isolated, missing}"""
+    g = (lambda t: None) if lost else val.get; r = layout(r, g); n = len(r["fsu"]); sw = sw_tags(r)
+    secs = [{"i": i, "tag": t, "state": None if g(t) is None else int(round(g(t))), "open": i == r["open"]} for i, t in enumerate(sw)]
+    fed = _fed([s["state"] == 1 for s in secs], n) if all(s["state"] is not None for s in secs) else [None] * n
+    fsu = [_unit(f, g, fed[k]) for k, f in enumerate(r["fsu"])]; auto = g("RING.auto"); ppdu = _ppdus(r, g, {f["id"]: f["live"] for f in fsu})
+    return {"name": r["name"], "sections": secs, "fsu": fsu, "ppdu": ppdu, "open": r["open"], "auto": None if auto is None else auto > 0.5,
+            "ok": n > 0 and all(f["live"] for f in fsu), "switched": bool(secs) and secs[r["open"]]["state"] == 1,
+            "isolated": [f["id"] for f in fsu if f["live"] is False], "cut": [s["i"] for s in secs if s["state"] == 2], "missing": [t for t in tags(r) if val.get(t) is None], "eff": r, "recog": _recog(r, fsu + ppdu)}
+
+
+def _found(s):
+    """자동 인식 결과: 자리 순서대로 지금 있는 장치와 빈 자리."""
+    out = []
+    def row(kind, u, where):
+        st = "무응답" if u["id_read"] is None else "확인 필요" if u["bad"] else "인식"
+        out.append({"seq": len(out) + 1, "kind": kind, "id": u["id"], "name": u["name"], "where": where, "expect": None, "read": u["id_read"], "state": st, "hint": u["bad"] or ("처음 보는 장치 — 바로 넣었습니다" if u["new"] else ""), "v": u["v"]})
+    for k, f in enumerate(s["fsu"]):
+        row("FSU", f, f"고리의 {k + 1}번째 마디")
+        for p in s["ppdu"]:
+            if p["at"] == f["id"]: row("PPDU", p, f"{f['name']}({f['id']})에 연결" + (" · 1등급 부하 있음" if p["vital"] else ""))
+    for p in s["ppdu"]:
+        if not p["at"]: row("PPDU", dict(p, bad=p["bad"] or "어느 구간분전함에 물렸는지 알 수 없음"), "연결 미확인")
+    for sid in s["recog"]["empty"]: out.append({"seq": len(out) + 1, "kind": "FSU" if sid.startswith("FSU") else "PPDU", "id": sid, "name": "", "where": "", "expect": None, "read": 0, "state": "비어 있음", "hint": "", "v": None})
+    live = [x for x in out if x["state"] != "비어 있음"]; bad = sum(1 for x in live if x["state"] != "인식")
+    return {"rows": out, "ok": bad == 0 and bool(live), "n": len(live), "bad": bad, "auto": True, "fsu": len(s["fsu"]), "ppdu": len(s["ppdu"]), "empty": len(s["recog"]["empty"])}
+
+
+def discover(r, val, lost=False):
+    """초기 기동 점검: 전원에서 가까운 순서(고리 순서)로 FSU 를 확인하고, FSU 마다 거기 붙은 PPDU 를 확인한다.
+    자동 인식이면 자리마다 읽은 ID 로 알아낸 배치를 돌려준다(state: 인식 · 확인 필요 · 무응답 · 비어 있음).
+    고정 배치(auto 거짓)면 [{seq, kind, id, name, where, expect, read, state}] — state: 일치 · 불일치 · 무응답. 불일치이고 다른 장치의 ID 와 같으면 '자리 바뀜'으로 알려 준다."""
+    s = status(r, val, lost); codes = {x["code"]: x["id"] for x in s["fsu"] + s["ppdu"]}; out = []
+    if s["recog"]["auto"]: return _found(s)
+    def row(kind, u, where):
+        st = "무응답" if u["id_read"] is None or u["id_read"] == 0 else "일치" if u["id_ok"] else "불일치"
+        hint = f" — {codes[u['id_read']]} 의 ID 입니다(자리가 바뀌었는지 확인)" if st == "불일치" and u["id_read"] in codes else ""
+        out.append({"seq": len(out) + 1, "kind": kind, "id": u["id"], "name": u["name"], "where": where, "expect": u["code"], "read": u["id_read"], "state": st, "hint": hint, "v": u["v"]})
+    for k, f in enumerate(s["fsu"]):
+        row("FSU", f, f"고리의 {k + 1}번째 마디")
+        for p in s["ppdu"]:
+            if p["at"] == f["id"]: row("PPDU", p, f"{f['id']} 에 연결" + (" · 1등급 부하 있음" if p["vital"] else ""))
+    return {"rows": out, "ok": all(x["state"] == "일치" for x in out), "n": len(out), "bad": sum(1 for x in out if x["state"] != "일치")}
+
+
+def _id_text(u):
+    return f"{u['id']} 자리의 장치 ID {u['id_read']} — {u['bad']}" if u["bad"] else f"{u['id']} 장치 ID 불일치(기대 {u['code']}, 읽음 {u['id_read']}) — 설치 위치 확인"
+
+
+def alarms(r, s):
+    """경보 목록: [(열쇠, 발생 여부, 등급, 대상, 글)]. 값이 없는 신호는 따지지 않는다(통신 경보가 따로 난다)."""
+    out = []; r = s.get("eff", r)
+    for sec in s["sections"]:
+        a = "전원" if sec["i"] == 0 else r["fsu"][sec["i"] - 1]["id"]; b = "전원" if sec["i"] == len(r["fsu"]) else r["fsu"][sec["i"]]["id"]
+        out.append((f"ring.cut.{sec['i']}", sec["state"] == 2, 2, "환망", f"환망 구간 {sec['i']}({a} ↔ {b}) 차단 — 그 구간의 케이블·접속부 점검"))
+    out.append(("ring.switched", bool(s["switched"]), 3, "환망", "환망 상시 개방점이 닫혀 있음 — 반대쪽 공급 중(다음 고장에 여유 없음). 고장 구간 복구 뒤 원래대로 되돌리십시오"))
+    for f in s["fsu"]:
+        vital = any(p["vital"] for p in s["ppdu"] if p["at"] == f["id"])
+        out.append((f"ring.dead.{f['id']}", f["live"] is False, 1 if vital else 2, f["id"], f"{f['name']}({f['id']}) 무전압 — 이 마디의 부하 정전" + (" [중요 부하]" if vital else "")))
+        out.append((f"ring.id.{f['id']}", f["id_ok"] is False and f["id_read"] not in (None, 0), 3, f["id"], _id_text(f)))
+    for p in s["ppdu"]:
+        i = p["id"]; top = 1 if p["vital"] else 2
+        out.append((f"ring.dead.{i}", p["live"] is False and p["at_live"] is True, top, i, f"{p['name']}({i}) 무전압 — {p['at']} 는 살아 있음. 입력 케이블·주 차단기 확인"))
+        out.append((f"ring.id.{i}", p["id_ok"] is False and p["id_read"] not in (None, 0), 3, i, _id_text(p)))
+        out.append((f"ring.at.{i}", p["at_auto"] and not p["at"], 3, i, f"{p['name']}({i}) 가 어느 구간분전함에 물렸는지 알 수 없음 — 입력 케이블·통신 확인"))
+        out.append((f"ring.mccb.{i}", p["mccb"] == 2, top, i, f"{p['name']}({i}) 주 차단기 트립 — 6회로 모두 정전. 단락·과부하 원인 확인"))
+        out.append((f"ring.over.{i}", bool(p["over"]), 2, i, f"{p['name']}({i}) 과부하 {p['kw'] or 0:.1f} kW — 정격 {RATED_KW:.0f} kW 초과. 낮은 등급 회로부터 줄이십시오"))
+        out.append((f"ring.gnd.{i}", bool(p["gnd_bad"]), 2, i, f"{p['name']}({i}) 접지저항 {p['gnd'] or 0:.0f} Ω — {GND_LIMIT:.0f} Ω 초과(주회로 투입 금지 조건). 접지봉·접지선 보강"))
+        for c in p["ch"]:
+            out.append((f"ring.ch.{i}.{c['n']}", c["cb"] == 2 and c["cls"] > 0, c["cls"] or 3, i, f"{p['name']}({i}) CH{c['n']} {c['name']} 회로 트립 — {c['cls']}등급 부하 정전"))
+    return out
+
+
+class Model:
+    """가상 장치에서 환망을 움직인다(시연·교육·시나리오 검증용). 단선은 brk 에 구간 번호를 넣어 만든다(또는 모의 신호 BRK.<번호>).
+    place 가 '어느 자리에 어떤 장치가 놓였는지'다 — 장치를 빼고 넣고 섞어서 자동 인식을 연습한다."""
+    def __init__(self, r, plant, kw=None):
+        self.r = r if r and "RING.sw0" in plant.by_tag else None; self.p = plant; self.kw = kw or {"L1": "LOAD.p1_kw", "L2": "LOAD.p2_kw", "L3": "LOAD.p3_kw"}
+        self.brk = set(); self.t_brk = {}; self.t_trip = None; self.init = set(); self.armed = False; self.swap = None; self.place = {}
+        if self.r is None: return
+        self._place0(); self._ids(); e = self.eff()
+        for i, t in enumerate(sw_tags(e)): plant.set(t, 0 if i == e["open"] else 1)
+        plant.set("RING.auto", 1); self._update(e)
+
+    def _place0(self):
+        """처음 배치: 목록의 순서대로 자리에 놓는다."""
+        num = lambda t: int(re.sub(r"\D", "", str(t)) or 0)
+        self.place = {"fsu": {k + 1: f.get("code", 0) for k, f in enumerate(self.r["fsu"])}, "ppdu": {k + 1: [p.get("code", 0), num(p.get("at"))] for k, p in enumerate(self.r["ppdu"])}}
+
+    def _n(self, kind):
+        return max(self.r.get(f"{kind}_slots", 0), len(self.r[kind]))
+
+    def _ids(self):
+        """자리마다 장치 ID 를 낸다. 빈 자리는 0. 배전체계는 물린 구간분전함의 ID(up)도 낸다."""
+        f = dict(self.place["fsu"]); pp = {k: v[0] for k, v in self.place["ppdu"].items()}; put = lambda t, v: self.p.set(t, v) if t in self.p.by_tag else None
+        if self.swap:                                                                    # 두 자리의 장치를 맞바꾼 상황
+            (ka, a), (kb, b) = [("fsu" if x.startswith("FSU") else "ppdu", int(re.sub(r"\D", "", x))) for x in self.swap]; da, db = (f if ka == "fsu" else pp), (f if kb == "fsu" else pp); da[a], db[b] = db.get(b, 0), da.get(a, 0)
+        for k in range(1, self._n("fsu") + 1): put(f"FSU{k}.id", f.get(k, 0))
+        for k in range(1, self._n("ppdu") + 1): put(f"PPDU{k}.id", pp.get(k, 0)); put(f"PPDU{k}.up", f.get(self.place["ppdu"][k][1], 0) if pp.get(k) else 0)
+
+    def eff(self):
+        """지금 놓인 배치(가상 장치의 신호로 자동 인식한 결과)."""
+        return layout(self.r, lambda t: self.p.get(t) if t in self.p.by_tag else None)
+
+    def _broken(self, i):
+        return i in self.brk or (f"BRK.{i}" in self.p.by_tag and self.p.get(f"BRK.{i}") > 0.5)
+
+    def _fsu_live(self, e):
+        """구간 개폐기와 단선으로 구간분전함마다 전기가 들어오는지 계산해 전압을 넣는다. 반환: {FSU: 공급 여부}"""
+        sw = sw_tags(e); src = "BUS.b_v" not in self.p.by_tag or self.p.get("BUS.b_v") > V_LIVE; self.armed = self.armed or src; src = src or not self.armed       # 모선 전압을 한 번 본 뒤부터 전원 정전을 따진다
+        ok = [int(round(self.p.get(t))) == 1 and not self._broken(i) for i, t in enumerate(sw)]; live = {}
+        for f, on in zip(e["fsu"], _fed(ok, len(e["fsu"]))): live[f["id"]] = src and on
+        for k in range(1, self._n("fsu") + 1):
+            if f"FSU{k}.v" in self.p.by_tag: self.p.set(f"FSU{k}.v", 380.0 if live.get(f"FSU{k}") else 0.0)
+        return live
+
+    def _clear(self, i):
+        """빈 자리의 배전체계 신호를 0 으로."""
+        self.init.discard(i)
+        for t in ("v", "kw", "mccb", "gnd", "lamp") + tuple(f"ch{n}{x}" for n in range(1, 7) for x in ("", "_kw")):
+            if f"{i}.{t}" in self.p.by_tag: self.p.set(f"{i}.{t}", 0)
+
+    def _one(self, p, fed):
+        """배전체계 한 대: 전압·회로별 전력·상태등."""
+        i = p["id"]; P = self.p
+        if i not in self.init: self.init.add(i); P.set(f"{i}.mccb", 1); P.set(f"{i}.gnd", 35.0); [P.set(f"{i}.ch{n}", 1) for n in range(1, 7)]
+        on = fed and int(round(P.get(f"{i}.mccb"))) == 1; tot = 0.0; bad = int(round(P.get(f"{i}.mccb"))) == 2
+        if f"{i}.v" in P.by_tag: P.set(f"{i}.v", 380.0 if fed else 0.0)
+        for n, c in enumerate(p["ch"]):
+            tag = self.kw.get(f"L{c['cls']}"); closed = int(round(P.get(f"{i}.ch{n + 1}"))) == 1; bad = bad or int(round(P.get(f"{i}.ch{n + 1}"))) == 2
+            kw = CH_SPEC[n][1] * 0.9 * min(1.2, P.get(tag) / LOAD_REF) if on and closed and c["cls"] and tag in P.by_tag else 0.0      # 그 등급 부하의 크기에 비례(기준 부하에서 회로 정격의 90%)
+            P.set(f"{i}.ch{n + 1}_kw", round(kw, 1)); tot += kw
+        P.set(f"{i}.kw", round(tot, 1)); P.set(f"{i}.lamp", 2 if bad else 1 if tot > RATED_KW or P.get(f"{i}.gnd") > GND_LIMIT or not fed else 0)
+
+    def _update(self, e):
+        """구간분전함 전압 → 배전체계(PPDU) 전압·주 차단기·회로별 전력. 회로 전력은 그 등급 부하(LOAD.pN_kw)의 크기에 비례하는 것으로 본다(가상 장치의 가정)."""
+        live = self._fsu_live(e); here = {p["id"]: p for p in e["ppdu"]}
+        for k in range(1, self._n("ppdu") + 1):
+            i = f"PPDU{k}"
+            if f"{i}.mccb" not in self.p.by_tag: continue
+            if i in here: self._one(here[i], bool(live.get(here[i]["at"], False)))
+            else: self._clear(i)
+
+    def tick(self, now):
+        if self.r is None: return
+        self._ids(); e = self.eff(); sw = sw_tags(e); auto = self.p.get("RING.auto") > 0.5
+        for i, t in enumerate(sw):
+            if not self._broken(i) or int(round(self.p.get(t))) != 1: self.t_brk.pop(i, None); continue
+            if not auto: continue
+            t0 = self.t_brk.setdefault(i, now)
+            if now - t0 >= e["trip_ms"] / 1000.0: self.p.set(t, 2); self.t_brk.pop(i, None); self.t_trip = now                 # 구간 차단
+        if auto and self.t_trip is not None and now - self.t_trip >= e["close_ms"] / 1000.0:
+            no = e["open"]
+            if int(round(self.p.get(sw[no]))) == 0 and not self._broken(no): self.p.set(sw[no], 1)                              # 상시 개방점 투입 → 반대쪽에서 공급
+            self.t_trip = None
+        self._update(e)
+
+    def remove(self, sid):
+        """그 자리의 장치를 뺀다. 빼는 구간분전함의 개폐기가 열려 있었으면(상시 개방점) 앞 구간을 대신 연다."""
+        kind = "fsu" if sid.startswith("FSU") else "ppdu"; k = int(re.sub(r"\D", "", sid))
+        if k not in self.place[kind]: raise ValueError("그 자리에 장치가 없습니다")
+        if kind == "fsu":
+            if len(self.place["fsu"]) <= 1: raise ValueError("구간분전함은 한 대 이상 있어야 합니다")
+            sw = sw_tags(self.eff()); i = sw.index(f"FSU{k}.sw") if f"FSU{k}.sw" in sw else 0
+            if i and int(round(self.p.get(sw[i]))) == 0: self.p.set(sw[i - 1], 0)
+        del self.place[kind][k]
+
+    def add(self, kind, at=0):
+        """빈 자리에 새 장치를 놓는다(처음 보는 ID). 배전체계는 at 번째 자리의 구간분전함에 물린다."""
+        pl = self.place[kind]; k = next((i for i in range(1, self._n(kind) + 1) if i not in pl), None)
+        if k is None: raise ValueError("빈 자리가 없습니다")
+        used = set(self.place["fsu"].values()) | {v[0] for v in self.place["ppdu"].values()}; base = 0x4600 if kind == "fsu" else 0x5000; code = next(c for c in range(base + 21, base + 250) if c not in used)
+        if kind == "fsu": pl[k] = code; self.p.set(f"FSU{k}.sw", 1)
+        else: pl[k] = [code, at if at in self.place["fsu"] else min(self.place["fsu"])]
+
+    def shuffle(self):
+        """놓인 자리를 뒤섞는다: 구간분전함은 순서를 거꾸로, 배전체계는 한 자리씩 민다(이름·회로 구성이 ID 를 따라가는지 보는 연습)."""
+        f = self.place["fsu"]; ks = sorted(f); f.update(dict(zip(ks, [f[k] for k in reversed(ks)])))
+        pp = self.place["ppdu"]; ks = sorted(pp); codes = [pp[k][0] for k in ks]
+        for k, c in zip(ks, codes[1:] + codes[:1]): pp[k][0] = c
+        self.init.clear()
+
+    def restore(self):
+        """고장을 없애고 처음 상태(처음 배치, 상시 개방점만 열림)로 되돌린다."""
+        if self.r is None: return
+        self.brk.clear(); self.swap = None; self.t_trip = None; self.t_brk.clear(); self._place0(); self._ids(); e = self.eff()
+        for i, t in enumerate(sw_tags(e)): self.p.set(t, 0 if i == e["open"] else 1)
+        self.p.set("RING.auto", 1); self.init.clear()

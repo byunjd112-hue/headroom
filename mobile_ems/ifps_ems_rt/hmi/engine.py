@@ -18,7 +18,7 @@ from ..runtime import Runtime
 from ..simplant import Plant
 from .cfgedit import ConfigEditor
 from ifps_ems.dataio import sky_from_clearness as dataio_sky
-from . import fuelwatch, fcstats, archwatch
+from . import fuelwatch, fcstats, archwatch, ringwatch, autodev
 from .skywatch import SkyWatch
 
 PRIO_TXT = {1: "긴급", 2: "높음", 3: "보통", 4: "낮음"}
@@ -249,7 +249,7 @@ class Engine:
         self.fuel_cfg = dict({"dg_tank_l": 1000.0, "warn_pct": 50.0, "warn_h": 8.0, "repeat_min": 30.0}, **(self.cfg.get("fuel") or {})); self._fuel_t = {}
         self.ai_cfg = dict({"enabled": True, "retrain_h": 24.0, "sim_retrain_h": 2.0, "first_min": 3.0}, **(self.cfg.get("ai") or {}))
         self.skyw = SkyWatch(self)                                                      # 하늘 카메라(구름량 → 태양광 예측 입력)
-        self.archw = archwatch.ArchWatch(self)                                          # 기록 보관소(검침 누적값·상황 기록·점검 기록)
+        self.archw = archwatch.ArchWatch(self); self.ever = set(); self.ringw = ringwatch.RingWatch(self)       # 기록 보관소(검침 누적값·상황 기록·점검 기록) · 환망 감시(구간분전함·분전반)
         self.ai_busy = False; self.ai_last = None; self.ai_next = time.time() + 60.0 * float(self.ai_cfg["first_min"])
         self._tag_dev = {p["tag"]: p["device"] for p in self.rt.pts}
         self.cfged = ConfigEditor(self.cfg_path, note=self.rt.note)                      # 설정 편집기(원본 설정 파일 대상, 재기동 후 적용)
@@ -504,13 +504,13 @@ class Engine:
                     for n, st in ch.items():
                         rt.note("통신", f"{n} 통신 {st}")
                         if n in rt.dev: rt.dev[n].online = rt.controllable(n)
-                        self.alarms.set(f"link.{n}", st == "두절", 1, n, f"{n} 통신 두절 — 지령 차단, 직전 유효값 유지")
+                        autodev.link_alarm(self, n, st)
                     self.purge()
             except Exception as e:
                 self.rt.note("오류", f"감시 주기 예외: {type(e).__name__}: {e}")
 
     def _post_scan(self):
-        k = self.kpi(); self._integrate(k); self.archw.step(self, k)
+        k = self.kpi(); self._integrate(k); self.archw.step(self, k); self.ringw.step(self)
         self.trend.append([round(time.time() * 1000), round(k["load"], 2), round(k["pv"], 2), round(k["dg"], 2), round(k["fc"], 2), round(k["ess"], 2),
                            round(k["soc"], 2), round(k["h2"], 1), round(k["reserve_margin"], 1)])
         self._alarms_comm(); self._alarms_process(k); self._alarms_grid(); self._alarms_ops(); self._alarms_events()
@@ -519,7 +519,7 @@ class Engine:
         """통신·품질 경보."""
         rt = self.rt; A = self.alarms
         for n, st in rt.lm.state.items():
-            A.set(f"link.{n}", st == "두절", 1, n, f"{n} 통신 두절 — 지령 차단, 직전 유효값 유지")
+            autodev.link_alarm(self, n, st)
             dead = [p for p, a in rt.links[n].alive.items() if not a]
             A.set(f"deg.{n}", st == "경로 저하", 3, n, f"{n} 통신 경로 저하 — 경로 {','.join(dead) or '?'} 무응답")
             A.set(f"hb.{n}", rt.hb_stop.get(n, False) and st != "두절", 1, n, f"{n} 생존 계수(hb) {SUP['stale_s']:.0f}초 이상 정지 — 장치 제어기 이상, 지령 차단")
@@ -785,7 +785,7 @@ class Engine:
         rt = self.rt; d = rt.dev.get(n)
         paths = {k: {"alive": lk.alive.get(k, False), "host": f"{cl.host}:{cl.port}", "unit": cl.unit, "ok": cl.n_ok, "err": cl.n_err,
                      "rtt": None if cl.last_rtt is None else round(cl.last_rtt * 1000, 2), "last_err": cl.last_err, "age": round(now - rt.lm.last[n][k], 1)} for k, cl in lk.cl.items()}
-        return {"link": rt.lm.state[n], "since": round(now - rt.lm.since[n], 1), "ctl": n in rt.dev, "paths": paths,
+        return {"link": rt.lm.state[n], "absent": autodev.absent(self, n), "since": round(now - rt.lm.since[n], 1), "ctl": n in rt.dev, "paths": paths,
                 "on": (d.on if d else (rt.val.get(f"{n}.status") or 0) > 0.5), "manual": d.manual if d else False, "online": rt.controllable(n), "hb_stop": rt.hb_stop.get(n, False),
                 "seq_ack": rt.val.get(f"{n}.seq_ack"), "hb": rt.val.get(f"{n}.hb")}
 
@@ -807,7 +807,7 @@ class Engine:
                           "avg_ms": round(sum(sm) / len(sm), 1) if sm else None, "p95_ms": round(st[int(len(st) * 0.95) - 1], 1) if len(st) > 20 else None,
                           "scan_s": float(self.cfg.get("scan_s", 1.0)), "wd": {k: (None if t is None else round(now - t, 1)) for k, t in rt.wd.last.items()},
                           "trace_n": self.trace_n, "audit_seq": rt.audit.seq, "hist": hist, "hist_top": round(top, 1)},
-                "sim_state": self.sim_state() if self.sim else None, "ops": self.ops(), "energy": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in self.energy.items() if k != "hours"}}
+                "sim_state": self.sim_state() if self.sim else None, "ring": self.ringw.status(), "ops": self.ops(), "energy": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in self.energy.items() if k != "hours"}}
 
     def sim_state(self):
         p = self.plant

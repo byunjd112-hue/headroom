@@ -87,32 +87,5 @@
    "delay_ms": 500,
    "code": 27
   }
- ],
- "ring": {
-  "enabled": true,
-  "name": "부하 환망(고리 모양 배전)",
-  "sections": [
-   "S1",
-   "S2",
-   "S3",
-   "S4"
-  ],
-  "open": "S3",
-  "nodes": [
-   {
-    "id": "N1",
-    "feeder": "L1"
-   },
-   {
-    "id": "N2",
-    "feeder": "L2"
-   },
-   {
-    "id": "N3",
-    "feeder": "L3"
-   }
-  ],
-  "trip_ms": 150,
-  "close_ms": 400
- }
+ ]
 }
