@@ -1,6 +1,6 @@
 {
- "date": "2026-11-21 02:14",
- "unittest_s": 304.7,
+ "date": "2026-11-21 02:40",
+ "unittest_s": 299.9,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -170,7 +170,7 @@
  },
  "branch": {
   "n": 1872,
-  "hit": 1532,
+  "hit": 1531,
   "pct": 81.8
  },
  "coverage_files": [
@@ -386,7 +386,7 @@
    "ifps_ems_rt/simplant.py",
    98.5,
    134,
-   94.0,
+   92.0,
    50,
    "130-131"
   ],
@@ -2008,7 +2008,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/train.js",
-   114,
+   165,
    true
   ],
   [
