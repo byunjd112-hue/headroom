@@ -790,3 +790,29 @@ body.viewer { overflow: auto; } .viewer-wrap { max-width: 1500px; margin: 0 auto
 .c-band { fill: rgba(var(--acc, 120,170,220), .22); background: rgba(var(--acc, 120,170,220), .35); } .arc-line { fill: none; stroke: var(--load, #6fa8dc); stroke-width: 1.8; }
 .arc-miss { color: var(--muted); opacity: .6; } table.arc-ess th { white-space: nowrap; font-size: 11px; } th.arc-grp { text-align: center; border-left: 1px solid var(--line); } .arc-act { white-space: nowrap; } .arc-act .btn { margin-left: 4px; }
 table.arc-ess td { white-space: nowrap; }
+
+/* ── 이상 조치 안내(troubleshoot.js) */
+.modal.wide { width: min(980px, 92vw); max-height: 88vh; overflow: auto; } .ts h3 { margin: 0; } .ts-hd { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; } .ts h4 { margin: 12px 0 4px; font-size: 13px; color: var(--accent-ink, var(--accent)); }
+.ts p { margin: 4px 0; line-height: 1.55; } .ts-list { margin: 0; padding-left: 20px; line-height: 1.6; } .ts-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; } .ts-alm { background: rgba(255,90,120,.10); border-left: 3px solid var(--alarm); padding: 6px 10px; border-radius: 4px; }
+.ts-danger { background: rgba(255,190,60,.12); border-left: 3px solid var(--warn); padding: 6px 10px; border-radius: 4px; } .ts-note { margin-top: 12px; } .ts-btn { margin-left: 8px; opacity: .8; } .ts-page { display: grid; grid-template-columns: 360px 1fr; gap: 12px; }
+@media print { body * { visibility: hidden; } #modalBox, #modalBox * { visibility: visible; color: #000 !important; background: #fff !important; } #modalBox { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; border: 0; } #modalBox .btn { display: none; } }
+input.in.sm, select.in.sm { height: 26px; font-size: 12px; min-width: 0; } .arc-form label { font-size: 12.5px; color: var(--text2); display: inline-flex; gap: 6px; align-items: center; }
+.col-sig { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; } .col-dev { display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; } .col-dev b { font-size: 12.5px; margin-bottom: 2px; }
+
+/* ── 도움말(manual.js) */
+.hp { display: grid; grid-template-columns: 300px 1fr; gap: 12px; } .hp-link { display: block; padding: 7px 12px; cursor: pointer; border-left: 3px solid transparent; font-size: 13px; color: var(--text2); } .hp-link:hover { background: rgba(255,255,255,.04); }
+.hp-link.on { border-left-color: var(--accent); color: var(--text); background: rgba(255,255,255,.05); } .hp-text { line-height: 1.7; font-size: 14px; max-width: 1100px; } .hp-text p { margin: 6px 0; } .hp-text h4 { margin: 16px 0 4px; color: var(--accent-ink, var(--accent)); font-size: 14px; }
+.hp-steps { margin: 4px 0 8px; padding-left: 22px; } .hp-note { background: rgba(255,190,60,.12); border-left: 3px solid var(--warn); padding: 6px 10px; border-radius: 4px; } .hp-tbl td { white-space: normal; vertical-align: top; } .hp-fig { margin: 10px 0; } .hp-fig img { max-width: 100%; border: 1px solid var(--line2); border-radius: 8px; }
+.hp-fig figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; } .hp-q { margin-left: auto; }
+@media print { .hp-toc, nav, header, footer, .pagehd { display: none !important; } .hp { display: block; } .hp-doc, .hp-doc * { visibility: visible !important; color: #000 !important; background: #fff !important; } .hp-text { max-height: none !important; overflow: visible !important; } }
+.modal.wide { padding: 18px 22px; }
+
+/* ── 교육 창(train.js) */
+.train { position: fixed; right: 14px; bottom: 44px; width: 380px; max-height: 72vh; z-index: 60; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--accent); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.55); font-size: 13px; }
+.train.min { max-height: 44px; overflow: hidden; } .tr-hd { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line2); } .tr-hd b { font-size: 14px; }
+.tr-tabs { display: flex; gap: 4px; padding: 8px 10px 0; flex-wrap: wrap; } .tr-tab { min-width: 28px; height: 26px; border-radius: 8px; border: 1px solid var(--line2); background: var(--panel2); color: var(--text2); cursor: pointer; padding: 0 6px; }
+.tr-tab.on { border-color: var(--accent); color: var(--text); } .tr-tab.ok { background: rgba(60,180,120,.25); color: var(--ok); } .tr-bd { padding: 10px 14px; overflow: auto; line-height: 1.55; } .tr-bd h4 { margin: 0 0 6px; font-size: 14px; }
+.tr-d { margin: 0 0 8px; color: var(--text2); } .tr-k div { padding: 3px 0; } .tr-k i { display: inline-block; width: 20px; font-style: normal; color: var(--muted); } .tr-k .ok { color: var(--ok); } .tr-k .ok i { color: var(--ok); }
+.tr-q { margin-top: 10px; border-top: 1px dashed var(--line2); padding-top: 8px; } .tr-q p { margin: 0 0 5px; } .tr-o { display: block; width: 100%; text-align: left; margin: 3px 0; padding: 5px 9px; border-radius: 8px; border: 1px solid var(--line2); background: var(--panel2); color: var(--text); cursor: pointer; }
+.tr-o.ok { border-color: var(--ok); background: rgba(60,180,120,.18); } .tr-o.bad { border-color: var(--alarm); background: rgba(255,90,120,.14); } .tr-x.ok { color: var(--ok); } .tr-x.bad { color: var(--warn); } .tr-ft { display: flex; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--line2); }
+.tr-who { display: flex; gap: 6px; margin-bottom: 6px; } .tr-score { font-weight: 700; margin: 10px 0 6px; }

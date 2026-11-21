@@ -41,12 +41,14 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await go("archive", null, 2500); await p.screenshot({ path: D + "archive.png" });
   await p.click('#arcTabs button[data-t="ess"]'); await p.waitForTimeout(1200); await p.screenshot({ path: D + "arch_ess.png" });
   await p.click('#arcTabs button[data-t="device"]'); await p.waitForTimeout(1200); await p.click('[data-d="FC"]').catch(() => {}); await p.waitForTimeout(1200); await p.screenshot({ path: D + "arch_dev.png" });
+  await p.click('#arcTabs button[data-t="collect"]'); await p.waitForTimeout(1500); await p.screenshot({ path: D + "arch_collect.png" });
+  await go("help", null, 2000); await p.screenshot({ path: D + "help.png" }); await go("archive", null, 2000);
   await p.click('#arcTabs button[data-t="xfer"]'); await p.waitForTimeout(1000); await post("/api/archive/xfer/make", { from: new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10), to: new Date(Date.now() - 864e5).toISOString().slice(0, 10) }).then(r => r.row && post("/api/archive/xfer/mark", { id: r.row.id, note: "보안 USB → 주둔지 서버(캡처용 예시)" }));
   await post("/api/archive/xfer/make", {}); await p.click('#arcTabs button[data-t="xfer"]'); await p.waitForTimeout(1500); await p.screenshot({ path: D + "arch_xfer.png" }); await p.click('#arcTabs button[data-t="meter"]');
   await go("energy", null, 9000); await p.click("#enAi"); await p.waitForTimeout(1500); await p.screenshot({ path: D + "ai_learn.png" }); await p.evaluate(() => closeModal());
   // 2) 고장: 2등급 급전선 과전류 트립 + 연료전지 통신 두절
   await sim({ action: "fault", target: "L2", code: 51 }); await sim({ action: "mute", target: "FC", on: true }); await p.waitForTimeout(6000);
-  await go("overview", "fault_overview", 2000); await go("sld", "fault_sld"); await go("alarms", "alarms"); await go("comm", "fault_comm");
+  await go("overview", "fault_overview", 2000); await go("sld", "fault_sld"); await go("alarms", "alarms"); await p.evaluate(() => { const b = [...document.querySelectorAll("#almRows tr")].find(r => r.textContent.includes("트립")); (b || document).querySelector("[data-ts]")?.click(); }); await p.waitForTimeout(900); await p.screenshot({ path: D + "alarm_guide.png" }); await p.evaluate(() => closeModal()); await go("comm", "fault_comm");
   await sim({ action: "scenario", name: "normal" }); await p.waitForTimeout(5000); await post("/api/ack", { ids: "all" });
   // 3) 주둔지: 상전 연계 → 정전
   await post("/api/ops", { mode: "grid" }); await p.waitForTimeout(6000);

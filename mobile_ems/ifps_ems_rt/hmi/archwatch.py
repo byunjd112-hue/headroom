@@ -43,13 +43,24 @@ class ArchWatch:
         except queue.Full: self.dropped += 1; self.err = f"보관소 쓰기가 밀려 {self.dropped}건을 건너뜀"
 
     def _work(self):
-        st = self.store
         while True:
-            item = self.q.get()
+            item = self.q.get(); st = self.store
             if item is None: return
+            if item[0] == "reconf": self._apply(*item[1:]); continue
             now, mono, inst, val, eng = item
             st.arch.tick(inst, now, mono); st.dev.tick(val, now)
             if mono - self.t_sync >= 2.0: self.t_sync = mono; st.arch.sync(eng.rt.events, eng.alarms.hist)
+
+    def reconfigure(self, eng, cfg, items):
+        """수집 항목·주기를 바꾼다. 쓰기 작업 스레드가 차례에 맞춰 적용한다(쌓던 구간은 먼저 적는다)."""
+        if self.store is not None: self.q.put(("reconf", eng.rt.pts, cfg, items)); self.flush()
+
+    def _apply(self, pts, cfg, items):
+        st = self.store; a = st.arch; st.dev.close()
+        with a.lock:
+            if a.acc and a.acc["n"]: a._flush()                         # pylint: disable=protected-access
+            a.slot = None; a.acc = None; a.cfg = dict(a.cfg, **{k: cfg[k] for k in ("interval_min", "dev_interval_min", "ess_interval_s", "retain_years", "max_mb", "dev_exclude")})
+        dev = archdev.DevLog(a, pts, items); st.xfer.d = dev; self.store = st._replace(dev=dev)
 
     def flush(self, timeout=5.0):
         """줄에 남은 값을 다 적을 때까지 기다린다(보고서·시험용)."""
@@ -99,6 +110,10 @@ def http_get(hd, eng, st, p, q):
             with open(os.path.join(st.xfer.outbox, d["file"]), "rb") as f: return hd._send(200, f.read(), "application/zip", {"Content-Disposition": "attachment; filename=" + d["file"]})     # pylint: disable=protected-access
         name, body = report.build(eng, st, q)
         return hd._send(200, body, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", {"Content-Disposition": "attachment; filename*=UTF-8''" + quote(name)})     # pylint: disable=protected-access
+    if p == "/api/archive/collect":
+        if eng is None: return hd._err(403, "기록 조회기에서는 수집 항목을 고칠 수 없습니다")     # pylint: disable=protected-access
+        from . import archcfg                                                        # pylint: disable=import-outside-toplevel — archcfg 가 이 모듈의 것을 쓴다
+        return hd._send(200, archcfg.read(eng)) if hd._sess("engineer") else None    # pylint: disable=protected-access
     r = archapi.get(st, p, q)
     if r is None: return hd._err(404, "없음")                                       # pylint: disable=protected-access
     return hd._send(200, r[0], r[1] or "application/json; charset=utf-8", r[2])     # pylint: disable=protected-access

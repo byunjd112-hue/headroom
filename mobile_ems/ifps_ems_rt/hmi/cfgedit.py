@@ -126,16 +126,16 @@ def _check_sections(cfg, bad):
 
 
 def _check_archive(ar, bad):
-    """기록 보관소: 저장 주기는 1·5·15·30·60분, 보관 기간은 1~5년."""
+    """기록 보관소: 주기는 정해진 값 중 하나, 보관 기간은 1~5년, 전송 주소는 http(s)."""
     if ar is None: return
     if not isinstance(ar, dict): bad.append("archive: 객체여야 함"); return
-    if "interval_min" in ar and ar["interval_min"] not in archive.INTERVALS: bad.append("archive.interval_min: 1·5·15·30·60 중 하나(분)")
-    if "retain_years" in ar and not (_in(ar["retain_years"], 1, 5) and float(ar["retain_years"]).is_integer()): bad.append("archive.retain_years: 1~5 의 정수(년)")
-    if "max_mb" in ar and not _in(ar["max_mb"], 16, 8192): bad.append("archive.max_mb: 16~8192 범위의 숫자(MB)")
-    if "enabled" in ar and not isinstance(ar["enabled"], bool): bad.append("archive.enabled: true 또는 false")
-    u = ar.get("server_url", "")
-    if not isinstance(u, str) or (u and not re.fullmatch(r"https?://[A-Za-z0-9.\-_]+(:\d{1,5})?(/[\w\-./]*)?", u)): bad.append("archive.server_url: 비우거나 http(s)://주소[:포트][/경로]")
-    if not isinstance(ar.get("outbox", ""), str): bad.append("archive.outbox: 문자열(묶음을 둘 폴더, 비우면 state/outbox)")
+    for k, allowed, txt in (("interval_min", archive.INTERVALS, "1·5·15·30·60 중 하나(분)"), ("dev_interval_min", archive.INTERVALS, "1·5·15·30·60 중 하나(분)"), ("ess_interval_s", archive.ESS_STEPS, "60·300·600·900 중 하나(초)")):
+        if k in ar and ar[k] not in allowed: bad.append(f"archive.{k}: {txt}")
+    rules = (("retain_years", lambda v: _in(v, 1, 5) and float(v).is_integer(), "1~5 의 정수(년)"), ("max_mb", lambda v: _in(v, 16, 8192), "16~8192 범위의 숫자(MB)"), ("enabled", lambda v: isinstance(v, bool), "true 또는 false"),
+             ("dev_exclude", lambda v: isinstance(v, list) and all(isinstance(x, str) for x in v), "신호 이름 목록"), ("outbox", lambda v: isinstance(v, str), "문자열(묶음을 둘 폴더, 비우면 state/outbox)"),
+             ("server_url", lambda v: isinstance(v, str) and (not v or re.fullmatch(r"https?://[A-Za-z0-9.\-_]+(:\d{1,5})?(/[\w\-./]*)?", v) is not None), "비우거나 http(s)://주소[:포트][/경로]"))
+    for k, ok, txt in rules:
+        if k in ar and not ok(ar[k]): bad.append(f"archive.{k}: {txt}")
 
 
 def check_runtime(cfg):

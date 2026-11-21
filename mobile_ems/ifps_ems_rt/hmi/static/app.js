@@ -273,7 +273,7 @@ const P_ALM = {
   tab: "list", sel: new Set(),
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("alm.title", "경보 관리")}</h2><span class="sub">ISA-18.2 형식 — 우선순위 · 발생/복귀 · 확인. 감사 기록은 연쇄 HMAC으로 변조를 검출</span></div>
-    <div class="tabs" id="almTabs"><button data-t="list">${t("alm.active", "경보 목록")}</button><button data-t="journal">${t("alm.journal", "경보 이력")}</button><button data-t="audit">${t("alm.audit", "감사 기록")}</button></div><div id="almBody"></div>`;
+    <div class="tabs" id="almTabs"><button data-t="list">${t("alm.active", "경보 목록")}</button><button data-t="journal">${t("alm.journal", "경보 이력")}</button><button data-t="audit">${t("alm.audit", "감사 기록")}</button><button data-t="guide">조치 안내</button></div><div id="almBody"></div>`;
     $$("#almTabs button").forEach(b => b.onclick = () => { this.tab = b.dataset.t; this.show(); }); this.show();
   },
   show() {
@@ -286,6 +286,7 @@ const P_ALM = {
       $("#ackAll").onclick = () => ack("all"); $("#ackSel").onclick = () => { if (this.sel.size) ack([...this.sel]); this.sel.clear(); $("#selAll").checked = false; };
       $("#selAll").onchange = e => { this.sel = e.target.checked ? new Set(this.rows(S.snap).map(a => a.id)) : new Set(); this.update(S.snap); };
       this.update(S.snap);
+    } else if (this.tab === "guide") { TS.page(B);
     } else if (this.tab === "journal") {
       B.innerHTML = `<div class="panel"><div class="hd"><h3>경보 이력 (최근 300건)</h3><div class="spacer"></div><button class="btn sm" id="jr">새로 고침</button></div><div class="bd np scroll hfill"><table class="t"><thead><tr><th>시각</th><th>구분</th><th>우선</th><th>장치</th><th>내용</th></tr></thead><tbody id="jrRows"></tbody></table></div></div>`;
       const load = async () => { const r = await api("/api/journal?n=300"); if (!$("#jrRows") || !r.rows) return; $("#jrRows").innerHTML = r.rows.map(e => `<tr><td class="mono">${F.dt(e.t)}</td><td><span class="pill ${e.ev === "발생" || e.ev === "재발생" ? "bad" : e.ev === "복귀" ? "ok" : "info"}">${e.ev}</span></td><td><span class="pr p${e.prio}">${e.prio}</span></td><td>${esc(e.src)}</td><td>${esc(e.text)}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">이력 없음</td></tr>`; };
@@ -302,11 +303,12 @@ const P_ALM = {
     if (this.tab !== "list" || !$("#almRows")) return;
     const rows = this.rows(s);
     $("#almRows").innerHTML = rows.length ? rows.map(a => `<tr class="${a.acked ? "" : "unack"} ${a.state === "RTN" ? "rtn" : ""} ${this.sel.has(a.id) ? "sel" : ""}" data-id="${a.id}">
-      <td><input type="checkbox" ${this.sel.has(a.id) ? "checked" : ""} data-id="${a.id}"></td><td><span class="pr p${a.prio}">${a.prio} ${prioTxt(a.prio)}</span></td><td class="mono">${F.dt(a.t_on)}</td><td>${esc(a.src)}</td><td>${esc(a.text)}</td>
+      <td><input type="checkbox" ${this.sel.has(a.id) ? "checked" : ""} data-id="${a.id}"></td><td><span class="pr p${a.prio}">${a.prio} ${prioTxt(a.prio)}</span></td><td class="mono">${F.dt(a.t_on)}</td><td>${esc(a.src)}</td><td>${esc(a.text)} <button class="btn sm ghost ts-btn" data-ts="${a.id}" title="이상의 종류 · 점검 방법 · 도구 · 부품">조치 안내</button></td>
       <td>${a.state === "ACT" ? `<span class="pill bad">발생</span>` : `<span class="pill ok">복귀</span>`}</td><td class="mono muted">${a.t_off ? F.time(a.t_off) : ""}</td><td>${a.acked ? `<span class="muted">${esc(a.ack_by || "")}</span>` : `<button class="btn sm" data-ack="${a.id}">확인</button>`}</td></tr>`).join("")
       : `<tr><td colspan="8" class="empty">${S.lang === "ko" ? "표시할 경보 없음 — 계통 정상" : "No alarms"}</td></tr>`;
     $$("#almRows input[type=checkbox]").forEach(c => c.onchange = () => { const id = +c.dataset.id; c.checked ? this.sel.add(id) : this.sel.delete(id); });
     $$("#almRows [data-ack]").forEach(b => b.onclick = () => ack([+b.dataset.ack]));
+    $$("#almRows [data-ts]").forEach(b => b.onclick = () => { const al = rows.find(x => x.id === +b.dataset.ts); if (al) TS.open(al); });
   },
 };
 
@@ -518,12 +520,12 @@ function regsView(regs, ord) {
   if (ord === "CDAB" || ord === "DCBA") w = w.slice().reverse();
   const dv = new DataView(new ArrayBuffer(2 * w.length)); w.forEach((x, k) => dv.setUint16(2 * k, x)); return dv;
 }
-const PAGES = { overview: P_OV, sld: P_SLD, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG, scenarios: P_SCENARIOS, archive: P_ARCHIVE };
+const PAGES = { overview: P_OV, sld: P_SLD, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG, scenarios: P_SCENARIOS, archive: P_ARCHIVE, help: P_HELP };
 let mounted = null;
 function render() {
   if (!S.snap) return; const p = PAGES[S.page] ? S.page : "overview";
   $$("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === p));
-  if (mounted !== p + S.lang + S.theme) { clearInterval(P_ENG._ex); const m = $("#main"); PAGES[p].mount(m); applyI18n(m); decoratePage(p); mounted = p + S.lang + S.theme; }
+  if (mounted !== p + S.lang + S.theme) { clearInterval(P_ENG._ex); const m = $("#main"); PAGES[p].mount(m); applyI18n(m); decoratePage(p); decorateHelp(p); mounted = p + S.lang + S.theme; }
   try { PAGES[p].update(S.snap); } catch (e) { console.error(e); }
 }
 window.addEventListener("hashchange", () => {

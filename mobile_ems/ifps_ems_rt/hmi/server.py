@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from .. import modbus as mb
 from .engine import ROLES
-from . import scenarios, scenextra, archwatch
+from . import scenarios, scenextra, archwatch, archcfg, seqppt
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_BODY = 128 * 1024
@@ -117,6 +117,7 @@ def make_handler(eng):
         def do_POST(self):
             p = urlparse(self.path).path
             try:
+                if p in ("/api/scenarios/pptx", "/api/scenarios/import"): return seqppt.http_post(self, eng, p)      # 시퀀스 문서(PPT) 내보내기 · 고친 문서 올리기(본문이 커서 따로 읽는다)
                 b = self._body()
                 if p == "/api/login": return self._send(200, eng.login(b.get("pin", ""), (b.get("name") or "운용자")[:24], self.client_address[0]))
                 if p == "/api/logout": return self._send(200, eng.logout(self.headers.get("X-EMS-Token")))
@@ -196,8 +197,8 @@ def make_handler(eng):
                     if b.get("kind") not in ("runtime", "pointmap"): return self._err(400, "kind 는 runtime 또는 pointmap")
                     return self._send(200, eng.cfged.check(b["kind"], b) if p.endswith("check") else eng.cfged.save(b["kind"], b, s["name"]))
                 if p.startswith("/api/archive/"):                # 점검 기록 넣기 · 주둔지 서버 전달(묶음 만들기·보내기·완료 적기)
-                    s = self._sess("operator")
-                    if s: self._send(200, archwatch.http_post(eng.archw.store, p, b, s["name"], eng.rt.site.name))
+                    s = self._sess("engineer" if p.endswith("/collect") else "operator")      # 수집 항목 관리는 관리자(엔지니어)만
+                    if s: self._send(200, archcfg.save(eng, b, s["name"]) if p.endswith("/collect") else archwatch.http_post(eng.archw.store, p, b, s["name"], eng.rt.site.name))
                     return
                 if p == "/api/sim":
                     s = self._sess("engineer")

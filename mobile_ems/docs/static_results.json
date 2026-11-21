@@ -1,9 +1,11 @@
 {
- "date": "2026-11-20 17:26",
- "unittest_s": 284.4,
+ "date": "2026-11-21 01:31",
+ "unittest_s": 296.5,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
+  "test_collect_check_rejects_bad_items | ok",
+  "test_collect_intervals_and_exclude | ok",
   "test_config_check | ok",
   "test_cumulative_survives_restart | ok",
   "test_device_series_avg_min_max | ok",
@@ -12,10 +14,13 @@
   "test_events_sync_search_and_inspect | ok",
   "test_group_by_day_month_year_and_seed_flag | ok",
   "test_items_file | ok",
+  "test_pptx_writer_reader | ok",
   "test_purge_covers_device_and_ess_tables | ok",
   "test_receiver_rejects_bad_upload | ok",
   "test_report_period | ok",
   "test_retention_and_size_cap | ok",
+  "test_sequence_ppt_edit_and_errors | ok",
+  "test_sequence_ppt_round_trip_all_presets | ok",
   "test_settings_range | ok",
   "test_tick_integrates_energy_and_cumulative | ok",
   "test_transfer_bundle_send_mark_and_history | ok",
@@ -155,20 +160,28 @@
   "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
   "test_check_scans_and_module_entry | ok"
  ],
- "n_tests": 152,
+ "n_tests": 157,
  "tests_ok": true,
- "coverage_pct": 91.4,
+ "coverage_pct": 90.6,
  "stmt": {
-  "n": 4979,
-  "hit": 4702,
-  "pct": 94.4
+  "n": 5304,
+  "hit": 4970,
+  "pct": 93.7
  },
  "branch": {
-  "n": 1756,
-  "hit": 1453,
-  "pct": 82.7
+  "n": 1872,
+  "hit": 1531,
+  "pct": 81.8
  },
  "coverage_files": [
+  [
+   "ifps_ems_rt/hmi/archcfg.py",
+   50.9,
+   55,
+   58.3,
+   12,
+   "21-23, 53-62, 67-80"
+  ],
   [
    "ifps_ems_rt/hmi/report.py",
    62.5,
@@ -187,11 +200,19 @@
   ],
   [
    "ifps_ems_rt/hmi/server.py",
-   76.9,
-   216,
-   67.9,
-   140,
-   "65-66, 80-82, 87-88, 105-106, 124-127, 129-137, 139, 153-155, 186-191, 193-197, 199-201, 211-212, 231-238"
+   77.0,
+   217,
+   67.6,
+   142,
+   "65-66, 80-82, 87-88, 105-106, 125-128, 130-138, 140, 154-156, 187-192, 194-198, 200-202, 212-213, 232-239"
+  ],
+  [
+   "ifps_ems_rt/hmi/archwatch.py",
+   79.4,
+   102,
+   56.8,
+   44,
+   "29-30, 43, 56, 59-63, 67-68, 108-110, 114-116, 126-128, 131"
   ],
   [
    "ifps_ems_rt/archrecv.py",
@@ -210,20 +231,20 @@
    "33-34, 48-50"
   ],
   [
-   "ifps_ems_rt/hmi/archwatch.py",
-   86.7,
-   90,
-   60.5,
-   38,
-   "29-30, 43, 56-57, 97-99, 111-113, 116"
-  ],
-  [
    "ifps_ems_rt/hmi/__main__.py",
    88.4,
    43,
    50.0,
    4,
    "27-28, 32-33, 55"
+  ],
+  [
+   "ifps_ems_rt/hmi/seqppt.py",
+   89.0,
+   154,
+   68.8,
+   80,
+   "159, 197-209, 213-215"
   ],
   [
    "ifps_ems_rt/hmi/archapi.py",
@@ -242,20 +263,20 @@
    "74, 126-127, 260-261, 306, 318-319, 342, 355, 359, 361, 363, 388-393, 423"
   ],
   [
+   "ifps_ems_rt/hmi/engine.py",
+   93.8,
+   776,
+   80.1,
+   286,
+   "29-30, 55-56, 67-72, 93-94, 192-193, 312-313, 317, 326, 370, 386-387, 401-404, 407-409, 462, 505-507, 509-510, 603-604, 727-728, 890-895, 907-908, 924-925"
+  ],
+  [
    "ifps_ems_rt/hmi/scenarios.py",
    94.0,
    250,
    84.3,
    108,
    "59, 67, 70, 80, 90, 92, 94, 106, 110, 124, 133, 138, 217, 264, 267"
-  ],
-  [
-   "ifps_ems_rt/hmi/engine.py",
-   94.1,
-   776,
-   80.4,
-   286,
-   "29-30, 55-56, 67-72, 93-94, 182, 192-193, 312-313, 317, 326, 370, 386-387, 401-404, 407-409, 462, 509-510, 603-604, 727-728, 890-895, 907-908, 924-925"
   ],
   [
    "ifps_ems_rt/hmi/scenextra.py",
@@ -274,14 +295,6 @@
    "139-143"
   ],
   [
-   "ifps_ems/nowcast.py",
-   96.4,
-   84,
-   81.2,
-   32,
-   "32, 57, 60"
-  ],
-  [
    "ifps_ems/skycam.py",
    96.4,
    84,
@@ -291,11 +304,19 @@
   ],
   [
    "ifps_ems_rt/archive.py",
-   96.5,
-   144,
+   96.6,
+   148,
    83.3,
    30,
-   "91-92, 106, 124-125"
+   "95-96, 110, 128-129"
+  ],
+  [
+   "ifps_ems_rt/hmi/pptx.py",
+   97.0,
+   100,
+   83.3,
+   12,
+   "131-132, 139"
   ],
   [
    "ifps_ems/__main__.py",
@@ -304,6 +325,14 @@
    75.0,
    8,
    "53"
+  ],
+  [
+   "ifps_ems/nowcast.py",
+   97.6,
+   84,
+   84.4,
+   32,
+   "32, 57"
   ],
   [
    "ifps_ems_rt/hmi/docx.py",
@@ -332,17 +361,17 @@
   [
    "ifps_ems_rt/archdev.py",
    97.8,
-   134,
+   135,
    88.3,
    60,
-   "83-84, 100"
+   "84-85, 101"
   ],
   [
    "ifps_ems_rt/hmi/cfgedit.py",
-   98.3,
-   230,
-   93.3,
-   90,
+   98.2,
+   228,
+   93.6,
+   94,
    "107, 274-276"
   ],
   [
@@ -357,7 +386,7 @@
    "ifps_ems_rt/simplant.py",
    98.5,
    134,
-   94.0,
+   92.0,
    50,
    "130-131"
   ],
@@ -540,7 +569,7 @@
  ],
  "pylint": {
   "E": 1,
-  "W": 31,
+  "W": 37,
   "by_id": [
    [
     "W0718 broad-exception-caught",
@@ -548,6 +577,10 @@
    ],
    [
     "W0613 unused-argument",
+    6
+   ],
+   [
+    "W0012 unknown-option-value",
     6
    ],
    [
@@ -559,7 +592,7 @@
     2
    ],
    [
-    "W0012 unknown-option-value",
+    "W0106 expression-not-assigned",
     2
    ],
    [
@@ -575,7 +608,7 @@
     1
    ],
    [
-    "W0106 expression-not-assigned",
+    "W1113 keyword-arg-before-vararg",
     1
    ],
    [
@@ -684,7 +717,7 @@
     "W0108",
     "unnecessary-lambda",
     "ifps_ems_rt/archive.py",
-    45,
+    49,
     "instant.<lambda>",
     "Lambda may not be necessary"
    ],
@@ -711,6 +744,38 @@
     36,
     "to_csv",
     "Expression \"[w.writerow([r[k] for k in keys]) for r in rows]\" is assigned to nothing"
+   ],
+   [
+    "W1113",
+    "keyword-arg-before-vararg",
+    "ifps_ems_rt/hmi/pptx.py",
+    65,
+    "Slide.box",
+    "Keyword argument before variable positional arguments list in the definition of box function"
+   ],
+   [
+    "W0012",
+    "unknown-option-value",
+    "ifps_ems_rt/hmi/seqppt.py",
+    177,
+    "",
+    "Unknown option value for 'disable', expected a valid pylint message and got 'scenarios'"
+   ],
+   [
+    "W0012",
+    "unknown-option-value",
+    "ifps_ems_rt/hmi/seqppt.py",
+    177,
+    "",
+    "Unknown option value for 'disable', expected a valid pylint message and got 'engine'"
+   ],
+   [
+    "W0012",
+    "unknown-option-value",
+    "ifps_ems_rt/hmi/seqppt.py",
+    186,
+    "",
+    "Unknown option value for 'disable', expected a valid pylint message and got 'ModbusError'"
    ],
    [
     "W0212",
@@ -825,6 +890,22 @@
     "Unused argument 'who'"
    ],
    [
+    "W0012",
+    "unknown-option-value",
+    "ifps_ems_rt/hmi/archwatch.py",
+    115,
+    "",
+    "Unknown option value for 'disable', expected a valid pylint message and got 'archcfg'"
+   ],
+   [
+    "W0106",
+    "expression-not-assigned",
+    "ifps_ems_rt/hmi/archcfg.py",
+    48,
+    "items_csv",
+    "Expression \"[w.writerow([i[k] for k in COLS]) for i in items]\" is assigned to nothing"
+   ],
+   [
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/server.py",
@@ -836,14 +917,14 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/server.py",
-    211,
+    212,
     "make_handler.H.do_POST",
     "Catching too general exception Exception"
    ]
   ]
  },
  "metrics": {
-  "n_func": 580,
+  "n_func": 623,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -852,7 +933,7 @@
    "file": 1000
   },
   "cc_max": 20,
-  "len_max": 197,
+  "len_max": 198,
   "arg_max": 8,
   "depth_max": 5,
   "file_max": 976,
@@ -892,6 +973,15 @@
     3
    ],
    [
+    "ifps_ems_rt/hmi/archcfg.py",
+    "check",
+    27,
+    20,
+    18,
+    2,
+    2
+   ],
+   [
     "ifps_ems_rt/hmi/engine.py",
     "step",
     160,
@@ -926,15 +1016,6 @@
     30,
     5,
     3
-   ],
-   [
-    "ifps_ems_rt/opsmode.py",
-    "gdg_step",
-    103,
-    19,
-    23,
-    7,
-    1
    ]
   ],
   "top_len": [
@@ -943,7 +1024,7 @@
     "make_handler",
     18,
     1,
-    197,
+    198,
     1,
     0
    ],
@@ -952,7 +1033,7 @@
     "do_POST",
     117,
     1,
-    96,
+    97,
     0,
     4
    ],
@@ -1098,7 +1179,7 @@
    [
     "ifps_ems_rt/archdev.py",
     "tick",
-    63,
+    64,
     17,
     22,
     2,
@@ -1143,7 +1224,7 @@
    [
     "ifps_ems_rt/archive.py",
     "tick",
-    77,
+    81,
     18,
     16,
     3,
@@ -1186,7 +1267,7 @@
    ],
    [
     "ifps_ems_rt/hmi/server.py",
-    249
+    250
    ],
    [
     "ifps_ems_rt/hmi/scenextra.py",
@@ -1197,8 +1278,12 @@
     236
    ],
    [
+    "ifps_ems_rt/hmi/seqppt.py",
+    216
+   ],
+   [
     "ifps_ems_rt/archive.py",
-    200
+    204
    ],
    [
     "ifps_ems_rt/hmi/report.py",
@@ -1214,11 +1299,15 @@
    ],
    [
     "ifps_ems_rt/archdev.py",
-    180
+    181
    ],
    [
     "ifps_ems_rt/simplant.py",
     165
+   ],
+   [
+    "ifps_ems_rt/hmi/pptx.py",
+    157
    ],
    [
     "ifps_ems/supervisor.py",
@@ -1231,6 +1320,10 @@
    [
     "ifps_ems/dispatch.py",
     151
+   ],
+   [
+    "ifps_ems_rt/hmi/archwatch.py",
+    136
    ],
    [
     "ifps_ems_rt/mbtool.py",
@@ -1249,10 +1342,6 @@
     123
    ],
    [
-    "ifps_ems_rt/hmi/archwatch.py",
-    121
-   ],
-   [
     "ifps_ems/skycam.py",
     119
    ],
@@ -1267,6 +1356,10 @@
    [
     "ifps_ems_rt/hmi/archapi.py",
     83
+   ],
+   [
+    "ifps_ems_rt/hmi/archcfg.py",
+    81
    ],
    [
     "ifps_ems_rt/hmi/scenario_policy.py",
@@ -1357,9 +1450,9 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 6147,
+   "loc": 6619,
    "nosec": 0,
-   "skipped_tests": 16
+   "skipped_tests": 21
   },
   "results": []
  },
@@ -1368,7 +1461,7 @@
    "B608",
    "MEDIUM",
    "ifps_ems_rt/archdev.py",
-   142,
+   143,
    "Possible SQL injection vector through string-based query construction.",
    "CWE-89"
   ],
@@ -1376,7 +1469,7 @@
    "B608",
    "MEDIUM",
    "ifps_ems_rt/archive.py",
-   157,
+   161,
    "Possible SQL injection vector through string-based query construction.",
    "CWE-89"
   ],
@@ -1384,7 +1477,7 @@
    "B608",
    "MEDIUM",
    "ifps_ems_rt/archive.py",
-   164,
+   168,
    "Possible SQL injection vector through string-based query construction.",
    "CWE-89"
   ],
@@ -1392,7 +1485,7 @@
    "B608",
    "MEDIUM",
    "ifps_ems_rt/archive.py",
-   185,
+   189,
    "Possible SQL injection vector through string-based query construction.",
    "CWE-89"
   ],
@@ -1424,7 +1517,7 @@
    "B311",
    "LOW",
    "ifps_ems_rt/hmi/archwatch.py",
-   67,
+   78,
    "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
    "CWE-330"
   ],
@@ -1443,6 +1536,46 @@
    383,
    "subprocess call - check for execution of untrusted input.",
    "CWE-78"
+  ],
+  [
+   "B405",
+   "LOW",
+   "ifps_ems_rt/hmi/pptx.py",
+   8,
+   "Using xml.etree.ElementTree to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called.",
+   "CWE-20"
+  ],
+  [
+   "B314",
+   "MEDIUM",
+   "ifps_ems_rt/hmi/pptx.py",
+   128,
+   "Using xml.etree.ElementTree.fromstring to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree.fromstring with its defusedxml equivalent function or make sure defusedxml.defuse_stdlib() is called",
+   "CWE-20"
+  ],
+  [
+   "B314",
+   "MEDIUM",
+   "ifps_ems_rt/hmi/pptx.py",
+   129,
+   "Using xml.etree.ElementTree.fromstring to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree.fromstring with its defusedxml equivalent function or make sure defusedxml.defuse_stdlib() is called",
+   "CWE-20"
+  ],
+  [
+   "B314",
+   "MEDIUM",
+   "ifps_ems_rt/hmi/pptx.py",
+   138,
+   "Using xml.etree.ElementTree.fromstring to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree.fromstring with its defusedxml equivalent function or make sure defusedxml.defuse_stdlib() is called",
+   "CWE-20"
+  ],
+  [
+   "B310",
+   "MEDIUM",
+   "tools/build_training.py",
+   28,
+   "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.",
+   "CWE-22"
   ],
   [
    "B404",
@@ -1493,12 +1626,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.61,
- "cc_n": 590,
+ "cc_avg": 5.67,
+ "cc_n": 634,
  "cc_rank": {
-  "A": 362,
-  "B": 141,
-  "C": 87,
+  "A": 386,
+  "B": 151,
+  "C": 97,
   "D": 0,
   "E": 0,
   "F": 0
@@ -1535,6 +1668,12 @@
    "C"
   ],
   [
+   "ifps_ems_rt/hmi/archcfg.py",
+   "check",
+   20,
+   "C"
+  ],
+  [
    "ifps_ems_rt/diag.py",
    "check_path",
    19,
@@ -1557,12 +1696,6 @@
    "gdg_step",
    19,
    "C"
-  ],
-  [
-   "ifps_ems_rt/hmi/engine.py",
-   "sim_action",
-   19,
-   "C"
   ]
  ],
  "mi": [
@@ -1577,19 +1710,24 @@
    "C"
   ],
   [
-   "ifps_ems_rt/hmi/cfgedit.py",
-   2.1,
+   "ifps_ems_rt/diag.py",
+   2.3,
    "C"
   ],
   [
-   "ifps_ems_rt/diag.py",
-   2.3,
+   "ifps_ems_rt/hmi/cfgedit.py",
+   2.6,
    "C"
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
    16.5,
    "B"
+  ],
+  [
+   "ifps_ems_rt/hmi/seqppt.py",
+   21.8,
+   "A"
   ],
   [
    "ifps_ems_rt/hmi/report.py",
@@ -1603,7 +1741,7 @@
   ],
   [
    "ifps_ems_rt/archive.py",
-   27.1,
+   26.5,
    "A"
   ],
   [
@@ -1613,7 +1751,7 @@
   ],
   [
    "ifps_ems_rt/archdev.py",
-   30.0,
+   28.4,
    "A"
   ],
   [
@@ -1627,13 +1765,18 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/server.py",
-   36.4,
+   "ifps_ems/nowcast.py",
+   36.8,
    "A"
   ],
   [
-   "ifps_ems/nowcast.py",
-   36.8,
+   "ifps_ems_rt/hmi/server.py",
+   37.1,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/pptx.py",
+   37.6,
    "A"
   ],
   [
@@ -1662,6 +1805,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/archwatch.py",
+   41.3,
+   "A"
+  ],
+  [
    "ifps_ems/supervisor.py",
    41.5,
    "A"
@@ -1674,11 +1822,6 @@
   [
    "ifps_ems/skycam.py",
    43.1,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/hmi/archwatch.py",
-   43.3,
    "A"
   ],
   [
@@ -1714,6 +1857,11 @@
   [
    "ifps_ems_rt/hmi/fcstats.py",
    52.2,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/archcfg.py",
+   56.4,
    "A"
   ],
   [
@@ -1798,19 +1946,19 @@
   ]
  ],
  "loc_py": {
-  "files": 46,
-  "sloc": 5207,
-  "comments": 621
+  "files": 49,
+  "sloc": 5553,
+  "comments": 664
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   549,
+   551,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/archive.js",
-   212,
+   246,
    true
   ],
   [
@@ -1834,8 +1982,13 @@
    true
   ],
   [
+   "ifps_ems_rt/hmi/static/manual.js",
+   34,
+   true
+  ],
+  [
    "ifps_ems_rt/hmi/static/scenarios.js",
-   593,
+   636,
    true
   ],
   [
@@ -1851,6 +2004,21 @@
   [
    "ifps_ems_rt/hmi/static/sld.js",
    154,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/train.js",
+   96,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/train_mock.js",
+   54,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/troubleshoot.js",
+   37,
    true
   ],
   [

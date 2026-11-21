@@ -11,8 +11,9 @@
 import os, sqlite3, threading, time
 from datetime import datetime, timedelta
 
-DEFAULTS = {"enabled": True, "interval_min": 15, "retain_years": 4, "max_mb": 2048, "server_url": "", "outbox": ""}
+DEFAULTS = {"enabled": True, "interval_min": 15, "dev_interval_min": 15, "ess_interval_s": 60, "retain_years": 4, "max_mb": 2048, "server_url": "", "outbox": "", "dev_exclude": []}
 INTERVALS = (1, 5, 15, 30, 60)
+ESS_STEPS = (60, 300, 600, 900)                    # ESS 안전 운영정보 저장 주기(초). 기본 60초 = 통합관리시스템의 전송 주기
 LEGAL_YEARS = 4                                   # 점검 기록 보존 기간(전기안전관리법 시행규칙 제36조). 이보다 짧게 잡으면 화면에서 알린다
 ENERGY = ("load", "pv", "dg", "fc", "gdg", "grid_in", "grid_out", "ess_chg", "ess_dis", "elz")      # 구간 전력량(kWh)
 PEAK = ("load", "grid", "pv")                                                                         # 구간 최대(kW)
@@ -33,6 +34,9 @@ def settings(cfg):
     """설정을 채우고 범위를 맞춘다(틀린 값은 기본값)."""
     c = dict(DEFAULTS, **(cfg or {}))
     if c["interval_min"] not in INTERVALS: c["interval_min"] = DEFAULTS["interval_min"]
+    if c["dev_interval_min"] not in INTERVALS: c["dev_interval_min"] = DEFAULTS["dev_interval_min"]
+    if c["ess_interval_s"] not in ESS_STEPS: c["ess_interval_s"] = DEFAULTS["ess_interval_s"]
+    c["dev_exclude"] = sorted({str(x) for x in c["dev_exclude"]}) if isinstance(c["dev_exclude"], list) else []
     c["retain_years"] = min(5, max(1, int(c["retain_years"]))) if isinstance(c["retain_years"], (int, float)) and not isinstance(c["retain_years"], bool) else DEFAULTS["retain_years"]
     c["max_mb"] = min(8192, max(16, float(c["max_mb"]))) if isinstance(c["max_mb"], (int, float)) and not isinstance(c["max_mb"], bool) else DEFAULTS["max_mb"]
     c["server_url"] = c["server_url"] if isinstance(c["server_url"], str) and c["server_url"].startswith(("http://", "https://")) else ""

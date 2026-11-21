@@ -6,7 +6,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ifps_ems_rt import archdev, archive, archrecv, archview, archxfer   # noqa: E402
 from ifps_ems_rt import pointmap                                  # noqa: E402
-from ifps_ems_rt.hmi import archapi, archwatch, cfgedit, docx, report   # noqa: E402
+from ifps_ems_rt.hmi import archapi, archcfg, archwatch, cfgedit, docx, pptx, report, seqppt   # noqa: E402
 
 INST = {"load": 60.0, "pv": 20.0, "dg": 30.0, "fc": 10.0, "gdg": 0.0, "grid_in": 0.0, "grid_out": 0.0, "ess_chg": 0.0, "ess_dis": 0.0, "elz": 0.0, "grid": 0.0, "soc": 55.0, "h2": 500.0, "fuel": 800.0, "va": 380.0, "vb": 381.0, "hz": 60.0, "temp": 20.0}
 
@@ -181,6 +181,56 @@ class ArchiveTest(unittest.TestCase):
         self.assertEqual(archapi.get(st, "/api/archive/ess", q)[0]["recorded"], 30); i = archapi.get(st, "/api/archive/info", {})[0]; self.assertEqual(i["ess_rows"], 30); self.assertEqual(i["server_url"], "")
         r = archwatch.http_post(st, "/api/archive/xfer/make", {"from": "2026-03-02", "to": "2026-03-02"}, "운용자", "S"); self.assertTrue(r["ok"]); self.assertEqual(archapi.get(st, "/api/archive/xfer", {})[0]["pending"], 1)
         self.assertTrue(archwatch.http_post(st, "/api/archive/xfer/mark", {"id": r["row"]["id"], "note": "USB"}, "운용자")["ok"]); self.assertRaises(KeyError, archwatch.http_post, st, "/api/archive/zzz", {}, "t"); st.arch.close()
+
+    def test_collect_intervals_and_exclude(self):
+        st = self._store(dev_interval_min=1, ess_interval_s=300, dev_exclude=["DG.kw"]); t0 = datetime(2026, 3, 2, 10, 0).timestamp(); self._fill(st, t0, 600)
+        d = st.dev.dev_series("FC", "raw", t0 - 1, t0 + 3600); self.assertEqual(len(d["rows"]), 10)       # 1분 줄
+        self.assertNotIn("DG.kw", [s["tag"] for s in st.dev.groups["DG"]]); self.assertEqual(st.dev.dev_series("DG", "raw", t0 - 1, t0 + 3600)["rows"], [])       # 뺀 신호는 쌓지 않는다
+        self.assertEqual(st.dev.ess_series("raw", t0, t0 + 3600)["rows"].__len__(), 2); self.assertEqual(st.dev.info()["ess_step_s"], 300); st.arch.close()
+
+    def test_collect_check_rejects_bad_items(self):
+        class E:                                         # 검사에 필요한 것만 가진 대역
+            pass
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); e = E(); e.rt = E(); e.rt.pts = pointmap.load(os.path.join(root, "config", "pointmap.csv"))
+        ok = {"items": [{"key": "soc", "group": "배터리", "label": "충전율", "unit": "%", "tag": "ESS.soc"}, {"key": "cell_v", "group": "배터리", "label": "셀 전압", "unit": "V", "tag": ""}], "cfg": {"interval_min": 5, "dev_interval_min": 1, "ess_interval_s": 60, "retain_years": 5, "max_mb": 1024}, "dev_exclude": ["DG.hb"]}
+        bad, items, part = archcfg.check(e, ok); self.assertEqual(bad, []); self.assertEqual(len(items), 2); self.assertEqual(part["dev_exclude"], ["DG.hb"]); self.assertIn("key,group,label,unit,tag", archcfg.items_csv(items))
+        for change in ({"items": [{"key": "Bad Key", "label": "x"}]}, {"items": [{"key": "a", "label": "x"}, {"key": "a", "label": "y"}]}, {"items": [{"key": "a", "label": "x", "tag": "NO.tag"}]}, {"items": [{"key": "a", "label": ""}]},
+                       {"cfg": {"ess_interval_s": 7}}, {"cfg": {"retain_years": 9}}, {"dev_exclude": ["NO.tag"]}, {"items": [{"key": f"k{i}", "label": "x"} for i in range(200)]}):
+            self.assertTrue(archcfg.check(e, dict(ok, **change))[0], change)
+
+    # ── 시퀀스 문서(PPT)
+    @staticmethod
+    def _json(path):
+        with open(path, encoding="utf-8") as f: return json.load(f)
+
+    def _cases(self):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); rd = lambda *a: self._json(os.path.join(root, *a)); cfg = rd("config", "runtime.json"); pts = pointmap.load(os.path.join(root, "config", "pointmap.csv"), cfg["devices"])
+        return rd("ifps_ems_rt", "hmi", "static", "scenario_presets.json"), pts, cfg["devices"], os.path.join(root, "config", "runtime.json")
+
+    def test_pptx_writer_reader(self):
+        d = pptx.Deck(); s = d.slide(); s.box(0.5, 0.5, 5, 0.5, "시나리오: 가 <&> 나", name="scn-name").line(1, 2, 5, 2, arrow=True, dash=True).table(0.5, 3, 12, ["번호", "종류"], [[1, "대기"], [2, "입력 & 값"]]); body = d.to_bytes()
+        z = zipfile.ZipFile(io.BytesIO(body)); self.assertIsNone(z.testzip())
+        import xml.dom.minidom as md
+        for n in z.namelist(): md.parseString(z.read(n))
+        r = pptx.read(body); self.assertEqual(r[0]["texts"], [("scn-name", "시나리오: 가 <&> 나")]); self.assertEqual(r[0]["tables"][0][2], ["2", "입력 & 값"])
+        self.assertRaises(ValueError, pptx.read, b"not a zip"); self.assertRaises(ValueError, pptx.read, b"x" * (pptx.MAX_FILE + 1))
+
+    def test_sequence_ppt_round_trip_all_presets(self):
+        cases, pts, devices, prof = self._cases(); body = seqppt.export(cases, None, "RevXX", "S"); r = seqppt.import_(body, pts, devices, prof)
+        self.assertEqual((r["found"], len(r["cases"]), r["errors"]), (len(cases), len(cases), [])); strip = lambda c: [{k: v for k, v in s.items() if k != "limit"} for s in c["steps"]]
+        for a, b in zip(r["cases"], cases): self.assertEqual(a["name"], b["name"]); self.assertEqual(strip(a), strip(b))
+
+    def test_sequence_ppt_edit_and_errors(self):
+        cases, pts, devices, prof = self._cases(); one = [c for c in cases if c["name"] == "작전지 · PV 급감과 디젤 인수"]; tl = seqppt.timeline(one[0]); self.assertEqual(tl[2], 100); self.assertEqual(tl[-1], 1200)        # 대기 100 + 판정 한도 500 + 600
+        self.assertEqual(seqppt.step_of(["판정", "DG.status", "≥", "1", "700"]), {"type": "expect", "tag": "DG.status", "value": 1, "op": "ge", "ms": 700, "limit": 700}); self.assertEqual(seqppt.step_of(["지령", "DG", "", "정지", ""])["value"], 2)
+        self.assertEqual(seqppt.step_of(["EMS 정책 실행", "AUTO · 주둔지 · 자립", "", "13", ""]), {"type": "policy", "control": "auto", "mode": "grid", "posture": "자립", "hour": 13})
+        for bad in (["모름", "", "", "", ""], ["판정", "DG.status", "?", "1", "0"], ["대기", "", "", "", "abc"], ["지령", "DG", "", "켜라", ""], ["EMS 정책 실행", "AUTO · 작전지", "", "", ""]): self.assertRaises(ValueError, seqppt.step_of, bad)
+        d = pptx.Deck(); s = d.slide(); s.box(0, 0, 5, 0.5, "시나리오: 회의 수정안").box(0, 1, 5, 0.5, "설명: 전문가 검토")
+        s.table(0, 2, 12, seqppt.HEAD, [[1, "입력", "LOAD.kw", "", "120", "", "", "", ""], [2, "대기", "", "", "", "200", "", "", "여유 필요"], [3, "판정", "ESS.kw", "≥", "0", "0", "", "", ""]])
+        s2 = d.slide(); s2.box(0, 0, 5, 0.5, "시나리오: 틀린 안"); s2.table(0, 2, 12, seqppt.HEAD, [[1, "입력", "NO.tag", "", "1", "", "", "", ""]])
+        s3 = d.slide(); s3.box(0, 0, 5, 0.5, "시나리오: 범위 밖"); s3.table(0, 2, 12, seqppt.HEAD, [[1, "대기", "", "", "", "999999", "", "", ""]])
+        r = seqppt.import_(d.to_bytes(), pts, devices, prof); self.assertEqual([c["name"] for c in r["cases"]], ["회의 수정안"]); self.assertEqual(len(r["cases"][0]["steps"]), 3); self.assertIn("[검토 의견] 2단계: 여유 필요", r["cases"][0]["note"])
+        self.assertEqual(sorted(e["name"] for e in r["errors"]), ["범위 밖", "틀린 안"]); self.assertRaises(ValueError, seqppt.import_, pptx.Deck().to_bytes(), pts, devices, prof)
 
     def test_report_period(self):
         a, b = report._period({"from": "2026-01-01", "to": "2026-01-31"}); self.assertEqual((b - a).days, 31); a, b = report._period({"days": "99999"}); self.assertEqual((b - a).days, 1830)

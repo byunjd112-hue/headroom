@@ -45,7 +45,8 @@ def groups(pts):
 class DevLog:
     """Archive 하나에 붙어 장치별 자료와 ESS 안전 운영정보를 쓰고 읽는다."""
     def __init__(self, arch, pts=None, items=None):
-        self.a = arch; self.items = items or []; self.groups = groups(pts or []); self.cid = {}; self.acc = None; self.slot = None; self.ess_slot = None; self.ess_cid = None
+        self.a = arch; self.items = items or []; ex = set(arch.cfg["dev_exclude"]); self.groups = {d: g for d, g in ((d, [s for s in sig if s["tag"] not in ex]) for d, sig in groups(pts or []).items()) if g}
+        self.step = int(arch.cfg["ess_interval_s"]); self.dstep = 60 * int(arch.cfg["dev_interval_min"]); self.cid = {}; self.acc = None; self.slot = None; self.ess_slot = None; self.ess_cid = None
         if arch.ro: return
         arch.tables += [t for t in TABLES if t not in arch.tables]
         with arch.lock:
@@ -66,7 +67,7 @@ class DevLog:
         now = time.time() if now is None else now
         try:
             with a.lock:
-                slot = a._slot(now)                                             # pylint: disable=protected-access — 같은 꾸러미의 짝 모듈
+                slot = int(now // self.dstep) * self.dstep
                 if self.slot is not None and slot != self.slot: self._flush()
                 if self.slot != slot: self.slot = slot; self.acc = {}
                 for sig in self.groups.values():
@@ -76,7 +77,7 @@ class DevLog:
                         c = self.acc.get(s["tag"])
                         if c is None: self.acc[s["tag"]] = [v, v, v, 1]
                         else: c[0] += v; c[1] = min(c[1], v); c[2] = max(c[2], v); c[3] += 1
-                es = int(now // ESS_STEP) * ESS_STEP
+                es = int(now // self.step) * self.step
                 if self.ess_cid is not None and es != self.ess_slot:
                     self.ess_slot = es; data = struct.pack(f"<{len(self.items)}f", *[float(val.get(i["tag"]) or 0.0) if i["tag"] else 0.0 for i in self.items])
                     a.db.execute("INSERT OR REPLACE INTO ess (ts, cid, data) VALUES (?,?,?)", (es, self.ess_cid, data)); a.db.commit()
@@ -107,7 +108,7 @@ class DevLog:
             val = {t: v.get(k) for t, k in pick.items()}; val["ESS.kw"] = (v.get("ess_dis") or 0.0) - (v.get("ess_chg") or 0.0); val["ESS.status"] = 1.0; val["ENV.rh"] = 45.0
             for dev, sig in self.groups.items():
                 d = [x for s in sig for x in ([val[s["tag"]]] * 3 if val.get(s["tag"]) is not None else [NAN] * 3)]
-                if any(x == x for x in d): out.append((self.a._slot(ts), self.cid[dev], 1, struct.pack(f"<{len(d)}f", *d)))          # pylint: disable=protected-access
+                if any(x == x for x in d): out.append((int(ts // self.dstep) * self.dstep, self.cid[dev], 1, struct.pack(f"<{len(d)}f", *d)))          # pylint: disable=protected-access
             if self.ess_cid is not None and ts > last - ess_days * 86400:
                 data = struct.pack(f"<{len(self.items)}f", *[float(val.get(i["tag"]) or 0.0) if i["tag"] else 0.0 for i in self.items]); step = 60 * self.a.cfg["interval_min"]
                 ess += [(m, self.ess_cid, data) for m in range(int(ts), int(ts) + step, ESS_STEP)]
@@ -168,7 +169,7 @@ class DevLog:
             for x in keys:
                 v = vals.get(x, 0.0); c = g["v"][x]; c[0] += v; c[1] = min(c[1], v); c[2] = max(c[2], v)
         rows = [{"k": k, "n": g["n"], "v": {x: [round(c[0] / g["n"], 3), round(c[1], 3), round(c[2], 3)] for x, c in g["v"].items()}} for k, g in sorted(acc.items())]
-        lo = max(t0, span[0] or t0); hi = min(t1, (span[1] or t0) + ESS_STEP); exp = max(0, int((hi - lo) // ESS_STEP)) if span[0] is not None else 0; rec = sum(r["n"] for r in rows)
+        lo = max(t0, span[0] or t0); hi = min(t1, (span[1] or t0) + self.step); exp = max(0, int((hi - lo) // self.step)) if span[0] is not None else 0; rec = sum(r["n"] for r in rows)
         return {"items": items, "rows": rows, "expected": exp, "recorded": rec, "rate": round(100.0 * rec / exp, 2) if exp and unit != "raw" else None}
 
     def info(self):
@@ -176,4 +177,4 @@ class DevLog:
             if not self._has("ess"): return {"dev_rows": 0, "ess_rows": 0, "ess_items": 0, "ess_mapped": 0, "ess_first": None, "ess_last": None}
             d = self.a.db.execute("SELECT COUNT(*) FROM dev").fetchone()[0]; e = self.a.db.execute("SELECT COUNT(*), MIN(ts), MAX(ts) FROM ess").fetchone(); spec = self._spec("ess")
         items = spec[max(spec)][1] if spec else self.items; f = lambda t: None if t is None else datetime.fromtimestamp(t).strftime("%Y-%m-%d %H:%M")
-        return {"dev_rows": d, "ess_rows": e[0], "ess_first": f(e[1]), "ess_last": f(e[2]), "ess_items": len(items), "ess_mapped": sum(1 for i in items if i["tag"]), "ess_step_s": ESS_STEP}
+        return {"dev_rows": d, "ess_rows": e[0], "ess_first": f(e[1]), "ess_last": f(e[2]), "ess_items": len(items), "ess_mapped": sum(1 for i in items if i["tag"]), "ess_step_s": self.step, "dev_step_min": self.dstep // 60}

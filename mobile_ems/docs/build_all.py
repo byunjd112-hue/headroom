@@ -9,10 +9,11 @@
 docs/out 에는 현재 리비전 파일만 남긴다(이전 리비전 산출물은 지운다 — 이력은 git 에 있다).
 필요: node, npm 패키지 docx·pptxgenjs (개발 PC). 측정에는 pip 패키지 coverage·bandit·pyflakes·radon·pylint.
 """
+import tempfile, shutil
 import argparse, datetime, os, re, subprocess, sys  # nosec B404 — 개발 도구 실행(고정 인자)
 
 DOCS = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(DOCS); OUT = os.path.join(DOCS, "out")
-BUILDERS = ["build_test_report.js", "build_reliability_report.js", "build_security_review.js", "build_interface_guide.js", "build_device_guides.js", "build_cpp_report.js", "build_ai_paper.js"]
+BUILDERS = ["build_test_report.js", "build_reliability_report.js", "build_security_review.js", "build_interface_guide.js", "build_device_guides.js", "build_cpp_report.js", "build_ai_paper.js", "build_user_manual.js"]
 
 
 def run(args, cwd=ROOT, env=None):
@@ -36,7 +37,7 @@ def clean(rev):
 
 # 문서 묶음의 폴더 구성(읽는 순서): (폴더, 설명, 파일 이름에 들어 있는 말들)
 LAYOUT = [("01_제안발표", "제안 발표 자료에 EMS 하드웨어·소프트웨어 4장을 넣은 보완본", ("IFPS_제안발표",)),
-          ("02_화면과운용", "화면 구성·운용 방안·사용 방법·디버깅·신뢰성 결과를 한 권으로 묶은 보고자료, 화면에서 출력하는 운영 보고서의 견본(가상 장치 값)", ("화면구성_사용설명_보고자료", "운영보고서_예시")),
+          ("02_화면과운용", "보고자료(화면 구성·운용 방안·사용 방법), 사용자 설명서, 교육용 가상 화면(압축을 풀어 index.html 로 연다), 화면에서 출력하는 운영 보고서와 시퀀스 문서의 견본(가상 장치 값)", ("화면구성_사용설명_보고자료", "사용자설명서", "교육용_가상화면", "운영보고서_예시", "시퀀스문서")),
           ("03_하드웨어", "쉘터 탑재형 구성, 이동·충격·진동·PLS·EMP 설계, WBS 와 시판 참조 모델", ("하드웨어구성_기술자료",)),
           ("04_AI예측", "예측 수식·학습된 모델의 입체 그림·독립 검증(기술자료)과 같은 내용의 논문 초안", ("AI예측_기술자료", "AI예측_논문")),
           ("05_통신연동", "실장치 통신 연동 방안서(Modbus TCP 규약·설정·시운전 절차)", ("실장치통신연동방안서",)),
@@ -46,6 +47,18 @@ EVIDENCE = [("scenario_results.json", "운영 시나리오 20건 실행 결과(�
             ("forecast_benchmark_static.json", "같은 시험 — 구간을 학습 때 한 번만 보정(개선 전 비교 기준)"), ("ppt/ai_paper_eval.json", "AI 기술자료·논문의 모든 수치와 그림용 값"),
             ("test_results.json", "동적 시험 측정값"), ("static_results.json", "정적 시험·실행률·메트릭 측정값"),
             ("ppt/img/aich_bench15.png", "그래프: 15분 앞 예측 오차(적용 전후)"), ("ppt/img/aich_cov24.png", "그래프: 24시간 예측 구간 포함률"), ("ppt/img/ai3d_m_now.jpg", "입체 그림: 단기 실측 앙상블의 보정량 응답면")]
+
+
+def manual_images():
+    """도움말 화면이 쓰는 그림: 설명서 본문(manual.json)이 가리키는 캡처만 static/manual 로 복사한다."""
+    import json, shutil
+    src = os.path.join(ROOT, "ifps_ems_rt", "hmi", "static"); dst = os.path.join(src, "manual"); os.makedirs(dst, exist_ok=True)
+    with open(os.path.join(src, "manual.json"), encoding="utf-8") as f: want = {k["name"] for s in json.load(f)["sections"] for k in s["blocks"] if k["type"] == "shot"}
+    for n in os.listdir(dst):
+        if n[:-4] not in want: os.remove(os.path.join(dst, n))
+    for n in sorted(want):
+        p = os.path.join(DOCS, "ppt", "img", n + ".jpg")
+        if os.path.exists(p): shutil.copyfile(p, os.path.join(dst, n + ".jpg"))
 
 
 def _guide(rev, date, groups, evid):
@@ -109,13 +122,17 @@ def main(argv=None):
         run([sys.executable, "tools/static_report.py"]); run([sys.executable, "tools/measure.py", "docs/test_results.json", "--soak", str(a.soak)])
         run([sys.executable, "-m", "tools.scenario_report", os.path.join(DOCS, "scenario_results.json")])     # 운영 시나리오 20건(문서의 시험 근거)
     os.makedirs(OUT, exist_ok=True); print(f"이전 리비전 산출물 {clean(rev)}개 삭제")
+    manual_images()
     for b in BUILDERS: run(["node", os.path.join(DOCS, b), rev, date], env=env)
     run(["node", os.path.join(DOCS, "ppt", "build_deck.js"), rev, ym], env=env)
     run(["node", os.path.join(DOCS, "ppt", "build_ai_deck.js"), rev, ym], env=env)            # AI 예측 기술자료(수식·입체 모델 그림)
     run(["node", os.path.join(DOCS, "ppt", "build_hw_deck.js"), rev, ym], env=env)            # 하드웨어 구성 기술자료
     run([sys.executable, os.path.join(DOCS, "fmea", "build_fmea.py"), rev, date])
-    run([sys.executable, "-m", "tools.sample_report", os.path.join(OUT, f"이동형전력체계EMS_운영보고서_예시_{rev}.docx")])   # 화면의 [보고서 출력]으로 나오는 문서의 견본(가상 장치 값)
+    run([sys.executable, "-m", "tools.sample_report", os.path.join(OUT, f"이동형전력체계EMS_운영보고서_예시_{rev}.docx"), os.path.join(OUT, f"IFPS_EMS_운영시나리오_시퀀스문서_{rev}.pptx")])   # 화면의 [보고서 출력]으로 나오는 문서의 견본(가상 장치 값)
     run([sys.executable, os.path.join(DOCS, "ppt", "add_ems_to_proposal.py"), rev])                 # 제안 발표 자료 EMS 보완본(원본이 있을 때만)          # FMEA·FTA 통합 분석 워크벤치(HTML)
+    with tempfile.TemporaryDirectory() as td:                    # 교육용 가상 화면: 실제 화면 파일 + 가상 장치에서 녹화한 값 + 교육 창(설치 없이 index.html 로 연다)
+        name = f"IFPS_EMS_교육용_가상화면_{rev}"; run([sys.executable, "-m", "tools.build_training", os.path.join(td, name), rev])
+        shutil.make_archive(os.path.join(OUT, name), "zip", td, name)
     names = sorted(os.path.relpath(os.path.join(dp, f), OUT) for dp, _, fs in os.walk(OUT) for f in fs)
     bad = [n for n in names if rev not in n]
     print(f"산출물 {len(names)}개 (docs/out):"); [print("   ", n) for n in names]

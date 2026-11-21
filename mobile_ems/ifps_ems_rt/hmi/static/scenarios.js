@@ -229,6 +229,7 @@ const P_SCENARIOS = (() => {
       ${button("verify", busy ? "실행 중…" : "선택 병렬 검증", "pri", busy || !selected.size)}
       ${button("improve", "자동 진단·개선", "", busy || !selected.size)}
       ${button("export", "Python 회귀시험 저장", "", busy || !selected.size)}
+      ${button("pptx", "시퀀스 PPT 내보내기", "", busy || !selected.size)}${button("pptx-in", "고친 PPT 올리기", "", busy)}
       </div>
       ${config.presets.length ? `<div class="sc-actions sc-presets">
         <label for="scPreset">기본 운전 시나리오</label>
@@ -420,6 +421,46 @@ const P_SCENARIOS = (() => {
     finally { busy = false; paint(); }
   }
 
+  /* 시퀀스 문서(PPT): 고른 시나리오를 검증한 시간과 함께 내보내고, 회의에서 고친 파일을 다시 올려 반영한다 */
+  async function pptxOut() {
+    if (!can("engineer")) return loginDialog();
+    const indexes = [...selected].sort((a, b) => a - b); busy = true; paint();
+    try {
+      const r = await fetch("/api/scenarios/pptx", {method: "POST", headers: {"X-EMS-Token": S.token || ""}, body: JSON.stringify({cases: indexes.map(i => cases[i]), verify: indexes.length <= maxBatch})});
+      if (!r.ok) { let why = ""; try { why = (await r.json()).why; } catch (_) { /* 무시 */ } return toast(why || "PPT 를 만들지 못했습니다", "bad"); }
+      const link = document.createElement("a"); link.href = URL.createObjectURL(await r.blob()); link.download = `EMS_sequence_${new Date().toISOString().slice(0, 10)}.pptx`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+      toast(`시퀀스 문서를 내보냈습니다 (${indexes.length}건)`, "ok");
+    } catch (_) { toast("시나리오 서버에 연결하지 못했습니다", "bad"); }
+    finally { busy = false; paint(); }
+  }
+  function pptxIn() {
+    if (!can("engineer")) return loginDialog();
+    const pick = document.createElement("input"); pick.type = "file"; pick.accept = ".pptx";
+    pick.onchange = async () => {
+      const file = pick.files[0]; if (!file) return; if (file.size > 8 * 1024 * 1024) return toast("파일이 너무 큽니다(8 MB 까지)", "bad");
+      let r; try { r = await (await fetch("/api/scenarios/import", {method: "POST", headers: {"X-EMS-Token": S.token || "", "Content-Type": "application/octet-stream"}, body: file})).json(); } catch (_) { return toast("올리지 못했습니다", "bad"); }
+      if (r.ok === false) return toast(r.why || "읽지 못했습니다", "bad");
+      const canon = st => st ? JSON.stringify(Object.keys(st).filter(k => k !== "limit").sort().map(k => [k, st[k]])) : "";      // 열쇠 순서와 판정 여유(limit)는 비교에서 뺀다
+      const same = (a, b) => a.steps.length === b.steps.length && a.steps.every((st, i) => canon(st) === canon(b.steps[i]));
+      r.cases.forEach(c => { const o = cases.find(x => x.name === c.name); if (o) c.steps = c.steps.map((st, i) => canon(st) === canon(o.steps[i]) ? o.steps[i] : st); });      // 안 바뀐 단계는 원래 것을 그대로 둔다
+      const rows = r.cases.map(c => { const at = cases.findIndex(x => x.name === c.name); return {c, at, kind: at < 0 ? "새 시나리오" : same(c, cases[at]) && (c.note || "") === (cases[at].note || "") ? "같음" : "바뀜"}; });
+      const diff = x => x.at < 0 ? `${x.c.steps.length}단계` : x.kind === "같음" ? "" : `${cases[x.at].steps.length} → ${x.c.steps.length}단계` + x.c.steps.map((st, i) => canon(st) !== canon(cases[x.at].steps[i]) ? i + 1 : 0).filter(Boolean).slice(0, 8).map(n => ` #${n}`).join("");
+      modal(`<h3>고친 시퀀스 문서 반영</h3><p class="sub">${esc(file.name)} — 시나리오 ${r.found}건을 읽었습니다. 반영할 것을 고르십시오. 틀린 시나리오는 반영하지 않습니다.</p>
+        <div class="scroll" style="max-height:340px"><table class="t"><thead><tr><th></th><th>시나리오</th><th>구분</th><th>바뀐 곳</th></tr></thead><tbody>
+        ${rows.map((x, i) => `<tr><td><input type="checkbox" data-in="${i}" ${x.kind === "같음" ? "" : "checked"}></td><td>${esc(x.c.name)}</td><td><span class="pill ${x.kind === "바뀜" ? "warn" : x.kind === "같음" ? "info" : "ok"}">${x.kind}</span></td><td class="mono">${esc(diff(x))}</td></tr>`).join("")}
+        ${r.errors.map(e => `<tr><td></td><td>${esc(e.name)}</td><td><span class="pill bad">틀림</span></td><td>${e.row ? e.row + "번 줄: " : ""}${esc(e.why)}</td></tr>`).join("")}</tbody></table></div>
+        ${r.comments.length ? `<h4>검토 의견 ${r.comments.length}건</h4><div class="scroll" style="max-height:140px">${r.comments.map(m => `<p class="sub">· ${esc(m.name)} ${m.step}단계 — ${esc(m.text)}</p>`).join("")}</div>` : ""}
+        <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn" id="inNo">닫기</button><button class="btn pri" id="inOk">고른 것 반영</button></div>`, box => {
+        box.querySelector("#inNo").onclick = closeModal;
+        box.querySelector("#inOk").onclick = () => {
+          let n = 0; box.querySelectorAll("[data-in]:checked").forEach(el => { const x = rows[+el.dataset.in]; if (x.at >= 0) cases[x.at] = x.c; else if (cases.length < maxDrafts) cases.push(x.c); else return; n++; });
+          save(); output = null; revision++; closeModal(); toast(`${n}건을 반영했습니다. 검증을 다시 돌려 확인하십시오`, "ok"); paint();
+        };
+      });
+    };
+    pick.click();
+  }
+
   function click(e) {
     const el = e.target.closest("button,[data-step]");
     if (!el) return;
@@ -448,6 +489,8 @@ const P_SCENARIOS = (() => {
     const action = d.sc;
     if (!action) return;
     if (["verify", "improve", "export"].includes(action)) return run(action);
+    if (action === "pptx") return pptxOut();
+    if (action === "pptx-in") return pptxIn();
     if (action === "add") return append(make($("#scAdd").value));
     if (action === "mode-select") {
       selected = new Set(cases.map((item, i) => isModeCase(item) ? i : -1).filter(i => i >= 0).slice(0, maxBatch));

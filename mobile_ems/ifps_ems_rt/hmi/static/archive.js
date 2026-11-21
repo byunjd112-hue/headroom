@@ -26,7 +26,7 @@ const ARC = {
       <a class="btn" id="arcCsv" title="지금 보는 표를 CSV 로">CSV 내려받기</a>
       <select class="in" id="arcDays" title="보고서에 담을 최근 기간"><option value="1">최근 1일</option><option value="7" selected>최근 7일</option><option value="31">최근 1달</option><option value="92">최근 3달</option><option value="366">최근 1년</option></select>
       <button class="btn pri" id="arcRep" title="현재 현황 · 최근 운영 현황 · 상황 기록 · 운전 시퀀스 · 점검 기록을 Word 문서로">보고서 출력(Word)</button></div></div>
-    <div class="tabs" id="arcTabs"><button data-t="meter">운전 실적 · 검침</button><button data-t="device">장치별 자료</button><button data-t="ess">ESS 안전 기록</button><button data-t="events">상황 기록</button><button data-t="inspect">점검 기록</button><button data-t="xfer">서버 전달</button><button data-t="store">보관 상태</button></div><div id="arcBody"></div>`;
+    <div class="tabs" id="arcTabs"><button data-t="meter">운전 실적 · 검침</button><button data-t="device">장치별 자료</button><button data-t="ess">ESS 안전 기록</button><button data-t="events">상황 기록</button><button data-t="inspect">점검 기록</button><button data-t="xfer">서버 전달</button><button data-t="collect">수집 항목</button><button data-t="store">보관 상태</button></div><div id="arcBody"></div>`;
     m.querySelectorAll("#arcUnit button").forEach(b => b.onclick = () => { this.unit = b.dataset.u; this.load(); });
     m.querySelectorAll("#arcTabs button").forEach(b => b.onclick = () => { this.tab = b.dataset.t; this.load(); });
     m.querySelector("#arcAt").onchange = e => { this.at = e.target.value || this.today(); this.load(); };
@@ -49,7 +49,7 @@ const ARC = {
     $q("#arcCsv").style.visibility = ["meter", "device", "ess"].includes(this.tab) ? "" : "hidden";
     this.info = await this.get("/api/archive/info");
     if (!this.info.ok) { $q("#arcBody").innerHTML = `<div class="panel"><div class="bd"><p class="warnc">${this.e(this.info.why || "기록 보관소를 열 수 없습니다")}</p></div></div>`; return; }
-    if (this.tab === "meter") return this.meter(); if (this.tab === "device") return this.device(); if (this.tab === "ess") return this.ess(); if (this.tab === "xfer") return this.xfer(); if (this.tab === "events") return this.events(); if (this.tab === "inspect") return this.inspect(); return this.store();
+    if (this.tab === "meter") return this.meter(); if (this.tab === "device") return this.device(); if (this.tab === "ess") return this.ess(); if (this.tab === "xfer") return this.xfer(); if (this.tab === "collect") return this.collect(); if (this.tab === "events") return this.events(); if (this.tab === "inspect") return this.inspect(); return this.store();
   },
 
   /* ── 운전 실적 · 검침 */
@@ -118,7 +118,7 @@ const ARC = {
     const B = document.querySelector("#arcBody"), r = await this.get(`/api/archive/ess?unit=${this.essRaw ? "raw" : this.unit}&at=${this.at}`), items = r.items || [], rows = r.rows || [], i = this.info; if (!B) return; document.querySelector("#arcTitle").textContent = r.title || "";
     if (!items.length) { B.innerHTML = `<div class="panel"><div class="bd warnc">ESS 안전 운영정보 항목 파일(config/ess_safety.csv)이 없어 기록하지 않습니다.</div></div>`; return; }
     if (!items.some(x => x.key === this.sig)) this.sig = "soc"; const one = this.essRaw, grp = [...new Set(items.map(x => x.group))];
-    B.innerHTML = `<div class="arc-tiles four"><div class="arc-tile"><span>저장 주기</span><b>1분</b><i></i><em>통합관리시스템 전송 주기와 같음</em></div><div class="arc-tile"><span>기록률 (이 구간)</span><b>${r.rate == null ? "—" : this.n(r.rate, 2)}</b><i>%</i><em>${this.n(r.recorded, 0)} / ${this.n(r.expected, 0)}줄</em></div>
+    B.innerHTML = `<div class="arc-tiles four"><div class="arc-tile"><span>저장 주기</span><b>${(i.ess_step_s || 60) / 60}분</b><i></i><em>${(i.ess_step_s || 60) === 60 ? "통합관리시스템 전송 주기와 같음" : "통합관리시스템 전송 주기(1분)보다 김"}</em></div><div class="arc-tile"><span>기록률 (이 구간)</span><b>${r.rate == null ? "—" : this.n(r.rate, 2)}</b><i>%</i><em>${this.n(r.recorded, 0)} / ${this.n(r.expected, 0)}줄</em></div>
       <div class="arc-tile"><span>항목 (수집 / 전체)</span><b>${i.ess_mapped} / ${i.ess_items}</b><i></i><em>미수집 항목은 0 으로 기록</em></div><div class="arc-tile"><span>기록 범위</span><b style="font-size:14px">${this.e(i.ess_first || "—")}</b><i></i><em>~ ${this.e(i.ess_last || "—")}</em></div></div>
     <div class="panel"><div class="hd"><h3>${this.e((items.find(x => x.key === this.sig) || {}).label || "")}</h3><select class="in" id="arcSig">${items.filter(x => x.tag).map(x => `<option value="${x.key}" ${x.key === this.sig ? "selected" : ""}>${this.e(x.label)}</option>`).join("")}</select>
       <label class="arc-chk"><input type="checkbox" id="essRaw" ${one ? "checked" : ""}> 1분 원자료(하루치)</label><div class="spacer"></div><span class="sub">인터넷 전송 대신 현장에 보관 → '서버 전달'에서 주둔지 서버로 넘긴다</span></div><div class="bd"><div id="arcChart"></div></div></div>
@@ -150,6 +150,40 @@ const ARC = {
       const h = {}; if (typeof S !== "undefined" && S.token) h["X-EMS-Token"] = S.token; const f = await fetch(`/api/archive/bundle?id=${id}`, { headers: h }); if (!f.ok) return this.say("내려받지 못했습니다", "bad");
       const a = document.createElement("a"); a.href = URL.createObjectURL(await f.blob()); a.download = b.dataset.f; document.body.appendChild(a); a.click(); a.remove();
     });
+  },
+
+  /* ── 수집 항목 관리(엔지니어): ESS 안전 항목 · 장치별 수집 신호 · 주기 · 보관 */
+  async collect() {
+    const B = document.querySelector("#arcBody"); document.querySelector("#arcTitle").textContent = "";
+    if (this.standalone || !this.role("engineer")) { B.innerHTML = `<div class="panel"><div class="bd"><p>수집 항목과 주기는 관리자(엔지니어 권한)가 EMS 화면에서 고칩니다.</p>${this.standalone ? "" : '<button class="btn pri" id="colLogin">로그인</button>'}</div></div>`; const b = B.querySelector("#colLogin"); if (b) b.onclick = () => loginDialog(); return; }
+    const r = await this.get("/api/archive/collect"); if (!r.ok) { B.innerHTML = `<div class="panel"><div class="bd warnc">${this.e(r.why || "불러오지 못했습니다")}</div></div>`; return; }
+    const c = r.cfg, tags = r.signals.map(x => x.tag), devs = [...new Set(r.signals.map(x => x.dev))]; let items = r.items.map(x => ({ ...x }));
+    const opt = (list, cur, f) => list.map(v => `<option value="${v}" ${v === cur ? "selected" : ""}>${f(v)}</option>`).join("");
+    const paintItems = () => {
+      B.querySelector("#colItems").innerHTML = items.map((it, i) => `<tr data-i="${i}"><td class="n">${i + 1}</td><td><input class="in sm" data-k="key" value="${this.e(it.key)}" style="width:110px"></td><td><input class="in sm" data-k="group" value="${this.e(it.group)}" style="width:100px" list="colGroups"></td><td><input class="in sm" data-k="label" value="${this.e(it.label)}" style="width:190px"></td>
+        <td><input class="in sm" data-k="unit" value="${this.e(it.unit)}" style="width:60px"></td><td><select class="in sm" data-k="tag"><option value="">(미수집 — 0 으로 기록)</option>${opt(tags, it.tag, v => v)}</select></td>
+        <td class="arc-act"><button class="btn sm" data-m="up" title="위로">▲</button><button class="btn sm" data-m="down" title="아래로">▼</button><button class="btn sm stop" data-m="del">삭제</button></td></tr>`).join("") || `<tr><td colspan="7" class="muted">항목이 없습니다 — ESS 안전 운영정보를 기록하지 않습니다</td></tr>`;
+      B.querySelector("#colCount").textContent = `${items.length}개 (연결 ${items.filter(x => x.tag).length}개)`;
+      B.querySelectorAll("#colItems [data-k]").forEach(el => el.onchange = () => { items[+el.closest("tr").dataset.i][el.dataset.k] = el.value.trim(); if (el.dataset.k === "tag") paintItems(); });
+      B.querySelectorAll("#colItems [data-m]").forEach(el => el.onclick = () => { const i = +el.closest("tr").dataset.i, m = el.dataset.m; if (m === "del") items.splice(i, 1); else { const j = m === "up" ? i - 1 : i + 1; if (j < 0 || j >= items.length) return; [items[i], items[j]] = [items[j], items[i]]; } paintItems(); });
+    };
+    B.innerHTML = `<div class="panel"><div class="hd"><h3>주기 · 보관</h3><div class="spacer"></div><span class="sub">저장하면 이전 판을 config/backup 에 남기고 바로 적용한다(재기동 불필요)</span><button class="btn pri" id="colSave">저장 · 적용</button></div>
+      <div class="bd arc-form"><label>검침 · 운전 실적 <select class="in" id="cInt">${opt(r.choices.interval_min, c.interval_min, v => v + "분")}</select></label><label>장치별 자료 <select class="in" id="cDev">${opt(r.choices.dev_interval_min, c.dev_interval_min, v => v + "분")}</select></label>
+        <label>ESS 안전 운영정보 <select class="in" id="cEss">${opt(r.choices.ess_interval_s, c.ess_interval_s, v => v / 60 + "분")}</select></label><label>보관 기간 <select class="in" id="cYears">${opt(r.choices.retain_years, c.retain_years, v => v + "년")}</select></label>
+        <label>용량 한도 <input class="in" id="cMb" type="number" min="16" max="8192" value="${c.max_mb}" style="width:90px"> MB</label><span class="sub" id="colWarn"></span></div></div>
+      <div class="panel"><div class="hd"><h3>ESS 안전 운영정보 항목 <span class="sub" id="colCount"></span></h3><div class="spacer"></div><span class="sub">연결 신호를 고르면 그 값을, 비우면 0 을 기록한다(미수집 표시). 공사 연계 명세의 열 순서대로 맞춘다</span><button class="btn" id="colAdd">항목 추가</button></div>
+        <div class="bd np scroll arc-table"><table class="t"><thead><tr><th class="n">순서</th><th>이름표(key)</th><th>분류</th><th>항목 이름</th><th>단위</th><th>연결 신호(대응표)</th><th></th></tr></thead><tbody id="colItems"></tbody></table><datalist id="colGroups">${[...new Set(items.map(x => x.group))].map(g => `<option>${this.e(g)}</option>`).join("")}</datalist></div></div>
+      <div class="panel"><div class="hd"><h3>장치별 수집 신호</h3><div class="spacer"></div><span class="sub">표시를 끄면 그 신호는 장치별 자료에 쌓지 않는다. 새 신호를 넣거나 주소를 바꾸는 일은 디버그 화면의 설정 편집(대응표)에서 한다</span></div>
+        <div class="bd col-sig">${devs.map(d => `<div class="col-dev"><b>${this.e(r.signals.find(x => x.dev === d).name)} <span class="sub">${this.e(d)}</span></b>${r.signals.filter(x => x.dev === d).map(x => `<label class="arc-chk"><input type="checkbox" data-sig="${this.e(x.tag)}" ${x.on ? "checked" : ""}> ${this.e(x.tag.split(".").slice(1).join("."))}${x.unit ? " <span class='sub'>" + this.e(x.unit) + "</span>" : ""}</label>`).join("")}</div>`).join("")}</div></div>`;
+    const warn = () => { const y = +B.querySelector("#cYears").value, e = +B.querySelector("#cEss").value; B.querySelector("#colWarn").innerHTML = (y < r.legal_years ? `<span class="pill warn">보관 ${y}년 — 점검 기록 보존 기간 ${r.legal_years}년보다 짧음</span> ` : "") + (e > 60 ? `<span class="pill warn">ESS ${e / 60}분 — 통합관리시스템 전송 주기(1분)보다 김</span>` : ""); };
+    ["#cYears", "#cEss"].forEach(id => B.querySelector(id).onchange = warn); warn(); paintItems();
+    B.querySelector("#colAdd").onclick = () => { if (items.length >= r.max_items) return this.say(`항목은 ${r.max_items}개까지입니다`, "bad"); let n = items.length + 1; while (items.some(x => x.key === "item_" + n)) n++; items.push({ key: "item_" + n, group: (items[items.length - 1] || {}).group || "배터리", label: "새 항목", unit: "", tag: "" }); paintItems(); };
+    B.querySelector("#colSave").onclick = async () => {
+      const body = { cfg: { interval_min: +B.querySelector("#cInt").value, dev_interval_min: +B.querySelector("#cDev").value, ess_interval_s: +B.querySelector("#cEss").value, retain_years: +B.querySelector("#cYears").value, max_mb: +B.querySelector("#cMb").value },
+        items, dev_exclude: [...B.querySelectorAll("[data-sig]")].filter(x => !x.checked).map(x => x.dataset.sig) };
+      const j = await api("/api/archive/collect", body);
+      if (j.ok) { this.say(j.changed.length ? "저장하고 적용했습니다: " + j.changed.join(" · ") : "바뀐 내용이 없습니다", "ok"); this.load(); } else this.say((j.errors || [j.why || "저장하지 못했습니다"]).slice(0, 3).join(" / "), "bad");
+    };
   },
 
   /* ── 상황 기록 */
@@ -193,12 +227,12 @@ const ARC = {
     const row = (a, b) => `<tr><td>${a}</td><td>${b}</td></tr>`;
     B.innerHTML = `<div class="arc-grid"><div class="panel"><div class="hd"><h3>자료 보관 상태</h3></div><div class="bd np"><table class="t"><tbody>
       ${row("저장 주기", `<b>${i.interval_min}분</b> <span class="sub">(1 · 5 · 15 · 30 · 60분 중 선택)</span>`)}${row("보관 기간", `<b>${i.retain_years}년</b> <span class="sub">(1~5년)</span>` + (i.retain_years < i.legal_years ? ` <span class="pill warn">점검 기록 보존 기간 ${i.legal_years}년보다 짧음</span>` : ""))}
-      ${row("기록 범위", `${this.e(i.first || "—")} ~ ${this.e(i.last || "—")}`)}${row("장치별 자료 / ESS 안전 운영정보", `${this.n(i.dev_rows, 0)}줄(${i.interval_min}분) / ${this.n(i.ess_rows, 0)}줄(1분)`)}${row("검침 기록", `${this.n(i.rows, 0)}줄 <span class="sub">(보관 기간을 다 채우면 약 ${this.n(i.rows_at_full, 0)}줄)</span><div class="arc-meter"><i style="width:${full.toFixed(1)}%"></i></div>`)}
+      ${row("기록 범위", `${this.e(i.first || "—")} ~ ${this.e(i.last || "—")}`)}${row("장치별 자료 / ESS 안전 운영정보", `${this.n(i.dev_rows, 0)}줄(${i.dev_step_min || i.interval_min}분) / ${this.n(i.ess_rows, 0)}줄(${(i.ess_step_s || 60) / 60}분)`)}${row("검침 기록", `${this.n(i.rows, 0)}줄 <span class="sub">(보관 기간을 다 채우면 약 ${this.n(i.rows_at_full, 0)}줄)</span><div class="arc-meter"><i style="width:${full.toFixed(1)}%"></i></div>`)}
       ${row("상황 기록 / 점검 기록", `${this.n(i.events, 0)}건 / ${this.n(i.inspects, 0)}건`)}${row("보관소 크기", `${this.n(i.size_mb)} MB / 한도 ${this.n(i.max_mb, 0)} MB<div class="arc-meter"><i style="width:${pct.toFixed(1)}%"></i></div>`)}
       ${row("시연용 합성 자료", i.demo_rows ? `${this.n(i.demo_rows, 0)}줄 <span class="pill warn">가상 장치 모드의 첫 기동 때 넣은 과거 자료</span>` : "없음")}${i.err ? row("저장 오류", `<span class="badc">${this.e(i.err)}</span>`) : ""}${row("열기 방식", i.read_only ? "읽기 전용(기록 조회기)" : "EMS 가 쓰는 중")}</tbody></table></div></div>
       <div class="panel"><div class="hd"><h3>보관 규칙</h3></div><div class="bd arc-rules"><p>· 저장 주기마다 한 줄씩 적는다: 구간 전력량, 구간 최대, 평균 상태, <b>검침 누적값</b>.</p><p>· 보관 기간이 지난 기록은 자동으로 지운다. 파일이 한도를 넘으면 가장 오래된 달부터 지우고 빈 공간을 돌려받는다.</p>
       <p>· 점검 결과 기록의 보존 기간은 <b>4년</b>이다(전기안전관리법 시행규칙). 그래서 기본 보관 기간을 4년으로 했다.</p><p>· 검침 · 장치별 자료의 저장 주기를 직접 정한 조항은 확인하지 못했다. 전력 검침 관행인 <b>15분</b>을 기본으로 했고, 현장 지침이 있으면 그에 맞춰 바꾼다.</p><p>· ESS 안전 운영정보는 전기안전공사 통합관리시스템의 전송 주기인 <b>1분</b>으로 쌓는다. 인터넷으로 보내지 못하므로 보관하고 주둔지 서버로 넘긴다.</p>
-      <p>· 바꾸는 곳: 디버그 화면의 설정 편집 → <span class="mono">archive.interval_min · retain_years · max_mb</span> (재기동 뒤 적용).</p><p>· 별도 조회: <span class="mono">python -m ifps_ems_rt.archview state/archive.db</span> — EMS 를 켜지 않고 보관소 파일만 읽는다.</p></div></div></div>`;
+      <p>· 바꾸는 곳: 이 화면의 <b>수집 항목</b> 탭(엔지니어 권한) — 주기 · 보관 기간 · ESS 항목 · 장치별 수집 신호를 고치면 바로 적용된다.</p><p>· 별도 조회: <span class="mono">python -m ifps_ems_rt.archview state/archive.db</span> — EMS 를 켜지 않고 보관소 파일만 읽는다.</p></div></div></div>`;
   },
 
   async report() {
