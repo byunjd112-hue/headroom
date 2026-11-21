@@ -42,11 +42,29 @@ const TRAIN = {
     return { seen: this.seen, did: this.did, tabs: this.tabs, role: S.me.role, mode: s.mode, posture: o.posture, shed: o.shed || [], outage: !!o.outage, auto: s.auto, dg: !!(s.devices && s.devices.DG && s.devices.DG.on), unack: (s.alarms || []).filter(a => !a.acked).length };
   },
   done(i, c) { return this.L[i].k.every(k => k[1](c)) && this.L[i].q.every((q, j) => this.ans[`${i}.${j}`] === q[2]); },
+  /* ── 작은 화면(휴대전화·태블릿): 실제 화면판(1920×1080)은 그대로 두고 손가락으로 밀어 보며, 확대·축소 단추를 쓴다. 교육 창은 아래에 붙는다 */
+  small() { const touch = matchMedia("(pointer: coarse)").matches; return innerWidth < 1100 || (touch && (innerHeight < 820 || Math.min(screen.width, screen.height) < 820)); },
+  fit() {
+    const app = document.getElementById("app"); if (!app) return;
+    if (!this.small()) { document.documentElement.classList.remove("tr-m"); const sp = document.getElementById("trSpace"); if (sp) sp.remove(); return this._fit(); }
+    document.documentElement.classList.add("tr-m"); const base = innerWidth / CANVAS_W, s = Math.min(1.2, Math.max(base, this.zoom || Math.max(base, innerWidth > innerHeight ? 0.45 : 0.55))); this.zoom = s; S.scale = s;
+    app.style.transform = `scale(${s})`; let sp = document.getElementById("trSpace"); if (!sp) { sp = document.createElement("div"); sp.id = "trSpace"; document.body.appendChild(sp); }
+    sp.style.width = CANVAS_W * s + "px"; sp.style.height = CANVAS_H * s + (this.el ? this.el.offsetHeight : 0) + 12 + "px";
+    ["modal", "toast", "stale"].forEach(id => { const e = document.getElementById(id); if (e && e.parentElement !== app) app.appendChild(e); });
+  },
+  zoomBy(k) { this.zoom = k === 0 ? innerWidth / CANVAS_W : (this.zoom || 0.5) * k; this.fit(); },
+  watch() {                 /* 작은 화면에서는 확인 창·알림이 화면 밖에 뜰 수 있어 그쪽으로 옮겨 주고, 알림 글은 교육 창에도 보여 준다 */
+    const m = document.getElementById("modal"), t = document.getElementById("toast");
+    if (m) new MutationObserver(() => { if (this.small() && m.classList.contains("on")) { const b = document.getElementById("modalBox"); if (b) b.scrollIntoView({ block: "center", inline: "center" }); } }).observe(m, { attributes: true, attributeFilter: ["class"] });
+    if (t) new MutationObserver(r => { const n = r.flatMap(x => [...x.addedNodes])[0]; if (n && this.small()) { this.msg = n.textContent; this.paint(true); clearTimeout(this._mt); this._mt = setTimeout(() => { this.msg = ""; this.paint(true); }, 4500); } }).observe(t, { childList: true });
+  },
   start() {
     if (this.on) return; this.on = true; this.load();
     const el = document.createElement("div"); el.id = "train"; el.className = "train"; document.body.appendChild(el); this.el = el;
     if (typeof TS !== "undefined") { const o = TS.open.bind(TS); TS.open = a => { this.did.add("guide"); return o(a); }; }
-    setInterval(() => this.paint(), 1000); this.paint(true);
+    this._fit = fitCanvas; fitCanvas = () => this.fit(); addEventListener("orientationchange", () => setTimeout(() => this.fit(), 200)); this.watch();      // eslint-disable-line no-global-assign — 화면판 맞춤을 교육 창이 맡는다
+    this.min = this.small() && innerHeight < 500;                      // 가로로 든 휴대전화는 화면이 낮아 교육 창을 접은 채로 시작한다
+    setInterval(() => this.paint(), 1000); this.paint(true); this.fit();
   },
   paint(force) {
     const c = this.ctx(), n = this.L.length, fin = this.cur === n, key = JSON.stringify([this.cur, this.min, fin ? this.ans : this.L[this.cur].k.map(k => k[1](c)), Object.keys(this.ans).length, this.L.map((_, i) => this.done(i, c))]);
@@ -63,12 +81,12 @@ const TRAIN = {
       body = `<h4>${esc(l.t)}</h4><p class="tr-d">${esc(l.d)}</p><div class="tr-k">${l.k.map(k => `<div class="${k[1](c) ? "ok" : ""}"><i>${k[1](c) ? "✔" : "□"}</i>${esc(k[0])}</div>`).join("")}</div>${l.q.map((q, j) => this.quiz(`${this.cur}.${j}`, q, j)).join("")}`;
     }
     this.el.classList.toggle("min", !!this.min);
-    this.el.innerHTML = `<div class="tr-hd"><b>교육</b><span class="sub">${off ? "가상 화면(녹화한 값)" : "가상 장치 모드"}</span><div class="spacer"></div><button class="btn sm ghost" id="trMin">${this.min ? "펼치기" : "접기"}</button><button class="btn sm ghost" id="trReset" title="진행 상황 지우기">처음부터</button></div>
-      <div class="tr-tabs">${tabs}</div><div class="tr-bd">${body}</div><div class="tr-ft"><button class="btn sm" id="trPrev" ${this.cur ? "" : "disabled"}>◀ 앞</button><button class="btn sm pri" id="trNext" ${fin ? "disabled" : ""}>다음 ▶</button></div>`;
+    this.el.innerHTML = `<div class="tr-hd"><b>교육</b><span class="sub">${off ? "가상 화면(녹화한 값)" : "가상 장치 모드"}</span><div class="spacer"></div><span class="tr-zoom"><button class="btn sm" id="trZo" title="축소">－</button><button class="btn sm" id="trZf" title="화면 너비에 맞춤">맞춤</button><button class="btn sm" id="trZi" title="확대">＋</button></span><button class="btn sm ghost" id="trMin">${this.min ? "펼치기" : "접기"}</button><button class="btn sm ghost" id="trReset" title="진행 상황 지우기">처음부터</button></div>
+      ${this.msg ? `<div class="tr-msg">${esc(this.msg)}</div>` : ""}<div class="tr-tabs">${tabs}</div><div class="tr-bd">${body}</div><div class="tr-ft"><button class="btn sm" id="trPrev" ${this.cur ? "" : "disabled"}>◀ 앞</button><button class="btn sm pri" id="trNext" ${fin ? "disabled" : ""}>다음 ▶</button></div>`;
     const q = s => this.el.querySelector(s);
     this.el.querySelectorAll("[data-l]").forEach(b => b.onclick = () => { this.cur = +b.dataset.l; this.paint(true); });
     this.el.querySelectorAll("[data-q]").forEach(b => b.onclick = () => { this.ans[b.dataset.q] = +b.dataset.a; this.paint(true); });
-    q("#trMin").onclick = () => { this.min = !this.min; this.paint(true); }; q("#trPrev").onclick = () => { this.cur--; this.paint(true); }; q("#trNext").onclick = () => { this.cur++; this.paint(true); };
+    q("#trMin").onclick = () => { this.min = !this.min; this.paint(true); this.fit(); }; q("#trZo").onclick = () => this.zoomBy(1 / 1.25); q("#trZi").onclick = () => this.zoomBy(1.25); q("#trZf").onclick = () => this.zoomBy(0); q("#trPrev").onclick = () => { this.cur--; this.paint(true); }; q("#trNext").onclick = () => { this.cur++; this.paint(true); };
     q("#trReset").onclick = () => { if (!confirm("교육 진행 상황을 지우고 처음부터 합니까?")) return; this.seen = new Set(); this.did = new Set(); this.tabs = new Set(); this.ans = {}; this.cur = 0; this.paint(true); };
     if (fin) { q("#trName").onchange = e => { this.who.name = e.target.value.trim().slice(0, 20); this.save(); }; q("#trUnit").onchange = e => { this.who.unit = e.target.value.trim().slice(0, 30); this.save(); }; q("#trPrint").onclick = () => this.print(c); }
   },
@@ -77,7 +95,7 @@ const TRAIN = {
     return `<div class="tr-q"><p>문제 ${j + 1}. ${esc(q[0])}</p>${q[1].map((o, i) => `<button class="tr-o ${a === i ? (ok ? "ok" : "bad") : ""}" data-q="${id}" data-a="${i}">${"①②③"[i]} ${esc(o)}</button>`).join("")}${a !== undefined && q[3] ? `<p class="tr-x ${ok ? "ok" : "bad"}">${ok ? "맞다. " : "다시 생각해 보자. "}${ok ? esc(q[3]) : ""}</p>` : ""}</div>`;
   },
   print(c) {
-    const sc = this.FINAL.filter((q, j) => this.ans["f." + j] === q[2]).length, w = window.open("", "_blank"); if (!w) return toast("팝업이 막혀 결과표를 열지 못했습니다", "bad");
+    const sc = this.FINAL.filter((q, j) => this.ans["f." + j] === q[2]).length, w = window.open("", "_blank"); if (!w) { this.msg = `결과: ${this.who.name || "이름 없음"} · 평가 ${sc}/${this.FINAL.length} · 단원 ${this.L.filter((_, i) => this.done(i, c)).length}/${this.L.length} — 이 화면을 갈무리(캡처)해 제출하십시오`; return this.paint(true); }
     w.document.write(`<!doctype html><meta charset="utf-8"><title>EMS 교육 결과표</title><style>body{font-family:"맑은 고딕",sans-serif;margin:40px;color:#000}table{border-collapse:collapse;width:100%}td,th{border:1px solid #666;padding:6px 10px;text-align:left}h1{font-size:22px}</style>
       <h1>IFPS 이동형 EMS 교육 결과표</h1><table><tr><th>이름</th><td>${esc(this.who.name)}</td><th>소속</th><td>${esc(this.who.unit)}</td></tr><tr><th>일시</th><td>${new Date().toLocaleString("ko-KR")}</td><th>교육 자료</th><td>${esc((S.snap && S.snap.version && S.snap.version.pkg) || "")}</td></tr>
       <tr><th>종합 평가</th><td>${sc} / ${this.FINAL.length}</td><th>단원 완료</th><td>${this.L.filter((_, i) => this.done(i, c)).length} / ${this.L.length}</td></tr></table><h3>단원별</h3><table>${this.L.map((l, i) => `<tr><td>${esc(l.t)}</td><td>${this.done(i, c) ? "완료" : "미완료"}</td></tr>`).join("")}</table>

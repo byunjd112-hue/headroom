@@ -42,6 +42,19 @@
     if (path === "/api/trace" || path === "/api/trace/clear") return { ok: true, on: false };
     return NO;
   }
+  /* 파일 하나짜리(휴대전화용)에서는 그림도 파일 안에 들어 있다(TRAIN_ASSETS). 화면이 그림 경로를 쓰면 그 자리에서 바꿔 끼운다 */
+  const A = window.TRAIN_ASSETS;
+  if (A) {
+    const norm = v => String(v || "").replace(/^\.?\//, "").split("?")[0], swap = v => A[norm(v)];
+    const fix = el => {
+      if (el.nodeType !== 1) return;
+      for (const k of ["src", "href", "xlink:href"]) { const v = el.getAttribute && el.getAttribute(k); if (v && !v.startsWith("data:") && swap(v)) el.setAttribute(k, swap(v)); }
+      const st = el.getAttribute && el.getAttribute("style"); if (st && st.includes("url(") && !st.includes("data:")) { const n = st.replace(/url\((['"]?)([^'")]+)\1\)/g, (m, q, u) => swap(u) ? `url("${swap(u)}")` : m); if (n !== st) el.setAttribute("style", n); }
+    };
+    const walk = el => { fix(el); if (el.querySelectorAll) el.querySelectorAll("img,image,[style*='url(']").forEach(fix); };
+    new MutationObserver(rs => rs.forEach(r => { if (r.type === "attributes") fix(r.target); else r.addedNodes.forEach(walk); })).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["src", "href", "style"] });
+    document.addEventListener("DOMContentLoaded", () => walk(document.body));
+  }
   const real = window.fetch ? window.fetch.bind(window) : null;
   window.fetch = async function (url, opt) {
     const u = new URL(String(url), "http://ems.local/"), path = u.pathname; opt = opt || {};

@@ -816,3 +816,10 @@ input.in.sm, select.in.sm { height: 26px; font-size: 12px; min-width: 0; } .arc-
 .tr-q { margin-top: 10px; border-top: 1px dashed var(--line2); padding-top: 8px; } .tr-q p { margin: 0 0 5px; } .tr-o { display: block; width: 100%; text-align: left; margin: 3px 0; padding: 5px 9px; border-radius: 8px; border: 1px solid var(--line2); background: var(--panel2); color: var(--text); cursor: pointer; }
 .tr-o.ok { border-color: var(--ok); background: rgba(60,180,120,.18); } .tr-o.bad { border-color: var(--alarm); background: rgba(255,90,120,.14); } .tr-x.ok { color: var(--ok); } .tr-x.bad { color: var(--warn); } .tr-ft { display: flex; justify-content: space-between; padding: 8px 12px; border-top: 1px solid var(--line2); }
 .tr-who { display: flex; gap: 6px; margin-bottom: 6px; } .tr-score { font-weight: 700; margin: 10px 0 6px; }
+.tr-zoom { display: none; gap: 4px; } .tr-msg { margin: 6px 10px 0; padding: 6px 10px; border-radius: 8px; background: rgba(120,170,220,.16); font-size: 13px; }
+/* 작은 화면: 화면판은 밀어서 보고(스크롤), 교육 창은 아래에 붙인다. 단추는 손가락으로 누르기 좋게 키운다 */
+html.tr-m, html.tr-m body { overflow: auto; height: auto; min-height: 100%; -webkit-overflow-scrolling: touch; } html.tr-m #app { position: absolute; left: 0; top: 0; }
+html.tr-m .train { left: 0; right: 0; bottom: 0; width: auto; max-height: 46vh; border-radius: 14px 14px 0 0; font-size: 15px; } html.tr-m .train.min { max-height: 48px; } html.tr-m .tr-zoom { display: inline-flex; }
+html.tr-m .train .btn.sm { height: 36px; padding: 0 12px; font-size: 14px; } html.tr-m .tr-tab { min-width: 38px; height: 36px; font-size: 14px; } html.tr-m .tr-o { padding: 10px 12px; font-size: 15px; } html.tr-m .tr-hd .sub { display: none; }
+html.tr-m .tr-who input { height: 36px; font-size: 15px; flex: 1; } #trSpace { pointer-events: none; }
+@media (orientation: landscape) { html.tr-m .train { left: auto; width: min(420px, 48vw); max-height: 92vh; border-radius: 14px 0 0 0; } }

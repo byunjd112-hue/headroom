@@ -5,7 +5,7 @@
 묶음의 index.html 을 두 번 누르면 브라우저에서 열린다(설치·서버 불필요). 화면은 실제 EMS 와 같은 파일이다.
 값은 가상 장치를 장면별로 돌려 녹화한 것이라, 운용 장소·태세·지령·고장은 '녹화해 둔 장면을 바꾸는' 식으로 움직인다(새로 계산하지 않는다).
 """
-import json, os, shutil, sys, tempfile, time, urllib.request
+import base64, json, mimetypes, os, re, shutil, sys, tempfile, time, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -57,6 +57,25 @@ def scenes(c):
     return out, sel
 
 
+def _data_uri(path):
+    with open(path, "rb") as f: return f"data:{mimetypes.guess_type(path)[0] or 'application/octet-stream'};base64," + base64.b64encode(f.read()).decode("ascii")
+
+
+def single_file(folder, dest):
+    """묶음 폴더를 파일 하나로 만든다(휴대전화·태블릿용): 글꼴 없는 CSS·스크립트·그림을 모두 한 HTML 안에 넣는다. 설명서 그림(manual/)은 커서 뺀다."""
+    with open(os.path.join(folder, "index.html"), encoding="utf-8") as f: html = f.read()
+    with open(os.path.join(folder, "style.css"), encoding="utf-8") as f: css = f.read()
+    css = re.sub(r"url\((['\"]?)([^'\")]+)\1\)", lambda m: f'url("{_data_uri(os.path.join(folder, m.group(2)))}")' if not m.group(2).startswith("data:") and os.path.isfile(os.path.join(folder, m.group(2))) else m.group(0), css)
+    assets = {f"{d}/{n}": _data_uri(os.path.join(folder, d, n)) for d in ("photos", "sprites") if os.path.isdir(os.path.join(folder, d)) for n in sorted(os.listdir(os.path.join(folder, d))) if os.path.isfile(os.path.join(folder, d, n))}
+    def script(m):
+        with open(os.path.join(folder, m.group(1)), encoding="utf-8") as f: return "<script>" + f.read().replace("</script", "<\\/script") + "</script>"
+    html = re.sub(r'<link[^>]+href="style\.css"[^>]*>', lambda m: "<style>" + css + "</style>", html, count=1)
+    html = html.replace('<script src="train_data.js"></script>', '<script>window.TRAIN_ASSETS = ' + json.dumps(assets) + ';</script>\n<script src="train_data.js"></script>', 1)
+    html = re.sub(r'<script src="([\w.]+\.js)"></script>', script, html)
+    with open(dest, "w", encoding="utf-8") as f: f.write(html)
+    return os.path.getsize(dest)
+
+
 def build(out, rev):
     d = tempfile.mkdtemp()
     try:
@@ -79,9 +98,10 @@ def build(out, rev):
         html = html.replace('<script src="core.js"></script>', '<script src="train_data.js"></script>\n<script src="train_mock.js"></script>\n<script src="core.js"></script>', 1)
         with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as f: f.write(html)
         with open(os.path.join(out, "읽어보기.txt"), "w", encoding="utf-8") as f:
-            f.write(f"IFPS 이동형 EMS 교육용 가상 화면 ({rev})\n\nindex.html 을 두 번 눌러 브라우저(Edge·Chrome)로 연다. 설치나 서버가 필요 없다.\n화면은 실제 EMS 와 같은 파일이다. 값은 가상 장치에서 녹화한 가상값이며,\n운용 장소·태세·지령·고장은 녹화해 둔 장면을 바꾸는 식으로 움직인다(새로 계산하지 않는다).\n값이 실제로 계산되는 연습은 EMS 의 가상 장치 모드(run_sim.bat)에서 '교육' 단추를 눌러 한다.\n")
+            f.write(f"IFPS 이동형 EMS 교육용 가상 화면 ({rev})\n\nPC: index.html 을 두 번 눌러 브라우저(Edge·Chrome)로 연다. 설치나 서버가 필요 없다.\n휴대전화·태블릿: 같이 나온 '_모바일.html' 파일 하나를 기기에 넣어 브라우저로 연다(화면을 밀어서 보고, 교육 창의 －·맞춤·＋ 로 크기를 바꾼다).\n화면은 실제 EMS 와 같은 파일이다. 값은 가상 장치에서 녹화한 가상값이며,\n운용 장소·태세·지령·고장은 녹화해 둔 장면을 바꾸는 식으로 움직인다(새로 계산하지 않는다).\n값이 실제로 계산되는 연습은 EMS 의 가상 장치 모드(run_sim.bat)에서 '교육' 단추를 눌러 한다.\n")
         size = sum(os.path.getsize(os.path.join(dp, n)) for dp, _, fs in os.walk(out) for n in fs)
-        print(f"교육용 가상 화면: {out} (장면 {len(sc)}개, {size / 1048576:.1f} MB)")
+        one = single_file(out, out + "_모바일.html")
+        print(f"교육용 가상 화면: {out} (장면 {len(sc)}개, 묶음 {size / 1048576:.1f} MB, 파일 하나짜리 {one / 1048576:.1f} MB)")
     finally:
         shutil.rmtree(d, ignore_errors=True)
     return 0
