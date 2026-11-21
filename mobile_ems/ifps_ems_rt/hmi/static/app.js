@@ -14,12 +14,19 @@ const LINK_EN = { "정상": "NORMAL", "경로 저하": "DEGRADED", "두절": "LO
 const linkTxt = s => S.lang === "ko" ? s : (LINK_EN[s] || s);
 const kv = (o, k, d = null) => (o && o[k] !== undefined && o[k] !== null) ? o[k] : d;
 const val = tag => kv(S.snap && S.snap.values[tag], "v");
+/* 같은 종류 주 장치 묶음(자동 인식): 대수 · 하나라도 운전 · 한 대도 없음(미설치) · 모두 두절. 묶음 정보가 없으면 장치 하나의 상태로 본다 */
+const KF = k => (S.snap && S.snap.fleet && S.snap.fleet[k]) || null, _kd = k => (S.snap && S.snap.devices[k]) || null;
+const kN = k => { const f = KF(k); return f ? f.n : 1; };
+const kOn = k => { const f = KF(k), d = _kd(k); return f ? f.on : !!(d && d.on); };
+const kAbsent = k => { const f = KF(k), d = _kd(k); return f ? f.seen === 0 && !!d && d.link === "두절" : !!(d && d.absent); };
+const kLost = k => { const f = KF(k), d = _kd(k); return f ? f.n === 0 && !!d && d.link === "두절" : !!(d && d.link === "두절"); };
+const kCnt = k => kN(k) > 1 ? ` · ${kN(k)}대` : "";
 
 /* ════════════════ 머리띠·경보 띠 */
 function renderHeader() {
   const s = S.snap; if (!s) return;
   $("#site").textContent = `${s.site} · ${s.sim ? "SIMULATION" : "LIVE PLANT"}`;
-  const m = MODE_TXT[s.mode] || [s.mode, s.mode]; const devs = Object.values(s.devices); const nOk = devs.filter(d => d.link === "정상").length; const nLost = devs.filter(d => d.link === "두절" && !d.absent).length;
+  const m = MODE_TXT[s.mode] || [s.mode, s.mode]; const devs = Object.values(s.devices).filter(d => !(d.slot && d.absent)); const nOk = devs.filter(d => d.link === "정상").length; const nLost = devs.filter(d => d.link === "두절" && !d.absent).length;
   $("#chips").innerHTML = [
     opsChip(s),
     `<span class="chip ${s.auto ? "ok" : "warn"}"><span class="dot"></span>${s.auto ? (S.lang === "ko" ? "자동 제어" : "AUTO DISPATCH") : (S.lang === "ko" ? "수동 운전" : "MANUAL")}</span>`,
@@ -54,18 +61,18 @@ function spark(c, ys, color, H = 30, lo = null, hi = null) {
 }
 function ovRight(s) {
   const k = s.kpi, D = s.devices, devOk = n => D[n] && D[n].link !== "두절";
-  const rows = [["PV", "태양광", k.pv, 400, TV("--pv"), 2, true], ["DG", "디젤", k.dg, 100, TV("--dg"), 3, D.DG && D.DG.on], ["FC", "연료전지", k.fc, 100, TV("--fc"), 4, D.FC && D.FC.on],
+  const rows = [["PV", "태양광", k.pv, 400, TV("--pv"), 2, true], ["DG", "디젤", k.dg, 100 * Math.max(1, kN("DG")), TV("--dg"), 3, kOn("DG")], ["FC", "연료전지", k.fc, 100 * Math.max(1, kN("FC")), TV("--fc"), 4, kOn("FC")],
     ["ESS", "ESS", k.ess, 500, TV("--ess"), 5, true], ["LOAD", "총 부하", k.load, 400, TV("--load"), 1, true]];
   const box = $("#srcRows"); if (!box) return;
   if (!box.dataset.built) { box.dataset.built = 1; box.innerHTML = rows.map(r => `<div class="srow"><span class="nm"><i style="background:${r[4]}"></i>${r[1]}</span><span class="v mono" id="sv-${r[0]}">—</span>
       <span class="sb"><i id="sb-${r[0]}" style="background:${r[4]}"></i></span><canvas class="sp" id="sp-${r[0]}"></canvas><span class="ss" id="ss-${r[0]}"></span></div>`).join(""); }
   const win = S.trend.slice(-900);
   rows.forEach(([id, nm, v, cap, col, ci, on]) => {
-    const lost = id === "DG" || id === "FC" || id === "ESS" ? !devOk(id) : !devOk("MTR");
-    $("#sv-" + id).textContent = lost ? "####" : (id === "ESS" && v > 0 ? "+" : "") + F.kw(v) + " kW";
+    const own = id === "DG" || id === "FC" || id === "ESS", lost = own ? kLost(id) : !devOk("MTR"), gone = own && kAbsent(id);
+    $("#sv-" + id).textContent = gone ? "—" : lost ? "####" : (id === "ESS" && v > 0 ? "+" : "") + F.kw(v) + " kW";
     $("#sb-" + id).style.width = Math.min(100, Math.abs(v) / cap * 100) + "%";
-    const ss = $("#ss-" + id); ss.textContent = lost ? "두절" : id === "ESS" ? (v < -0.5 ? "충전" : v > 0.5 ? "방전" : "대기") : id === "LOAD" ? "급전" : on && Math.abs(v) > 0.5 ? "운전" : "정지";
-    ss.className = "ss " + (lost ? "bad" : ss.textContent === "정지" || ss.textContent === "대기" ? "" : "on");
+    const ss = $("#ss-" + id); ss.textContent = gone ? "미설치" : lost ? "두절" : (id === "ESS" ? (v < -0.5 ? "충전" : v > 0.5 ? "방전" : "대기") : id === "LOAD" ? "급전" : on && Math.abs(v) > 0.5 ? "운전" : "정지") + ((own || id === "PV") && kN(id) > 1 ? " ×" + kN(id) : "");
+    ss.className = "ss " + (gone ? "" : lost ? "bad" : /^(정지|대기)/.test(ss.textContent) ? "" : "on");
     spark($("#sp-" + id), win.map(r => r[ci]), col, 26);
   });
   $("#balPill").className = "pill " + (k.ess < -0.5 ? "info" : "ok"); $("#balPill").textContent = k.ess < -0.5 ? `잉여 ${F.kw(-k.ess)}kW → ESS 충전` : k.ess > 0.5 ? `부족 ${F.kw(k.ess)}kW ← ESS` : "수급 균형";
@@ -202,19 +209,19 @@ const P_CTL = {
     const paths = d => Object.entries(d.paths).map(([a, p]) => a + (p.alive ? "●" : "○")).join(" ");
     for (const u of CTL_UNITS) {
       const lp = $("#lp-" + u.id); if (!lp) continue;
-      const d = u.dev ? D[u.dev] : null, lost = d ? d.link === "두절" : ((u.id === "G1" || u.id === "GRID") && !gw);
+      const d = u.dev ? D[u.dev] : null, kf = u.dev && KF(u.dev), lost = d ? (kf ? kLost(u.dev) : d.link === "두절") : ((u.id === "G1" || u.id === "GRID") && !gw), gone = !!(d && (kf ? kAbsent(u.dev) : d.absent));
       const o = s.ops || {}, garr = o.mode === "grid";
-      const on = u.id === "EMS" ? true : u.id === "G1" ? cb("G1") === 1 : u.id === "GRID" ? (garr && cb("GRID") === 1) : u.id === "MTR" ? !lost : !!(d && d.on);
+      const on = u.id === "EMS" ? true : u.id === "G1" ? cb("G1") === 1 : u.id === "GRID" ? (garr && cb("GRID") === 1) : u.id === "MTR" ? !lost : kf ? kOn(u.dev) : !!(d && d.on);
       lp.className = "lamp " + (lost ? "lost" : on ? "on" : "");
       const lk = $("#lk-" + u.id);
-      if (d) { lk.className = "pill " + (d.absent ? "" : LINK_CLS[d.link]); lk.textContent = d.absent ? "미설치" : linkTxt(d.link); }
+      if (d) { const best = kf && kf.units.find(x => x.live); lk.className = "pill " + (gone ? "" : LINK_CLS[best ? best.link : d.link]); lk.textContent = gone ? "미설치" : linkTxt(best ? best.link : d.link) + (kf ? kCnt(u.dev) : ""); lk.title = kf && kf.units.length > 1 ? kf.units.map(x => `${x.id}: ${x.live ? (x.on ? "운전" : "정지") : "두절"}${x.kw == null ? "" : " " + F.kw(x.kw) + " kW"}`).join(" / ") + " — 지령은 있는 장치 모두에게 간다" : ""; }
       else if (u.id === "EMS") { lk.className = "pill " + (s.alarm_cnt[1].act ? "bad" : "ok"); lk.textContent = s.alarm_cnt[1].act ? `긴급 ${s.alarm_cnt[1].act}` : "정상"; }
       else if (u.id === "GRID" && !lost) { const g2 = s.ops || {}, t2 = g2.mode !== "grid" ? "미연계" : g2.outage ? "정전" : "연계"; lk.className = "pill " + (t2 === "정전" ? "bad" : t2 === "연계" ? "ok" : "info"); lk.textContent = t2; }
       else { lk.className = "pill " + (lost ? "bad" : "info"); lk.textContent = lost ? "게이트웨이 두절" : "미계측"; }
       const big = u.id === "EMS" ? `${F.n(s.stats.last_ms, 0)}<small>ms</small>` : u.id === "G1" ? `100<small>kW 형성</small>` : `${lost ? "####" : F.kw(val(u.kw))}<small>kW</small>`;
       $("#kw2-" + u.id).innerHTML = big;
       const c = { G1: cb("G1"), PV: cb("PV"), DG: cb("DG"), FC: cb("FC"), ESS: cb("ESS"), GRID: cb("GRID"), GDG: lost ? -1 : Math.round(val("CB.GDG") ?? -1) }[u.id];
-      $("#sx-" + u.id).innerHTML = d && d.absent ? `<span class="sub">미설치 (자동 인식)</span>` : lost ? `<span class="badc">통신 두절</span>` : c === 2 ? `<span class="badc">차단기 트립</span>`
+      $("#sx-" + u.id).innerHTML = gone ? `<span class="sub">미설치 (자동 인식)</span>` : lost ? `<span class="badc">통신 두절</span>` : c === 2 ? `<span class="badc">차단기 트립</span>`
         : u.id === "GRID" ? (!garr ? `<span class="muted">미연계(작전지)</span>` : o.outage ? `<span class="badc">정전</span>` : `<span class="okc">수전 중</span>`)
         : u.id === "GDG" ? (on ? `<span class="okc">운전 중</span>` : `<span class="muted">${garr ? "대기" : "미사용"}</span>`)
         : u.id === "MTR" ? `<span class="okc">계측 중</span>` : u.id === "EMS" ? `<span class="okc">${s.auto ? "자동 제어" : "수동 운전"}</span>`
@@ -341,11 +348,12 @@ const P_CM = {
       </div></div>`;
   },
   update(s) {
-    $("#cmRows").innerHTML = Object.entries(s.devices).map(([n, d]) => Object.entries(d.paths).map(([k, p], i) => `<tr>
+    const spare = Object.entries(s.devices).filter(([, d]) => d.slot && d.absent).map(([n]) => n);            // 같은 종류 추가 자리 가운데 빈 자리
+    $("#cmRows").innerHTML = Object.entries(s.devices).filter(([n]) => !spare.includes(n)).map(([n, d]) => Object.entries(d.paths).map(([k, p], i) => `<tr>
       ${i === 0 ? `<td rowspan="2"><b>${n}</b></td><td rowspan="2"><span class="pill ${d.absent ? "" : LINK_CLS[d.link]}" title="${d.absent ? "켠 뒤 한 번도 응답하지 않음 — 설치되지 않은 장치로 봄(자동 인식)" : ""}">${d.absent ? "미설치" : linkTxt(d.link)}</span></td><td rowspan="2" class="mono">${F.dur(d.since)}</td>` : ""}
       <td><b class="mono">${k}</b></td><td class="mono">${esc(p.host)}</td><td class="mono">${p.unit}</td><td>${p.alive ? `<span class="okc">● 응답</span>` : `<span class="badc">○ 무응답</span>`}</td><td class="n">${F.n(p.rtt, 2)}</td><td class="n">${p.ok}</td><td class="n">${p.err}</td>
       <td class="n">${F.n(p.ok + p.err ? p.err / (p.ok + p.err) * 100 : 0, 2)}%</td><td class="n">${F.n(p.age, 1)}s</td><td class="muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.last_err)}">${esc(p.last_err)}</td></tr>`).join("")).join("");
-    const st = s.stats; $("#scKv").innerHTML = `<span class="k">주기</span><span class="v">${F.n(st.scan_s * 1000, 0)} ms</span><span class="k">최근 / 평균</span><span class="v">${F.n(st.last_ms, 1)} / ${F.n(st.avg_ms, 1)} ms</span><span class="k">p95 / 최대</span><span class="v">${F.n(st.p95_ms, 1)} / ${F.n(st.max_ms, 1)} ms</span><span class="k">주기 수 / 초과</span><span class="v">${st.n_scan} / <span class="${st.n_over ? "warnc" : ""}">${st.n_over}</span></span><span class="k">추적 프레임</span><span class="v">${st.trace_n}</span><span class="k">가동 시간</span><span class="v">${F.dur(s.uptime)}</span>`;
+    const st = s.stats; $("#scKv").innerHTML = `<span class="k">주기</span><span class="v">${F.n(st.scan_s * 1000, 0)} ms</span><span class="k">최근 / 평균</span><span class="v">${F.n(st.last_ms, 1)} / ${F.n(st.avg_ms, 1)} ms</span><span class="k">p95 / 최대</span><span class="v">${F.n(st.p95_ms, 1)} / ${F.n(st.max_ms, 1)} ms</span><span class="k">주기 수 / 초과</span><span class="v">${st.n_scan} / <span class="${st.n_over ? "warnc" : ""}">${st.n_over}</span></span><span class="k">추적 프레임</span><span class="v">${st.trace_n}</span><span class="k">가동 시간</span><span class="v">${F.dur(s.uptime)}</span><span class="k" title="같은 종류 장치를 더 놓으면 스스로 인식한다">빈 자리</span><span class="v">${spare.join(" · ") || "없음"}</span>`;
     const mx = Math.max(1, ...st.hist); $("#scHist").innerHTML = st.hist.map(v => `<i style="height:${v / mx * 100}%" title="${v}"></i>`).join(""); $("#scTop").textContent = F.n(st.hist_top, 0) + " ms";
     $("#wdKv").innerHTML = Object.entries(st.wd).map(([k, v]) => `<span class="k">${esc(k)} 생존 신호</span><span class="v ${v !== null && v > 3 ? "badc" : "okc"}">${v === null ? "—" : F.n(v, 1) + " s 전"}</span>`).join("") + `<span class="k">판정 한도</span><span class="v">3.0 s</span>`;
   },
@@ -451,7 +459,8 @@ const P_ENG = {
     $("#engBody").innerHTML = `<div class="engbox" style="margin-bottom:12px">가상 장치(Modbus TCP 서버, 127.0.0.1:${s.sim_state.ports.join(" / ")})에 고장을 주입해 EMS의 감시·지령·대체 전원 논리를 실제 통신으로 확인합니다. 엔지니어 권한 필요.</div>
       <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
         <div class="panel"><div class="hd"><h3>장치 고장 주입</h3></div><div class="bd np"><table class="t"><thead><tr><th>장치</th><th>무응답 (시간 초과)</th><th>지령 무시 (무응답)</th><th>현장 수동 모드</th></tr></thead><tbody id="simDev"></tbody></table></div>
-          <div class="bd"><div class="lab" style="margin-bottom:8px">통신 경로 단절 (전 장치)</div><div style="display:flex;gap:8px" id="simPath"></div></div></div>
+          <div class="bd"><div class="lab" style="margin-bottom:8px">통신 경로 단절 (전 장치)</div><div style="display:flex;gap:8px" id="simPath"></div></div>
+          <div class="bd" style="border-top:1px solid var(--line)"><div class="lab" style="margin-bottom:8px">같은 종류 장치 놓기 · 빼기 (자동 인식 연습 — 놓으면 조작 없이 화면에 나타난다)</div><div style="display:flex;flex-wrap:wrap;gap:8px" id="simUnit"></div></div></div>
         <div class="panel"><div class="hd"><h3>운전 시나리오</h3></div><div class="bd" style="display:flex;flex-wrap:wrap;gap:8px" id="simScn">
           ${[["load_surge", "부하 급증 +60kW"], ["cloud", "구름 통과 (PV −70%)"], ["night", "야간 (PV 0)"], ["soc_low", "ESS 충전율 22%"], ["soc_critical", "ESS 충전율 17%"], ["h2_low", "수소 잔량 130Nm³"], ["fault_l3", "3등급 급전선 과전류 트립"], ["fault_dg", "디젤 차동(87) 트립"], ["fault_ess", "ESS 지락(64) 트립"], ["tie_open", "모선 연계 개방"], ["grid_outage", "상전 정전(주둔지)"], ["grid_restore", "상전 복전"], ["normal", "▶ 정상 복귀 (전 고장 해제)"]].map(([k, v]) => `<button class="btn ${k === "normal" ? "go" : ""}" data-s="${k}">${v}</button>`).join("")}
           ${[[13, "모의 시각 13시(주간·태양광)"], [21, "모의 시각 21시(야간)"], ["", "실제 시각으로"]].map(([h, v]) => `<button class="btn" data-clk="${h}">${v}</button>`).join("")}</div>
@@ -469,6 +478,7 @@ const P_ENG = {
   simUpdate() {
     const s = S.snap; if (!s || !s.sim || !$("#simDev")) return; const ss = s.sim_state; const tog = (on, a, tgt) => `<button class="btn sm ${on ? "stop" : ""}" data-a="${a}" data-t="${tgt}" data-on="${on ? 0 : 1}">${on ? "● 적용 중 — 해제" : "적용"}</button>`;
     $("#simDev").innerHTML = Object.keys(s.devices).map(n => `<tr><td><b>${n}</b></td><td>${tog(ss.muted.includes(n), "mute", n)}</td><td>${s.devices[n].ctl ? tog(ss.noack.includes(n), "noack", n) : `<span class="muted">—</span>`}</td><td>${s.devices[n].ctl ? tog(ss.manual.includes(n), "manual", n) : `<span class="muted">—</span>`}</td></tr>`).join("");
+    $("#simUnit").innerHTML = Object.entries(s.devices).filter(([, d]) => d.kind).map(([n]) => { const g = (ss.gone || []).includes(n); return `<button class="btn sm ${g ? "go" : ""}" data-a="unit" data-t="${n}" data-on="${g ? 1 : 0}">${n} ${g ? "놓기" : "빼기"}</button>`; }).join("");
     $("#simPath").innerHTML = ["A", "B"].map(p => `<span>경로 ${p} ${tog(ss.down.includes(p), "down", p)}</span>`).join("");
     const FD = [["PV", "태양광"], ["DG", "디젤"], ["FC", "연료전지"], ["ESS", "ESS"], ["G1", "복합전력 G1"], ["TIE", "모선 연계"], ["L1", "1등급 부하"], ["L2", "2등급 부하"], ["L3", "3등급 부하"]];
     const cbE = $("#simCb"); if (cbE && !cbE.dataset.built) { cbE.dataset.built = 1; cbE.innerHTML = FD.map(([f, nm]) => `<tr><td><b>CB-${f}</b> <span class="muted">${nm}</span></td><td id="sc-${f}"></td><td class="mono" id="sf-${f}"></td>
@@ -478,7 +488,7 @@ const P_ENG = {
       $$("#simCb [data-cbo]").forEach(b => b.onclick = () => this._simAct({ action: "cb", target: b.dataset.cbo, on: false }));
       $$("#simCb [data-cbc]").forEach(b => b.onclick = () => this._simAct({ action: "cb", target: b.dataset.cbc, on: true })); }
     FD.forEach(([f]) => { const c = Math.round(val("CB." + f) ?? -1), e = $("#sc-" + f); if (!e) return; e.innerHTML = c === 1 ? `<span class="pill ok">투입</span>` : c === 2 ? `<span class="pill bad">트립</span>` : c === 0 ? `<span class="pill warn">개방</span>` : `<span class="pill">미상</span>`; const fc = Math.round(val("FLT." + f) || 0); $("#sf-" + f).textContent = fc ? (ANSI_TXT[fc] || fc) : "—"; });
-    $$("#simDev [data-a], #simPath [data-a]").forEach(b => b.onclick = () => this._simAct({ action: b.dataset.a, target: b.dataset.t, on: b.dataset.on === "1" }));
+    $$("#simDev [data-a], #simPath [data-a], #simUnit [data-a]").forEach(b => b.onclick = () => this._simAct({ action: b.dataset.a, target: b.dataset.t, on: b.dataset.on === "1" }));
     $("#simHold").innerHTML = Object.entries(ss.hold).map(([k, v]) => `<span class="pill eng">${k} = ${F.n(v, 1)} <a href="#" data-r="${k}" style="color:#fff;margin-left:6px;text-decoration:none">✕</a></span>`).join("") || `<span class="muted" style="font-size:12px">강제 유지 값 없음${ss.scenario ? " · 시나리오: " + ss.scenario : ""}</span>`;
     $$("#simHold [data-r]").forEach(a => a.onclick = e => { e.preventDefault(); this._simAct({ action: "release", tag: a.dataset.r }); });
   },

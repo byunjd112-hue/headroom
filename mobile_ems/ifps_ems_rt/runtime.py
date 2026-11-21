@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from ifps_ems import supervisor as sv, dispatch as dp, security
 from ifps_ems.config import Site, SUP
-from . import pointmap as pm, modbus as mb
+from . import pointmap as pm, modbus as mb, fleet
 from .hal import DeviceLink, RtCommander
 from . import opsmode as om
 from dataclasses import replace
@@ -51,6 +51,8 @@ class Runtime:
         self.cmd = RtCommander({n: self.links[n] for n in self.ctl}, self.dev, fallback=fb, clock=clock)
         self.cmd.gate = self.controllable; self.cmd.tick = lambda: self.wd.kick("제어", self.now())
         self.cmd.done_s = {n: float(d["done_s"]) for n, d in self.cfg["devices"].items() if "done_s" in d}
+        self._probe = {}; self.seen = set()                                                 # 켠 뒤 한 번이라도 응답한 장치
+        self.fleet = fleet.Fleet(list(self.links), self.seen)                        # 같은 종류 여러 대 자동 인식·합산
         self.lm = sv.LinkMonitor(list(self.links)); self.wd = sv.Watchdog(["수집", "제어"])
         self.val = {}; self.flag = {}; self.t_upd = {}; self.hb_seen = {}; self.hb_stop = {}; self.t0 = clock(); self.events = []; self.ev_n = 0; self.audit_err = ""; self.n_scan = 0; self.n_over = 0; self.max_scan_s = 0.0
         self.state_dir = os.path.join(base, self.cfg.get("state_dir", "state")); os.makedirs(self.state_dir, exist_ok=True)
@@ -83,9 +85,10 @@ class Runtime:
     # ── 1)~3) 수집·통신 감시·품질 확인
     def _read_parallel(self):
         """모든 장치·경로를 동시에 읽는다. 응답 없는 장치가 있어도 한 주기는 시간 초과 1회 안에 끝난다."""
-        futs = {(n, k): self.pool.submit(lk.read_blocks, cl) for n, lk in self.links.items() for k, cl in lk.cl.items()}
-        out = {}
+        skip = {n for n in self.links if self.fleet.empty(n)}; out = {n: self._probe_slot(n) for n in skip}     # 빈 자리는 주기 밖에서 가끔만 불러 본다
+        futs = {(n, k): self.pool.submit(lk.read_blocks, cl) for n, lk in self.links.items() if n not in skip for k, cl in lk.cl.items()}
         for n, lk in self.links.items():
+            if n in skip: continue
             vals = None
             for k in lk.cl:                                         # 값은 경로 A를 우선, 실패하면 B
                 try:
@@ -96,24 +99,49 @@ class Runtime:
             out[n] = vals
         return out
 
+    def _probe_slot(self, n):
+        """빈 자리(같은 종류 추가 자리)를 불러 본다. 응답을 기다리지 않는다 — 없는 장치의 시간 초과가 수집 주기를 늦추지 않게 따로 돌리고, 끝난 결과만 다음 주기에 받는다.
+        반환: 이번에 받은 값 사전(없으면 None)."""
+        f = self._probe.get(n)
+        if f is None:
+            if not self.fleet.skip(n, self.now()): self._probe[n] = self.pool.submit(self.links[n].read_all)
+            return None
+        if not f.done(): return None
+        del self._probe[n]
+        try: return f.result()
+        except Exception: return None                              # 어떤 오류든 '아직 없음'으로 본다
+
     def scan(self):
-        t = self.now(); got = self._read_parallel()
+        t = self.now(); got = self._read_parallel(); bad = set()
         for n, lk in self.links.items():
             was = self.lm.state[n]; v = got[n]
             for k, a in lk.alive.items():
                 if a: self.lm.heartbeat(n, t, k)
             if v is None: continue
+            self.seen.add(n)
             if was == "재조회 대기":                                 # 복구 뒤 첫 수집: 달라진 값을 반영한 뒤 제어 재개
                 diff = self.lm.resync(n, v, {k: self.val.get(k) for k in v}, t); self.note("통신", f"{n} 복구, 변경 {len(diff)}건 반영")
-            self._take(lk, v, t)
-        for n, st in self.lm.check(t).items(): self.note("통신", f"{n} 통신 {st}")          # check 는 바뀐 것만 돌려준다
-        self._check_hb(t)
+            self._take(lk, v, t); got[n] = {tag: x for tag, x in v.items() if self.flag.get(tag) == 0}      # 합산에는 품질 검사를 통과한 값만 넘긴다
+            bad.update(tag for tag in v if self.flag.get(tag) != 0)
+        for n, st in self.lm.check(t).items():                                              # check 는 바뀐 것만 돌려준다
+            if not self.fleet.empty(n): self.note("통신", f"{n} 통신 {st}")                  # 빈 자리의 무응답은 적지 않는다
+        self._merge_fleet(got, t, bad); self._check_hb(t)
         for tag, tu in self.t_upd.items():
             if t - tu > SUP["stale_s"] and self.flag.get(tag) == 0: self.flag[tag] = 3      # 갱신 지연
         self._refresh_devices()
         self.wd.kick("수집", t); self.n_scan += 1
         self._accumulate()
         return {"t": t, "bad": {k: f for k, f in self.flag.items() if f}, "link": {n: s for n, s in self.lm.state.items() if s != "정상"}}
+
+    def _merge_fleet(self, got, t, bad):
+        """같은 종류 여러 대: 있는 장치를 가리고 종류 이름의 값을 합산한다. 대수가 바뀌면 기록에 남긴다."""
+        before = {k: list(v) for k, v in self.fleet.live_now.items()}
+        def mark(tag, ok):
+            self.flag[tag] = 0 if ok else 5
+            if ok: self.t_upd[tag] = t
+        self.fleet.merge(got, self.lm.state, self.val, mark, bad)
+        for k, us in self.fleet.live_now.items():
+            if us != before[k] and len(self.fleet.slots[k]) > 1: self.note("자동 인식", f"{k} {len(us)}대 인식: {', '.join(us) or '없음'}")
 
     def _take(self, lk, v, t):
         """읽은 값을 품질 확인 뒤 반영한다. 범위 밖·NaN·무한대는 버리고 직전 유효값을 둔다(품질 5)."""
@@ -137,7 +165,8 @@ class Runtime:
     def _refresh_devices(self):
         for n in self.ctl:
             self.dev[n].online = self.controllable(n)
-            if f"{n}.status" in self.val: self.dev[n].on = int(round(self.val[f"{n}.status"])) == 1
+            st = self.fleet.unit(n, "status", self.val)                           # 장치 하나의 상태(종류 이름의 값은 여러 대의 합산이다)
+            if st is not None: self.dev[n].on = int(round(st)) == 1
             if f"{n}.mode" in self.val: self.dev[n].manual = int(round(self.val[f"{n}.mode"])) == 1
 
     def controllable(self, n):
@@ -193,7 +222,13 @@ class Runtime:
             if t - self.t_grid_ok >= self.gar.restore_s: self.grid_lost = False; self.note("운용", f"상전 복전 {self.gar.restore_s:.0f}초 안정 — 주둔지 운전 복귀")
 
     def _write(self, dev, tag, value, tol):
-        """자동 설정값 쓰기. 직전에 쓴 값과 tol 이내면 다시 쓰지 않는다. 지령 가능 상태가 아니면 쓰지 않는다."""
+        """자동 설정값 쓰기. 같은 종류가 여러 대면 있는 장치에 똑같이 나누어 쓴다."""
+        us = self.fleet.live(dev); ok = False; den = self.fleet.share(dev) if len(us) > 1 or dev in self.fleet.slots and self.fleet.ever else 1
+        for n in us: ok = self._write1(n, n + tag[len(dev):], value / max(den, len(us)), tol) or ok
+        return ok
+
+    def _write1(self, dev, tag, value, tol):
+        """장치 하나에 쓰기. 직전에 쓴 값과 tol 이내면 다시 쓰지 않는다. 지령 가능 상태가 아니면 쓰지 않는다."""
         lk = self.links.get(dev)
         if lk is None or tag not in lk.by_tag or not self.lm.controllable(dev): return False
         if tag in self._w and abs(self._w[tag] - value) <= tol: return True
@@ -296,11 +331,28 @@ class Runtime:
             a = (0, 1 if h2_ok else int(a[1]), 0)
         want = {"DG": bool(a[0]), "FC": bool(a[1]), "_policy": tuple(int(x) for x in a)}
         if self.posture == "저소음": want["_quiet"] = True
-        gdg_on = self._decide_gdg(want)
+        self._swap_missing(want); gdg_on = self._decide_gdg(want)
         if self.mode in ("island", "grid"):                           # 자립 운전(작전지, 또는 주둔지 정전 중) N-1 순동 예비력
-            online = [self.site.ess_kw] * int(g("ESS.status", 1)) + [self.cfg.get("g1_kw", 100.0)] + [self.site.dg_kw] * int(want["DG"]) + [self.site.fc_kw] * int(want["FC"]) + [self.gar.gdg_kw] * int(gdg_on)
+            online = self.online_kw(self._ready("DG") if want["DG"] else 0, self._ready("FC") if want["FC"] else 0) + [self.gar.gdg_kw] * int(gdg_on)
             if not gdg_on and dp.reserve_need(g("LOAD.p1_kw") + g("LOAD.p2_kw"), online): want["FC"] = True; want["_reserve"] = True
         return want
+
+    def online_kw(self, n_dg, n_fc):
+        """N-1 예비력 계산에 넣는 병렬 전원의 용량 목록: 운전 중인 ESS(대수만큼), 복합전력 G1, 디젤 n_dg 대, 연료전지 n_fc 대."""
+        ess = self.fleet.running("ESS", self.val) if "ESS.status" in self.val else 1
+        return [self.site.ess_kw] * ess + [self.cfg.get("g1_kw", 100.0)] + [self.site.dg_kw] * n_dg + [self.site.fc_kw] * n_fc
+
+    def _ready(self, k):
+        """기동 지령을 받을 수 있는 대수(있는 장치 가운데 현장 수동이 아닌 것). 아직 읽기 전이면 1."""
+        if not self.fleet.ever: return 1
+        return sum(1 for n in self.fleet.live(k) if not (n in self.dev and self.dev[n].manual))
+
+    def _swap_missing(self, want):
+        """가져오지 않은 종류는 지령하지 않는다: 디젤이 없으면 연료전지로, 연료전지가 없으면 디젤로 대신한다.
+        '없다'는 그 종류의 모든 자리가 한 번도 응답하지 않았고 통신 두절로 판정된 뒤다(첫 수집을 한 번 놓친 것으로 바꾸지 않는다)."""
+        for a, b in (("DG", "FC"), ("FC", "DG")):
+            if want.get(a) and a in self.fleet.slots and all(u not in self.fleet.ever and self.lm.state.get(u) == "두절" for u in self.fleet.slots[a]):
+                want[a] = False; want[b] = bool(want.get(b)) or b not in self.fleet.slots or self.fleet.n(b) > 0; want["_swap"] = a
 
     def _self_supply_sources(self, r):
         """주둔지 자립 태세(상전 연계 중): 태양광·ESS 로 모자라면 연료전지, 그래도 모자라거나 수소가 없으면 이동형 디젤을 돌린다.
@@ -325,9 +377,9 @@ class Runtime:
         if not force and t - self.t_ctl < self.cfg.get("ctrl_s", 60.0):
             self.wd.kick("제어", t); return []                       # 제어 주기 전이어도 제어 과정은 살아 있다
         self.t_ctl = t; want = self.decide(); done = []
-        for n in ("DG", "FC") + tuple(self.gdgs):
+        for n, k in self.targets(("DG", "FC")):
             if n not in self.dev or (n in self.gdgs and "GDG" not in want): continue
-            d = self.dev[n]; w_n = want["GDG"] if n in self.gdgs else want[n]
+            d = self.dev[n]; w_n = want["GDG"] if n in self.gdgs else want[k]
             if w_n != d.on:
                 n0 = len(self.cmd.log); ok, dt = self.cmd.send(n, "start" if w_n else "stop")
                 for e in self.cmd.log[n0:]: self.note("지령", e["text"])
@@ -335,6 +387,10 @@ class Runtime:
         if len(self.cmd.log) > 2000: del self.cmd.log[:1000]
         self.wd.kick("제어", self.now())
         return done
+
+    def targets(self, kinds):
+        """지령 대상: [(장치, 종류)] — 그 종류의 있는 장치 모두, 그리고 주둔지 발전기."""
+        return [(n, k) for k in kinds for n in self.fleet.live(k)] + [(n, "GDG") for n in self.gdgs]
 
     # ── 5) 기록
     def _accumulate(self):
@@ -381,9 +437,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="ifps_ems_rt"); ap.add_argument("config"); ap.add_argument("--scans", type=int, default=None); ap.add_argument("--check", action="store_true", help="대응표와 접속만 확인")
     a = ap.parse_args(argv); rt = Runtime(a.config)
     if a.check:
-        r = rt.scan(); dead = {n: lk.err or "무응답" for n, lk in rt.links.items() if not any(lk.alive.values())}      # 두절 판정(2초)을 기다리지 않고 1회 수집 결과로 본다
-        half = {n: "경로 " + ",".join(k for k, ok in lk.alive.items() if not ok) + " 무응답" for n, lk in rt.links.items() if n not in dead and not all(lk.alive.values())}
-        print("장치", len(rt.links), "대 | 읽은 점", len(rt.val), "| 통신 이상", dead or "없음", "| 경로 저하", half or "없음", "| 품질 이상", r["bad"] or "없음"); rt.close(); return 1 if dead else 0
+        r = rt.scan(); dead = {n: lk.err or "무응답" for n, lk in rt.links.items() if not any(lk.alive.values()) and not rt.fleet.empty(n)}; spare = [n for n in rt.links if rt.fleet.empty(n)]     # 응답 없는 추가 자리는 빈 자리      # 두절 판정(2초)을 기다리지 않고 1회 수집 결과로 본다
+        half = {n: "경로 " + ",".join(k for k, ok in lk.alive.items() if not ok) + " 무응답" for n, lk in rt.links.items() if n not in dead and n not in spare and not all(lk.alive.values())}
+        print("장치", len(rt.links) - len(spare), "대 | 빈 자리", ",".join(spare) or "없음", "| 읽은 점", len(rt.val), "| 통신 이상", dead or "없음", "| 경로 저하", half or "없음", "| 품질 이상", r["bad"] or "없음"); rt.close(); return 1 if dead else 0
     try: rt.run(a.scans)
     finally: rt.close()
     return 0

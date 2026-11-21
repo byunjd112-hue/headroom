@@ -80,6 +80,7 @@ class RingWatch:
         """화면의 구간 번호(지금 배치 기준) → 설정에 적는 자리 번호."""
         eff = self.last["eff"] if self.last else self.r
         if not eff.get("eff"): return i
+        if not 0 <= i < len(ring.sw_tags(eff)): raise ValueError("상시 개방점 구간 번호 오류")
         t = ring.sw_tags(eff)[i]; return 0 if t == "RING.sw0" else int(t[3:-3])
 
     def configure(self, eng, b, who):
@@ -107,19 +108,28 @@ class RingWatch:
         for x in new["fsu"] + new["ppdu"]: x["code"] = rd[x["id"]]
         return self._save(eng, new, who, "초기 기동 점검에서 읽은 장치 ID 를 기준으로 확정")
 
+    def _pair(self, b):
+        """자리 바꿈 대상: 지금 놓여 있는 같은 종류 두 장치. 비우면 해제."""
+        pair = (str(b["a"]), str(b["b"])) if b.get("a") and b.get("b") else None; here = [u["id"] for u in self.last["fsu"] + self.last["ppdu"]] if self.last else []
+        if pair and (pair[0] not in here or pair[1] not in here or pair[0][:3] != pair[1][:3]): raise ValueError("자리 바꿈은 지금 놓여 있는 같은 종류 두 장치만")
+        return pair
+
+    def _sim_ppdu(self, b):
+        """배전체계 고장 연습: 주 차단기·회로 트립, 접지저항."""
+        i = str(b["id"]); tag = f"{i}.{b['what']}"
+        if b["what"] not in ("mccb", "gnd") + tuple(f"ch{n}" for n in range(1, 7)) or tag not in self.model.p.by_tag: raise ValueError("배전체계 조작 대상 오류")
+        self.model.p.set(tag, float(b["value"]))
+
     def sim(self, b):
         """가상 장치 모드의 환망 조작(연습용): 구간 단선 넣기·빼기, 두 장치의 자리 바꾸기, 장치 빼기·넣기·뒤섞기, 처음 상태로."""
         m = self.model
         if m is None: raise ValueError("가상 장치 모드가 아닙니다")
         a = b.get("action")
         if a == "break": (m.brk.add if b.get("on", True) else m.brk.discard)(int(b["section"]))
-        elif a == "swap": m.swap = (str(b["a"]), str(b["b"])) if b.get("a") and b.get("b") else None
+        elif a == "swap": m.swap = self._pair(b)
         elif a == "auto": m.p.set("RING.auto", 1 if b.get("on", True) else 0)
-        elif a == "switch": m.p.set(ring.sw_tags(m.r)[int(b["section"])], int(b["state"]))
-        elif a == "ppdu":                                                                # 배전체계 고장 연습: 주 차단기·회로 트립, 접지저항
-            i = str(b["id"]); tag = f"{i}.{b['what']}"
-            if b["what"] not in ("mccb", "gnd") + tuple(f"ch{n}" for n in range(1, 7)) or tag not in m.p.by_tag: raise ValueError("배전체계 조작 대상 오류")
-            m.p.set(tag, float(b["value"]))
+        elif a == "switch": m.p.set(ring.sw_tags(m.eff())[int(b["section"])], int(b["state"]))
+        elif a == "ppdu": self._sim_ppdu(b)
         elif a == "remove": m.remove(str(b["id"]))
         elif a == "add": m.add("fsu" if b.get("kind") == "fsu" else "ppdu", int(b.get("at", 0)))
         elif a == "shuffle": m.shuffle()
@@ -129,7 +139,7 @@ class RingWatch:
 
 
 def http_post(eng, b, sess):
-    """POST /api/ring — 분전반 구성은 운용자, ID 확정과 가상 장치 조작은 엔지니어."""
+    """POST /api/ring — 배전체계 구성은 운용자, 고정 배치의 ID 확정과 가상 장치 조작은 엔지니어."""
     w = eng.ringw; kind = b.get("do"); who = sess["name"]
     if kind == "config": return w.configure(eng, b, who)
     if sess["role"] != "engineer": return {"ok": False, "why": "권한 필요: engineer"}

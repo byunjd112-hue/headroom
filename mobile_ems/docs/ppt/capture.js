@@ -67,6 +67,9 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   // 4) 작전지 저소음 태세 → 3등급 자동 차단
   await post("/api/ops", { posture: "저소음" }); await p.waitForTimeout(7000); await go("control", "r18_ctl_quiet"); await go("overview", "r18_ov_quiet", 1500);
   await post("/api/ops", { posture: "평시" });
+  // 4-1) 같은 종류 장치를 한 대씩 더 놓는다 → 조작 없이 개요·결선도가 다시 짜인다
+  for (const n of ["DG2", "ESS2", "PV2"]) await sim({ action: "unit", target: n, on: true });
+  await p.waitForTimeout(16000); await post("/api/ack", { ids: "all" }); await go("overview", "fleet_ov", 2500); await go("sld", "fleet_sld", 2500);
   // 5) 로그인 창
   await p.evaluate(() => { sessionStorage.removeItem("ems.token"); }); await p.goto(B + "#overview"); await p.reload(); await p.waitForTimeout(1500); await p.evaluate(() => loginDialog()); await p.waitForTimeout(500); await p.screenshot({ path: D + "login.png" });
   console.log("화면 오류", errs.slice(0, 5)); await b.close();

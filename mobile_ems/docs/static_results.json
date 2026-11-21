@@ -1,6 +1,6 @@
 {
- "date": "2026-11-21 08:58",
- "unittest_s": 467.1,
+ "date": "2026-11-21 10:41",
+ "unittest_s": 476.6,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -170,20 +170,24 @@
   "test_start_serve_and_stop_by_signal | ok",
   "test_read_write_probe_check | ok",
   "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
-  "test_check_scans_and_module_entry | ok"
+  "test_check_scans_and_module_entry | ok",
+  "test_extra_units_are_recognized_summed_and_commanded | ok",
+  "test_kind_not_brought_is_marked_absent_and_replaced | ok",
+  "test_kind_slot_and_pointmap_expand | ok",
+  "test_merge_sum_any_mean_and_empty_slot | ok"
  ],
- "n_tests": 169,
+ "n_tests": 173,
  "tests_ok": true,
- "coverage_pct": 90.7,
+ "coverage_pct": 91.0,
  "stmt": {
-  "n": 5679,
-  "hit": 5334,
-  "pct": 93.9
+  "n": 5821,
+  "hit": 5475,
+  "pct": 94.1
  },
  "branch": {
-  "n": 2036,
-  "hit": 1665,
-  "pct": 81.8
+  "n": 2096,
+  "hit": 1726,
+  "pct": 82.3
  },
  "coverage_files": [
   [
@@ -244,11 +248,11 @@
   ],
   [
    "ifps_ems_rt/hmi/ringwatch.py",
-   87.6,
-   105,
-   63.2,
-   68,
-   "103-108, 133-139"
+   88.3,
+   111,
+   65.3,
+   72,
+   "104-109, 143-149"
   ],
   [
    "ifps_ems_rt/hmi/__main__.py",
@@ -277,10 +281,10 @@
   [
    "ifps_ems_rt/diag.py",
    93.2,
-   293,
-   85.6,
-   118,
-   "74, 126-127, 260-261, 306, 318-319, 342, 355, 359, 361, 363, 388-393, 423"
+   296,
+   85.8,
+   120,
+   "74, 126-127, 263-264, 309, 321-322, 345, 358, 362, 364, 366, 391-396, 426"
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
@@ -292,11 +296,11 @@
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
-   94.5,
-   776,
-   81.5,
-   286,
-   "29-30, 55-56, 67-72, 187, 192-193, 312-313, 326, 370, 386-387, 401-404, 407-409, 462, 509-510, 603-604, 727-728, 890-895, 907-908, 924-925"
+   94.6,
+   789,
+   82.1,
+   290,
+   "29-30, 55-56, 67-72, 195-196, 315-316, 329, 373, 389-390, 404-407, 410-412, 465, 512-513, 606-607, 738-739, 901-906, 915-917, 945-946"
   ],
   [
    "ifps_ems_rt/hmi/scenextra.py",
@@ -404,11 +408,11 @@
   ],
   [
    "ifps_ems_rt/simplant.py",
-   98.5,
-   134,
-   92.0,
-   50,
-   "130-131"
+   98.7,
+   150,
+   92.9,
+   56,
+   "152-153"
   ],
   [
    "ifps_ems_rt/hal.py",
@@ -419,20 +423,20 @@
    "97"
   ],
   [
+   "ifps_ems_rt/runtime.py",
+   98.9,
+   349,
+   94.4,
+   108,
+   "112, 443-445"
+  ],
+  [
    "ifps_ems_rt/mbtool.py",
    99.0,
    96,
    86.8,
    38,
    "134"
-  ],
-  [
-   "ifps_ems_rt/runtime.py",
-   99.0,
-   309,
-   94.6,
-   92,
-   "387-389"
   ],
   [
    "ifps_ems/forecast.py",
@@ -523,6 +527,14 @@
    ""
   ],
   [
+   "ifps_ems_rt/fleet.py",
+   100.0,
+   60,
+   100.0,
+   26,
+   ""
+  ],
+  [
    "ifps_ems_rt/hmi/__init__.py",
    100.0,
    0,
@@ -533,7 +545,7 @@
   [
    "ifps_ems_rt/hmi/autodev.py",
    100.0,
-   9,
+   8,
    100.0,
    0,
    ""
@@ -549,8 +561,8 @@
   [
    "ifps_ems_rt/hmi/fuelwatch.py",
    100.0,
-   16,
-   80.0,
+   17,
+   90.0,
    10,
    ""
   ],
@@ -597,7 +609,7 @@
   [
    "ifps_ems_rt/pointmap.py",
    100.0,
-   45,
+   46,
    100.0,
    14,
    ""
@@ -605,19 +617,19 @@
   [
    "ifps_ems_rt/ring.py",
    100.0,
-   234,
-   92.0,
-   88,
+   237,
+   92.2,
+   90,
    ""
   ]
  ],
  "pylint": {
   "E": 1,
-  "W": 38,
+  "W": 40,
   "by_id": [
    [
     "W0718 broad-exception-caught",
-    12
+    13
    ],
    [
     "W0613 unused-argument",
@@ -632,12 +644,12 @@
     5
    ],
    [
-    "W0106 expression-not-assigned",
+    "W0640 cell-var-from-loop",
     3
    ],
    [
-    "W0640 cell-var-from-loop",
-    2
+    "W0106 expression-not-assigned",
+    3
    ],
    [
     "E1121 too-many-function-args",
@@ -753,17 +765,33 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/runtime.py",
-    94,
+    97,
     "Runtime._read_parallel",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/runtime.py",
+    112,
+    "Runtime._probe_slot",
     "Catching too general exception Exception"
    ],
    [
     "W0106",
     "expression-not-assigned",
     "ifps_ems_rt/ring.py",
-    285,
+    290,
     "Model._one",
     "Expression \"[P.set(f'{i}.ch{n}', 1) for n in range(1, 7)]\" is assigned to nothing"
+   ],
+   [
+    "W0640",
+    "cell-var-from-loop",
+    "ifps_ems_rt/fleet.py",
+    45,
+    "Fleet.__init__.<lambda>",
+    "Cell variable k defined in loop"
    ],
    [
     "W0108",
@@ -833,14 +861,6 @@
     "W0212",
     "protected-access",
     "ifps_ems_rt/hmi/fuelwatch.py",
-    23,
-    "alarms",
-    "Access to a protected member _fuel_t of a client class"
-   ],
-   [
-    "W0212",
-    "protected-access",
-    "ifps_ems_rt/hmi/fuelwatch.py",
     24,
     "alarms",
     "Access to a protected member _fuel_t of a client class"
@@ -849,7 +869,15 @@
     "W0212",
     "protected-access",
     "ifps_ems_rt/hmi/fuelwatch.py",
-    24,
+    25,
+    "alarms",
+    "Access to a protected member _fuel_t of a client class"
+   ],
+   [
+    "W0212",
+    "protected-access",
+    "ifps_ems_rt/hmi/fuelwatch.py",
+    25,
     "alarms",
     "Access to a protected member _fuel_t of a client class"
    ],
@@ -857,7 +885,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    192,
+    195,
     "SimDriver.loop",
     "Catching too general exception Exception"
    ],
@@ -865,7 +893,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    312,
+    315,
     "Engine._scan_loop",
     "Catching too general exception Exception"
    ],
@@ -873,7 +901,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    370,
+    373,
     "Engine._ai_loop",
     "Catching too general exception Exception"
    ],
@@ -881,7 +909,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    386,
+    389,
     "Engine.ai_train",
     "Catching too general exception Exception"
    ],
@@ -889,7 +917,7 @@
     "W1510",
     "subprocess-run-check",
     "ifps_ems_rt/hmi/engine.py",
-    383,
+    386,
     "Engine.ai_train",
     "'subprocess.run' used without explicitly defining the value for 'check'."
    ],
@@ -897,7 +925,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    439,
+    442,
     "Engine._compute_forecast",
     "Catching too general exception Exception"
    ],
@@ -905,7 +933,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    509,
+    512,
     "Engine._sup_loop",
     "Catching too general exception Exception"
    ],
@@ -913,7 +941,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    603,
+    606,
     "Engine._exec_loop",
     "Catching too general exception Exception"
    ],
@@ -976,7 +1004,7 @@
   ]
  },
  "metrics": {
-  "n_func": 677,
+  "n_func": 709,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -988,7 +1016,7 @@
   "len_max": 199,
   "arg_max": 8,
   "depth_max": 5,
-  "file_max": 976,
+  "file_max": 997,
   "over": {
    "cc": [],
    "len": [],
@@ -1000,7 +1028,7 @@
    [
     "ifps_ems_rt/diag.py",
     "menu",
-    351,
+    354,
     20,
     32,
     5,
@@ -1009,7 +1037,7 @@
    [
     "ifps_ems_rt/pointmap.py",
     "validate",
-    40,
+    41,
     20,
     21,
     2,
@@ -1018,20 +1046,29 @@
    [
     "ifps_ems_rt/ring.py",
     "alarms",
-    209,
+    213,
     20,
     22,
     2,
     2
    ],
    [
-    "ifps_ems_rt/simplant.py",
-    "_tick_power",
-    70,
+    "ifps_ems_rt/runtime.py",
+    "scan",
+    114,
     20,
-    27,
-    2,
+    21,
+    0,
     3
+   ],
+   [
+    "ifps_ems_rt/simplant.py",
+    "_tick_bus",
+    119,
+    20,
+    10,
+    1,
+    0
    ],
    [
     "ifps_ems_rt/hmi/archcfg.py",
@@ -1043,18 +1080,9 @@
     2
    ],
    [
-    "ifps_ems_rt/hmi/engine.py",
-    "step",
-    160,
-    20,
-    28,
-    0,
-    2
-   ],
-   [
     "ifps_ems_rt/hmi/ringwatch.py",
     "configure",
-    85,
+    86,
     20,
     13,
     3,
@@ -1110,7 +1138,7 @@
    [
     "ifps_ems_rt/hmi/engine.py",
     "__init__",
-    223,
+    226,
     13,
     45,
     4,
@@ -1135,13 +1163,13 @@
     2
    ],
    [
-    "ifps_ems_rt/hmi/scenarios.py",
-    "check_expectation",
-    232,
-    11,
+    "ifps_ems_rt/runtime.py",
+    "__init__",
+    36,
+    18,
     37,
     4,
-    2
+    1
    ]
   ],
   "top_arg": [
@@ -1193,7 +1221,7 @@
    [
     "ifps_ems_rt/diag.py",
     "watch",
-    247,
+    250,
     12,
     18,
     8,
@@ -1240,7 +1268,7 @@
    [
     "ifps_ems_rt/diag.py",
     "menu",
-    351,
+    354,
     20,
     32,
     5,
@@ -1249,8 +1277,8 @@
    [
     "ifps_ems_rt/hmi/engine.py",
     "_sup_loop",
-    496,
-    5,
+    499,
+    6,
     15,
     0,
     5
@@ -1285,7 +1313,7 @@
    [
     "ifps_ems_rt/diag.py",
     "print_result",
-    191,
+    194,
     10,
     15,
     3,
@@ -1295,19 +1323,19 @@
   "files": [
    [
     "ifps_ems_rt/hmi/engine.py",
-    976
-   ],
-   [
-    "ifps_ems_rt/diag.py",
-    424
+    997
    ],
    [
     "ifps_ems_rt/runtime.py",
-    390
+    446
+   ],
+   [
+    "ifps_ems_rt/diag.py",
+    427
    ],
    [
     "ifps_ems_rt/ring.py",
-    348
+    353
    ],
    [
     "ifps_ems_rt/hmi/scenarios.py",
@@ -1346,6 +1374,10 @@
     195
    ],
    [
+    "ifps_ems_rt/simplant.py",
+    187
+   ],
+   [
     "ifps_ems_rt/opsmode.py",
     185
    ],
@@ -1356,10 +1388,6 @@
    [
     "ifps_ems_rt/archdev.py",
     181
-   ],
-   [
-    "ifps_ems_rt/simplant.py",
-    165
    ],
    [
     "ifps_ems_rt/hmi/pptx.py",
@@ -1379,7 +1407,7 @@
    ],
    [
     "ifps_ems_rt/hmi/ringwatch.py",
-    140
+    150
    ],
    [
     "ifps_ems_rt/hmi/archwatch.py",
@@ -1410,6 +1438,10 @@
     115
    ],
    [
+    "ifps_ems_rt/fleet.py",
+    105
+   ],
+   [
     "ifps_ems/nowcast.py",
     99
    ],
@@ -1427,7 +1459,7 @@
    ],
    [
     "ifps_ems_rt/pointmap.py",
-    78
+    79
    ],
    [
     "ifps_ems_rt/archview.py",
@@ -1479,7 +1511,7 @@
    ],
    [
     "ifps_ems_rt/hmi/fuelwatch.py",
-    25
+    26
    ],
    [
     "ifps_ems_rt/hmi/autodev.py",
@@ -1518,7 +1550,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 7096,
+   "loc": 7280,
    "nosec": 0,
    "skipped_tests": 21
   },
@@ -1593,7 +1625,7 @@
    "B404",
    "LOW",
    "ifps_ems_rt/hmi/engine.py",
-   375,
+   378,
    "Consider possible security implications associated with the subprocess module.",
    "CWE-78"
   ],
@@ -1601,7 +1633,7 @@
    "B603",
    "LOW",
    "ifps_ems_rt/hmi/engine.py",
-   383,
+   386,
    "subprocess call - check for execution of untrusted input.",
    "CWE-78"
   ],
@@ -1694,12 +1726,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.84,
- "cc_n": 689,
+ "cc_avg": 5.87,
+ "cc_n": 721,
  "cc_rank": {
-  "A": 412,
-  "B": 167,
-  "C": 110,
+  "A": 425,
+  "B": 179,
+  "C": 117,
   "D": 0,
   "E": 0,
   "F": 0
@@ -1718,8 +1750,14 @@
    "C"
   ],
   [
+   "ifps_ems_rt/runtime.py",
+   "scan",
+   20,
+   "C"
+  ],
+  [
    "ifps_ems_rt/simplant.py",
-   "_tick_power",
+   "_tick_bus",
    20,
    "C"
   ],
@@ -1732,12 +1770,6 @@
   [
    "ifps_ems_rt/hmi/scenarios.py",
    "run_case",
-   20,
-   "C"
-  ],
-  [
-   "ifps_ems_rt/hmi/engine.py",
-   "step",
    20,
    "C"
   ],
@@ -1760,26 +1792,26 @@
    "C"
   ],
   [
-   "ifps_ems_rt/hal.py",
-   "send",
+   "ifps_ems_rt/runtime.py",
+   "main",
    19,
    "C"
   ]
  ],
  "mi": [
   [
+   "ifps_ems_rt/runtime.py",
+   0.0,
+   "C"
+  ],
+  [
    "ifps_ems_rt/hmi/engine.py",
    0.0,
    "C"
   ],
   [
-   "ifps_ems_rt/runtime.py",
-   1.7,
-   "C"
-  ],
-  [
    "ifps_ems_rt/diag.py",
-   2.3,
+   1.9,
    "C"
   ],
   [
@@ -1789,7 +1821,7 @@
   ],
   [
    "ifps_ems_rt/ring.py",
-   3.3,
+   3.0,
    "C"
   ],
   [
@@ -1828,18 +1860,18 @@
    "A"
   ],
   [
-   "ifps_ems/learner.py",
-   30.4,
-   "A"
-  ],
-  [
    "ifps_ems_rt/hmi/ringwatch.py",
-   31.6,
+   28.4,
    "A"
   ],
   [
    "ifps_ems_rt/simplant.py",
-   33.5,
+   28.8,
+   "A"
+  ],
+  [
+   "ifps_ems/learner.py",
+   30.4,
    "A"
   ],
   [
@@ -1883,12 +1915,12 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/archwatch.py",
-   41.3,
+   "ifps_ems/supervisor.py",
+   41.5,
    "A"
   ],
   [
-   "ifps_ems/supervisor.py",
+   "ifps_ems_rt/hmi/archwatch.py",
    41.5,
    "A"
   ],
@@ -1928,6 +1960,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/fleet.py",
+   50.5,
+   "A"
+  ],
+  [
    "ifps_ems/security.py",
    50.8,
    "A"
@@ -1963,11 +2000,6 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/fuelwatch.py",
-   61.8,
-   "A"
-  ],
-  [
    "ifps_ems/solar.py",
    62.0,
    "A"
@@ -1980,6 +2012,11 @@
   [
    "ifps_ems_rt/hmi/skywatch.py",
    64.5,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/fuelwatch.py",
+   65.3,
    "A"
   ],
   [
@@ -1998,13 +2035,13 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/pin.py",
-   88.1,
+   "ifps_ems_rt/hmi/autodev.py",
+   87.3,
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/autodev.py",
-   91.0,
+   "ifps_ems_rt/hmi/pin.py",
+   88.1,
    "A"
   ],
   [
@@ -2034,14 +2071,14 @@
   ]
  ],
  "loc_py": {
-  "files": 53,
-  "sloc": 5936,
-  "comments": 732
+  "files": 54,
+  "sloc": 6079,
+  "comments": 773
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   551,
+   561,
    true
   ],
   [
@@ -2091,17 +2128,17 @@
   ],
   [
    "ifps_ems_rt/hmi/static/site.js",
-   224,
+   243,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/sld.js",
-   154,
+   164,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/train.js",
-   170,
+   171,
    true
   ],
   [

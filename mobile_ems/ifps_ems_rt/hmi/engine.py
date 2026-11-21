@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from ifps_ems import __version__ as CORE_VERSION
 from ifps_ems.solar import clear_pv_kw
 from ifps_ems.config import SUP
-from .. import __version__ as RT_VERSION
+from .. import fleet, __version__ as RT_VERSION
 from .. import modbus as mb, pointmap as pm
 from ..runtime import Runtime
 from ..simplant import Plant
@@ -164,8 +164,8 @@ class SimDriver:
         p2 = 22 + 18 * day + random.gauss(0, 0.8)
         p3 = 9 + 16 * day * (0.6 + 0.4 * math.sin(math.pi * max(0.0, min(1.0, (hr - 7) / 12)))) + random.gauss(0, 0.8) + self.extra_load
         clear = float(clear_pv_kw(self.site, doy, hr)); self._cloud_step(clear); pv = max(0.0, clear * self.cloud * (1 + random.gauss(0, 0.01)))
-        if "PV.status" in self.p.by_tag:                                    # 인버터 분리 → 0, 출력 제한 적용
-            pv = 0.0 if self.p.get("PV.status") < .5 else min(pv, self.p.get("PV.lim_set") or 400.0)
+        if "PV.status" in self.p.by_tag:                                    # 인버터 분리 → 0, 출력 제한 적용. 여러 대면 대수만큼 더한다
+            pv = sum(0.0 if self.p.get(f"{u}.status") < .5 else min(pv, self.p.get(f"{u}.lim_set") or 400.0) for u in self.p.us("PV"))
         temp = 16 + 7 * math.sin(2 * math.pi * (hr - 9) / 24) + random.gauss(0, 0.05)
         vals = {"LOAD.p1_kw": p1, "LOAD.p2_kw": p2, "LOAD.p3_kw": max(0.0, p3), "PV.kw": pv, "ENV.temp": temp,
                 "ENV.press": 1012.5 + random.gauss(0, 0.05), "ENV.rh": 55 + random.gauss(0, 0.3)}
@@ -177,12 +177,15 @@ class SimDriver:
             if k in self.p.by_tag: self.p.set(k, v)
         tot = sum(vals[k] if not cbo(f) else self.hold.get(k, vals[k]) for k, f in (("LOAD.p1_kw", "L1"), ("LOAD.p2_kw", "L2"), ("LOAD.p3_kw", "L3")))
         self.p.set("LOAD.kw", self.hold.get("LOAD.kw", tot))
-        dg_on = self.p.get("DG.status") > 0.5                                  # 디젤 연료 소비
-        if dg_on and "DG.fuel_l" not in self.hold:
-            self.p.set("DG.fuel_l", max(0.0, self.p.get("DG.fuel_l") - 90 * 0.28 / 3600))
-        if "ELZ.h2_rate" in self.p.by_tag and "H2.nm3" not in self.hold and self.p.get("ELZ.status") > .5:
-            self.p.set("H2.nm3", min(1000.0, self.p.get("H2.nm3") + self.p.get("ELZ.h2_rate") / 3600))
-        fc_kw = self.p.get("FC.kw")
+        self._consume()
+
+    def _consume(self):
+        """연료·수소 소비와 생산."""
+        for u in self.p.us("DG"):                                              # 디젤 연료 소비(장치마다)
+            if self.p.get(f"{u}.status") > 0.5 and f"{u}.fuel_l" not in self.hold: self.p.set(f"{u}.fuel_l", max(0.0, self.p.get(f"{u}.fuel_l") - 90 * 0.28 / 3600))
+        if "ELZ.h2_rate" in self.p.by_tag and "H2.nm3" not in self.hold:
+            self.p.set("H2.nm3", min(1000.0, self.p.get("H2.nm3") + sum(self.p.get(f"{u}.h2_rate") for u in self.p.us("ELZ") if self.p.get(f"{u}.status") > .5) / 3600))
+        fc_kw = sum(self.p.get(f"{u}.kw") for u in self.p.us("FC"))
         if fc_kw > 0 and "H2.nm3" not in self.hold:
             self.p.set("H2.nm3", max(0.0, self.p.get("H2.nm3") - fc_kw * 0.75 / 3600))
 
@@ -249,7 +252,7 @@ class Engine:
         self.fuel_cfg = dict({"dg_tank_l": 1000.0, "warn_pct": 50.0, "warn_h": 8.0, "repeat_min": 30.0}, **(self.cfg.get("fuel") or {})); self._fuel_t = {}
         self.ai_cfg = dict({"enabled": True, "retrain_h": 24.0, "sim_retrain_h": 2.0, "first_min": 3.0}, **(self.cfg.get("ai") or {}))
         self.skyw = SkyWatch(self)                                                      # 하늘 카메라(구름량 → 태양광 예측 입력)
-        self.archw = archwatch.ArchWatch(self); self.ever = set(); self.ringw = ringwatch.RingWatch(self)       # 기록 보관소(검침 누적값·상황 기록·점검 기록) · 환망 감시(구간분전함·분전반)
+        self.archw = archwatch.ArchWatch(self); self.ringw = ringwatch.RingWatch(self)       # 기록 보관소(검침 누적값·상황 기록·점검 기록) · 환망 감시(구간분전함·분전반)
         self.ai_busy = False; self.ai_last = None; self.ai_next = time.time() + 60.0 * float(self.ai_cfg["first_min"])
         self._tag_dev = {p["tag"]: p["device"] for p in self.rt.pts}
         self.cfged = ConfigEditor(self.cfg_path, note=self.rt.note)                      # 설정 편집기(원본 설정 파일 대상, 재기동 후 적용)
@@ -502,7 +505,7 @@ class Engine:
                 with self.lock:
                     rt = self.rt; ch = rt.lm.check(rt.now())
                     for n, st in ch.items():
-                        rt.note("통신", f"{n} 통신 {st}")
+                        if not rt.fleet.empty(n): rt.note("통신", f"{n} 통신 {st}")
                         if n in rt.dev: rt.dev[n].online = rt.controllable(n)
                         autodev.link_alarm(self, n, st)
                     self.purge()
@@ -617,9 +620,9 @@ class Engine:
         want = rt.decide(); note = getattr(rt.policy, "note", "") if rt.policy else "규칙 운전"
         want["ELZ"] = bool(want["_policy"][2]) and not want.get("DG")      # 수전해: 계획이 고르고 디젤 운전 중이 아닐 때만
         done = []
-        for n in ("DG", "FC", "ELZ") + tuple(rt.gdgs):
+        for n, k in rt.targets(("DG", "FC", "ELZ")):
             if n not in rt.dev or (n in rt.gdgs and "GDG" not in want): continue
-            w_n = want["GDG"] if n in rt.gdgs else want[n]
+            w_n = want["GDG"] if n in rt.gdgs else want[k]
             if w_n != rt.dev[n].on:
                 ok, dt = self._send(n, "start" if w_n else "stop", who); done.append({"dev": n, "on": w_n, "ok": ok, "dt": round(dt, 2)})
         self._fc_setpoint(want, who)
@@ -628,25 +631,34 @@ class Engine:
 
     def _fc_setpoint(self, want, who):
         """연료전지 출력 설정: 예비력만으로 병렬했으면 대기(0 kW), 계획이 골랐으면 정격."""
-        rt = self.rt; fcl = rt.links.get("FC"); on = bool(rt.dev.get("FC") and rt.dev["FC"].on)
-        if not on: self.fc_set_written = None                                    # 정지했다가 다시 기동하면 설정값을 다시 쓴다
-        if fcl is None or "FC.kw_set" not in fcl.by_tag or not on: return
+        rt = self.rt; us = [n for n in rt.fleet.live("FC") if n in rt.dev and rt.dev[n].on and f"{n}.kw_set" in rt.links[n].by_tag]      # 운전 중인 연료전지 모두(여러 대면 대마다 정격)
+        if not us: self.fc_set_written = None; return                            # 정지했다가 다시 기동하면 설정값을 다시 쓴다
         sp = 0.0 if (want.get("_reserve") and not bool(want["_policy"][1])) else rt.site.fc_kw
-        if self.fc_set_written != sp and fcl.write("FC.kw_set", sp):
-            self.fc_set_written = sp; rt.note("지령", f"FC 출력 설정 {sp:.0f}kW ({'순동 예비 대기' if sp == 0 else '정격 운전'})", actor=who)
+        if self.fc_set_written != (sp, tuple(us)) and all([rt.links[n].write(f"{n}.kw_set", sp) for n in us]):
+            self.fc_set_written = (sp, tuple(us)); rt.note("지령", f"FC 출력 설정 {sp:.0f}kW ({'순동 예비 대기' if sp == 0 else '정격 운전'})", actor=who)
 
     def _do_cmd(self, job):
         dev, cmd, who = job["dev"], job["cmd"], job["who"]
         if cmd == "set":
             tag, val = job["tag"], job["value"]
-            ok = self.rt.controllable(dev) and self.rt.links[dev].write(tag, val)                 # 선택 뒤 실행까지 사이에 통신이 끊겼으면 보내지 않는다
+            us = [n for n in self.rt.fleet.live(dev) if self.rt.controllable(n)] if tag.startswith(dev + ".") else [dev] * int(self.rt.controllable(dev))      # 같은 종류가 여러 대면 있는 장치 모두에(선택 뒤 통신이 끊긴 장치에는 보내지 않는다)
+            each = val if tag == "FC.kw_set" else val / max(1, self.rt.fleet.share(dev) if len(us) > 1 else 1)        # 합으로 다루는 설정값(ESS·PV)은 똑같이 나누고, 연료전지 출력은 대마다
+            ok = bool(us) and all([self.rt.links[n].write(n + tag[len(dev):] if n != dev else tag, each) for n in us])
             self.rt.cmd.log.append({"t": 0, "dev": dev, "cmd": f"set {tag}={val}", "ok": ok, "text": f"{tag} 설정 {val} {'완료' if ok else '실패'}", "wall": wall_iso(), "who": who})
             self.rt.note("지령", f"{tag} 설정 {val} {'완료' if ok else '실패'}", actor=who)
-            if tag == "FC.kw_set" and ok: self.fc_set_written = val
+            if tag == "FC.kw_set" and ok: self.fc_set_written = (val, ("FC",))
             return
-        self._send(dev, cmd, who)
+        for n in self.rt.fleet.live(dev) or [dev]: self._send(n, cmd, who)                    # 손으로 낸 기동·정지도 그 종류의 있는 장치 모두에게
 
     # ── 선택-실행(SBO) 지령: 선택 후 sbo_s초 안에 실행해야 한다
+    def _ready_why(self, dev, cmd):
+        """지령·설정을 받을 수 있는지. 같은 종류가 여러 대면 있는 장치로 확인한다(첫 자리가 비어도, 한 대라도 받을 수 있으면 통과). 반환: 못 받는 까닭(받을 수 있으면 빈 글)."""
+        rt = self.rt
+        if cmd is None:
+            one = next(iter(rt.fleet.live(dev)), dev)
+            return "" if rt.controllable(one) else "통신 두절" if not rt.lm.controllable(one) else "장치 생존 계수(hb) 정지"
+        whys = [rt.cmd.check(n, cmd) for n in (rt.fleet.live(dev) or [dev])]; return "" if not all(whys) else whys[0]
+
     def select(self, dev, cmd, who, tag=None, value=None):
         rt = self.rt
         if dev not in rt.links: return {"ok": False, "why": "정의되지 않은 장치"}
@@ -658,11 +670,10 @@ class Engine:
             except (TypeError, ValueError): return {"ok": False, "why": "설정값 오류"}
             if not math.isfinite(value): return {"ok": False, "why": "설정값 오류(유한한 수가 아님)"}
             if (p["lo"] is not None and value < p["lo"]) or (p["hi"] is not None and value > p["hi"]): return {"ok": False, "why": f"설정 범위 {p['lo']}~{p['hi']} 밖"}
-            if not rt.controllable(dev): return {"ok": False, "why": "통신 두절" if not rt.lm.controllable(dev) else "장치 생존 계수(hb) 정지"}
-            why = ""
+            why = self._ready_why(dev, None)
         else:
             if dev not in rt.dev: return {"ok": False, "why": "지령 대상 아님(감시 전용 장치)"}
-            why = rt.cmd.check(dev, cmd)
+            why = self._ready_why(dev, cmd)
         if why: return {"ok": False, "why": why}
         sid = secrets.token_hex(8); self.selects[sid] = {"dev": dev, "cmd": cmd, "who": who, "tag": tag, "value": value, "exp": time.monotonic() + float(self.hcfg["sbo_s"])}
         rt.note("선택", f"{dev} {cmd}{' ' + str(tag) + '=' + str(value) if cmd == 'set' else ''} 선택(SBO)", actor=who)
@@ -764,16 +775,16 @@ class Engine:
 
     # ── 상태
     def kpi(self):
-        rt = self.rt; v = rt.val; g = lambda k, d=0.0: v.get(k, d); s = rt.site
-        on = lambda n: rt.dev[n].on if n in rt.dev else g(f"{n}.status") > 0.5
+        rt = self.rt; v = rt.val; g = lambda k, d=0.0: v.get(k, d); s = rt.site; n = lambda k: max(1, rt.fleet.n(k))         # 같은 종류 대수(용량에 곱한다)
+        run = lambda k: rt.fleet.running(k, v) if rt.fleet.ever else int(rt.dev[k].on if k in rt.dev else g(f"{k}.status") > 0.5)          # 운전 중인 대수
         load, pv, dg, fc, ess = g("LOAD.kw"), g("PV.kw"), g("DG.kw"), g("FC.kw"), g("ESS.kw"); elz = g("ELZ.kw")
-        online = [s.ess_kw] * int(g("ESS.status", 1) > 0.5) + [float(self.cfg.get("g1_kw", 100.0))] + [s.dg_kw] * int(on("DG")) + [s.fc_kw] * int(on("FC"))
+        online = [float(x) for x in rt.online_kw(run("DG"), run("FC"))]
         l12 = g("LOAD.p1_kw") + g("LOAD.p2_kw"); margin = (sum(online) - max(online)) - l12 if online else -l12
         soc = g("ESS.soc", 0.0); h2 = g("H2.nm3", 0.0); fuel = g("DG.fuel_l", 0.0)
-        ess_h = ((soc / 100 - s.soc_min) * s.ess_kwh / ess) if ess > 1 else None
+        ess_h = ((soc / 100 - s.soc_min) * s.ess_kwh * n("ESS") / ess) if ess > 1 else None
         return {"load": load, "pv": pv, "dg": dg, "fc": fc, "ess": ess, "soc": soc, "h2": h2, "fuel": fuel, "l1": g("LOAD.p1_kw"), "l2": g("LOAD.p2_kw"), "l3": g("LOAD.p3_kw"),
                 "gen": pv + dg + fc + max(ess, 0.0) + max(g("GRID.kw"), 0.0) + max(g("GDG.kw"), 0.0), "renew": (min(pv, load) / load * 100) if load > 1 else 0.0, "reserve_margin": margin, "reserve_need": margin < 0,
-                "online_kw": online, "ess_h": ess_h, "h2_h": h2 / (s.fc_kw * s.fc_nm3_per_kwh) if s.fc_kw else None, "fuel_h": fuel / (s.dg_kw * s.dg_l_per_kwh) if s.dg_kw else None,
+                "online_kw": online, "ess_h": ess_h, "h2_h": h2 / (s.fc_kw * n("FC") * s.fc_nm3_per_kwh) if s.fc_kw else None, "fuel_h": fuel / (s.dg_kw * n("DG") * s.dg_l_per_kwh) if s.dg_kw else None,
                 "grid": g("GRID.kw"), "gdg": sum(g(f"{n}.kw") for n in rt.gdgs), "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "elz": elz, "g1_kw": float(self.cfg.get("g1_kw", 100.0))}
 
     def _snap_values(self, now):
@@ -785,7 +796,7 @@ class Engine:
         rt = self.rt; d = rt.dev.get(n)
         paths = {k: {"alive": lk.alive.get(k, False), "host": f"{cl.host}:{cl.port}", "unit": cl.unit, "ok": cl.n_ok, "err": cl.n_err,
                      "rtt": None if cl.last_rtt is None else round(cl.last_rtt * 1000, 2), "last_err": cl.last_err, "age": round(now - rt.lm.last[n][k], 1)} for k, cl in lk.cl.items()}
-        return {"link": rt.lm.state[n], "absent": autodev.absent(self, n), "since": round(now - rt.lm.since[n], 1), "ctl": n in rt.dev, "paths": paths,
+        return {"link": rt.lm.state[n], "absent": autodev.absent(self, n), "slot": fleet.is_slot(n), "kind": fleet.kind(n), "since": round(now - rt.lm.since[n], 1), "ctl": n in rt.dev, "paths": paths,
                 "on": (d.on if d else (rt.val.get(f"{n}.status") or 0) > 0.5), "manual": d.manual if d else False, "online": rt.controllable(n), "hb_stop": rt.hb_stop.get(n, False),
                 "seq_ack": rt.val.get(f"{n}.seq_ack"), "hb": rt.val.get(f"{n}.hb")}
 
@@ -807,11 +818,11 @@ class Engine:
                           "avg_ms": round(sum(sm) / len(sm), 1) if sm else None, "p95_ms": round(st[int(len(st) * 0.95) - 1], 1) if len(st) > 20 else None,
                           "scan_s": float(self.cfg.get("scan_s", 1.0)), "wd": {k: (None if t is None else round(now - t, 1)) for k, t in rt.wd.last.items()},
                           "trace_n": self.trace_n, "audit_seq": rt.audit.seq, "hist": hist, "hist_top": round(top, 1)},
-                "sim_state": self.sim_state() if self.sim else None, "ring": self.ringw.status(), "ops": self.ops(), "energy": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in self.energy.items() if k != "hours"}}
+                "sim_state": self.sim_state() if self.sim else None, "ring": self.ringw.status(), "fleet": rt.fleet.view(rt.lm.state, rt.dev, rt.val), "ops": self.ops(), "energy": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in self.energy.items() if k != "hours"}}
 
     def sim_state(self):
         p = self.plant
-        return {"muted": sorted(p.muted), "noack": sorted(p.no_ack), "down": sorted(p.down), "hold": dict(self.simdrv.hold), "scenario": self.simdrv.scn,
+        return {"muted": sorted(p.muted), "noack": sorted(p.no_ack), "down": sorted(p.down), "gone": sorted(p.gone), "hold": dict(self.simdrv.hold), "scenario": self.simdrv.scn,
                 "clock": (datetime.now() + timedelta(hours=self.simdrv.off_h)).strftime("%H:%M") if self.simdrv.off_h else "",
                 "ports": list(self.sim_ports), "manual": [d for d in ("DG", "FC", "ELZ", "PV") if f"{d}.mode" in p.by_tag and p.get(f"{d}.mode") > 0.5]}
 
@@ -894,18 +905,28 @@ class Engine:
             off = h - (now.hour + now.minute / 60)
         self.simdrv.off_h = off; self.rt.hr_off = off
 
+    def _sim_unit(self, tgt, on):
+        """같은 종류 장치를 놓거나 뺀다(자동 인식 연습)."""
+        if tgt not in self.plant.units or not fleet.kind(tgt): raise ValueError("놓고 뺄 수 있는 장치가 아님")
+        (self.plant.gone.discard if on else self.plant.gone.add)(tgt)
+
+    def _sim_grid(self, out):
+        """상전 정전·복전."""
+        p = self.plant
+        if "CB.GRID" not in p.by_tag: raise ValueError("수전점 계측이 없음")
+        p.set("CB.GRID", 0 if out else 1); p.set("FLT.GRID", 27 if out else 0)
+
     def sim_action(self, q, who):
         if not self.sim: raise ValueError("가상 장치 모드가 아님")
         a = q["action"]; p = self.plant; tgt = q.get("target"); on = q.get("on", True)
         flags = {"mute": p.muted, "noack": p.no_ack, "down": p.down}
         if a in flags: (flags[a].add if on else flags[a].discard)(tgt)
+        elif a == "unit": self._sim_unit(tgt, on)
         elif a == "manual": p.set(f"{tgt}.mode", 1 if on else 0)
         elif a == "set": self._sim_set(q)
         elif a == "release": self.simdrv.hold.pop(q["tag"], None)
         elif a == "clock": self._sim_clock(q.get("hour"))
-        elif a == "scenario" and q["name"] in ("grid_outage", "grid_restore"):
-            if "CB.GRID" not in p.by_tag: raise ValueError("수전점 계측이 없음")
-            out = q["name"] == "grid_outage"; p.set("CB.GRID", 0 if out else 1); p.set("FLT.GRID", 27 if out else 0)
+        elif a == "scenario" and q["name"] in ("grid_outage", "grid_restore"): self._sim_grid(q["name"] == "grid_outage")
         elif a == "scenario": self.simdrv.scenario(q["name"])
         elif a in ("fault", "cb"): self._sim_feeder(q)
         else: raise ValueError(f"동작 없음: {a}")

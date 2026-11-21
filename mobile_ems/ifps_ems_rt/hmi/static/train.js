@@ -61,6 +61,7 @@ const TRAIN = {
     [/차단기|CB-|트립|투입|개방/, "차단기", "전기 길을 열고 닫는 스위치다. 투입(닫힘) · 개방(열림) · 트립(보호 동작으로 끊김). 트립이면 원인을 찾기 전에는 다시 넣지 않는다."], [/모선|BUS|전압|주파수/, "모선", "전원과 부하가 모이는 굵은 전선이다. A · B 두 개가 있고 전압 · 주파수가 정상 범위에 있어야 한다."],
     [/PPDU|배전체계|CH[1-6]|회로/, "휴대용 배전체계(PPDU-20)", "구간분전함에서 받아 시설 부하로 나누어 주는 20 kW급 휴대용 배전함이다. 주 차단기 아래 6회로(3상 2 · 단상 4)가 있고 회로마다 보호 · 계측을 한다. 회로에 물린 시설과 부하 등급은 [배전체계 구성]에서 고른다. ★ 는 1등급(중요) 부하가 물린 곳이다."],
     [/FSU|구간분전함/, "구간분전함(FSU)", "환망의 마디다. 전압으로 전기가 들어오는지 알고, 다음 구간으로 나가는 개폐기를 가진다. 장치마다 ID 가 있어 설치 뒤 자리를 확인한다."],
+    [/DG2|ESS2|PV2|FC2|× ?\d대|미설치/, "같은 종류 여러 대 · 미설치", "같은 종류 장치를 더 놓으면 EMS 가 스스로 알아내 이 화면에 한 대씩 더 그린다. 값은 있는 장치의 합이고, 기동 · 정지는 모두에게 간다. 가져오지 않은 종류는 '미설치'로 흐리게 나온다 — 고장이 아니다."],
     [/초기 기동 점검|ID/, "초기 기동 점검", "EMS 가 자리마다 장치 ID 를 읽어 알아낸 배치를 전원에서 가까운 순서로 보여 준다. 장치를 바꿔 놓거나 대수가 달라도 화면이 스스로 맞춰지므로 따로 맞출 것이 없다. '확인 필요'만 살피면 된다."],
     [/환망|구간|상시 개방점|마디|단선/, "환망(고리 모양 배전)", "전원에서 나가 부하 마디를 돌아 다시 전원으로 오는 고리다. 평소 한 구간(상시 개방점)을 열어 둔다. 어느 구간이 끊어지면 그 구간을 양 끝에서 떼어 내고 상시 개방점을 닫아 반대쪽에서 전기를 보낸다."],
     [/부하|등급|차단 중/, "부하와 등급", "전기를 쓰는 장비다. 1등급이 가장 중요하고, 전기가 모자라면 3등급 → 2등급 순으로 자동 차단하고 여유가 생기면 되돌린다."], [/예비력|N-1/, "예비력", "가장 큰 전원 하나가 꺼져도 1 · 2등급 부하를 감당할 수 있는 여유다. 부족하면 경보가 뜬다."],
@@ -84,7 +85,7 @@ const TRAIN = {
     const s = S.snap || {}, o = s.ops || {}, pg = (location.hash || "#overview").slice(1); this.seen.add(pg); if (s.mode === "grid" && pg === "sld") this.seen.add("sld2");
     if (o.posture === "저소음") this.did.add("quiet"); if (s.auto === false) this.did.add("manual"); if (s.mode === "grid") this.did.add("grid");
     if (pg === "archive" && typeof ARC !== "undefined") this.tabs.add(ARC.tab);
-    return { seen: this.seen, did: this.did, tabs: this.tabs, role: S.me.role, mode: s.mode, posture: o.posture, shed: o.shed || [], outage: !!o.outage, auto: s.auto, dg: !!(s.devices && s.devices.DG && s.devices.DG.on), unack: (s.alarms || []).filter(a => !a.acked).length };
+    return { seen: this.seen, did: this.did, tabs: this.tabs, role: S.me.role, mode: s.mode, posture: o.posture, shed: o.shed || [], outage: !!o.outage, auto: s.auto, dg: kOn("DG"), unack: (s.alarms || []).filter(a => !a.acked).length };
   },
   done(i, c) { return this.L[i].k.every(k => k[1](c)) && this.L[i].q.every((q, j) => this.ans[`${i}.${j}`] === q[2]); },
   /* ── 작은 화면(휴대전화·태블릿): 실제 화면판(1920×1080)은 그대로 두고 손가락으로 밀어 보며, 확대·축소 단추를 쓴다. 교육 창은 아래에 붙는다 */

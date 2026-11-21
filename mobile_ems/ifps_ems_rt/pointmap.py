@@ -16,6 +16,7 @@ CSV 열: tag, device, fc, addr, type, scale, unit, lo, hi, rw
   type 16비트: u16 i16 · 32비트: u32 i32 f32 · 64비트: u64 i64 f64 (레지스터 1/2/4개 차지)
 """
 import csv
+from . import fleet
 from .modbus import NREG, norm_order, ModbusError
 
 REQUIRED = ("tag", "device", "fc", "addr", "type", "scale", "unit", "lo", "hi", "rw")
@@ -34,7 +35,7 @@ def load(path, devices=None):
         pts[-1]["order_raw"] = (r.get("order") or "").strip() or dev_def
         try: pts[-1]["order"] = norm_order(pts[-1]["order_raw"])
         except ModbusError: pts[-1]["order"] = None          # validate()가 오류로 알린다
-    return pts
+    return fleet.expand(pts, devices)                        # 같은 종류 추가 자리(DG2 …)는 첫 장치의 줄을 본뜬다
 
 
 def validate(pts, devices=None):

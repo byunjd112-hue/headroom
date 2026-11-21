@@ -46,6 +46,7 @@ class RingTest(unittest.TestCase):
             d = ring.discover(R, values(ids=ids)); self.assertFalse(d["ok"]); self.assertEqual(d["bad"], 1); self.assertIn("ring.id.FSU3", {a[0] for a in ring.alarms(R, ring.status(R, values(ids=ids))) if a[1]})
         v = values(); v.update({"PPDU1.up": float(R["fsu"][6]["code"]), "PPDU2.up": 9.0}); s = ring.status(R, v)                                                              # 배전체계가 물린 곳은 상위 ID 신호로 안다
         self.assertEqual((s["ppdu"][0]["at"], s["ppdu"][0]["at_auto"], s["ppdu"][1]["at"], s["ppdu"][2]["at"]), ("FSU7", True, "", "FSU6")); self.assertIn("ring.at.PPDU2", {a[0] for a in ring.alarms(R, s) if a[1]})
+        v["PPDU2.v"] = 0.0; a = {x[0]: x[2] for x in ring.alarms(R, ring.status(R, v)) if x[1]}; self.assertEqual(a.get("ring.dead.PPDU2"), 1)                     # 어디 물렸는지 몰라도 정전 경보는 낸다(1등급 회로가 있으면 1등급)
 
     def test_fixed_layout_reports_swapped_units(self):
         F = dict(R, auto=False); d = ring.discover(F, values(ids={"FSU2": R["fsu"][4]["code"], "FSU5": R["fsu"][1]["code"]})); bad = [x for x in d["rows"] if x["state"] != "일치"]
@@ -70,7 +71,7 @@ class RingTest(unittest.TestCase):
 
 
 class RingWatchTest(unittest.TestCase):
-    """가상 장치를 띄워 감시 → 경보 → 초기 기동 점검 → 분전반 구성 저장까지."""
+    """가상 장치를 띄워 감시 → 경보 → 자동 인식 → 배전체계 구성 저장까지."""
     def setUp(self):
         self.td = tempfile.mkdtemp(); shutil.copytree(os.path.join(ROOT, "config"), os.path.join(self.td, "config"), ignore=shutil.ignore_patterns("state*", "backup"))
         self.cfg = os.path.join(self.td, "config", "runtime.json"); self.eng = Engine(self.cfg, sim=True); self.eng.start(); time.sleep(3.5)
@@ -101,7 +102,8 @@ class RingWatchTest(unittest.TestCase):
         w.sim({"action": "ppdu", "id": "PPDU1", "what": "ch3", "value": 2}); self.assertTrue(self._wait(lambda: "ring.ch.PPDU1.3" in {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}))
         self.assertRaises(ValueError, w.sim, {"action": "ppdu", "id": "PPDU1", "what": "id", "value": 1})
         self.assertTrue(w.configure(e, {"ppdu": []}, "시험").get("same"))
-        self.assertRaises(ValueError, w.sim, {"action": "모름"})
+        self.assertRaises(ValueError, w.sim, {"action": "모름"}); self.assertRaises(ValueError, w.sim, {"action": "swap", "a": "PPDU1", "b": "PPDU6"}); self.assertRaises(ValueError, w.sim, {"action": "swap", "a": "FSU1", "b": "PPDU1"})
+        self.assertRaises(ValueError, w.configure, e, {"ppdu": [], "open": -1}, "시험")
 
     def test_units_removed_added_and_shuffled_without_any_setting(self):
         e = self.eng; w = e.ringw; n = lambda: (len(w.status()["fsu"]), len(w.status()["ppdu"])); act = lambda: {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}
@@ -123,11 +125,13 @@ class AutoDeviceTest(unittest.TestCase):
     def test_never_answered_device_is_treated_as_not_installed(self):
         from types import SimpleNamespace as NS
         from ifps_ems_rt.hmi import autodev
-        got = {}; eng = NS(ever=set(), rt=NS(lm=NS(state={"DG": "두절", "FC": "정상"})), alarms=NS(set=lambda k, on, pr, src, text: got.__setitem__(k, (on, pr))))
+        got = {}; eng = NS(rt=NS(lm=NS(state={"DG": "두절", "FC": "정상"}), seen={"FC"}, fleet=NS(slots={"DG": ["DG", "DG2"], "FC": ["FC"]})), alarms=NS(set=lambda k, on, pr, src, text: got.__setitem__(k, (on, pr))))
         for n, st in eng.rt.lm.state.items(): autodev.link_alarm(eng, n, st)
         self.assertEqual((got["link.DG"], got["absent.DG"], got["link.FC"], got["absent.FC"]), ((False, 1), (True, 3), (False, 1), (False, 3)))
         eng.rt.lm.state["FC"] = "두절"; autodev.link_alarm(eng, "FC", "두절"); self.assertEqual((got["link.FC"][0], got["absent.FC"][0]), (True, False))            # 응답하던 장치의 두절은 그대로 1등급
-        eng.rt.lm.state["DG"] = "정상"; autodev.link_alarm(eng, "DG", "정상"); eng.rt.lm.state["DG"] = "두절"; autodev.link_alarm(eng, "DG", "두절"); self.assertEqual((got["link.DG"][0], got["absent.DG"][0]), (True, False))
+        eng.rt.lm.state["DG2"] = "두절"; autodev.link_alarm(eng, "DG2", "두절"); self.assertEqual((got["link.DG2"][0], got["absent.DG2"][0]), (False, False))            # 추가 자리가 빈 것은 알리지 않는다
+        eng.rt.seen.add("DG2"); autodev.link_alarm(eng, "DG", "두절"); self.assertEqual((got["link.DG"][0], got["absent.DG"][0]), (False, False))                      # 같은 종류가 한 대라도 있으면 첫 자리가 비어도 알리지 않는다
+        eng.rt.seen.add("DG"); autodev.link_alarm(eng, "DG", "두절"); self.assertEqual((got["link.DG"][0], got["absent.DG"][0]), (True, False))
 
 
 if __name__ == "__main__":

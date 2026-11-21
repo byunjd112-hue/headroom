@@ -44,7 +44,7 @@ function sldSvg() {
     <rect class="hexbg" x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" rx="12"/>
     <g clip-path="url(#cp-${n.id})"><g id="art-${n.id}" data-x="${n.x - r * 1.18}" data-y="${cy - r * .8}" data-w="${r * 2.36}" data-h="${r * 1.6}" class="eqimg"></g></g>
     <rect class="hexo" x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" rx="12" style="fill:none"/>
-    <circle class="sdot" cx="${n.x + r * 1.18 - 10}" cy="${cy - r * .8 + 10}" r="5"/>
+    <circle class="sdot" cx="${n.x + r * 1.18 - 10}" cy="${cy - r * .8 + 10}" r="5"/><g id="un-${n.id}" data-x="${n.x}" data-y="${cy - r * .8 - 12}"></g>
     <g class="ico" style="display:none" stroke="${color}" transform="translate(${n.x - 16.8},${cy - 16.8}) scale(1.4)">${icon}</g>
     <text class="nm" x="${n.x}" y="${cy + r + 22}" text-anchor="middle">${ko ? n.name : n.en}</text>
     <text x="${n.x}" y="${cy + r + 47}" text-anchor="middle"><tspan class="kw" id="kw-${n.id}">—</tspan><tspan class="u" dx="4">kW</tspan></text>
@@ -80,6 +80,12 @@ function setFlow(id, kw, cap, on = true) {
   f.style.strokeWidth = 2.5 + 3 * Math.min(1, a / (cap || 100));
 }
 
+/* 같은 종류 장치가 여러 대면 그림 위에 장치 칩을 대수만큼 그린다(자동 인식 — 놓거나 빼면 스스로 바뀐다). 초록 운전 · 회색 정지 · 빨강 두절 */
+function sldUnits(id) {
+  const g = document.getElementById("un-" + id); if (!g) return; const f = KF(id), us = f && f.units.length > 1 ? f.units : [], sig = JSON.stringify(us.map(u => [u.id, u.live, u.on])); if (g.dataset.sig === sig) return; g.dataset.sig = sig;
+  const x0 = +g.dataset.x - us.length * 17 + 1, y = +g.dataset.y;
+  g.innerHTML = us.map((u, i) => `<g class="uchip ${u.live ? (u.on ? "on" : "off") : "lost"}"><title>${u.id} · ${u.live ? (u.on ? "운전" : "정지") : "통신 두절"}</title><rect x="${x0 + i * 34}" y="${y - 8}" width="32" height="15" rx="4"/><text x="${x0 + i * 34 + 16}" y="${y + 3.5}" text-anchor="middle">${u.id}</text></g>`).join("");
+}
 /* 상태 갱신 */
 function sldArt(id, st) {
   const g = document.getElementById("art-" + id); if (!g) return; const sig = JSON.stringify(st); if (g.dataset.sig === sig) return; g.dataset.sig = sig;
@@ -92,9 +98,9 @@ function sldUpdate(s) {
   const cbv = f => { const v = val("CB." + f), ok = f === "GDG" ? !!(D.GDG && D.GDG.link !== "두절") : gw; return (!ok || v === null || v === undefined) ? null : Math.round(v); };   // 1 투입, 0 개방, 2 트립, null 미상
   const closed = f => cbv(f) === null ? true : cbv(f) === 1;
   const code = f => Math.round(val("FLT." + f) || 0);
-  const devLost = id => id === "PV" || id === "G1" || id === "GRID" ? !gw : (D[id] ? D[id].link === "두절" : false);
+  const devLost = id => id === "PV" || id === "G1" || id === "GRID" ? !gw : KF(id) ? kLost(id) : (D[id] ? D[id].link === "두절" : false);
   const ops = s.ops || {}, garr = ops.mode === "grid";
-  const running = { PV: k.pv > 0.5, DG: !!(D.DG && D.DG.on), FC: !!(D.FC && D.FC.on), ESS: val("ESS.status") > 0.5, G1: true, GRID: garr && cbv("GRID") === 1, GDG: !!(D.GDG && D.GDG.on) };
+  const running = { PV: k.pv > 0.5, DG: kOn("DG"), FC: kOn("FC"), ESS: val("ESS.status") > 0.5, G1: true, GRID: garr && cbv("GRID") === 1, GDG: !!(D.GDG && D.GDG.on) };
   // 모선 통전: 실측 전압 우선
   const est = bus => SRC.some(n => n.bus === bus && n.id !== "PV" && running[n.id] && closed(n.id));
   let aLive = est("A"), bLive = est("B"); if (closed("TIE")) { const x = aLive || bLive; aLive = bLive = x; }
@@ -110,13 +116,16 @@ function sldUpdate(s) {
   const pk = { PV: k.pv, DG: k.dg, FC: k.fc, ESS: k.ess, G1: 0, GRID: k.grid || 0, GDG: k.gdg || 0 };
   SRC.forEach(n => {
     if (n.id === "GDG" && !D.GDG) { const e = $("#n-GDG"); if (e) e.style.opacity = .25; return; }      // 주둔지 발전기를 연동하지 않은 현장
-    const lost = devLost(n.id), c = cbv(n.id), trip = c === 2, on = running[n.id] && !lost, g = $("#n-" + n.id);
+    const lost = devLost(n.id), c = cbv(n.id), trip = c === 2, on = running[n.id] && !lost, g = $("#n-" + n.id); sldUnits(n.id);
+    if (KF(n.id) && kAbsent(n.id)) {                                     // 가져오지 않은 종류: 흐리게 두고 '미설치'
+      g.setAttribute("class", "node off absent"); if (n.kw) $("#kw-" + n.id).textContent = "—"; sldArt(n.id, { on: false }); cbDraw(n.id); setCls("lu-" + n.id, "ln off"); setCls("ld-" + n.id, "ln " + (live[n.bus] ? "on" : "off"));
+      setFlow(n.id, 0); $("#fv-" + n.id).textContent = ""; st(n.id, ko ? "미설치 · 자동 인식" : "NOT INSTALLED", "var(--muted)"); return; }
     g.setAttribute("class", "node " + (trip ? "flt" : lost ? "lost" : on ? "on" : "off"));
     if (n.kw) $("#kw-" + n.id).textContent = lost ? "####" : F.kw(pk[n.id]);
-    sldArt(n.id, { on: n.id === "G1" ? !!(D.DG && D.DG.on) : on, lost, soc: n.id === "ESS" ? Math.round(k.soc / 5) * 5 : undefined });
+    sldArt(n.id, { on: n.id === "G1" ? kOn("DG") : on, lost, soc: n.id === "ESS" ? Math.round(k.soc / 5) * 5 : undefined });
     cbDraw(n.id);
     setCls("lu-" + n.id, "ln " + (trip ? "flt" : on ? "on" : "off")); setCls("ld-" + n.id, "ln " + (live[n.bus] ? "on" : "off"));
-    const flowing = closed(n.id) && on && n.kw; setFlow(n.id, flowing ? pk[n.id] : 0, n.id === "PV" ? 400 : n.id === "ESS" || n.id === "GRID" ? 300 : n.id === "GDG" ? 1000 : 100);
+    const flowing = closed(n.id) && on && n.kw; setFlow(n.id, flowing ? pk[n.id] : 0, (n.id === "PV" ? 400 : n.id === "ESS" || n.id === "GRID" ? 300 : n.id === "GDG" ? 1000 : 100) * Math.max(1, kN(n.id)));
     $("#fv-" + n.id).textContent = flowing && Math.abs(pk[n.id]) > 0.5 ? `${pk[n.id] < 0 ? "▲" : "▼"} ${F.kw(Math.abs(pk[n.id]))}` : "";
     if (trip) st(n.id, (ko ? "차단기 트립 · " : "CB TRIP · ") + (ANSI_TXT[code(n.id)] || code(n.id)), "var(--alarm)");
     else if (lost) st(n.id, ko ? "통신 두절" : "COMM LOSS", "var(--alarm)");
@@ -128,7 +137,8 @@ function sldUpdate(s) {
     else if (n.id === "G1") st(n.id, ko ? "계통 형성" : "GRID-FORMING", "var(--g1)");
     else st(n.id, on ? (ko ? "운전" : "RUNNING") : (ko ? "정지" : "STOPPED"), on ? "var(--ok)" : "var(--muted)");
     const tg = $("#tg-" + n.id);
-    if (tg && n.id === "ESS") { tg.textContent = `SOC ${F.n(k.soc, 1)}%`; }
+    if (tg && n.id === "ESS") { tg.textContent = `SOC ${F.n(k.soc, 1)}%${kCnt("ESS")}`; }
+    else if (tg && kN(n.id) > 1) { tg.textContent = `${n.sub} × ${kN(n.id)}대`; tg.setAttribute("fill", "var(--muted)"); }
     else if (tg && D[n.id] && D[n.id].ctl) { tg.textContent = D[n.id].manual ? "LOCAL · MANUAL" : "REMOTE · AUTO"; tg.setAttribute("fill", D[n.id].manual ? "var(--warn)" : "var(--muted)"); }
   });
   LOADS.forEach(n => {

@@ -11,7 +11,7 @@
 """
 import argparse, html, json, os, socket, sys, time, unicodedata
 from concurrent.futures import ThreadPoolExecutor
-from . import modbus as mb, pointmap as pm
+from . import modbus as mb, pointmap as pm, fleet
 
 OK, WARN, BAD = "정상", "주의", "이상"
 RANK = {OK: 0, WARN: 1, BAD: 2}
@@ -153,13 +153,16 @@ def diagnose_device(name, dcfg, pts, allow, timeout=0.8, hb_wait=2.2):
     """장비 하나를 점검한다. 반환: {name, unit, paths:{A:…,B:…}, state, summary}"""
     mine = [p for p in pts if p["device"] == name]
     d = {"name": name, "unit": dcfg["unit"], "order": dcfg.get("order", "ABCD"), "paths": {}, "notes": []}
+    if fleet.is_slot(name) and not mine: return dict(d, state=OK, summary="빈 자리(같은 종류 추가 자리 — 대응표 줄 없음)")
     for k, (host, port) in zip("AB", dcfg["paths"]): d["paths"][k] = check_path(host, port, dcfg["unit"], mine, allow, timeout, hb_wait)
     if len(d["paths"]) == 2 and all(x["points"] for x in d["paths"].values()):
         diff = _path_diff(d["paths"]["A"]["points"], d["paths"]["B"]["points"])
         if diff: d["notes"].append(f"⑦ 경로 A·B 값이 다름: {', '.join(diff[:6])} — 두 경로가 같은 장비인지(IP 충돌) 확인")
     need = _missing_protocol(name, mine)
     if need: d["notes"].append(f"지령 규약 점 누락: {', '.join(need)} — 대응표에 추가")
-    return _judge(d)
+    d = _judge(d)
+    if fleet.is_slot(name) and d["summary"].startswith("모든 경로 통신 불가"): d["state"] = OK; d["summary"] = "빈 자리 — 응답 없음(놓지 않은 추가 장치로 봄)"      # 같은 종류 추가 자리는 비어 있어도 이상이 아니다
+    return d
 
 
 def _judge(d):

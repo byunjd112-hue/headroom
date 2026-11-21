@@ -202,6 +202,10 @@ def discover(r, val, lost=False):
     return {"rows": out, "ok": all(x["state"] == "일치" for x in out), "n": len(out), "bad": sum(1 for x in out if x["state"] != "일치")}
 
 
+def _dead_text(p):
+    return f"{p['name']}({p['id']}) 무전압 — " + (f"{p['at']} 는 살아 있음. " if p["at_live"] else "") + "입력 케이블·주 차단기 확인"
+
+
 def _id_text(u):
     return f"{u['id']} 자리의 장치 ID {u['id_read']} — {u['bad']}" if u["bad"] else f"{u['id']} 장치 ID 불일치(기대 {u['code']}, 읽음 {u['id_read']}) — 설치 위치 확인"
 
@@ -219,7 +223,7 @@ def alarms(r, s):
         out.append((f"ring.id.{f['id']}", f["id_ok"] is False and f["id_read"] not in (None, 0), 3, f["id"], _id_text(f)))
     for p in s["ppdu"]:
         i = p["id"]; top = 1 if p["vital"] else 2
-        out.append((f"ring.dead.{i}", p["live"] is False and p["at_live"] is True, top, i, f"{p['name']}({i}) 무전압 — {p['at']} 는 살아 있음. 입력 케이블·주 차단기 확인"))
+        out.append((f"ring.dead.{i}", p["live"] is False and p["at_live"] is not False, top, i, _dead_text(p)))      # 물린 구간분전함이 정전이면 그쪽 경보 하나로 충분하다
         out.append((f"ring.id.{i}", p["id_ok"] is False and p["id_read"] not in (None, 0), 3, i, _id_text(p)))
         out.append((f"ring.at.{i}", p["at_auto"] and not p["at"], 3, i, f"{p['name']}({i}) 가 어느 구간분전함에 물렸는지 알 수 없음 — 입력 케이블·통신 확인"))
         out.append((f"ring.mccb.{i}", p["mccb"] == 2, top, i, f"{p['name']}({i}) 주 차단기 트립 — 6회로 모두 정전. 단락·과부하 원인 확인"))
@@ -235,7 +239,7 @@ class Model:
     place 가 '어느 자리에 어떤 장치가 놓였는지'다 — 장치를 빼고 넣고 섞어서 자동 인식을 연습한다."""
     def __init__(self, r, plant, kw=None):
         self.r = r if r and "RING.sw0" in plant.by_tag else None; self.p = plant; self.kw = kw or {"L1": "LOAD.p1_kw", "L2": "LOAD.p2_kw", "L3": "LOAD.p3_kw"}
-        self.brk = set(); self.t_brk = {}; self.t_trip = None; self.init = set(); self.armed = False; self.swap = None; self.place = {}
+        self.brk = set(); self.t_brk = {}; self.t_trip = None; self.init = set(); self.armed = False; self.swap = None; self.place = {}; self.zero = set()
         if self.r is None: return
         self._place0(); self._ids(); e = self.eff()
         for i, t in enumerate(sw_tags(e)): plant.set(t, 0 if i == e["open"] else 1)
@@ -275,14 +279,15 @@ class Model:
 
     def _clear(self, i):
         """빈 자리의 배전체계 신호를 0 으로."""
-        self.init.discard(i)
+        if i not in self.init and i in self.zero: return                              # 이미 비운 자리는 다시 쓰지 않는다
+        self.init.discard(i); self.zero.add(i)
         for t in ("v", "kw", "mccb", "gnd", "lamp") + tuple(f"ch{n}{x}" for n in range(1, 7) for x in ("", "_kw")):
             if f"{i}.{t}" in self.p.by_tag: self.p.set(f"{i}.{t}", 0)
 
     def _one(self, p, fed):
         """배전체계 한 대: 전압·회로별 전력·상태등."""
         i = p["id"]; P = self.p
-        if i not in self.init: self.init.add(i); P.set(f"{i}.mccb", 1); P.set(f"{i}.gnd", 35.0); [P.set(f"{i}.ch{n}", 1) for n in range(1, 7)]
+        if i not in self.init: self.init.add(i); self.zero.discard(i); P.set(f"{i}.mccb", 1); P.set(f"{i}.gnd", 35.0); [P.set(f"{i}.ch{n}", 1) for n in range(1, 7)]
         on = fed and int(round(P.get(f"{i}.mccb"))) == 1; tot = 0.0; bad = int(round(P.get(f"{i}.mccb"))) == 2
         if f"{i}.v" in P.by_tag: P.set(f"{i}.v", 380.0 if fed else 0.0)
         for n, c in enumerate(p["ch"]):

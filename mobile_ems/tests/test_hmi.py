@@ -48,7 +48,8 @@ class TestHmi(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/", timeout=5) as f:
             html = f.read().decode(); self.assertIn("IFPS", html); self.assertIn("default-src 'self'", f.headers["Content-Security-Policy"])
         s = self.req("/api/snapshot")[1]
-        self.assertEqual(set(s["devices"]), {"DG", "FC", "ESS", "MTR", "ELZ", "PV", "GDG"}); self.assertTrue(all(d["link"] == "정상" for d in s["devices"].values()))
+        self.assertEqual({n for n, d in s["devices"].items() if not d["slot"]}, {"DG", "FC", "ESS", "MTR", "ELZ", "PV", "GDG"}); self.assertTrue(all(d["link"] == "정상" for d in s["devices"].values() if not d["slot"]))
+        self.assertEqual({n for n, d in s["devices"].items() if d["slot"]}, {"DG2", "FC2", "ESS2", "PV2"}); self.assertEqual({k: f["n"] for k, f in s["fleet"].items()}, {"DG": 1, "FC": 1, "ESS": 1, "PV": 1, "ELZ": 1})      # 추가 자리는 비어 있다
         self.assertGreater(s["kpi"]["load"], 30); self.assertEqual(s["me"]["role"], "viewer")
         self.assertGreater(len(self.req("/api/trend")[1]["rows"]), 0); self.assertGreater(len(self.req("/api/trace")[1]["rows"]), 0)
         self.assertEqual(self.req("/static/../../runtime.py")[0], 404)                                # 경로 이탈 차단
@@ -83,7 +84,7 @@ class TestHmi(unittest.TestCase):
         self.assertTrue(any(a["key"] == "link.ESS" and a["prio"] == 1 for a in s["alarms"]))
         self.assertLess(s["stats"]["last_ms"], 600)                                                    # 병렬 수집: 무응답 장치가 있어도 시간 초과 1회 안
         self.req("/api/sim", {"action": "scenario", "name": "normal"}, en)
-        s, _ = self.wait(lambda s: all(d["link"] == "정상" for d in s["devices"].values()))
+        s, _ = self.wait(lambda s: all(d["link"] == "정상" for d in s["devices"].values() if not d["slot"]))
         n = self.req("/api/ack", {"ids": "all"}, op)[1]["n"]; self.assertGreater(n, 0)
         s = self.req("/api/snapshot")[1]; self.assertFalse(any(a["key"] == "link.ESS" for a in s["alarms"]))  # 복귀+확인 = 목록에서 사라짐
 

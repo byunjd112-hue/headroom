@@ -45,7 +45,7 @@ class ArchWatch:
     def _work(self):
         while True:
             item = self.q.get(); st = self.store
-            if item is None: return
+            if item is None or st is None: return                        # 닫는 중(보관소가 이미 내려갔으면 남은 것은 버린다)
             if item[0] == "reconf": self._apply(*item[1:]); continue
             now, mono, inst, val, eng = item
             st.arch.tick(inst, now, mono); st.dev.tick(val, now)

@@ -7,7 +7,8 @@ def status(eng):
     """[(장치, 이름, 잔량 %, 잔량 L, 정격 운전 기준 남은 시간)]. 남은 시간은 가장 빨리 줄어드는 경우(정격 연속 운전)로 계산한다."""
     rt = eng.rt; g = lambda k, d=0.0: rt.val.get(k, d); s = rt.site; gar = rt.gar; f = eng.fuel_cfg; out = []
     if "DG.fuel_l" in rt.val:
-        lit = g("DG.fuel_l"); out.append(("DG", "이동형 디젤발전기", 100.0 * lit / max(1.0, f["dg_tank_l"]), lit, lit / max(1e-6, s.dg_kw * s.dg_l_per_kwh)))
+        lit = g("DG.fuel_l"); n = max(1, rt.fleet.n("DG"))                    # 여러 대면 잔량은 합이므로 탱크·정격도 대수만큼 본다
+        out.append(("DG", "이동형 디젤발전기" + (f" {n}대" if n > 1 else ""), 100.0 * lit / max(1.0, f["dg_tank_l"] * n), lit, lit / max(1e-6, s.dg_kw * n * s.dg_l_per_kwh)))
     for n in rt.gdgs:
         if f"{n}.fuel_pct" in rt.val:
             pct = g(f"{n}.fuel_pct"); lit = pct / 100.0 * gar.gdg_tank_l; out.append((n, "주둔지 디젤발전기", pct, lit, lit / max(1e-6, gar.gdg_kw * gar.gdg_l_per_kwh)))
