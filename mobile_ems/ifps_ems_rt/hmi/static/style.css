@@ -832,3 +832,10 @@ html.tr-d .train { top: 8px; right: 8px; bottom: 8px; width: 392px; max-height: 
 .sc-pickbar { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); } .sc-cur { display: inline-flex; gap: 6px; align-items: center; margin-left: 6px; } .sc-cur b { font-size: 14px; }
 .sc-fat { margin: 0 0 10px; padding: 6px 10px; border-left: 3px solid var(--warn); background: rgba(255,190,60,.10); border-radius: 4px; font-size: 12.5px; } .sc-pk-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
 .sc-pk-bar .seg button small { opacity: .7; } .sc-pk-list { max-height: 56vh; } .sc-pk-name { cursor: pointer; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; } .sc-pk-list .sub { font-size: 11.5px; margin-top: 2px; }
+
+/* ── 환망 그림(시나리오 구성도 아래) */
+.rg { margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--panel); } .rg-h { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; } .rg-svg { width: 100%; height: auto; display: block; }
+.rg-l { stroke-width: 5; fill: none; stroke: var(--ok, #58c08a); } .rg-l.open { stroke: #6b7280; stroke-dasharray: 3 7; } .rg-l.trip { stroke: var(--alarm, #ff5a78); stroke-dasharray: 3 7; } .rg-l.brk { stroke: var(--alarm, #ff5a78); stroke-dasharray: 12 6; }
+.rg-back { stroke: var(--ok, #58c08a); stroke-width: 3; fill: none; opacity: .6; } .rg-cb { fill: var(--ok, #58c08a); stroke: #0b0e09; } .rg-cb.open { fill: #6b7280; } .rg-cb.trip, .rg-cb.brk { fill: var(--alarm, #ff5a78); }
+.rg-n.on { fill: rgba(88,192,138,.25); stroke: var(--ok, #58c08a); stroke-width: 2.5; } .rg-n.off { fill: rgba(255,90,120,.2); stroke: var(--alarm, #ff5a78); stroke-width: 2.5; } .rg-src { fill: var(--panel2); stroke: var(--ok, #58c08a); }
+.rg-t { fill: var(--text2); font-size: 12px; } .rg-nt { fill: var(--text); font-size: 12px; font-weight: 700; } .rg-s { font-size: 12px; fill: var(--ok, #58c08a); } .rg-s.open { fill: #9aa3ad; } .rg-s.trip, .rg-s.brk { fill: var(--alarm, #ff5a78); font-weight: 700; }

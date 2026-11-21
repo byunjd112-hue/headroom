@@ -16,7 +16,15 @@ OSCALE = [[1, "매우 낮음 (10년 1회 미만)", 0.03, "자동 감시·즉시 
           [7, "높음 (분기 1회)", 2.0, "정기 점검·시험 때 검출", 2160.0], [8, "높음", 4.0, "정기 점검·시험 때 검출", 4380.0],
           [9, "매우 높음 (월 1회 이상)", 8.0, "상시 감시 불가(고장 후 인지)", 8760.0], [10, "매우 높음", 12.0, "상시 감시 불가(고장 후 인지)", 17520.0]]
 NAV = [("dashboard", "01", "대시보드"), ("fmea", "05", "FMEA 워크시트"), ("rpn", "06", "RPN·위험매트릭스"), ("fta", "08", "FTA 고장수목"), ("mcs", "11", "MCS·중요도"),
-       ("comm", "12", "연동·CCF·리스크"), ("design", "14", "보완설계·조치계획"), ("qa", "15", "정합성·무결성"), ("tools", "⚙", "저장·내보내기")]
+       ("comm", "12", "연동·CCF·리스크"), ("design", "14", "보완설계·조치계획"), ("qa", "15", "정합성·무결성"), ("scn", "20", "시나리오·FAT 연결"), ("tools", "⚙", "저장·내보내기")]
+
+
+def scenario_links():
+    """운영 시나리오 검증 결과(docs/scenario_results.json)를 읽어 FMEA 와 잇는다: [{name, cat, ref, ok, fat}]. 파일이 없으면 빈 목록."""
+    path = os.path.join(HERE, "..", "scenario_results.json")
+    if not os.path.exists(path): return []
+    with open(path, encoding="utf-8") as f: sc = json.load(f)
+    return [{"name": r["name"], "cat": r.get("cat", ""), "ref": r.get("ref", ""), "ok": bool(t["ok"]), "first": bool(r["ok"]), "steps": r["steps"]} for r, t in zip(sc["results"], sc["retest"])]
 
 
 def build_data(rev, date):
@@ -45,7 +53,7 @@ def build_data(rev, date):
             for i, k in enumerate(kids): walk(k, "" if depth == 0 else prefix + ("    " if last else "│   "), i == len(kids) - 1, depth + 1)
     walk("TOP", "", True, 0)
     order = ["G1", "G2", "G2.1", "G2.2", "G2.3", "G3", "G3.1", "G3.2", "G3.3", "G4", "G4.1", "G5", "TOP"]
-    return {"fmea": rows, "oscale": OSCALE,
+    return {"fmea": rows, "oscale": OSCALE, "scn": scenario_links(),
             "be": [{"id": b[0], "type": b[1], "fm": b[2], "desc": b[3], "gate": parent[b[0]], "note": b[4]} for b in FT.BE],
             "gates": [{"id": gates[i][0], "logic": gates[i][1], "desc": gates[i][2], "inputs": gates[i][3], "cls": gates[i][4]} for i in order],
             "tree": tree, "s07_1": FT.S07_1, "s07_2": FT.S07_2, "s07_note": FT.S07_NOTE, "s07_3": FT.S07_3, "s07_4": FT.S07_4, "s08_1": FT.S08_1, "s08_h2": FT.S08_H2, "s08_2": FT.S08_2,

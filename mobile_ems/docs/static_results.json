@@ -1,6 +1,6 @@
 {
- "date": "2026-11-21 06:35",
- "unittest_s": 296.4,
+ "date": "2026-11-21 07:07",
+ "unittest_s": 315.5,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -139,6 +139,10 @@
   "test_extra_feeder_can_count_in_the_load_seen_by_ems | ok",
   "test_inverse_time_ground_fault_undervoltage_and_breaker_failure | ok",
   "test_relays_trip_selectively_and_backup_acts_only_when_needed | ok",
+  "test_ring_break_is_isolated_and_fed_from_the_other_side | ok",
+  "test_ring_definition_and_points | ok",
+  "test_ring_manual_switching_and_double_break | ok",
+  "test_ring_survives_equipment_dialog_save | ok",
   "test_shipped_definition_and_presets_are_valid | ok",
   "test_virtual_points_do_not_touch_the_real_point_map | ok",
   "test_attention_context_falls_back_when_sky_missing | ok",
@@ -160,18 +164,18 @@
   "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
   "test_check_scans_and_module_entry | ok"
  ],
- "n_tests": 157,
+ "n_tests": 161,
  "tests_ok": true,
- "coverage_pct": 90.6,
+ "coverage_pct": 90.7,
  "stmt": {
-  "n": 5308,
-  "hit": 4971,
+  "n": 5370,
+  "hit": 5033,
   "pct": 93.7
  },
  "branch": {
-  "n": 1872,
-  "hit": 1531,
-  "pct": 81.8
+  "n": 1906,
+  "hit": 1565,
+  "pct": 82.1
  },
  "coverage_files": [
   [
@@ -266,7 +270,7 @@
    "ifps_ems_rt/hmi/engine.py",
    93.8,
    776,
-   80.1,
+   80.4,
    286,
    "29-30, 55-56, 67-72, 93-94, 192-193, 312-313, 317, 326, 370, 386-387, 401-404, 407-409, 462, 505-507, 509-510, 603-604, 727-728, 890-895, 907-908, 924-925"
   ],
@@ -280,11 +284,11 @@
   ],
   [
    "ifps_ems_rt/hmi/scenextra.py",
-   94.5,
-   165,
+   94.7,
+   170,
    86.8,
    68,
-   "111, 154-157, 162-165"
+   "113, 159-162, 167-170"
   ],
   [
    "ifps_ems_rt/archxfer.py",
@@ -386,7 +390,7 @@
    "ifps_ems_rt/simplant.py",
    98.5,
    134,
-   92.0,
+   94.0,
    50,
    "130-131"
   ],
@@ -540,6 +544,14 @@
    64,
    100.0,
    12,
+   ""
+  ],
+  [
+   "ifps_ems_rt/hmi/scenring.py",
+   100.0,
+   57,
+   94.1,
+   34,
    ""
   ],
   [
@@ -924,7 +936,7 @@
   ]
  },
  "metrics": {
-  "n_func": 623,
+  "n_func": 631,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1271,7 +1283,7 @@
    ],
    [
     "ifps_ems_rt/hmi/scenextra.py",
-    241
+    247
    ],
    [
     "ifps_ems/forecast.py",
@@ -1352,6 +1364,10 @@
    [
     "ifps_ems/nowcast.py",
     99
+   ],
+   [
+    "ifps_ems_rt/hmi/scenring.py",
+    89
    ],
    [
     "ifps_ems_rt/hmi/archapi.py",
@@ -1450,7 +1466,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 6639,
+   "loc": 6717,
    "nosec": 0,
    "skipped_tests": 21
   },
@@ -1626,12 +1642,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.68,
- "cc_n": 634,
+ "cc_avg": 5.72,
+ "cc_n": 643,
  "cc_rank": {
-  "A": 386,
-  "B": 151,
-  "C": 97,
+  "A": 389,
+  "B": 154,
+  "C": 100,
   "D": 0,
   "E": 0,
   "F": 0
@@ -1850,6 +1866,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/scenring.py",
+   50.3,
+   "A"
+  ],
+  [
    "ifps_ems/security.py",
    50.8,
    "A"
@@ -1946,9 +1967,9 @@
   ]
  ],
  "loc_py": {
-  "files": 49,
-  "sloc": 5557,
-  "comments": 664
+  "files": 50,
+  "sloc": 5620,
+  "comments": 682
  },
  "js": [
   [
@@ -1988,7 +2009,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/scenarios.js",
-   675,
+   686,
    true
   ],
   [
@@ -2008,7 +2029,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/train.js",
-   165,
+   166,
    true
   ],
   [

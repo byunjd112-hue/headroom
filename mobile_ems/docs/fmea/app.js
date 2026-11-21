@@ -410,6 +410,7 @@ aoa("11_최소절단집합",[["MCS","차수","사상","—","내용","경로","P
   aoa("17_무결성점검",[["종합 판정",M.ok?"정상":"점검 필요","OK "+M.chk.filter(c=>c[1]).length+" / NG "+M.chk.filter(c=>!c[1]).length],["No","점검 항목","판정","상세값"]].concat(M.chk.map((c,i)=>[i+1,c[0],c[1]?"OK":"NG",c[2]])),[10,50,16,30]);
   aoa("18_약어·참고문헌",[["약어"],["약어","원어","뜻"]].concat(DATA.b_abbr).concat([[],["참고문헌·근거 문서"],["구분","문서","내용"]]).concat(DATA.b_ref),[16,70,60]);
   const log=[["항목","필드","기준 값","편집 값"]]; for(const [id,o] of Object.entries(state.ov)){ const b=DATA.fmea.find(f=>f.id===id); for(const [k,v] of Object.entries(o)) log.push([id,k,b[k],v]); } for(const [no,o] of Object.entries(state.act)) log.push(["조치 "+no,"상태/비고",DATA.s10.find(a=>a[0]===no)[6],(o.status||"")+" / "+(o.note||"")]);
+  aoa("20_시나리오·FAT연결",[["번호","부체계","고장모드","확인 수단","연결된 운영 시나리오","시나리오 결과","시험 시기","검증 방법(실장비 시험에서 확인할 것)"]].concat(scnLink().map(x=>[x.id,x.ss,x.mode,x.how,x.ls.map(s=>s.name).join(" / "),x.ls.length?(x.ls.every(s=>s.ok)?"통과":"실패 있음"):"",x.due,x.verify])).concat([[],["운영 시나리오 전체"],["시나리오","분류","FMEA","단계 수","결과(재시험)"]]).concat((DATA.scn||[]).map(s=>[s.name,s.cat,s.ref,s.steps,s.ok?"통과":"실패"])),[8,22,36,16,60,10,16,70]);
   aoa("19_변경이력",log.length>1?log:[["편집값 없음 — 기준값 그대로"]],[12,10,40,40]);
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
   saveFile("IFPS_EMS_FMEA_FTA_통합분석서_"+DATA.meta.rev+"_"+stamp()+".xlsx", new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
@@ -432,7 +433,31 @@ async function initCaps(){
 }
 
 /* ───────────── router */
-const VIEWS={dashboard:vDashboard, fmea:vFmea, rpn:vRpn, fta:vFta, mcs:vMcs, comm:vComm, design:vDesign, qa:vQa, tools:vTools};
+/* ───────────── 시나리오 · FAT 연결: 고장모드마다 무엇으로 확인하는지(운영 시나리오 / 회귀 시험 / 실장비 시험) */
+function scnLink(){
+  const by={}; (DATA.scn||[]).forEach(s=>{ if(s.ref) (by[s.ref]=by[s.ref]||[]).push(s); });
+  return DATA.fmea.map(f=>{ const ls=by[f.id]||[]; const how = ls.length ? "운영 시나리오" : /회귀 시험|R-\d/.test(f.verify) ? "회귀 시험" : "실장비 시험 · 절차";
+    return {id:f.id, ss:f.ss, mode:f.mode, due:f.due, verify:f.verify, ls, how}; });
+}
+function vScn(){
+  const L=scnLink(), S=DATA.scn||[], n=k=>L.filter(x=>x.how===k).length, cats={}; S.forEach(s=>{ const c=cats[s.cat]=cats[s.cat]||[0,0]; c[0]++; if(s.ok) c[1]++; });
+  const fat=L.filter(x=>/FAT/.test(x.due)), pill=s=>`<span class="pill ${s.ok?"ok":"bad"}" title="${s.steps}단계${s.first?"":" · 최초 실행은 의도한 실패, 대기 시간 조정 뒤 통과"}">${esc(s.name)}</span>`;
+  setMain(head("시나리오 · FAT 연결", "고장모드 "+L.length+"건을 무엇으로 확인하는지 — 운영 시나리오(가상 장치 검증) · 회귀 시험 · 실장비 시험(FAT·SAT)") + `
+  <div class="grid kpis" style="margin-bottom:12px">
+    <div class="kpi good"><div class="l">운영 시나리오로 확인</div><div class="v">${n("운영 시나리오")}건</div><div class="d">가상 장치에서 고장 조건을 넣어 EMS 판단을 본다</div></div>
+    <div class="kpi"><div class="l">회귀 시험으로 확인</div><div class="v">${n("회귀 시험")}건</div><div class="d">소프트웨어 자동 시험(tests)</div></div>
+    <div class="kpi"><div class="l">실장비 시험 · 절차로 확인</div><div class="v">${n("실장비 시험 · 절차")}건</div><div class="d">가상 장치로 만들 수 없는 고장(통신선 · 센서 · 노트북 등)</div></div>
+    <div class="kpi"><div class="l">운영 시나리오</div><div class="v">${S.length}건</div><div class="d">통과 ${S.filter(s=>s.ok).length}건(재시험 기준)</div></div>
+  </div>
+  <div class="card"><h2>20-1. 운영 시나리오 분류별 결과</h2>${tbl(["분류","건수","통과"],Object.entries(cats).map(([k,v])=>[k,v[0],v[1]]),[0])}
+   <p class="small">시나리오는 EMS 화면의 '운영 시나리오'에서 고르고 고칠 수 있다([시나리오 고르기] 창의 분류와 같다). 고장은 가상 장치에 조건을 넣어 만든 것이며, 통과가 실장비에서의 동작을 보증하지는 않는다.</p></div>
+  <div class="card" style="margin-top:12px"><h2>20-2. 고장모드별 확인 수단과 연결된 시나리오</h2><div class="tbl-wrap"><table><thead><tr><th>번호</th><th class="l">부체계</th><th class="l">고장모드</th><th>확인 수단</th><th class="l">연결된 운영 시나리오</th><th>시험 시기</th><th class="l">검증 방법(실장비 시험에서 확인할 것)</th></tr></thead><tbody>
+   ${L.map(x=>`<tr><td>${x.id}</td><td class="l small">${esc(x.ss)}</td><td class="l">${esc(x.mode)}</td><td><span class="pill ${x.how==="운영 시나리오"?"ok":x.how==="회귀 시험"?"":"warn"}">${x.how}</span></td><td class="l">${x.ls.map(pill).join(" ")||'<span class="small">—</span>'}</td><td class="small">${esc(x.due)}</td><td class="l small">${esc(x.verify)}</td></tr>`).join("")}</tbody></table></div></div>
+  <div class="card" style="margin-top:12px"><h2>20-3. 실장비 연동시험(FAT) 확인 항목 ${fat.length}건</h2>
+   ${tbl(["번호","고장모드","FAT 에서 확인할 것","미리 돌려 볼 시나리오"],fat.map(x=>[x.id,x.mode,x.verify,x.ls.map(s=>s.name).join(" / ")||"없음(실장비에서만 확인)"]),[1,2,3])}
+   <p class="small">FAT 확인 항목은 FMEA 의 '검증 방법' 가운데 시험 시기가 실장비 연동시험(FAT) 전인 것이다. 별도의 FAT 절차서가 정해지면 그 항목 번호를 여기에 잇는다.</p></div>`);
+}
+const VIEWS={dashboard:vDashboard, fmea:vFmea, rpn:vRpn, fta:vFta, mcs:vMcs, comm:vComm, design:vDesign, qa:vQa, scn:vScn, tools:vTools};
 function route(){ const h=(location.hash||"#dashboard").slice(1); const v=VIEWS[h]||vDashboard; document.querySelectorAll("#nav a").forEach(a=>a.classList.toggle("on", a.getAttribute("href")==="#"+(VIEWS[h]?h:"dashboard"))); v(); window.scrollTo(0,0); }
 loadLocal(); route(); window.addEventListener("hashchange", route); initCaps();
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>route());

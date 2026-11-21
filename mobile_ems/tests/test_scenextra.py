@@ -2,7 +2,7 @@
 """시나리오용 추가 설비: 정의 검사, 실제 대응표를 건드리지 않는 모의 신호, 보호 계전기의 선택 차단, 저장·되읽기."""
 import json, os, shutil, tempfile, unittest
 from pathlib import Path
-from ifps_ems_rt.hmi import scenarios, scenextra
+from ifps_ems_rt.hmi import scenarios, scenextra, scenring
 
 ROOT = Path(__file__).resolve().parents[1]
 EX = lambda tag, value, ms=0, op="eq": {"type": "expect", "tag": tag, "value": value, "op": op, "ms": ms, "limit": ms}
@@ -86,6 +86,36 @@ class TestScenarioExtra(unittest.TestCase):
         base = [p for p in scenarios.load_profile(ROOT / "config/runtime.json")[0] if not p.get("virtual")]
         shipped = json.loads((ROOT / "config" / scenextra.FILE).read_text(encoding="utf-8")); self.assertEqual(scenextra.check(shipped, base), [])
         self.assertEqual(scenextra.load(os.path.join(self.td, "없는폴더", "runtime.json")), scenextra.empty())
+
+
+    # ── 환망(고리 모양 배전): 구간 단선 → 구간 차단 → 상시 개방점 투입
+    def _ring(self, steps, **over):
+        ring = dict(scenring.DEFAULT, **over); self.assertEqual(scenextra.save(self.cfg, {"feeders": [], "transformers": [], "relays": [], "ring": ring}, self.base), [])
+        pts, devices = scenarios.load_profile(self.cfg); return scenarios.verify([{"name": "환망", "steps": steps}], pts, devices, profile=self.cfg)["results"][0]
+
+    def test_ring_definition_and_points(self):
+        bad = []; scenring.check(scenring.DEFAULT, {"L1", "L2", "L3"}, bad); self.assertEqual(bad, [])
+        for change in ({"open": "S9"}, {"sections": ["S1", "S2"]}, {"nodes": [{"id": "N1", "feeder": "없음"}], "sections": ["S1", "S2"], "open": "S1"}, {"trip_ms": -1}, {"sections": ["S1", "S1", "S3", "S4"]}):
+            bad = []; scenring.check(dict(scenring.DEFAULT, **change), {"L1", "L2", "L3"}, bad); self.assertTrue(bad, change)
+        tags = {p["tag"] for p in scenextra.points({"feeders": [], "transformers": [], "relays": [], "ring": scenring.DEFAULT})}
+        self.assertTrue({"RING.S1", "BRK.S3", "RN.N2", "RING.auto", "RING.ok"} <= tags); self.assertFalse(any(t.startswith("RING") for t in {p["tag"] for p in self.base}))      # 실제 대응표에는 없다
+        self.assertEqual(scenextra.points({"feeders": [], "transformers": [], "relays": [], "ring": None}), [])
+
+    def test_ring_break_is_isolated_and_fed_from_the_other_side(self):
+        SET = lambda tag, value: {"type": "set", "tag": tag, "value": value}
+        r = self._ring([{"type": "wait", "ms": 100}, EX("RING.ok", 1), EX("RING.S3", 0), SET("BRK.S2", 1), EX("RN.N2", 0, 100), EX("RING.S2", 2, 300), EX("RING.S3", 1, 800), EX("RN.N1", 1), EX("RN.N2", 1), EX("RN.N3", 1), EX("RING.ok", 1), EX("CB.L2", 1), EX("LOAD.p2_kw", 1, 0, "ge")])
+        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] != "pass"]); cut = next(x for x in r["rows"] if x["step"] == 5); self.assertLessEqual(cut["elapsed"], 400)      # 구간 차단은 정한 시간(150 ms) 근처
+
+    def test_ring_manual_switching_and_double_break(self):
+        SET = lambda tag, value: {"type": "set", "tag": tag, "value": value}
+        r = self._ring([SET("RING.auto", 0), {"type": "wait", "ms": 100}, SET("BRK.S2", 1), {"type": "wait", "ms": 1000}, EX("RING.S2", 1), EX("RN.N2", 0), EX("LOAD.p2_kw", 0), SET("RING.S2", 0), SET("RING.S3", 1), EX("RN.N2", 1, 200), EX("RING.ok", 1)])
+        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] != "pass"])                                  # 자동이 꺼져 있으면 사람이 열고 닫을 때까지 그 마디는 정전
+        r = self._ring([{"type": "wait", "ms": 100}, SET("BRK.S2", 1), SET("BRK.S3", 1), {"type": "wait", "ms": 1500}, EX("RN.N2", 0), EX("RN.N1", 1), EX("RN.N3", 1), EX("RING.ok", 0)])
+        self.assertTrue(r["ok"], [x for x in r["rows"] if x["state"] != "pass"])                                  # 두 구간이 함께 끊어지면 가운데 마디는 고립된다
+
+    def test_ring_survives_equipment_dialog_save(self):
+        self._ring([{"type": "wait", "ms": 50}]); self.assertEqual(scenextra.save(self.cfg, {"feeders": [], "transformers": [], "relays": []}, self.base), [])
+        self.assertEqual(scenextra.load(self.cfg)["ring"]["open"], "S3")                                           # 설비 구성 창은 환망을 다루지 않지만 저장해도 환망 정의가 남는다
 
 
 if __name__ == "__main__":

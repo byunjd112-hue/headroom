@@ -16,6 +16,8 @@
 """
 import json, os, re
 
+from . import scenring
+
 FILE = "scenario_extra.json"
 MAX = {"feeders": 12, "transformers": 4, "relays": 16}
 ID = re.compile(r"^[A-Z][A-Z0-9]{1,7}$")
@@ -41,7 +43,7 @@ def load(profile):
 
 
 def empty():
-    return {"feeders": [], "transformers": [], "relays": []}
+    return {"feeders": [], "transformers": [], "relays": [], "ring": None}
 
 
 def _num(item, key, lo, hi, bad, where):
@@ -112,6 +114,7 @@ def check(extra, pts):
     feeders = set(BUILTIN) | seen
     _check_transformers(extra.get("transformers", []), feeders, taken, bad)
     _check_relays(extra.get("relays", []), feeders, (feeders - {"ELZ"}) | {"TIE", "G1"}, bad)
+    scenring.check(extra.get("ring"), feeders, bad)
     return bad
 
 
@@ -129,6 +132,7 @@ def points(extra):
     for r in map(relay_view, extra.get("relays", [])):            # 지락 전류(시험 입력)와 차단 실패 모사 신호는 그것을 쓰는 계전기가 있을 때만 만든다
         for tag, typ, scale, unit, hi in ((f"GF.{r['on']}", "u16", 0.1, "A", 3000.0),) * (r["kind"] == "gf") + ((f"STK.{r['cb']}", "u16", 1.0, "", 1.0),) * bool(r["backup"]):
             if tag not in seen: seen.add(tag); add(tag, typ, scale, unit, 0.0, hi)
+    scenring.points(extra.get("ring"), add)                       # 환망(고리 모양 배전)의 구간·마디 신호
     return out
 
 
@@ -143,6 +147,7 @@ def save(profile, extra, pts):
     bad = check(extra, pts)
     if bad: return bad
     clean = {k: extra.get(k, []) for k in MAX}; pth = path_for(profile); tmp = pth + ".tmp"
+    clean["ring"] = extra["ring"] if "ring" in extra else load(profile).get("ring")          # 화면의 설비 구성 창은 환망을 다루지 않는다 — 있던 정의를 지우지 않는다
     with open(tmp, "w", encoding="utf-8") as f: json.dump(clean, f, ensure_ascii=False, indent=1)
     if os.path.exists(pth): os.replace(pth, pth + ".bak")
     os.replace(tmp, pth)
@@ -169,11 +174,12 @@ class Model:
     """가상 장치 위에서 추가 설비를 움직인다: 처음 값 넣기, 변압기 부하율, 보호 계전기(과전류·지락·부족전압, 정한시·반한시, 차단 실패 후비), 수급 반영."""
 
     def __init__(self, extra, plant):
-        self.x = extra or empty(); self.p = plant; self.acc = {}; self.armed = set(); self.bf = {}; self.t_last = None; self.wrote = None; self.base = None
+        self.x = dict(empty(), **(extra or {})); self.p = plant; self.acc = {}; self.armed = set(); self.bf = {}; self.t_last = None; self.wrote = None; self.base = None
         self.relays = [relay_view(r) for r in self.x["relays"]]
         self.kw = dict(BUILTIN); self.kw.update({f["id"]: f"{f['id']}.kw" for f in self.x["feeders"]})
         for f in self.x["feeders"]:
             if f"CB.{f['id']}" in plant.by_tag: plant.set(f"CB.{f['id']}", 1); plant.set(f"{f['id']}.kw", f["kw"])
+        self.ring = scenring.Ring(self.x.get("ring"), plant, self.kw)
 
     def _has(self, tag): return tag in self.p.by_tag
     def _is(self, tag, value): return self._has(tag) and int(round(self.p.get(tag))) == value
@@ -237,4 +243,4 @@ class Model:
         for t in self.x["transformers"]:
             if self._has(f"{t['id']}.load_pct"): self.p.set(f"{t['id']}.load_pct", min(1000.0, 100.0 * self.flow(t["on"]) / (t["kva"] * t["pf"])))
         for r in self.relays: self._relay(r, now, dt)
-        self._balance()
+        self.ring.tick(now); self._balance()

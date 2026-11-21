@@ -2727,5 +2727,647 @@
   "cat": "고장 대응 (FMEA)",
   "ref": "FM-28",
   "fat": "충전율 95%·태양광 과잉 모의에서 출력 제한 동작과 주파수 유지 확인"
+ },
+ {
+  "name": "환망 · 구간 단선 → 구간 차단 → 반대쪽 공급",
+  "note": "고리 모양 배전(환망)의 가운데 구간이 끊어진 상황입니다. 끊어진 구간을 양 끝에서 떼어 내고(구간 차단) 상시 개방점을 닫아 반대쪽에서 전기를 보내, 모든 부하 마디에 다시 전기가 들어오고 부하 차단기는 닫힌 채 유지되는지 봅니다.",
+  "steps": [
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "expect",
+    "tag": "RING.ok",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RING.S3",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "set",
+    "tag": "BRK.S2",
+    "value": 1
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N2",
+    "value": 0,
+    "op": "eq",
+    "ms": 100,
+    "limit": 100
+   },
+   {
+    "type": "expect",
+    "tag": "RING.S2",
+    "value": 2,
+    "op": "eq",
+    "ms": 300,
+    "limit": 300
+   },
+   {
+    "type": "expect",
+    "tag": "RING.S3",
+    "value": 1,
+    "op": "eq",
+    "ms": 800,
+    "limit": 800
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N1",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N2",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RING.ok",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L1",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L2",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "LOAD.p2_kw",
+    "value": 1,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "BUS.b_v",
+    "value": 300,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "C-11",
+  "fat": "구간 단선 모의 시험: 고장 구간 양 끝 개방, 상시 개방점 투입, 전 마디 재공급까지의 시간 기록, EMS 화면의 구간 상태와 현장 일치 확인"
+ },
+ {
+  "name": "환망 · 전원 쪽 첫 구간 단선",
+  "note": "전원에서 나가는 첫 구간이 끊어진 상황입니다. 그 구간을 떼어 내고 상시 개방점을 닫으면 모든 마디가 반대쪽 끝에서 공급받는지 봅니다.",
+  "steps": [
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "expect",
+    "tag": "RING.ok",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "set",
+    "tag": "BRK.S1",
+    "value": 1
+   },
+   {
+    "type": "expect",
+    "tag": "RING.S1",
+    "value": 2,
+    "op": "eq",
+    "ms": 300,
+    "limit": 300
+   },
+   {
+    "type": "expect",
+    "tag": "RING.S3",
+    "value": 1,
+    "op": "eq",
+    "ms": 800,
+    "limit": 800
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N1",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N2",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RING.ok",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "C-11",
+  "fat": "구간 단선 모의 시험: 고장 구간 양 끝 개방, 상시 개방점 투입, 전 마디 재공급까지의 시간 기록, EMS 화면의 구간 상태와 현장 일치 확인"
+ },
+ {
+  "name": "환망 · 자동 절체 불능 시 수동 구간 개방·투입",
+  "note": "자동 구간 차단·절체를 쓸 수 없을 때입니다. 단선 뒤 해당 마디가 정전된 것을 확인하고, 운용자가 고장 구간을 열고 상시 개방점을 닫아 공급을 되살리는 순서를 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "RING.auto",
+    "value": 0
+   },
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "set",
+    "tag": "BRK.S2",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 1000
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N2",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N1",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "LOAD.p2_kw",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "set",
+    "tag": "RING.S2",
+    "value": 0
+   },
+   {
+    "type": "set",
+    "tag": "RING.S3",
+    "value": 1
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N2",
+    "value": 1,
+    "op": "eq",
+    "ms": 200,
+    "limit": 200
+   },
+   {
+    "type": "expect",
+    "tag": "RING.ok",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "LOAD.p2_kw",
+    "value": 1,
+    "op": "ge",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "C-11",
+  "fat": "구간 단선 모의 시험: 고장 구간 양 끝 개방, 상시 개방점 투입, 전 마디 재공급까지의 시간 기록, EMS 화면의 구간 상태와 현장 일치 확인"
+ },
+ {
+  "name": "환망 · 두 구간 동시 단선(마디 고립)",
+  "note": "두 구간이 함께 끊어져 가운데 마디에 어느 쪽으로도 보낼 수 없는 상황입니다. 고립된 마디만 정전되고 나머지 마디는 계속 공급되는지 봅니다. 고립 마디의 복구는 케이블 수리나 임시 전원이 필요합니다.",
+  "steps": [
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "set",
+    "tag": "BRK.S2",
+    "value": 1
+   },
+   {
+    "type": "set",
+    "tag": "BRK.S3",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "RING.S2",
+    "value": 2,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N2",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N1",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RN.N3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "RING.ok",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L1",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "C-12",
+  "fat": "두 구간 동시 단선 모의: 고립 마디 식별, 나머지 마디 공급 유지, 임시 전원 접속 절차 확인"
+ },
+ {
+  "name": "고장 대응 · 정상 상태에서 불필요한 부하 차단 없음",
+  "note": "충전율과 수소가 넉넉한 정상 상태에서 EMS 가 부하를 끊거나 불필요한 지령을 내지 않는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 60
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 80
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "FC",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "wait",
+    "ms": 3500
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L2",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L1",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "policy_check",
+    "metric": "writes",
+    "value": 0,
+    "op": "eq"
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-21",
+  "fat": "계측값 한 점 왜곡만으로는 차단이 일어나지 않는지 확인"
+ },
+ {
+  "name": "고장 대응 · 저충전 중 수전해 가동 금지",
+  "note": "태양광이 남아 보여도 충전율이 낮아 디젤이 필요한 때에는 수전해를 켜지 않는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "PV.kw",
+    "value": 300
+   },
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 60
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 12
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "ELZ",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "ELZ.status",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-26",
+  "fat": "태양광 변동 모의에서 수전해 기동·정지 횟수 확인"
+ },
+ {
+  "name": "고장 대응 · 주둔지 설정인데 상전이 없는 경우",
+  "note": "운용 장소를 주둔지로 두었는데 수전 차단기가 열려 있는 상황입니다. 상전 연계로 잘못 판단하지 않고 정전으로 보고 ESS 가 부하를 맡는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "CB.GRID",
+    "value": 0
+   },
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 100
+   },
+   {
+    "type": "set",
+    "tag": "PV.kw",
+    "value": 20
+   },
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "policy",
+    "mode": "grid",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "tied",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "outage",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "ESS.kw",
+    "value": 80,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "GRID.kw",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-24",
+  "fat": "수전 차단기 투입 상태에서 '작전지' 선택 시 불일치 경보 확인"
+ },
+ {
+  "name": "고장 대응 · 최대부하 시간의 피크 억제",
+  "note": "주둔지 최대부하 시간에 부하가 피크 목표를 넘는 상황입니다. 수전 목표를 피크 목표 아래로 잡고 ESS 를 방전하도록 판단하는지, 최소 수전(역송 방지)은 지키는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "CB.GRID",
+    "value": 1
+   },
+   {
+    "type": "set",
+    "tag": "LOAD.kw",
+    "value": 300
+   },
+   {
+    "type": "set",
+    "tag": "PV.kw",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 70
+   },
+   {
+    "type": "wait",
+    "ms": 100
+   },
+   {
+    "type": "policy",
+    "mode": "grid",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 14
+   },
+   {
+    "type": "policy_check",
+    "metric": "tied",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "grid_target",
+    "value": 150,
+    "op": "le"
+   },
+   {
+    "type": "policy_check",
+    "metric": "ess_target",
+    "value": 1,
+    "op": "ge"
+   },
+   {
+    "type": "policy_check",
+    "metric": "grid_target",
+    "value": 5,
+    "op": "ge"
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-34",
+  "fat": "한 달 운전 자료로 피크 초과 횟수 확인"
  }
 ]

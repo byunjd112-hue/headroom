@@ -139,7 +139,18 @@ const P_SCENARIOS = (() => {
     return `<div class="sq-summary"><span>${ctx.steps.length}단계</span>${ctx.rows.length ? `<span class="sc-ok">통과 ${ctx.rows.filter(r => r.state === "pass").length}</span>${ctx.rows.some(r => r.state === "fail") ? `<span class="sc-fail">실패 ${ctx.rows.filter(r => r.state === "fail").length}</span>` : ""}` : '<span class="muted">아직 검증하지 않음</span>'}
         <span class="sc-spacer"></span><span class="sq-legend"><i class="l-call"></i>지령·입력 <i class="l-ret"></i>응답 판정 <i class="l-inj"></i>고장 주입 <i class="l-pow"></i>전력 흐름</span>
         ${button("extra", "설비 구성")}${ScTopo.custom() ? button("layout-reset", "배치 초기화") : ""}</div>
-      <div class="tp-wrap">${ScTopo.html(ctx)}</div>${pickPanel()}`;
+      <div class="tp-wrap">${ScTopo.html(ctx)}</div>${ringStrip(ctx)}${pickPanel()}`;
+  }
+  /* 환망(고리 모양 배전): 구간(투입·개방·차단·단선)과 부하 마디(공급·정전)를 한 줄 그림으로. 단계마다 검증기가 남긴 값을 쓴다 */
+  function ringStrip(ctx) {
+    const R = config?.extra?.ring; if (!R || R.enabled === false) return "";
+    const rows = ctx.rows || [], row = rows.filter(r => r.step <= ctx.stepIndex && r.snap).pop(), v = row ? row.snap : null, n = R.nodes.length, W = 1040, x0 = 90, x1 = W - 90, gap = (x1 - x0) / (n + 1), xs = i => x0 + gap * i;
+    const st = s => !v ? (s === R.open ? 0 : 1) : Math.round(v["RING." + s] ?? (s === R.open ? 0 : 1)), brk = s => !!(v && v["BRK." + s] > 0.5), live = id => !v || (v["RN." + id] ?? 1) > 0.5, nm = {DG: "디젤", L1: "1등급 부하", L2: "2등급 부하", L3: "3등급 부하"};
+    const seg = R.sections.map((s, i) => { const a = xs(i), b = xs(i + 1), k = st(s), c = brk(s) ? "brk" : k === 2 ? "trip" : k === 0 ? "open" : "on", m = (a + b) / 2;
+      return `<line class="rg-l ${c}" x1="${a + 16}" y1="70" x2="${b - 16}" y2="70"/><rect class="rg-cb ${c}" x="${m - 9}" y="61" width="18" height="18" rx="3"><title>${esc(s)}</title></rect><text class="rg-t" x="${m}" y="50" text-anchor="middle">${esc(s)}${s === R.open ? " · 상시 개방점" : ""}</text><text class="rg-s ${c}" x="${m}" y="98" text-anchor="middle">${brk(s) ? "단선" + (k === 2 ? " · 차단" : "") : k === 2 ? "차단" : k === 0 ? "개방" : "투입"}</text>`; }).join("");
+    const nodes = R.nodes.map((d, i) => `<circle class="rg-n ${live(d.id) ? "on" : "off"}" cx="${xs(i + 1)}" cy="70" r="14"/><text class="rg-nt" x="${xs(i + 1)}" y="75" text-anchor="middle">${esc(d.id)}</text><text class="rg-t" x="${xs(i + 1)}" y="118" text-anchor="middle">${esc(nm[d.feeder] || d.feeder || "")} · ${live(d.id) ? "공급" : "정전"}</text>`).join("");
+    return `<div class="rg"><div class="rg-h"><b>${esc(R.name || "환망")}</b><span class="muted">전원(모선)에서 나가 부하 마디를 돌아 다시 전원으로 — 한 구간이 끊어지면 그 구간을 떼어 내고 상시 개방점을 닫아 반대쪽에서 공급한다${v ? "" : " · 검증하면 단계별 상태가 나온다"}</span></div>
+      <svg viewBox="0 0 ${W} 130" class="rg-svg"><path class="rg-l on" d="M${x0 + 16} 70 H${x0}"/><path class="rg-l on" d="M${x1 - 16} 70 H${x1}"/><path class="rg-back" d="M${x0} 70 V18 H${x1} V70"/><rect class="rg-src" x="${W / 2 - 60}" y="6" width="120" height="24" rx="5"/><text class="rg-nt" x="${W / 2}" y="23" text-anchor="middle">전원(모선 B)</text>${seg}${nodes}</svg></div>`;
   }
 
   // 구성도에서 블록(장비·차단기·배전반)을 누르면 그 블록의 신호로 단계를 바로 넣는다
