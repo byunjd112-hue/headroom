@@ -873,3 +873,4 @@ table.t th { z-index: 2; background-clip: padding-box; }
 /* 화면 높이에 맞춰 짠 화면은 그대로 두고, 내용이 더 긴 화면(운영 시나리오 · 조치 안내 · 기록의 일부 탭)은 본문을 스크롤한다 — 숨기면 아래쪽이 잘려 볼 수 없다 */
 :root[data-theme] main { overflow-y: auto; }
 @media print { :root[data-theme] main, .hp > .panel, .hp > .panel > .bd { overflow: visible !important; } .hp > .panel { display: block; } }
+.dev .toprow { position: relative; } .uq { position: absolute; top: 7px; right: 7px; z-index: 2; display: inline-flex; align-items: center; gap: 3px; padding: 3px 4px; border-radius: 9px; background: rgba(10,14,9,.78); border: 1px solid var(--line); } .uq b { font: 600 11.5px var(--mono); color: var(--text2); min-width: 46px; text-align: center; } .uq .btn { padding: 1px 7px; min-width: 0; line-height: 1.3; }

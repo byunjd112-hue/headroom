@@ -54,7 +54,7 @@ class Runtime:
         self._probe = {}; self.seen = set()                                                 # 켠 뒤 한 번이라도 응답한 장치
         self.fleet = fleet.Fleet(list(self.links), self.seen)                        # 같은 종류 여러 대 자동 인식·합산
         self.lm = sv.LinkMonitor(list(self.links)); self.wd = sv.Watchdog(["수집", "제어"])
-        self.val = {}; self.flag = {}; self.t_upd = {}; self.hb_seen = {}; self.hb_stop = {}; self.t0 = clock(); self.events = []; self.ev_n = 0; self.audit_err = ""; self.n_scan = 0; self.n_over = 0; self.max_scan_s = 0.0
+        self.val = {}; self.flag = {}; self.t_upd = {}; self.hb_seen = {}; self.hb_stop = {}; self.hb_skip = set(); self.t0 = clock(); self.events = []; self.ev_n = 0; self.audit_err = ""; self.n_scan = 0; self.n_over = 0; self.max_scan_s = 0.0
         self.state_dir = os.path.join(base, self.cfg.get("state_dir", "state")); os.makedirs(self.state_dir, exist_ok=True)
         self.key_note = ""
         if key is None: key, self.key_note = security.load_or_create_key(self.state_dir)
@@ -147,7 +147,7 @@ class Runtime:
         """읽은 값을 품질 확인 뒤 반영한다. 범위 밖·NaN·무한대는 버리고 직전 유효값을 둔다(품질 5)."""
         for tag, x in v.items():
             p = lk.by_tag[tag]
-            bad = not math.isfinite(x) or (p["lo"] is not None and x < p["lo"]) or (p["hi"] is not None and x > p["hi"])
+            bad = not math.isfinite(x) or (p["lo"] is not None and x < p["lo"]) or (p["hi"] is not None and x > p["hi"] * self.fleet.span(tag, p["device"]))
             if not bad: self.val[tag] = x; self.t_upd[tag] = t
             self.flag[tag] = 5 if bad else 0
 
@@ -155,7 +155,7 @@ class Runtime:
         """생존 계수(hb) 정지: 통신은 되는데 장치 제어기가 멈춘 경우."""
         for n in self.links:
             hb = self.val.get(f"{n}.hb")
-            if hb is None: continue
+            if hb is None or self.fleet.empty(n) or n in self.hb_skip: continue      # 빈 자리와 빼는 중인 장치(unitctl)는 묵은 값으로 판정하지 않는다
             last = self.hb_seen.get(n)
             if last is None or last[0] != hb: self.hb_seen[n] = (hb, t)
             stop = t - self.hb_seen[n][1] > SUP["stale_s"]

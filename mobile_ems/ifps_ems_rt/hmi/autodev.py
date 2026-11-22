@@ -14,10 +14,16 @@ def absent(eng, n):
 
 def link_alarm(eng, n, st):
     """통신 두절 경보. 설치되지 않은 것으로 보이는 장치는 3등급 알림으로 낮춘다."""
-    gone = absent(eng, n); k = fleet.kind(n)
+    gone = absent(eng, n) or n in getattr(eng, "unit_drop", ()); k = fleet.kind(n)      # 빼기로 한 장치(unitctl)는 끊겨도 두절 경보를 내지 않는다
     alone = k is None or not any(u in eng.rt.seen for u in eng.rt.fleet.slots.get(k, ()))          # 그 종류가 한 대도 없는가
     eng.alarms.set(f"link.{n}", st == "두절" and not gone, 1, n, f"{n} 통신 두절 — 지령 차단, 직전 유효값 유지")
     eng.alarms.set(f"absent.{n}", gone and alone and not fleet.is_slot(n), 3, n, f"{n} 응답 없음 — 켠 뒤 한 번도 응답하지 않아 설치되지 않은 장치로 보고 화면에서 뺌(자동 인식). 설치했다면 통신선·주소 확인")
+
+
+def cycle(eng):
+    """주기마다 하는 자동 인식 쪽 일(엔진의 줄 수를 늘리지 않으려고 한데 모았다)."""
+    from . import unitctl
+    ems_power(eng); unitctl.cycle(eng)
 
 
 def ems_power(eng):

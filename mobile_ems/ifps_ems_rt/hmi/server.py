@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from .. import modbus as mb
 from .engine import ROLES
-from . import scenarios, scenextra, archwatch, archcfg, seqppt, ringwatch, weatherwatch
+from . import scenarios, scenextra, archwatch, archcfg, seqppt, ringwatch, weatherwatch, unitctl
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_BODY = 128 * 1024
@@ -196,7 +196,7 @@ def make_handler(eng):
                     if p.endswith("restore"): return self._send(200, eng.cfged.restore(b.get("name"), s["name"]))
                     if b.get("kind") not in ("runtime", "pointmap"): return self._err(400, "kind 는 runtime 또는 pointmap")
                     return self._send(200, eng.cfged.check(b["kind"], b) if p.endswith("check") else eng.cfged.save(b["kind"], b, s["name"]))
-                if p in ("/api/ring", "/api/weather"): return (lambda s: s and self._send(200, (ringwatch if p == "/api/ring" else weatherwatch).http_post(eng, b, s)))(self._sess("operator"))      # 환망: 배전체계 구성(운용자) · ID 확정과 가상 장치 조작(엔지니어)
+                if p in ("/api/ring", "/api/weather", "/api/units"): return (lambda s: s and self._send(200, {"/api/ring": ringwatch, "/api/weather": weatherwatch, "/api/units": unitctl}[p].http_post(eng, b, s)))(self._sess("operator"))      # 환망: 배전체계 구성(운용자) · ID 확정과 가상 장치 조작(엔지니어)
                 if p.startswith("/api/archive/"):                # 점검 기록 넣기 · 주둔지 서버 전달(묶음 만들기·보내기·완료 적기)
                     s = self._sess("engineer" if p.endswith("/collect") else "operator")      # 수집 항목 관리는 관리자(엔지니어)만
                     if s: self._send(200, archcfg.save(eng, b, s["name"]) if p.endswith("/collect") else archwatch.http_post(eng.archw.store, p, b, s["name"], eng.rt.site.name))

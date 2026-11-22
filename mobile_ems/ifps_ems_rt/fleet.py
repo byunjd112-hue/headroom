@@ -94,6 +94,11 @@ class Fleet:
         if not xs: return
         val[f"{k}.{suf}"] = sum(xs) if how == "sum" else float(any(x > 0.5 for x in xs)) if how == "any" else sum(xs) / len(xs); mark(f"{k}.{suf}", True)
 
+    def span(self, tag, dev):
+        """다른 장치(계측 게이트웨이)가 재는 종류 합계(PV.kw 등)의 범위 배율: 그 종류가 여러 대면 정격도 그만큼 는다."""
+        k, _, suf = tag.partition(".")
+        return max(1, len(self.live_now.get(k, ()))) if k in self.slots and dev != k and AGG.get(suf) == "sum" else 1
+
     def view(self, state, dev, val):
         """화면용: {종류: {n, seen, slots, on, units: [{id, link, seen, on, manual, kw, soc}]}}"""
         out = {}

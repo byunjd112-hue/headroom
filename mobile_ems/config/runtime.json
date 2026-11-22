@@ -1,415 +1,541 @@
 {
- "allow": [
-  "127.0.0.0/8",
-  "192.168.10.0/24"
- ],
- "scan_s": 1.0,
- "ctrl_s": 60.0,
- "timeout_s": 0.5,
- "mode": "island",
- "run_mode": "개발",
- "plan": 1,
- "g1_kw": 100.0,
- "autonomy_target_h": 72,
- "garrison": {
-  "peak_kw": 150,
-  "import_min_kw": 5,
-  "reserve_soc": 0.5,
-  "charge_kw": 150,
-  "peak_hours": [
-   [
-    10,
-    12
-   ],
-   [
-    13,
-    17
-   ]
+  "allow": [
+    "127.0.0.0/8",
+    "192.168.10.0/24"
   ],
-  "offpeak_hours": [
-   [
-    23,
-    24
-   ],
-   [
-    0,
-    9
-   ]
-  ],
-  "price_peak": 0,
-  "price_mid": 0,
-  "price_off": 0,
-  "restore_s": 30,
-  "gdg_kw": 1000,
-  "gdg_min_load": 0.3,
-  "gdg_delay_s": 30,
-  "gdg_stop_soc": 0.85,
-  "gdg_restart_soc": 0.35,
-  "gdg_tank_l": 5000,
-  "gdg_l_per_kwh": 0.26,
-  "gdg_min_run_s": 600
- },
- "pointmap": "pointmap.csv",
- "state_dir": "state",
- "devices": {
-  "DG": {
-   "paths": [
-    [
-     "192.168.10.11",
-     502
+  "scan_s": 1.0,
+  "ctrl_s": 60.0,
+  "timeout_s": 0.5,
+  "mode": "island",
+  "run_mode": "개발",
+  "plan": 1,
+  "g1_kw": 100.0,
+  "autonomy_target_h": 72,
+  "garrison": {
+    "peak_kw": 150,
+    "import_min_kw": 5,
+    "reserve_soc": 0.5,
+    "charge_kw": 150,
+    "peak_hours": [
+      [
+        10,
+        12
+      ],
+      [
+        13,
+        17
+      ]
     ],
-    [
-     "192.168.10.111",
-     502
-    ]
-   ],
-   "unit": 1,
-   "order": "ABCD"
+    "offpeak_hours": [
+      [
+        23,
+        24
+      ],
+      [
+        0,
+        9
+      ]
+    ],
+    "price_peak": 0,
+    "price_mid": 0,
+    "price_off": 0,
+    "restore_s": 30,
+    "gdg_kw": 1000,
+    "gdg_min_load": 0.3,
+    "gdg_delay_s": 30,
+    "gdg_stop_soc": 0.85,
+    "gdg_restart_soc": 0.35,
+    "gdg_tank_l": 5000,
+    "gdg_l_per_kwh": 0.26,
+    "gdg_min_run_s": 600
   },
-  "FC": {
-   "paths": [
-    [
-     "192.168.10.12",
-     502
-    ],
-    [
-     "192.168.10.112",
-     502
-    ]
-   ],
-   "unit": 2,
-   "order": "ABCD"
+  "pointmap": "pointmap.csv",
+  "state_dir": "state",
+  "devices": {
+    "DG": {
+      "paths": [
+        [
+          "192.168.10.11",
+          502
+        ],
+        [
+          "192.168.10.111",
+          502
+        ]
+      ],
+      "unit": 1,
+      "order": "ABCD"
+    },
+    "FC": {
+      "paths": [
+        [
+          "192.168.10.12",
+          502
+        ],
+        [
+          "192.168.10.112",
+          502
+        ]
+      ],
+      "unit": 2,
+      "order": "ABCD"
+    },
+    "ESS": {
+      "paths": [
+        [
+          "192.168.10.13",
+          502
+        ],
+        [
+          "192.168.10.113",
+          502
+        ]
+      ],
+      "unit": 3,
+      "order": "ABCD"
+    },
+    "MTR": {
+      "paths": [
+        [
+          "192.168.10.14",
+          502
+        ],
+        [
+          "192.168.10.114",
+          502
+        ]
+      ],
+      "unit": 4,
+      "order": "ABCD"
+    },
+    "ELZ": {
+      "paths": [
+        [
+          "192.168.10.15",
+          502
+        ],
+        [
+          "192.168.10.115",
+          502
+        ]
+      ],
+      "unit": 5,
+      "order": "ABCD"
+    },
+    "PV": {
+      "paths": [
+        [
+          "192.168.10.16",
+          502
+        ],
+        [
+          "192.168.10.116",
+          502
+        ]
+      ],
+      "unit": 6,
+      "order": "ABCD"
+    },
+    "GDG": {
+      "paths": [
+        [
+          "192.168.10.17",
+          502
+        ],
+        [
+          "192.168.10.117",
+          502
+        ]
+      ],
+      "unit": 7,
+      "order": "ABCD",
+      "done_s": 30
+    },
+    "DG2": {
+      "paths": [
+        [
+          "192.168.10.21",
+          502
+        ],
+        [
+          "192.168.10.121",
+          502
+        ]
+      ],
+      "unit": 11,
+      "order": "ABCD"
+    },
+    "FC2": {
+      "paths": [
+        [
+          "192.168.10.22",
+          502
+        ],
+        [
+          "192.168.10.122",
+          502
+        ]
+      ],
+      "unit": 12,
+      "order": "ABCD"
+    },
+    "ESS2": {
+      "paths": [
+        [
+          "192.168.10.23",
+          502
+        ],
+        [
+          "192.168.10.123",
+          502
+        ]
+      ],
+      "unit": 13,
+      "order": "ABCD"
+    },
+    "PV2": {
+      "paths": [
+        [
+          "192.168.10.24",
+          502
+        ],
+        [
+          "192.168.10.124",
+          502
+        ]
+      ],
+      "unit": 16,
+      "order": "ABCD"
+    },
+    "DG3": {
+      "paths": [
+        [
+          "192.168.10.31",
+          502
+        ],
+        [
+          "192.168.10.131",
+          502
+        ]
+      ],
+      "unit": 21,
+      "order": "ABCD"
+    },
+    "DG4": {
+      "paths": [
+        [
+          "192.168.10.32",
+          502
+        ],
+        [
+          "192.168.10.132",
+          502
+        ]
+      ],
+      "unit": 22,
+      "order": "ABCD"
+    },
+    "FC3": {
+      "paths": [
+        [
+          "192.168.10.33",
+          502
+        ],
+        [
+          "192.168.10.133",
+          502
+        ]
+      ],
+      "unit": 23,
+      "order": "ABCD"
+    },
+    "FC4": {
+      "paths": [
+        [
+          "192.168.10.34",
+          502
+        ],
+        [
+          "192.168.10.134",
+          502
+        ]
+      ],
+      "unit": 24,
+      "order": "ABCD"
+    },
+    "ESS3": {
+      "paths": [
+        [
+          "192.168.10.35",
+          502
+        ],
+        [
+          "192.168.10.135",
+          502
+        ]
+      ],
+      "unit": 25,
+      "order": "ABCD"
+    },
+    "ESS4": {
+      "paths": [
+        [
+          "192.168.10.36",
+          502
+        ],
+        [
+          "192.168.10.136",
+          502
+        ]
+      ],
+      "unit": 26,
+      "order": "ABCD"
+    },
+    "PV3": {
+      "paths": [
+        [
+          "192.168.10.37",
+          502
+        ],
+        [
+          "192.168.10.137",
+          502
+        ]
+      ],
+      "unit": 27,
+      "order": "ABCD"
+    },
+    "PV4": {
+      "paths": [
+        [
+          "192.168.10.38",
+          502
+        ],
+        [
+          "192.168.10.138",
+          502
+        ]
+      ],
+      "unit": 28,
+      "order": "ABCD"
+    },
+    "PV5": {
+      "paths": [
+        [
+          "192.168.10.39",
+          502
+        ],
+        [
+          "192.168.10.139",
+          502
+        ]
+      ],
+      "unit": 29,
+      "order": "ABCD"
+    }
   },
-  "ESS": {
-   "paths": [
-    [
-     "192.168.10.13",
-     502
-    ],
-    [
-     "192.168.10.113",
-     502
-    ]
-   ],
-   "unit": 3,
-   "order": "ABCD"
-  },
-  "MTR": {
-   "paths": [
-    [
-     "192.168.10.14",
-     502
-    ],
-    [
-     "192.168.10.114",
-     502
-    ]
-   ],
-   "unit": 4,
-   "order": "ABCD"
-  },
-  "ELZ": {
-   "paths": [
-    [
-     "192.168.10.15",
-     502
-    ],
-    [
-     "192.168.10.115",
-     502
-    ]
-   ],
-   "unit": 5,
-   "order": "ABCD"
-  },
-  "PV": {
-   "paths": [
-    [
-     "192.168.10.16",
-     502
-    ],
-    [
-     "192.168.10.116",
-     502
-    ]
-   ],
-   "unit": 6,
-   "order": "ABCD"
-  },
-  "GDG": {
-   "paths": [
-    [
-     "192.168.10.17",
-     502
-    ],
-    [
-     "192.168.10.117",
-     502
-    ]
-   ],
-   "unit": 7,
-   "order": "ABCD",
-   "done_s": 30
-  },
-  "DG2": {
-   "paths": [
-    [
-     "192.168.10.21",
-     502
-    ],
-    [
-     "192.168.10.121",
-     502
-    ]
-   ],
-   "unit": 11,
-   "order": "ABCD"
-  },
-  "FC2": {
-   "paths": [
-    [
-     "192.168.10.22",
-     502
-    ],
-    [
-     "192.168.10.122",
-     502
-    ]
-   ],
-   "unit": 12,
-   "order": "ABCD"
-  },
-  "ESS2": {
-   "paths": [
-    [
-     "192.168.10.23",
-     502
-    ],
-    [
-     "192.168.10.123",
-     502
-    ]
-   ],
-   "unit": 13,
-   "order": "ABCD"
-  },
-  "PV2": {
-   "paths": [
-    [
-     "192.168.10.24",
-     502
-    ],
-    [
-     "192.168.10.124",
-     502
-    ]
-   ],
-   "unit": 16,
-   "order": "ABCD"
-  }
- },
- "auto": true,
- "site": {
-  "name": "IFPS-FOB-01",
-  "lat": 37.5,
-  "lon": 127.0,
-  "dg_kw": 90.0,
-  "elz_kw": 150.0,
-  "h2_min": 0.3
- },
- "fuel": {
-  "dg_tank_l": 1000,
-  "warn_pct": 50,
-  "warn_h": 8,
-  "repeat_min": 30
- },
- "archive": {
-  "enabled": true,
-  "interval_min": 15,
-  "retain_years": 4,
-  "max_mb": 2048,
-  "server_url": "",
-  "outbox": ""
- },
- "skycam": {
-  "enabled": true,
-  "path": "",
-  "max_age_s": 180,
-  "period_s": 10
- },
- "ai": {
-  "enabled": true,
-  "retrain_h": 24,
-  "sim_retrain_h": 2,
-  "first_min": 3,
-  "holdout_days": 3,
-  "min_gain": 0.0,
-  "keep": 10,
-  "nmae_limit": 15,
-  "bias_slots": 8,
-  "bias_tau": 8
- },
- "weather": {
-  "enabled": true,
-  "url": "",
-  "interval_min": 30,
-  "timeout_s": 5,
-  "only_garrison": true,
-  "w0": 0.3,
-  "w_max": 0.8,
-  "keep_days": 30
- },
- "hmi": {
-  "bind": "127.0.0.1",
-  "port": 8080,
-  "pin_operator": "1111",
-  "pin_engineer": "2222",
-  "session_min": 30,
-  "sbo_s": 10
- },
- "ring": {
-  "enabled": true,
   "auto": true,
-  "fsu_slots": 7,
-  "ppdu_slots": 8,
-  "name": "부하 환망",
-  "open": 4,
-  "trip_ms": 1500,
-  "close_ms": 2500,
-  "fsu": [
-   {
-    "id": "FSU1",
-    "code": 17921,
-    "name": "구간분전함 1"
-   },
-   {
-    "id": "FSU2",
-    "code": 17922,
-    "name": "구간분전함 2"
-   },
-   {
-    "id": "FSU3",
-    "code": 17923,
-    "name": "구간분전함 3"
-   },
-   {
-    "id": "FSU4",
-    "code": 17924,
-    "name": "구간분전함 4"
-   },
-   {
-    "id": "FSU5",
-    "code": 17925,
-    "name": "구간분전함 5"
-   },
-   {
-    "id": "FSU6",
-    "code": 17926,
-    "name": "구간분전함 6"
-   },
-   {
-    "id": "FSU7",
-    "code": 17927,
-    "name": "구간분전함 7"
-   }
-  ],
-  "ppdu": [
-   {
-    "id": "PPDU1",
-    "code": 20481,
-    "at": "FSU2",
-    "name": "지휘·통신 배전",
-    "ch": [
-     {
-      "name": "예비 동력",
-      "cls": 3
-     },
-     {
-      "name": "환상 연결",
-      "cls": 0
-     },
-     {
-      "name": "지휘소",
-      "cls": 1
-     },
-     {
-      "name": "통신소",
-      "cls": 1
-     },
-     {
-      "name": "상황실 조명",
-      "cls": 2
-     },
-     {
-      "name": "생활 전열",
-      "cls": 3
-     }
+  "site": {
+    "name": "IFPS-FOB-01",
+    "lat": 37.5,
+    "lon": 127.0,
+    "dg_kw": 90.0,
+    "elz_kw": 150.0,
+    "h2_min": 0.3
+  },
+  "fuel": {
+    "dg_tank_l": 1000,
+    "warn_pct": 50,
+    "warn_h": 8,
+    "repeat_min": 30
+  },
+  "archive": {
+    "enabled": true,
+    "interval_min": 15,
+    "retain_years": 4,
+    "max_mb": 2048,
+    "server_url": "",
+    "outbox": ""
+  },
+  "skycam": {
+    "enabled": true,
+    "path": "",
+    "max_age_s": 180,
+    "period_s": 10
+  },
+  "ai": {
+    "enabled": true,
+    "retrain_h": 24,
+    "sim_retrain_h": 2,
+    "first_min": 3,
+    "holdout_days": 3,
+    "min_gain": 0.0,
+    "keep": 10,
+    "nmae_limit": 15,
+    "bias_slots": 8,
+    "bias_tau": 8
+  },
+  "weather": {
+    "enabled": true,
+    "url": "",
+    "interval_min": 30,
+    "timeout_s": 5,
+    "only_garrison": true,
+    "w0": 0.3,
+    "w_max": 0.8,
+    "keep_days": 30
+  },
+  "hmi": {
+    "bind": "127.0.0.1",
+    "port": 8080,
+    "pin_operator": "1111",
+    "pin_engineer": "2222",
+    "session_min": 30,
+    "sbo_s": 10
+  },
+  "ring": {
+    "enabled": true,
+    "auto": true,
+    "fsu_slots": 7,
+    "ppdu_slots": 8,
+    "name": "부하 환망",
+    "open": 4,
+    "trip_ms": 1500,
+    "close_ms": 2500,
+    "fsu": [
+      {
+        "id": "FSU1",
+        "code": 17921,
+        "name": "구간분전함 1"
+      },
+      {
+        "id": "FSU2",
+        "code": 17922,
+        "name": "구간분전함 2"
+      },
+      {
+        "id": "FSU3",
+        "code": 17923,
+        "name": "구간분전함 3"
+      },
+      {
+        "id": "FSU4",
+        "code": 17924,
+        "name": "구간분전함 4"
+      },
+      {
+        "id": "FSU5",
+        "code": 17925,
+        "name": "구간분전함 5"
+      },
+      {
+        "id": "FSU6",
+        "code": 17926,
+        "name": "구간분전함 6"
+      },
+      {
+        "id": "FSU7",
+        "code": 17927,
+        "name": "구간분전함 7"
+      }
+    ],
+    "ppdu": [
+      {
+        "id": "PPDU1",
+        "code": 20481,
+        "at": "FSU2",
+        "name": "지휘·통신 배전",
+        "ch": [
+          {
+            "name": "예비 동력",
+            "cls": 3
+          },
+          {
+            "name": "환상 연결",
+            "cls": 0
+          },
+          {
+            "name": "지휘소",
+            "cls": 1
+          },
+          {
+            "name": "통신소",
+            "cls": 1
+          },
+          {
+            "name": "상황실 조명",
+            "cls": 2
+          },
+          {
+            "name": "생활 전열",
+            "cls": 3
+          }
+        ]
+      },
+      {
+        "id": "PPDU2",
+        "code": 20482,
+        "at": "FSU4",
+        "name": "의무·조명 배전",
+        "ch": [
+          {
+            "name": "의무 장비",
+            "cls": 3
+          },
+          {
+            "name": "환상 연결",
+            "cls": 0
+          },
+          {
+            "name": "수술·처치",
+            "cls": 1
+          },
+          {
+            "name": "의무 통신",
+            "cls": 1
+          },
+          {
+            "name": "경계 조명",
+            "cls": 2
+          },
+          {
+            "name": "생활 전열",
+            "cls": 3
+          }
+        ]
+      },
+      {
+        "id": "PPDU3",
+        "code": 20483,
+        "at": "FSU6",
+        "name": "정비·작업 배전",
+        "ch": [
+          {
+            "name": "정비 동력",
+            "cls": 3
+          },
+          {
+            "name": "환상 연결",
+            "cls": 0
+          },
+          {
+            "name": "정비 통신",
+            "cls": 1
+          },
+          {
+            "name": "공구 충전",
+            "cls": 1
+          },
+          {
+            "name": "작업 조명",
+            "cls": 2
+          },
+          {
+            "name": "생활 전열",
+            "cls": 3
+          }
+        ]
+      }
     ]
-   },
-   {
-    "id": "PPDU2",
-    "code": 20482,
-    "at": "FSU4",
-    "name": "의무·조명 배전",
-    "ch": [
-     {
-      "name": "의무 장비",
-      "cls": 3
-     },
-     {
-      "name": "환상 연결",
-      "cls": 0
-     },
-     {
-      "name": "수술·처치",
-      "cls": 1
-     },
-     {
-      "name": "의무 통신",
-      "cls": 1
-     },
-     {
-      "name": "경계 조명",
-      "cls": 2
-     },
-     {
-      "name": "생활 전열",
-      "cls": 3
-     }
-    ]
-   },
-   {
-    "id": "PPDU3",
-    "code": 20483,
-    "at": "FSU6",
-    "name": "정비·작업 배전",
-    "ch": [
-     {
-      "name": "정비 동력",
-      "cls": 3
-     },
-     {
-      "name": "환상 연결",
-      "cls": 0
-     },
-     {
-      "name": "정비 통신",
-      "cls": 1
-     },
-     {
-      "name": "공구 충전",
-      "cls": 1
-     },
-     {
-      "name": "작업 조명",
-      "cls": 2
-     },
-     {
-      "name": "생활 전열",
-      "cls": 3
-     }
-    ]
-   }
-  ]
- }
+  }
 }

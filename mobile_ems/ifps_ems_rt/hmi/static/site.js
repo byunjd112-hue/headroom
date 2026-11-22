@@ -118,15 +118,28 @@ function layCables(items) {
 }
 /* 자동 인식한 대수대로 배치도를 다시 짠다(편집 중에는 저장된 배치 그대로): 같은 종류가 더 있으면 첫 장비 옆에 덧그리고, 없는 종류는 한 대만 흐리게 두며, 빈 자리의 구간분전함은 뺀다 */
 const LAY_FLEET = { DG: "DG", ESS: "ESS", PV: "PV", FC: "FC" };
+/* 늘어난 장치를 놓을 빈 자리: 같은 종류 첫 장비에서 가까운 순으로 격자 자리를 훑어, 이미 놓인 것들과 겹치지 않는 첫 자리(장비 크기만큼 타원 거리로 띄운다) */
+const LAY_GAP = { PV: [200, 104], DG: [170, 74], ESS: [180, 74], FC: [190, 78], DIST: [250, 130], EMS: [210, 110], FSU: [70, 50], L1: [180, 100], L2: [180, 100], L3: [170, 96], BARRACK: [180, 100] };
+function layFree(it, taken) {
+  const [gx, gy] = LAY_GAP[it.kind] || [140, 80], clear = (x, y) => taken.every(o => { const [ox, oy] = LAY_GAP[o.kind] || [170, 100], rx = (gx + ox) / 2, ry = (gy + oy) / 2; return ((x - o.x) / rx) ** 2 + ((y - o.y) / ry) ** 2 >= 1; });
+  const cand = []; for (let i = -12; i <= 12; i++) for (let j = -8; j <= 8; j++) { const x = it.x + i * 46, y = it.y + j * 30; if ((i || j) && x >= 110 && x <= 1500 && y >= 215 && y <= 850) cand.push([x, y, (i * 46) ** 2 + (j * 30 * 1.6) ** 2]); }
+  const hit = cand.sort((a, b) => a[2] - b[2]).find(c => clear(c[0], c[1])); return hit ? [hit[0], hit[1]] : [Math.min(1510, it.x + 70), Math.min(850, it.y + 40)];
+}
+/* 배치 편집에 들어갈 때: 자동으로 놓인 장치를 실제 항목으로 넣어 끌어 옮길 수 있게 한다(저장하면 그 자리가 기억된다) */
+function layAdopt() {
+  const add = layAuto(L.items).filter(i => String(i.uid).startsWith("auto-")).map((i, k) => ({ uid: "u" + Date.now().toString(36) + k, kind: i.kind, bind: i.bind, name: i.name, x: Math.round(i.x), y: Math.round(i.y) }));
+  if (add.length) { L.items = L.items.concat(add); L.dirty = true; toast(`자동으로 놓인 장비 ${add.length}대를 편집 목록에 넣었습니다 — 옮긴 뒤 저장하면 그 자리가 기억됩니다`, "ok"); }
+}
 function layAuto(items) {
   const fl = S.snap && S.snap.fleet; if (L.edit || !fl) return items; const out = [], cnt = {}, first = {}, rmap = fsuRing(items);
   items.forEach(it => { const kd = LAY_FLEET[it.kind], f = kd && fl[kd];
     if (it.kind === "FSU") { if (!rmap) out.push(it); else if (rmap.get(it.uid)) out.push(Object.assign({}, it, { rid: rmap.get(it.uid) })); return; }
     if (!f) { out.push(it); return; }
     const i = cnt[kd] = (cnt[kd] || 0) + 1; first[kd] = first[kd] || it;
-    if (i <= Math.max(1, f.units.length)) out.push(Object.assign({}, it, { unit: (f.units[i - 1] || {}).id, absent: !f.units.length })); });
+    if (i <= Math.max(1, f.units.length)) out.push(Object.assign({}, it, { unit: (f.units[i - 1] || {}).id, absent: !f.units.length }));
+    else out.push(Object.assign({}, it, { absent: true, spare: true })); });      // 배치 편집으로 미리 놓아 둔 자리: 흐리게 두었다가 그 장치가 인식되면 켜진다(저장한 배치가 사라져 보이지 않게)
   Object.keys(first).forEach(kd => { const f = fl[kd], it = first[kd];
-    for (let i = cnt[kd]; i < f.units.length; i++) out.push(Object.assign({}, it, { uid: `auto-${kd}-${i}`, name: `${it.name} #${i + 1}`, unit: f.units[i].id, x: Math.min(1540, it.x + 78 * (i - cnt[kd] + 1)), y: Math.min(870, it.y + 44 * (i - cnt[kd] + 1)) })); });
+    for (let i = cnt[kd]; i < f.units.length; i++) { const [x, y] = layFree(it, out); out.push(Object.assign({}, it, { uid: `auto-${kd}-${i}`, name: `${it.name} #${i + 1}`, unit: f.units[i].id, x, y })); } });
   return out;
 }
 function mapEqSt(s, it) {
@@ -187,7 +200,7 @@ function siteMarkers() {
   box.dataset.n = (L.view || L.items).length + (rg ? rg.ppdu.length * 100 : 0); box.innerHTML = pp + (L.view || L.items).filter(i => i.kind !== "FSU").map(it => {
     const [x, y] = _mkPos(it), mini = it.kind === "BARRACK" || seen[it.bind]; seen[it.bind] = 1;
     return `<div class="spt ${mini ? "mini" : ""}" data-act="goctl" data-uid="${it.uid}" style="left:${x}%;top:${y}%"><i class="pulse"></i><i class="core"></i>
-      <div class="scard"><div class="sh">${esc(it.name || LAY_KINDS[it.kind].nm)}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`;
+      <div class="scard"><div class="sh">${esc(it.name || LAY_KINDS[it.kind].nm)}${it.spare ? " · 예비 자리" : ""}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`;
   }).join("");
 }
 function siteRebuild() { const box = $("#siteMap"); if (box && S.snap) { box.dataset.sig = ""; siteUpdate(S.snap, true); } siteMarkers(); layToolbar(); }
@@ -246,7 +259,7 @@ function layToolbar() {
     <div class="grp"><span class="lab">추가</span><select class="in" id="layKind">${kinds.map(([k, v]) => `<option value="${k}">${v.nm}</option>`).join("")}</select><button class="btn sm pri" id="layAdd">＋ 추가</button></div>
     <div class="grp">${it ? `<span class="lab">선택</span><input class="in" id="layName" value="${esc(it.name || "")}" maxlength="24" style="width:150px">
       <select class="in" id="layBind" ${LAY_KINDS[it.kind].binds.length < 2 ? "disabled" : ""}>${LAY_KINDS[it.kind].binds.map(b => `<option value="${b}" ${b === it.bind ? "selected" : ""}>${BIND_TXT[b]}</option>`).join("")}</select>
-      <button class="btn sm" id="layDup">복제</button><button class="btn sm stop" id="layDel">삭제</button>` : `<span class="muted">장비를 누르면 선택, 선택한 장비를 끌면 이동</span>`}</div>
+      <button class="btn sm" id="layDup">복제</button><button class="btn sm stop" id="layDel">삭제</button>` : `<span class="muted">장비를 누르면 선택, 끌면 이동 · 같은 종류를 더 놓으면 예비 자리(흐림)로 저장되고 그 장치가 인식되면 켜진다 · 대수는 설비 제어 화면의 − ＋</span>`}</div>
     <div class="grp end"><span class="muted" style="font-size:11.5px">${L.dirty ? "● 저장 안 된 변경" : esc(L.meta || "")}</span><button class="btn sm" id="layReset">기본값</button><button class="btn sm" id="layCancel">취소</button><button class="btn sm go" id="laySave">저장</button></div></div>`;
   $("#layAdd").onclick = () => { const k = $("#layKind").value, n = L.items.filter(i => i.kind === k).length + 1;
     const uid = "u" + Date.now().toString(36); L.items.push({ uid, kind: k, bind: LAY_KINDS[k].bind, name: `${LAY_KINDS[k].nm} #${n}`, x: 300 + (L.items.length * 97) % 1000, y: 700 + (L.items.length % 3) * 45 }); L.sel = uid; L.dirty = true; siteRebuild(); };
@@ -269,6 +282,6 @@ function layToggleEdit() {
   if (!can("operator")) return loginDialog();
   if (L.edit && L.dirty && !confirm("저장하지 않은 변경을 버리고 편집을 끝냅니까?")) return;
   if (L.edit) { L.edit = false; layoutLoad(); return; }
-  L.edit = true; L.sel = null; siteRebuild();
+  layAdopt(); L.edit = true; L.sel = null; siteRebuild();
 }
 document.addEventListener("keydown", e => { if (S.page === "overview" && $("#siteBox") && L.edit && L.sel && (e.key === "Delete" || e.key === "Backspace") && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); layDelete(); } });

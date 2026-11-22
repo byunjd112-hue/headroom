@@ -49,6 +49,26 @@ class FleetLiveTest(unittest.TestCase):
             time.sleep(0.25)
         return False
 
+    def test_unit_count_buttons_add_and_remove(self):
+        """설비 제어 화면의 − · ＋: 가상 장치를 놓으면 조작 없이 인식되고, 빼면 두절 경보 없이 빈 자리로 돌아간다."""
+        from ifps_ems_rt.hmi import unitctl
+        e = self.eng; pv = lambda: e.snapshot()["fleet"]["PV"]; act = lambda: {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}
+        self.assertTrue(self._wait(lambda: pv()["n"] == 1)); self.assertEqual(pv()["slots"], 5)
+        for want in (2, 3):
+            r = unitctl.change(e, "PV", 1, "시험"); self.assertTrue(r["ok"]); self.assertEqual(r["unit"], f"PV{want}")
+            self.assertTrue(self._wait(lambda: pv()["n"] == want and len(pv()["units"]) == want), f"PV {want}대 인식")
+        r = unitctl.change(e, "PV", -1, "시험"); self.assertEqual((r["ok"], r["unit"]), (True, "PV3"))
+        self.assertTrue(self._wait(lambda: [u["id"] for u in pv()["units"]] == ["PV", "PV2"] and "PV3" not in e.rt.seen), "뺀 장치는 목록에서 사라진다")
+        self.assertFalse([k for k in act() if k.startswith(("link.PV", "absent.PV"))])                                              # 일부러 뺀 장치는 두절 경보가 아니다
+        time.sleep(7.0); self.assertEqual(unitctl.change(e, "PV", 1, "시험")["unit"], "PV3"); self.assertTrue(self._wait(lambda: pv()["n"] == 3)); time.sleep(3.0)      # 뺀 자리에 다시 놓을 수 있다
+        self.assertFalse([x["text"] for x in e.rt.events if "PV3 생존 계수 정지" in x["text"]])                                       # 다시 놓을 때 묵은 생존 계수로 '정지' 경보가 뜨지 않는다
+        self.assertEqual(e.rt.fleet.span("PV.kw", "MTR"), 3); self.assertEqual((e.rt.fleet.span("PV.kw", "PV"), e.rt.fleet.span("LOAD.kw", "MTR")), (1, 1))      # 게이트웨이가 재는 합계의 범위는 대수만큼 넓어진다
+        for _ in range(2): self.assertTrue(unitctl.change(e, "PV", 1, "시험")["ok"])
+        self.assertTrue(self._wait(lambda: pv()["n"] == 5)); self.assertFalse(unitctl.change(e, "PV", 1, "시험")["ok"])                          # 자리가 다 차면 알려 준다
+        self.assertRaises(ValueError, unitctl.change, e, "MTR", 1, "시험"); self.assertRaises(ValueError, unitctl.change, e, "PV", 2, "시험")
+        for _ in range(4): unitctl.change(e, "PV", -1, "시험")
+        self.assertTrue(self._wait(lambda: len(pv()["units"]) == 1))
+
     def test_extra_units_are_recognized_summed_and_commanded(self):
         e = self.eng; rt = e.rt; fl = lambda: e.snapshot()["fleet"]; act = lambda: {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}
         self.assertTrue(self._wait(lambda: fl()["DG"]["n"] == 1 and fl()["ESS"]["n"] == 1)); self.assertFalse([k for k in act() if k.startswith(("link.", "absent."))])      # 빈 자리는 경보가 아니다
