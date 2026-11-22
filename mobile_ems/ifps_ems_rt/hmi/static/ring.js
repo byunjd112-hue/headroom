@@ -5,22 +5,24 @@ const RingView = {
   LOAD: { L1: "1등급", L2: "2등급", L3: "3등급", "": "미지정" },
   /* m: {sections: [{i, state, open, brk}], fsu: [{id, name, live, id_ok}], ppdu: [{id, name, at, load, vital, live}]} — 값이 없으면 null(회색) */
   svg(m, o = {}) {
-    const n = m.fsu.length, W = 1500, H = 250, x0 = 70, x1 = W - 70, gap = (x1 - x0) / (n + 1), xs = i => x0 + gap * i, y = 96;
-    const seg = m.sections.map(s => { const a = xs(s.i), b = xs(s.i + 1), mid = (a + b) / 2, c = s.state == null ? "na" : s.brk ? "brk" : s.state === 2 ? "trip" : s.state === 0 ? "open" : "on";
+    /* 전원 ─(구간 0 급전)─ F1 ─ F2 ─ … ─ Fn ─(구간 n 복귀선)─ 위로 돌아 다시 F1 */
+    const n = m.fsu.length, W = 1500, H = 250, x0 = 70, x1 = W - 70, gap = (x1 - x0) / (n + 1), xs = i => x0 + gap * i, y = 96, top = 30;
+    const seg = m.sections.map(s => { const c = s.state == null ? "na" : s.brk ? "brk" : s.state === 2 ? "trip" : s.state === 0 ? "open" : "on", back = s.i === n && n > 0;
+      const a = s.i === 0 ? x0 + 62 : xs(s.i) + 20, b = back ? x1 : xs(s.i + 1) - 20, mid = (a + b) / 2;
       const txt = s.state == null ? "값 없음" : (s.brk ? "단선 · " : "") + (s.state === 2 ? "차단" : s.state === 0 ? "개방" : s.brk ? "미차단" : "투입");
-      return `<g class="rv-sec" data-sec="${s.i}"><line class="rg-l ${c}" x1="${a + 20}" y1="${y}" x2="${b - 20}" y2="${y}"/><rect class="rg-cb ${c}" x="${mid - 10}" y="${y - 10}" width="20" height="20" rx="3"/>
-        <text class="rg-t" x="${mid}" y="${y - 22}" text-anchor="middle">구간 ${s.i}${s.open ? " · 상시 개방점" : ""}</text><text class="rg-s ${c}" x="${mid}" y="${y + 28}" text-anchor="middle">${txt}</text></g>`; }).join("");
+      return `<g class="rv-sec" data-sec="${s.i}">${back ? `<path class="rg-l ${c}" d="M${a} ${y} H${x1} V${top} H${xs(1)} V${y - 19}"/>` : `<line class="rg-l ${c}" x1="${a}" y1="${y}" x2="${b}" y2="${y}"/>`}<rect class="rg-cb ${c}" x="${mid - 10}" y="${y - 10}" width="20" height="20" rx="3"/>
+        <text class="rg-t" x="${mid}" y="${y - 22}" text-anchor="middle">구간 ${s.i}${s.i === 0 ? " · 급전" : back ? " · 복귀선" : ""}${s.open ? " · 상시 개방점" : ""}</text><text class="rg-s ${c}" x="${mid}" y="${y + 28}" text-anchor="middle">${txt}</text></g>`; }).join("");
     const nodes = m.fsu.map((f, k) => { const c = f.live == null ? "na" : f.live ? "on" : "off", X = xs(k + 1), pp = m.ppdu.filter(p => p.at === f.id);
-      return `<g class="rv-fsu" data-unit="${esc(f.id)}"><circle class="rg-n ${c}" cx="${X}" cy="${y}" r="19"/><text class="rg-nt" x="${X}" y="${y + 4}" text-anchor="middle">${esc(f.id.replace("FSU", "F"))}</text>${f.id_ok === false ? `<text class="rg-s trip" x="${X}" y="${y - 26}" text-anchor="middle">ID 확인</text>` : ""}</g>` +
+      return `<g class="rv-fsu" data-unit="${esc(f.id)}"><circle class="rg-n ${c}" cx="${X}" cy="${y}" r="19"/><text class="rg-nt" x="${X}" y="${y + 4}" text-anchor="middle">${esc(f.id.replace("FSU", "F"))}</text>${f.id_ok === false ? `<text class="rg-s trip" x="${X + 24}" y="${y - 26}">ID 확인</text>` : ""}</g>` +
         pp.map((p, j) => { const pc = p.live == null ? "na" : p.live ? "on" : "off", py = y + 62 + j * 46;
           return `<g class="rv-ppdu" data-unit="${esc(p.id)}"><line class="rg-l ${pc === "on" ? "on" : pc === "off" ? "trip" : "na"} thin" x1="${X}" y1="${j ? py - 30 : y + 19}" x2="${X}" y2="${py - 14}"/><rect class="rg-p ${pc} ${p.vital ? "vital" : ""}" x="${X - 62}" y="${py - 14}" width="124" height="30" rx="5"/>
             <text class="rg-nt" x="${X}" y="${py + 5}" text-anchor="middle">${esc(p.id)}${p.kw == null ? "" : " · " + p.kw.toFixed(1) + " kW"}${p.vital ? " ★" : ""}</text></g>`; }).join(""); }).join("");
-    return `<svg viewBox="0 0 ${W} ${H}" class="rg-svg ${o.cls || ""}"><path class="rg-back" d="M${x0} ${y} V26 H${x1} V${y}"/><path class="rg-l on" d="M${x0} ${y} H${x0 + 20}"/><path class="rg-l on" d="M${x1 - 20} ${y} H${x1}"/>
-      <rect class="rg-src" x="${W / 2 - 80}" y="12" width="160" height="28" rx="6"/><text class="rg-nt" x="${W / 2}" y="31" text-anchor="middle">전원(배전반 · 모선 A ↔ B)</text>${seg}${nodes}</svg>`;
+    return `<svg viewBox="0 0 ${W} ${H}" class="rg-svg ${o.cls || ""}"><rect class="rg-src" x="${x0 - 62}" y="${y - 16}" width="124" height="32" rx="6"/><text class="rg-nt" x="${x0}" y="${y + 4}" text-anchor="middle">전원(배전반)</text>
+      <text class="rg-t" x="${(xs(1) + x1) / 2}" y="${top - 8}" text-anchor="middle">복귀선 — 마지막 구간분전함이 첫 구간분전함으로 돌아와 고리가 닫힌다</text>${seg}${nodes}</svg>`;
   },
   /* 다른 화면(개요 · 결선도 · 설비 제어)이 같이 쓰는 것: 지금 상태(snapshot 의 ring)로 그림용 모형 · 한 줄 요약 · 구간 이름을 만든다 */
   fromSnap(s) { const r = s && s.ring; return r ? { sections: r.sections, fsu: r.fsu, ppdu: r.ppdu } : null; },
-  ends(r, i) { return [i === 0 ? "전원" : r.fsu[i - 1].name, i === r.fsu.length ? "전원" : r.fsu[i].name]; },
+  ends(r, i) { return [i === 0 ? "전원" : r.fsu[i - 1].name, i === r.fsu.length ? r.fsu[0].name + " (복귀선)" : r.fsu[i].name]; },
   sum(s) {
     const r = s && s.ring; if (!r) return null;
     const cut = r.cut.map(i => `구간 ${i}(${this.ends(r, i).join(" ↔ ")}) 차단`), dead = r.fsu.filter(f => f.live === false).map(f => f.name), pd = r.ppdu.filter(p => p.live === false || p.mccb === 2).map(p => p.name);
