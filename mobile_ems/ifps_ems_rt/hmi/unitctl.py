@@ -7,7 +7,7 @@
 """
 import time
 
-HOLD_S = 30.0                     # 뺀 장치의 통신이 끊기기를 기다리는 시간(초). 그 안에 끊기면 인식 목록에서 지운다
+HOLD_S = 30.0                     # 뺀 장치의 통신 상태가 '두절'로 정리되기를 기다리는 시간(초). 그동안 두절 경보를 내지 않는다
 
 
 def _drop(eng):
@@ -37,8 +37,9 @@ def cycle(eng):
     """주기마다: 빼기로 한 장치의 통신이 끊긴 것을 확인하면 인식 목록에서 지운다(빈 자리로 돌아간다)."""
     drop = _drop(eng); rt = eng.rt
     for n in list(drop):
+        rt.seen.discard(n)                                             # 바로 빈 자리로 돌린다: 수집 주기가 없는 장치의 응답을 기다리며 멈추지 않게(빈 자리는 주기 밖에서 불러 본다)
         if rt.lm.state.get(n) == "두절": rt.seen.discard(n); drop.pop(n); eng.alarms.set(f"link.{n}", False, 1, n, ""); rt.hb_seen.pop(n, None); rt.hb_stop.pop(n, None); rt.hb_skip.discard(n)
-        elif time.time() > drop[n]: drop.pop(n); rt.hb_skip.discard(n)      # 끝내 끊기지 않았다 — 있는 장치로 둔다
+        elif time.time() > drop[n]: drop.pop(n); rt.hb_skip.discard(n)      # 끝내 끊기지 않았다 — 응답하면 다시 인식된다
 
 
 def http_post(eng, b, sess):
