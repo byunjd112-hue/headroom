@@ -92,6 +92,13 @@ class RingWatchTest(unittest.TestCase):
         w.sim({"action": "break", "section": 2}); self.assertTrue(self._wait(lambda: w.status()["cut"] == [2] and w.status()["switched"] and w.status()["ok"]))                  # 구간 차단 뒤 반대쪽 공급
         keys = {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}; self.assertIn("ring.cut.2", keys); self.assertIn("ring.switched", keys)
         w.sim({"action": "break", "section": 3}); self.assertTrue(self._wait(lambda: w.status()["isolated"] == ["FSU3"]))
+        w.sim({"action": "break", "section": 3, "on": False}); w.sim({"action": "break", "section": 2, "on": False})                                                     # 단선을 풀면(고치면) 복구 절차: 구간 재투입 → 상시 개방점 다시 개방
+        self.assertTrue(self._wait(lambda: w.status()["cut"] == [] and not w.status()["switched"] and w.status()["ok"], 12.0)); self.assertEqual([x["state"] for x in w.status()["sections"]], [1, 1, 1, 1, 0, 1, 1, 1])
+        self.assertTrue(self._wait(lambda: not [k for k in {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"} if k.startswith("ring.")]))
+        for i in (0, 4, 7):                                                                                                                                          # 급전 구간 · 상시 개방점 구간 · 급전 B 구간을 차례로 끊었다 풀어도 매번 평소 상태로 돌아온다
+            w.sim({"action": "break", "section": i}); time.sleep(5.5); w.sim({"action": "break", "section": i, "on": False})
+            self.assertTrue(self._wait(lambda: [x["state"] for x in w.status()["sections"]] == [1, 1, 1, 1, 0, 1, 1, 1] and w.status()["ok"], 12.0), i)
+        w.sim({"action": "break", "section": 2}); self.assertTrue(self._wait(lambda: w.status()["cut"] == [2] and w.status()["switched"] and w.status()["ok"])); w.sim({"action": "break", "section": 3}); self.assertTrue(self._wait(lambda: w.status()["isolated"] == ["FSU3"]))
         w.sim({"action": "restore"}); w.sim({"action": "swap", "a": "FSU2", "b": "FSU5"}); self.assertTrue(self._wait(lambda: w.status()["fsu"][1]["name"] == "구간분전함 5"))      # 자리를 바꿔 놓아도 조작 없이 따라간다
         self.assertTrue(w.view(e)["discover"]["ok"]); self.assertEqual(w.status()["ppdu"][0]["at"], "FSU2"); self.assertFalse(w.accept(e, "시험")["ok"]); w.sim({"action": "swap"})
         self.assertTrue(w.status()["ppdu"][2]["vital"]); ch = [{"name": "통신 중계", "cls": 3}] + [{"name": c["name"], "cls": min(3, c["cls"] + 1) if c["cls"] else 0} for c in w.r["ppdu"][2]["ch"][1:]]      # 1등급 회로를 모두 낮춘다
@@ -137,6 +144,9 @@ class AutoDeviceTest(unittest.TestCase):
         eng.rt.lm.state["DG2"] = "두절"; autodev.link_alarm(eng, "DG2", "두절"); self.assertEqual((got["link.DG2"][0], got["absent.DG2"][0]), (False, False))            # 추가 자리가 빈 것은 알리지 않는다
         eng.rt.seen.add("DG2"); autodev.link_alarm(eng, "DG", "두절"); self.assertEqual((got["link.DG"][0], got["absent.DG"][0]), (False, False))                      # 같은 종류가 한 대라도 있으면 첫 자리가 비어도 알리지 않는다
         eng.rt.seen.add("DG"); autodev.link_alarm(eng, "DG", "두절"); self.assertEqual((got["link.DG"][0], got["absent.DG"][0]), (True, False))
+        eng.rt.val = {"BUS.a_v": 441.0, "BUS.b_v": 440.0}; eng.rt.lm.state["MTR"] = "정상"; autodev.ems_power(eng); self.assertEqual(got["ems.power"], (False, 2))                 # EMS 주 전원(배전 모선)
+        eng.rt.val = {"BUS.a_v": 0.0, "BUS.b_v": 0.0}; autodev.ems_power(eng); self.assertEqual(got["ems.power"], (True, 2)); eng.rt.val = {"BUS.a_v": 0.0, "BUS.b_v": 440.0}; autodev.ems_power(eng); self.assertFalse(got["ems.power"][0])
+        eng.rt.val = {"BUS.a_v": 0.0, "BUS.b_v": 0.0}; eng.rt.lm.state["MTR"] = "두절"; autodev.ems_power(eng); self.assertFalse(got["ems.power"][0])                              # 게이트웨이가 끊겨 값을 못 믿으면 내지 않는다
 
 
 if __name__ == "__main__":

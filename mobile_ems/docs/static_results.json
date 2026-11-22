@@ -1,6 +1,6 @@
 {
- "date": "2026-11-22 03:30",
- "unittest_s": 544.5,
+ "date": "2026-11-22 06:47",
+ "unittest_s": 585.7,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -183,16 +183,16 @@
  ],
  "n_tests": 178,
  "tests_ok": true,
- "coverage_pct": 91.8,
+ "coverage_pct": 92.0,
  "stmt": {
-  "n": 6075,
-  "hit": 5762,
-  "pct": 94.8
+  "n": 6086,
+  "hit": 5780,
+  "pct": 95.0
  },
  "branch": {
-  "n": 2170,
-  "hit": 1810,
-  "pct": 83.4
+  "n": 2174,
+  "hit": 1820,
+  "pct": 83.7
  },
  "coverage_files": [
   [
@@ -292,14 +292,6 @@
    "74, 126-127, 263-264, 309, 321-322, 345, 358, 362, 364, 366, 391-396, 426"
   ],
   [
-   "ifps_ems_rt/hmi/report.py",
-   93.6,
-   140,
-   73.7,
-   38,
-   "124, 128, 175-181"
-  ],
-  [
    "ifps_ems_rt/hmi/scenarios.py",
    94.4,
    250,
@@ -311,7 +303,7 @@
    "ifps_ems_rt/hmi/engine.py",
    94.6,
    789,
-   82.4,
+   82.1,
    290,
    "29-30, 55-56, 67-72, 195-196, 315-316, 329, 373, 389-390, 404-407, 410-412, 465, 512-513, 606-607, 738-739, 901-906, 915-917, 945-946"
   ],
@@ -420,10 +412,18 @@
    "110-111"
   ],
   [
+   "ifps_ems_rt/hmi/report.py",
+   98.6,
+   140,
+   89.5,
+   38,
+   "124, 128"
+  ],
+  [
    "ifps_ems_rt/simplant.py",
    98.7,
    150,
-   92.9,
+   94.6,
    56,
    "152-153"
   ],
@@ -566,7 +566,7 @@
   [
    "ifps_ems_rt/hmi/autodev.py",
    100.0,
-   8,
+   12,
    100.0,
    0,
    ""
@@ -638,9 +638,9 @@
   [
    "ifps_ems_rt/ring.py",
    100.0,
-   238,
-   92.2,
-   90,
+   245,
+   92.6,
+   94,
    ""
   ]
  ],
@@ -1093,7 +1093,7 @@
   ]
  },
  "metrics": {
-  "n_func": 755,
+  "n_func": 757,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1424,7 +1424,7 @@
    ],
    [
     "ifps_ems_rt/ring.py",
-    354
+    363
    ],
    [
     "ifps_ems_rt/hmi/scenarios.py",
@@ -1607,12 +1607,12 @@
     31
    ],
    [
-    "ifps_ems_rt/hmi/fuelwatch.py",
-    26
+    "ifps_ems_rt/hmi/autodev.py",
+    29
    ],
    [
-    "ifps_ems_rt/hmi/autodev.py",
-    21
+    "ifps_ems_rt/hmi/fuelwatch.py",
+    26
    ],
    [
     "ifps_ems_rt/hmi/pin.py",
@@ -1647,7 +1647,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 7660,
+   "loc": 7674,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -1831,12 +1831,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.85,
- "cc_n": 770,
+ "cc_avg": 5.86,
+ "cc_n": 772,
  "cc_rank": {
-  "A": 458,
+  "A": 459,
   "B": 190,
-  "C": 122,
+  "C": 123,
   "D": 0,
   "E": 0,
   "F": 0
@@ -1915,6 +1915,11 @@
    "C"
   ],
   [
+   "ifps_ems_rt/ring.py",
+   0.1,
+   "C"
+  ],
+  [
    "ifps_ems_rt/diag.py",
    1.9,
    "C"
@@ -1922,11 +1927,6 @@
   [
    "ifps_ems_rt/hmi/cfgedit.py",
    2.6,
-   "C"
-  ],
-  [
-   "ifps_ems_rt/ring.py",
-   2.7,
    "C"
   ],
   [
@@ -2145,13 +2145,13 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/scenring.py",
-   83.2,
+   "ifps_ems_rt/hmi/autodev.py",
+   81.8,
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/autodev.py",
-   87.3,
+   "ifps_ems_rt/hmi/scenring.py",
+   83.2,
    "A"
   ],
   [
@@ -2187,8 +2187,8 @@
  ],
  "loc_py": {
   "files": 56,
-  "sloc": 6341,
-  "comments": 823
+  "sloc": 6352,
+  "comments": 826
  },
  "js": [
   [
@@ -2233,17 +2233,17 @@
   ],
   [
    "ifps_ems_rt/hmi/static/scenarios.js",
-   681,
+   690,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/scentopo.js",
-   186,
+   187,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/site.js",
-   270,
+   272,
    true
   ],
   [

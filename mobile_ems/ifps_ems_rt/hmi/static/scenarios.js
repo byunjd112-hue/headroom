@@ -25,7 +25,9 @@ const P_SCENARIOS = (() => {
   const scene = () => cases[active];
   const point = tag => config.points.find(p => p.tag === tag);
   const lane = step => step.device || point(step.tag)?.device || "EMS";
-  const deviceName = d => names[d] || d;
+  const slotOf = d => { const m = /^(DG|FC|ESS|PV|ELZ)(\d+)$/.exec(d); return m ? [m[1], m[2]] : null; };                  // 같은 종류의 둘째 장치(DG2 …)
+  const deviceName = d => { const sl = slotOf(d); return names[d] || (sl ? `${names[sl[0]]} ${sl[1]}` : d); };
+  const seenNow = d => { const sl = slotOf(d), f = sl && S.snap?.fleet?.[sl[0]]; return !sl || !f || f.units.some(u => u.id === d); };      // 자동 인식되지 않은 둘째 장치는 목록에서 뺀다(개요 · 결선도와 같게)
   const option = (id, caption, current) => `<option value="${esc(id)}"${id === current ? " selected" : ""}>${esc(caption)}</option>`;
   const button = (action, label, cls = "", disabled = false) =>
     `<button type="button" class="btn sm ${cls}" data-sc="${action}" ${disabled ? "disabled" : ""}>${label}</button>`;
@@ -55,7 +57,8 @@ const P_SCENARIOS = (() => {
   }
 
   // ── 시퀀스 다이어그램(UML 식): 머리에 실제 장비 사진, 생명선과 활성 막대, 호출은 실선·응답과 판정은 점선
-  const photo = {DG: "dg", FC: "fc", ESS: "ess", PV: "pv", MTR: "dist", GDG: "gdg", EMS: "ems", ELZ: "elz"};
+  const photo = {DG: "dg", FC: "fc", ESS: "ess", PV: "pv", MTR: "dist", GDG: "gdg", EMS: "ems", ELZ: "fc"};      // 수전해는 수소생성 · 발전 차량에 실려 있다(개요 화면과 같은 그림)
+  const photoOf = d => photo[d] || photo[(slotOf(d) || [])[0]] || "";                                                      // 그림이 없는 장치는 이름만 보인다(깨진 그림을 내지 않는다)
   const tint = {TEST: "#c9a6c0", EMS: "#f2d27a", DG: "#e59866", FC: "#7fc8c0", ESS: "#9aa8e8", PV: "#f0c05a", MTR: "#a9d18e", ELZ: "#8fd3ff", GDG: "#d7a86e"};
   const SQ = {w: 138, row: 50, top: 14};
   function route(step) {                                   // [보내는 쪽, 받는 쪽, 선 모양]
@@ -77,7 +80,7 @@ const P_SCENARIOS = (() => {
     const state = i => rows.find(row => row.step === i);
     const heads = lanes.map(d => `<div class="sq-head" style="--c:${tint[d] || "#9fb0ad"}">
       ${d === "TEST" ? `<svg viewBox="0 0 40 44" class="sq-actor" aria-hidden="true"><circle cx="20" cy="9" r="6.5"/><path d="M20 16v15M7 22h26M20 31l-9 12M20 31l9 12"/></svg>`
-        : `<span class="sq-photo"><img src="photos/${photo[d] || d.toLowerCase()}.jpg" alt="" loading="lazy" onerror="this.remove()"><em>${esc(d)}</em></span>`}
+        : `<span class="sq-photo">${photoOf(d) ? `<img src="photos/${photoOf(d)}.jpg" alt="" loading="lazy">` : ""}<em>${esc(d)}</em></span>`}
       <b>${d === "TEST" ? "검증기" : esc(d)}</b><small>${d === "TEST" ? "시험 입력 · 판정" : esc(deviceName(d))}</small></div>`).join("");
     const life = lanes.map(d => `<line class="sq-life" x1="${x(d)}" x2="${x(d)}" y1="0" y2="${height}"/>`).join("");
     const bars = lanes.map(d => {                           // 활성 막대: 그 장비가 관여한 연속 구간
@@ -122,15 +125,21 @@ const P_SCENARIOS = (() => {
   // 실시간 보기: 지금 장치에서 읽은 값으로 구성도를 그린다(실장비 모드에서도 열린다 — 표시 전용, 지령은 나가지 않는다)
   const liveSnap = () => Object.fromEntries(Object.entries(S.snap?.values || {}).map(([k, o]) => [k, o && typeof o === "object" ? o.v : o]).filter(([, v]) => typeof v === "number"));
   function liveView() {
-    const html = ScTopo.html({steps: [], rows: [{step: 0, snap: liveSnap()}], stepIndex: 0, describe: description, picked: "", part: "", live: true});
+    const html = ScTopo.html(liveCtx());
     return `<div class="sq-summary"><span>실시간 상태</span><span class="muted">${S.snap?.sim ? "가상 장치" : "실장비"} · 1초마다 갱신 · 표시 전용(지령 없음)</span><span class="sc-spacer"></span>
-        <span class="sq-legend"><i class="l-pow"></i>전력 흐름</span>${ScTopo.custom() ? button("layout-reset", "배치 초기화") : ""}</div><div class="tp-wrap" id="tpLive">${html}</div>
+        <span class="sq-legend"><i class="l-pow"></i>전력 흐름</span>${ScTopo.custom() ? button("layout-reset", "배치 초기화") : ""}</div><div class="tp-wrap" id="tpLive">${html}</div><div id="tpLiveRing">${liveRing()}</div>
       <p class="muted tp-pick">차단기 색: 초록 투입 · 회색 개방 · 빨강 트립. 값이 없는 신호(대응표에 없거나 통신 두절)는 회색으로 보입니다.${S.snap?.sim ? "" : " 시나리오 편집·실행과 추가 설비는 가상 장치 모드에서만 쓸 수 있습니다."}</p>`;
   }
+  const liveCtx = () => ({steps: [], rows: [{step: 0, snap: liveSnap()}], stepIndex: 0, describe: description, picked: "", part: "", live: true, fleet: S.snap?.fleet || null});
+  /* 실시간 보기의 환망: 환망 · 개요 · 결선도 화면과 같은 자료(자동 인식한 구간분전함 · 배전체계, 구간 상태)로 그린다 */
+  function liveRing() {
+    const r = RingView.fromSnap(S.snap), sm = RingView.sum(S.snap); if (!r) return "";
+    return `<div class="rg"><div class="rg-h"><b>환망</b><span class="${sm.cls === "bad" ? "bad" : "muted"}">${esc(sm.text)}</span></div>${RingView.svg(r)}</div>`;
+  }
   function refreshLive() {
-    const box = $("#tpLive");
+    const box = $("#tpLive"), rb = $("#tpLiveRing");
     if (!box || ScTopo.dragging()) return;
-    box.innerHTML = ScTopo.html({steps: [], rows: [{step: 0, snap: liveSnap()}], stepIndex: 0, describe: description, picked: "", part: "", live: true});
+    box.innerHTML = ScTopo.html(liveCtx()); if (rb) rb.innerHTML = liveRing();
     ScTopo.bind(box, () => {}, refreshLive);
   }
 
@@ -215,7 +224,7 @@ const P_SCENARIOS = (() => {
 
   function palette() {
     const query = search.trim().toLowerCase();
-    return config.devices.map(d => {
+    return config.devices.filter(seenNow).map(d => {
       const points = config.points.filter(p => p.device === d && `${d} ${deviceName(d)} ${p.tag}`.toLowerCase().includes(query));
       const titleMatch = `${d} ${deviceName(d)}`.toLowerCase().includes(query);
       if (!titleMatch && !points.length) return "";

@@ -18,3 +18,11 @@ def link_alarm(eng, n, st):
     alone = k is None or not any(u in eng.rt.seen for u in eng.rt.fleet.slots.get(k, ()))          # 그 종류가 한 대도 없는가
     eng.alarms.set(f"link.{n}", st == "두절" and not gone, 1, n, f"{n} 통신 두절 — 지령 차단, 직전 유효값 유지")
     eng.alarms.set(f"absent.{n}", gone and alone and not fleet.is_slot(n), 3, n, f"{n} 응답 없음 — 켠 뒤 한 번도 응답하지 않아 설치되지 않은 장치로 보고 화면에서 뺌(자동 인식). 설치했다면 통신선·주소 확인")
+
+
+def ems_power(eng):
+    """EMS 쉘터의 주 전원(배전 모선)이 끊겼는지. EMS 는 입력 3종(상전 · 모선 · 차량 28 V) 자동 절체와 무정전 전원으로 켜져 있지만,
+    모선이 죽으면 배터리 · 차량 전원으로 버티는 중이므로 운용자에게 알린다. 무정전 전원의 상태 신호는 아직 대응표에 없어 모선 전압으로 미루어 본다(추정)."""
+    v = eng.rt.val; a, b = v.get("BUS.a_v"), v.get("BUS.b_v"); gw = eng.rt.lm.state.get("MTR") not in ("두절", "재조회 대기")
+    dead = gw and a is not None and b is not None and a < 300.0 and b < 300.0
+    eng.alarms.set("ems.power", bool(dead), 2, "EMS", "EMS 주 전원(배전 모선) 상실 — 무정전 전원으로 운전 중(추정). 차량 28 V 입력을 연결하고 배터리 잔량을 확인하십시오. 잔량이 낮아지면 기록을 닫고 정상 종료합니다")

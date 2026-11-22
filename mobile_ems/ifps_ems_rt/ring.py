@@ -7,8 +7,7 @@
   · 배전체계가 어느 구간분전함에 물렸는지는 PPDUk.up(상위 구간분전함의 ID)으로 안다. 이 신호가 없으면 목록의 값(at)을 쓴다.
   · ID 의 윗자리(0x46 = FSU, 0x50 = PPDU)로 종류를 가린다. ID 체계와 PPDUk.up 신호는 가정이다 — 실제 장치의 사양이 정해지면 맞춘다.
 
-  전원(배전반) ─[RING.sw0 급전]─ FSU1 ─[FSU1.sw]─ FSU2 ─[FSU2.sw]─ … ─ FSUn ─[FSUn.sw 복귀선]─ 다시 FSU1
-  (PPDU-20 자료의 설치 절차 '마지막 → 첫 장치 복귀 구성으로 링 폐합'과 같다: 전원은 첫 구간분전함으로 들어가고, 마지막 구간분전함이 첫 구간분전함으로 돌아와 고리가 닫힌다)
+  모선 A ─[RING.sw0]─ FSU1 ─[FSU1.sw]─ FSU2 ─[FSU2.sw]─ … ─ FSUn ─[FSUn.sw]─ 모선 B      (고리의 양 끝이 배전반의 두 모선에 하나씩 물린다)
   · FSU(구간분전함): 고리의 마디. 신호 FSUk.id(장치 ID) · FSUk.v(마디 전압) · FSUk.sw(다음 구간으로 나가는 개폐기: 0 개방 · 1 투입 · 2 차단)
   · PPDU(20 kW급 초경량 휴대용 배전체계, PPDU-20): FSU 에서 받아 시설 부하로 나누어 준다(전력 흐름: ⑥ 배전체계 → FSU → PPDU → 6회로 → 시설 부하).
     주 차단기(MCCB 40 A) 아래 분기 6회로 — CH1·CH2 3상 16 A(10.5 kW), CH3~CH6 단상 20 A(4.4 kW). CH2 는 PPDU 끼리의 환상 연결용.
@@ -129,9 +128,8 @@ def tags(r):
 
 
 def _fed(ok, n):
-    """구간이 이어졌는지(ok)로 마디마다 전원까지 닿는지. 전원은 급전 구간(0)으로 첫 마디에 들어온다.
-    k 번째 마디는 첫 마디에서 앞쪽(구간 1‥k)으로든, 복귀선 쪽(구간 k+1‥n)으로든 닿으면 참."""
-    return [ok[0] and (all(ok[1:k + 1]) or all(ok[k + 1:])) for k in range(n)]
+    """구간이 이어졌는지(ok)로 마디마다 전원까지 닿는지: 왼쪽으로든 오른쪽으로든 닿으면 참."""
+    return [all(ok[:k + 1]) or all(ok[k + 1:]) for k in range(n)]
 
 
 def _unit(x, g, fed=None):
@@ -216,7 +214,7 @@ def alarms(r, s):
     """경보 목록: [(열쇠, 발생 여부, 등급, 대상, 글)]. 값이 없는 신호는 따지지 않는다(통신 경보가 따로 난다)."""
     out = []; r = s.get("eff", r)
     for sec in s["sections"]:
-        a = "전원" if sec["i"] == 0 else r["fsu"][sec["i"] - 1]["id"]; b = r["fsu"][0]["id"] + " 복귀선" if sec["i"] == len(r["fsu"]) else r["fsu"][sec["i"]]["id"]
+        a = "전원" if sec["i"] == 0 else r["fsu"][sec["i"] - 1]["id"]; b = "전원" if sec["i"] == len(r["fsu"]) else r["fsu"][sec["i"]]["id"]
         out.append((f"ring.cut.{sec['i']}", sec["state"] == 2, 2, "환망", f"환망 구간 {sec['i']}({a} ↔ {b}) 차단 — 그 구간의 케이블·접속부 점검"))
     out.append(("ring.switched", bool(s["switched"]), 3, "환망", "환망 상시 개방점이 닫혀 있음 — 반대쪽 공급 중(다음 고장에 여유 없음). 고장 구간 복구 뒤 원래대로 되돌리십시오"))
     for f in s["fsu"]:
@@ -241,7 +239,7 @@ class Model:
     place 가 '어느 자리에 어떤 장치가 놓였는지'다 — 장치를 빼고 넣고 섞어서 자동 인식을 연습한다."""
     def __init__(self, r, plant, kw=None):
         self.r = r if r and "RING.sw0" in plant.by_tag else None; self.p = plant; self.kw = kw or {"L1": "LOAD.p1_kw", "L2": "LOAD.p2_kw", "L3": "LOAD.p3_kw"}
-        self.brk = set(); self.t_brk = {}; self.t_trip = None; self.init = set(); self.armed = False; self.swap = None; self.place = {}; self.zero = set()
+        self.brk = set(); self.t_brk = {}; self.t_trip = None; self.init = set(); self.armed = False; self.swap = None; self.place = {}; self.zero = set(); self.t_fix = {}
         if self.r is None: return
         self._place0(); self._ids(); e = self.eff()
         for i, t in enumerate(sw_tags(e)): plant.set(t, 0 if i == e["open"] else 1)
@@ -272,9 +270,10 @@ class Model:
 
     def _fsu_live(self, e):
         """구간 개폐기와 단선으로 구간분전함마다 전기가 들어오는지 계산해 전압을 넣는다. 반환: {FSU: 공급 여부}"""
-        sw = sw_tags(e); src = "BUS.a_v" not in self.p.by_tag or self.p.get("BUS.a_v") > V_LIVE; self.armed = self.armed or src; src = src or not self.armed       # 전원은 모선 A. 모선 전압을 한 번 본 뒤부터 전원 정전을 따진다
+        sw = sw_tags(e); bus = lambda t: t not in self.p.by_tag or self.p.get(t) > V_LIVE; a, b = bus("BUS.a_v"), bus("BUS.b_v")       # 왼쪽 끝은 모선 A, 오른쪽 끝은 모선 B
+        self.armed = self.armed or a or b; a, b = (a, b) if self.armed else (True, True)                                              # 모선 전압을 한 번 본 뒤부터 전원 정전을 따진다
         ok = [int(round(self.p.get(t))) == 1 and not self._broken(i) for i, t in enumerate(sw)]; live = {}
-        for f, on in zip(e["fsu"], _fed(ok, len(e["fsu"]))): live[f["id"]] = src and on
+        for k, f in enumerate(e["fsu"]): live[f["id"]] = (a and all(ok[:k + 1])) or (b and all(ok[k + 1:]))
         for k in range(1, self._n("fsu") + 1):
             if f"FSU{k}.v" in self.p.by_tag: self.p.set(f"FSU{k}.v", 380.0 if live.get(f"FSU{k}") else 0.0)
         return live
@@ -319,7 +318,16 @@ class Model:
             no = e["open"]
             if int(round(self.p.get(sw[no]))) == 0 and not self._broken(no): self.p.set(sw[no], 1)                              # 상시 개방점 투입 → 반대쪽에서 공급
             self.t_trip = None
+        if auto: self._repair(e, sw, now)
         self._update(e)
+
+    def _repair(self, e, sw, now):
+        """복구 절차: 단선이 없어진(고친) 차단 구간을 close_ms 뒤에 다시 잇고, 고리가 모두 이어지면 상시 개방점을 다시 연다(평소 상태로)."""
+        st = [int(round(self.p.get(t))) for t in sw]; no = e["open"]
+        for i, t in enumerate(sw):
+            if st[i] != 2 or self._broken(i): self.t_fix.pop(i, None); continue
+            if now - self.t_fix.setdefault(i, now) >= e["close_ms"] / 1000.0: self.p.set(t, 0 if i == no else 1); st[i] = 0 if i == no else 1; self.t_fix.pop(i, None)
+        if st[no] == 1 and all(x == 1 for x in st) and not any(self._broken(i) for i in range(len(sw))) and self.t_trip is None: self.p.set(sw[no], 0)      # 모두 이어졌으면 개방점을 되돌린다
 
     def remove(self, sid):
         """그 자리의 장치를 뺀다. 빼는 구간분전함의 개폐기가 열려 있었으면(상시 개방점) 앞 구간을 대신 연다."""
@@ -349,6 +357,6 @@ class Model:
     def restore(self):
         """고장을 없애고 처음 상태(처음 배치, 상시 개방점만 열림)로 되돌린다."""
         if self.r is None: return
-        self.brk.clear(); self.swap = None; self.t_trip = None; self.t_brk.clear(); self._place0(); self._ids(); e = self.eff()
+        self.brk.clear(); self.swap = None; self.t_trip = None; self.t_brk.clear(); self.t_fix.clear(); self._place0(); self._ids(); e = self.eff()
         for i, t in enumerate(sw_tags(e)): self.p.set(t, 0 if i == e["open"] else 1)
         self.p.set("RING.auto", 1); self.init.clear()

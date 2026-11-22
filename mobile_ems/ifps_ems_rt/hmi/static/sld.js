@@ -2,7 +2,7 @@
    통전 판정: 모선 전압(BUS.a_v/b_v, 보호 IED 게이트웨이)이 있으면 실측을 쓰고, 없으면 차단기·운전 상태로 추정한다. */
 "use strict";
 const BUS_Y = 316, SY = 78, SR = 48, LY = 474, LR = 42;
-const RG = { YR: 436, X0: 42, X1: 958, H: 694, RT: 374 };      // 환망이 있으면 부하는 구간분전함 아래에 달고(등급별 합계는 맨 아래 글), 그림 높이는 H      // 환망: 모선 A(X0) 와 모선 B(X1) 에서 내려와 구간분전함 줄(YR)에서 만난다. 환망이 있으면 부하는 그 아래로 DY 만큼 내려 환망에 단다
+const RG = { YR: 410, X0: 42, X1: 958, H: 668 };      // 환망이 있으면 부하는 구간분전함 아래에 달고(등급별 합계는 맨 아래 글), 그림 높이는 H      // 환망: 모선 A(X0) 와 모선 B(X1) 에서 내려와 구간분전함 줄(YR)에서 만난다. 환망이 있으면 부하는 그 아래로 DY 만큼 내려 환망에 단다
 const SRC = [
   { id: "GRID", name: "상전 수전", en: "UTILITY GRID", x: 70, col: "g1", kw: "GRID.kw", sub: "22.9kV 수전", bus: "A" },
   { id: "PV", name: "태양광 PV", en: "SOLAR PV", x: 195, col: "pv", kw: "PV.kw", sub: "80kWp × 5", bus: "A" },
@@ -93,20 +93,20 @@ function sldRing(s, live) {
   const g = document.getElementById("sldRingG"); if (!g) return; const r = s.ring;
   const sig = r ? JSON.stringify([live, S.lang, [1, 2, 3].map(c => [Math.round(val("CB.L" + c) ?? 1), Math.round((val("LOAD.p" + c + "_kw") || 0) * 2)]), !!(S.sprites && S.sprites.l1), r.ppdu.map(p => p.ch.map(q => Math.round((q.kw || 0) * 5))), r.sections.map(x => x.state), r.fsu.map(f => [f.id, f.name, f.live]), r.ppdu.map(p => [p.id, p.name, p.at, p.live, p.mccb, p.vital, Math.round((p.kw || 0) * 2), p.ch.filter(c => c.cb === 2 && c.cls > 0).length])]) : "";
   if (g.dataset.sig === sig) return; g.dataset.sig = sig; if (!r) { g.innerHTML = ""; return; }
-  const { YR, X0, X1, RT } = RG, n = r.fsu.length, xs = k => X0 + (X1 - X0) * (k + 1) / (n + 1), ym = (BUS_Y + YR) / 2, sm = RingView.sum(s);
-  const liveAt = k => k < 0 ? live.A : r.fsu[k >= n ? 0 : k].live === true;                                             // 구간 양 끝 가운데 한쪽이라도 살아 있으면 그 구간에 전압이 있다(복귀선의 끝은 첫 구간분전함)
+  const { YR, X0, X1 } = RG, n = r.fsu.length, xs = k => X0 + (X1 - X0) * (k + 1) / (n + 1), ym = (BUS_Y + YR) / 2, sm = RingView.sum(s);
+  const liveAt = k => k < 0 ? live.A : k >= n ? live.B : r.fsu[k].live === true;                                             // 구간 양 끝 가운데 한쪽이라도 살아 있으면 그 구간에 전압이 있다
   const sw = (x, y, st) => `<g class="cbk ${st == null ? "unk" : st === 1 ? "closed" : st === 2 ? "trip" : "open"}"><rect x="${x - 7}" y="${y - 7}" width="14" height="14" rx="2.5"/><path class="x" d="M${x - 4} ${y - 4}l8 8M${x + 4} ${y - 4}l-8 8"/></g>`;
-  let h = `<text class="sring-t ${sm.cls}" x="${X0 + 118}" y="${ym + 14}">${esc("환망 · " + (sm.cut.length ? "구간 " + sm.cut.join(", ") + " 차단" + (r.switched ? " · 반대쪽에서 공급 중" : "") : r.ok ? "전 마디 공급" : "확인 필요"))}</text>
-    <text class="sring-s" x="${(xs(0) + X1) / 2}" y="${RT - 6}" text-anchor="middle">복귀선 — 마지막 구간분전함이 첫 구간분전함으로 돌아와 고리가 닫힌다</text>`;
-  r.sections.forEach(x => { const i = x.i, back = i === n && n > 0, cls = x.state === 2 ? "flt" : x.state === 0 || x.state == null ? "off" : (liveAt(i - 1) || liveAt(i)) ? "on" : "off";
-    const d = i === 0 ? `M${X0} ${BUS_Y} V${YR} H${xs(0) - 13}` : back ? `M${xs(n - 1) + 13} ${YR} H${X1} V${RT} H${xs(0)} V${YR - 13}` : `M${xs(i - 1) + 13} ${YR} H${xs(i) - 13}`;
-    const [px, py] = i === 0 ? [X0, ym + 22] : back ? [X1, (RT + YR) / 2] : [(xs(i - 1) + xs(i)) / 2, YR], side = i === 0 ? 1 : back ? -1 : 0;
-    const lab = (i === 0 ? "환망 급전" : back ? "복귀선" : "") + (x.state === 2 ? (side ? " · " : "구간 " + i + " ") + "차단" : x.open ? (side ? " · " : "") + (x.state === 0 ? "상시 개방점" : "개방점 닫힘") : x.state === 0 ? (side ? " · " : "구간 " + i + " ") + "개방" : "");
+  let h = `<text class="cbl" x="${X0 + 14}" y="${ym + 2}">환망 급전 A</text><text class="cbl" x="${X1 - 14}" y="${ym + 2}" text-anchor="end">환망 급전 B</text>
+    <text class="sring-t ${sm.cls}" x="${X0 + 118}" y="${YR - 46}">${esc("환망 · " + (sm.cut.length ? "구간 " + sm.cut.join(", ") + " 차단" + (r.switched ? " · 반대쪽에서 공급 중" : "") : r.ok ? "전 마디 공급" : "확인 필요"))}</text>`;
+  r.sections.forEach(x => { const i = x.i, cls = x.state === 2 ? "flt" : x.state === 0 || x.state == null ? "off" : (liveAt(i - 1) || liveAt(i)) ? "on" : "off";
+    const d = i === 0 ? `M${X0} ${BUS_Y} V${YR} H${xs(0) - 13}` : i === n ? `M${xs(n - 1) + 13} ${YR} H${X1} V${BUS_Y}` : `M${xs(i - 1) + 13} ${YR} H${xs(i) - 13}`;
+    const [px, py] = i === 0 ? [X0, ym + 16] : i === n ? [X1, ym + 16] : [(xs(i - 1) + xs(i)) / 2, YR], side = i === 0 ? 1 : i === n ? -1 : 0;
+    const lab = x.state === 2 ? "구간 " + i + " 차단" : x.open ? (x.state === 0 ? "상시 개방점" : "개방점 닫힘") : x.state === 0 ? "구간 " + i + " 개방" : "";
     h += `<path class="ln ${cls}" d="${d}"/>${sw(px, py, x.state)}<text class="sring-s ${x.state === 2 ? "t" : x.state === 0 || x.open ? "o" : ""}" x="${px + side * 12}" y="${side ? py + 4 : py - 33}" text-anchor="${side > 0 ? "start" : side < 0 ? "end" : "middle"}">${lab}</text>`; });
   const CLS = [["1", "#ff6b8a"], ["2", "#ffb547"], ["3", TV("--load")]], cbl = c => { const v = val("CB.L" + c); return v == null ? null : Math.round(v); }, shed = c => cbl(c) != null && cbl(c) !== 1;      // 등급별 차단기가 열렸으면 그 등급 회로는 끊긴 것으로 보인다
   const PIC = ["L1", "L2", "L3"]; let tile = 0; h += `<defs>${SPRITE_FILTERS.replace(/id="sp/g, 'id="spRG')}</defs>`;
   r.fsu.forEach((f, k) => { const x = xs(k), c = f.live == null ? "na" : f.live ? "on" : "off", pp = r.ppdu.filter(p => p.at === f.id), one = pp.length === 1;
-    h += `<circle class="sring-n ${c}" cx="${x}" cy="${YR}" r="13"/><text class="sring-k" x="${x}" y="${YR + 4}" text-anchor="middle">${k + 1}</text><text class="sring-nm ${c}" x="${k ? x : x + 9}" y="${YR - 19}" text-anchor="${k ? "middle" : "start"}">${esc(f.name)}</text>` +
+    h += `<circle class="sring-n ${c}" cx="${x}" cy="${YR}" r="13"/><text class="sring-k" x="${x}" y="${YR + 4}" text-anchor="middle">${k + 1}</text><text class="sring-nm ${c}" x="${x}" y="${YR - 19}" text-anchor="middle">${esc(f.name)}</text>` +
       pp.map((p, j) => { const bad = p.live === false || p.mccb === 2, tr = p.ch.filter(q => q.cb === 2 && q.cls > 0).length, y = YR + 26 + j * 46, w = 108, st = bad ? "off" : tr || p.over || p.gnd_bad ? "warn" : "on", fed = !bad && f.live === true;
         const kw = cl => p.ch.filter(q => q.cls === cl).reduce((a, q) => a + (q.kw || 0), 0), has = cl => p.ch.some(q => q.cls === cl), ty = y + 52, sp = one ? spriteSvg(PIC[tile++ % 3], { on: fed, fault: bad }, x, ty + 62, 92) : null;
         return `<path class="ln ${bad ? "flt" : fed ? "on" : "off"}" d="M${x} ${j ? y - 10 : YR + 13} V${y}"/><rect class="sring-p ${st}" x="${x - w / 2}" y="${y}" width="${w}" height="16" rx="4"/>

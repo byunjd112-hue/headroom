@@ -83,7 +83,7 @@ function mapWorld(X, Y) { const a = (X - MAP_O[0]) / (ISO_C * MAP_S), b = (Y - M
 function _cabPath([x1, y1], [x2, y2]) { const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 + Math.abs(x2 - x1) * .06; return `M${x1} ${y1} Q${mx} ${my} ${x2} ${y2}`; }
 const _d2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 /* 배치 → 케이블 자동 생성: FSU 환상망 + 배전반-FSU 2회선 + 장비별 최근접 FSU 인입 */
-/* 환망을 감시 중이면 그 순서대로 잇는다: 배전 → 첫 구간분전함(구간 0, 급전) → 둘째 → … → 마지막 → 다시 첫 구간분전함(구간 n, 복귀선). 케이블 꼬리표 RS<n> 이 구간 번호다 */
+/* 환망을 감시 중이면 그 순서대로 잇는다: 배전 → 첫 구간분전함(구간 0) → … → 마지막 → 배전(구간 n). 케이블 꼬리표 RS<n> 이 구간 번호다 */
 const _fsuNo = it => { if (it.rid !== undefined) return it.rid; const m = /(\d+)/.exec(it.name || ""); return m ? "FSU" + m[1] : ""; };      // 그 구간분전함 그림이 환망의 어느 자리인지
 /* 배치도의 구간분전함 그림을 환망 순서에 맞춘다: 놓인 자리를 따라 한 바퀴(가운데에서 본 방향 순) 돌면서 첫째 · 둘째 … 로 삼는다 — 그래야 이웃끼리 이어지고 선이 가로지르지 않는다. 환망보다 그림이 많으면 남는 것은 뺀다 */
 function fsuRing(items) {
@@ -95,7 +95,7 @@ function ringCables(fsu, dist, pt) {
   const r = S.snap && S.snap.ring; if (!r || !dist.length || L.edit) return null;
   const by = {}; fsu.forEach(i => { by[_fsuNo(i)] = i; }); const seq = r.fsu.map(f => by[f.id]); if (!seq.length || seq.some(x => !x)) return null;
   const d = dist[0], out = [[pt(d), pt(seq[0]), "RS0"]];
-  seq.forEach((f, k) => { if (k + 1 < seq.length) out.push([pt(f), pt(seq[k + 1]), "RS" + (k + 1)]); else if (seq.length > 1) out.push([pt(f), pt(seq[0]), "RS" + seq.length]); });      // 마지막은 첫 구간분전함으로 돌아온다(복귀선 — 링 폐합)
+  seq.forEach((f, k) => out.push(k + 1 < seq.length ? [pt(f), pt(seq[k + 1]), "RS" + (k + 1)] : [pt(f), pt(d), "RS" + seq.length]));
   return out;
 }
 function layCables(items) {
@@ -158,17 +158,19 @@ function siteMapSvg(s) {
     <path d="M0 255 Q800 225 1600 255 L1600 900 L0 900Z" fill="url(#mGnd)"/><path d="M0 255 Q800 225 1600 255 L1600 900 L0 900Z" fill="url(#mGv)" opacity=".55"/>
     ${L.edit ? `<path d="M0 255 Q800 225 1600 255 L1600 900 L0 900Z" fill="url(#mGrid)"/>` : ""}`;
   const ems = items.find(i => i.kind === "EMS");
-  if (ems) items.filter(i => ["DG", "ESS", "PV", "FC", "DIST"].includes(i.kind)).forEach(i => { g += `<path d="${_cabPath([ems.x, ems.y - 20], [i.x, i.y + 20])}" class="mcom" fill="none"/>`; });
+  if (ems) items.filter(i => ["DG", "ESS", "PV", "FC", "DIST", "FSU"].includes(i.kind)).forEach(i => {      // 통신선: 발전 장비 · 배전 · 구간분전함 모두 EMS 와 이어진다
+    g += `<path d="${_cabPath([ems.x, ems.y - 20], [i.x, i.y + 20])}" class="mcom" fill="none"/>`; });
   cab.forEach(([a, b, f], i) => { const d = _cabPath(a, b); g += `<path d="${d}" class="mcab" fill="none"/><path d="${d}" class="mflow" id="mf-${i}" fill="none"/>`; });
   items.slice().sort((a, b) => a.y - b.y).forEach(it => {
     const kind = it.kind === "BARRACK" ? "BARRACK" : it.kind, [Lx, Ly] = ISO_EXT[kind] || ISO_EXT.FSU, [wx, wy] = mapWorld(it.x, it.y), [px, py] = I.p(wx - Lx / 2, wy - Ly / 2, 0);
     const sel = L.edit && L.sel === it.uid;
     g += `<g class="meq ${L.edit ? "editable" : ""} ${sel ? "sel" : ""}" data-uid="${it.uid}">${sel ? `<ellipse cx="${it.x}" cy="${it.y}" rx="${(Lx + Ly) * ISO_C * MAP_S * .62}" ry="${(Lx + Ly) * ISO_S * MAP_S * .62}" class="msel"/>` : ""}${spriteSvg(kind, mapEqSt(s, it), it.x, it.y + (Lx + Ly) * ISO_S * MAP_S / 2 + 6, (Lx + Ly) * ISO_C * MAP_S * (kind === "FSU" ? 1.5 : kind === "PV" ? .78 : 1.12)) || isoPlace(kind, mapEqSt(s, it), px, py, MAP_S)}</g>`;
   });
+  if (ems && !L.edit) g += `<text x="${ems.x}" y="${ems.y + 58}" text-anchor="middle" class="mfsu sec">EMS 전원: 배전 모선(주) · 차량 28 V(예비) · 내장 무정전 전원</text>`;      // 하드웨어 설계의 전원 이중화
   const rg = !L.edit && s.ring ? s.ring : null;                                    // 구간분전함 이름표(환망 화면의 이름과 같다)
   if (rg) items.filter(i => i.kind === "FSU").forEach(it => { const f = rg.fsu.find(x => x.id === _fsuNo(it)); if (f) g += `<text x="${it.x}" y="${it.y + 34}" text-anchor="middle" class="mfsu ${f.live === false ? "bad" : ""}">${esc(f.name)}</text>`; });
   if (rg) cab.forEach(([a, b, f]) => { const sec = /^RS\d+$/.test(f) ? rg.sections[+f.slice(2)] : null; if (!sec) return; const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 + Math.abs(b[0] - a[0]) * .03;      // 구간 이름표
-    const t = sec.state === 2 ? `구간 ${sec.i} 차단` : sec.open ? (sec.state === 1 ? "상시 개방점(닫힘 · 우회 중)" : "상시 개방점(열림)") : sec.i === 0 ? "환망 급전" : sec.i === rg.fsu.length ? "복귀선" : "";      // 전원은 첫 구간분전함으로 들어가고, 마지막이 첫 구간분전함으로 돌아와 고리가 닫힌다
+    const t = sec.state === 2 ? `구간 ${sec.i} 차단` : sec.open ? (sec.state === 1 ? "상시 개방점(닫힘 · 우회 중)" : "상시 개방점(열림)") : sec.i === 0 ? "환망 급전 A(모선 A)" : sec.i === rg.fsu.length ? "환망 급전 B(모선 B)" : "";      // 고리의 양 끝은 배전반의 두 모선에 물려 닫힌다
     if (t) g += `<text x="${mx}" y="${my - 16}" text-anchor="middle" class="mfsu sec ${sec.state === 2 ? "bad" : sec.open ? "open" : ""}">${t}</text>`; });
   cab.forEach(([a, b], i) => { const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 + Math.abs(b[0] - a[0]) * .03; g += `<g class="mflt" id="mx-${i}" style="display:none"><circle cx="${mx}" cy="${my}" r="13" fill="#ff5148"/><path d="M${mx - 5} ${my - 5}l10 10M${mx + 5} ${my - 5}l-10 10" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g>`; });
   return `<svg viewBox="0 0 ${MAP_W} ${MAP_H}" class="sitemap ${L.edit ? "editing" : ""}" preserveAspectRatio="xMidYMid slice">${g}</svg>`;

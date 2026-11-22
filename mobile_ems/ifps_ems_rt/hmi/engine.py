@@ -516,7 +516,7 @@ class Engine:
         k = self.kpi(); self._integrate(k); self.archw.step(self, k); self.ringw.step(self)
         self.trend.append([round(time.time() * 1000), round(k["load"], 2), round(k["pv"], 2), round(k["dg"], 2), round(k["fc"], 2), round(k["ess"], 2),
                            round(k["soc"], 2), round(k["h2"], 1), round(k["reserve_margin"], 1)])
-        self._alarms_comm(); self._alarms_process(k); self._alarms_grid(); self._alarms_ops(); self._alarms_events()
+        self._alarms_comm(); self._alarms_process(k); self._alarms_grid(); self._alarms_ops(); self._alarms_events(); autodev.ems_power(self)
 
     def _alarms_comm(self):
         """통신·품질 경보."""

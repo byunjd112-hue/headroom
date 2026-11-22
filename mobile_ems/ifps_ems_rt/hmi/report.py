@@ -64,7 +64,7 @@ def _current(doc, s):
 def _ring(doc, r):
     """1.4 환망(구간분전함 · 휴대용 배전체계) — 환망 화면과 같은 이름 · 상태."""
     if not r: return
-    st = {None: "값 없음", 0: "개방", 1: "투입", 2: "차단"}; live = {None: "값 없음", True: "공급", False: "정전"}; end = lambda i: "전원" if i == 0 else r["fsu"][0]["name"] + "(복귀선)" if i == len(r["fsu"]) + 1 else r["fsu"][i - 1]["name"]
+    st = {None: "값 없음", 0: "개방", 1: "투입", 2: "차단"}; live = {None: "값 없음", True: "공급", False: "정전"}; end = lambda i: "전원" if i in (0, len(r["fsu"]) + 1) else r["fsu"][i - 1]["name"]
     doc.h2("1.4 환망 · 구간분전함 · 휴대용 배전체계")
     doc.p(("전 마디 공급" if r["ok"] else "정전 마디 있음: " + ", ".join(r["isolated"]) if r["isolated"] else "확인 필요") + (" · 차단된 구간 " + ", ".join(str(i) for i in r["cut"]) if r["cut"] else "")
           + (" · 상시 개방점이 닫혀 반대쪽에서 공급 중(여유 없음)" if r["switched"] else "") + f" · 자동 인식: 구간분전함 {len(r['fsu'])}대, 배전체계 {len(r['ppdu'])}대")

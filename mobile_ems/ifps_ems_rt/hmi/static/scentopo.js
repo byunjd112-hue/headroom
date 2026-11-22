@@ -15,7 +15,7 @@ const ScTopo = (() => {
     ESS: {name: "ESS", kind: "src", bus: "B", at: [10.6, 0.2], cb: "ESS", kw: "ESS.kw", st: "ESS.status", soc: "ESS.soc", c: "#9aa8e8", photo: "ess"},
     G1: {name: "복합전력 G1", kind: "src", bus: "B", at: [12.4, 0.2], cb: "G1", c: "#c4b08a", photo: "dg"},
     L1: {name: "1등급 필수 부하", kind: "load", bus: "A", at: [1.2, 7.9], cb: "L1", kw: "LOAD.p1_kw", c: "#ff8fa6", photo: "l1"},
-    ELZ: {name: "수전해", kind: "load", bus: "A", at: [4.6, 7.9], kw: "ELZ.kw", st: "ELZ.status", c: "#8fd3ff"},
+    ELZ: {name: "수전해", kind: "load", bus: "A", at: [4.6, 7.9], kw: "ELZ.kw", st: "ELZ.status", c: "#8fd3ff", photo: "fc"},
     L2: {name: "2등급 중요 부하", kind: "load", bus: "B", at: [9.4, 7.9], cb: "L2", kw: "LOAD.p2_kw", c: "#ffc56b", photo: "l2"},
     L3: {name: "3등급 일반 부하", kind: "load", bus: "B", at: [11.8, 7.9], cb: "L3", kw: "LOAD.p3_kw", c: "#8fb7ff", photo: "l3"},
     EMS: {name: "EMS", kind: "ctl", at: [7.3, -2.8], c: "#f2d27a", photo: "ems"},
@@ -126,12 +126,13 @@ const ScTopo = (() => {
         ${pct === null ? "" : `<text class="tp-cbst" x="${p[0] - 16}" y="${p[1] - 7}" text-anchor="end" fill="${pct > 100 ? "#ff6b6b" : "#e8dcc0"}">부하율 ${pct.toFixed(0)}%</text>`}</g>`; }).join("");
     const nodes = order.map(id => { const n = NODES[id], [gx, gy] = at(id), p = P(gx, gy), k = kw(id), seen = id === "GRID" ? cb("GRID") !== null : v(n.st || n.kw) !== null, run = snap && n.kind !== "ctl" && seen ? running(id) : null;
       const cut = n.kind === "load" && n.cb && snap && cb(n.cb) !== null && cb(n.cb) !== 1;                 // 부하 차단기가 열려 있으면 급전되지 않는다(표시값은 부하 요구량)
-      const chip = !snap || n.kind === "ctl" ? "" : !seen && k === null ? "값 없음" : cut ? `급전 차단${k ? " · 요구 " + k.toFixed(0) + " kW" : ""}` : [k === null ? "" : `${k.toFixed(k % 1 ? 1 : 0)} kW`, n.soc && v(n.soc) !== null ? `SOC ${v(n.soc)}%` : "", n.st ? (run ? "운전" : "정지") : ""].filter(Boolean).join(" · ");
+      const fl = ctx.fleet && ctx.fleet[id], none = !!fl && fl.seen === 0, many = fl && fl.units.length > 1 ? ` · ${fl.units.length}대(운전 ${fl.units.filter(u => u.on).length})` : "";      // 자동 인식한 대수(개요 · 결선도와 같은 자료)
+      const chip = none ? "미설치(인식된 장치 없음)" : !snap || n.kind === "ctl" ? "" : !seen && k === null ? "값 없음" : cut ? `급전 차단${k ? " · 요구 " + k.toFixed(0) + " kW" : ""}` : [k === null ? "" : `${k.toFixed(k % 1 ? 1 : 0)} kW`, n.soc && v(n.soc) !== null ? `SOC ${v(n.soc)}%` : "", n.st ? (run ? "운전" : "정지") : ""].filter(Boolean).join(" · ") + many;
       const card = n.icon ? `<g transform="translate(${p[0]} ${p[1] - 40})" stroke="${n.c}" fill="none" class="tp-icon"><circle r="27" fill="#16201e" stroke-width="2"/>${ICON[n.icon]}</g>`
         : `<g class="tp-card"><rect x="${p[0] - 37}" y="${p[1] - 66}" width="74" height="50" rx="6" fill="#16201e" stroke="${n.c}" stroke-width="2"/>
             <text x="${p[0]}" y="${p[1] - 36}" text-anchor="middle" fill="${n.c}" class="tp-code">${id}</text>
-            ${n.photo ? `<image href="photos/${n.photo}.jpg" x="${p[0] - 35}" y="${p[1] - 64}" width="70" height="46" preserveAspectRatio="xMidYMid slice" clip-path="inset(0 round 4px)" onerror="this.remove()"/>` : ""}</g>`;
-      return `<g class="tp-node ${cut ? "off" : run === true ? "on" : run === false ? "off" : ""} ${picked === id && !ctx.part ? "picked" : ""}" data-node="${id}" tabindex="0" role="button" aria-label="${esc(n.name)}">
+            ${n.photo ? `<image href="photos/${n.photo}.jpg" x="${p[0] - 35}" y="${p[1] - 64}" width="70" height="46" preserveAspectRatio="xMidYMid slice" clip-path="inset(0 round 4px)"/>` : ""}</g>`;
+      return `<g class="tp-node ${cut || none ? "off" : run === true ? "on" : run === false ? "off" : ""} ${picked === id && !ctx.part ? "picked" : ""}" data-node="${id}" tabindex="0" role="button" aria-label="${esc(n.name)}">
         ${box(gx, gy, 0.52, 10, n.c)}${card}<text class="tp-name" x="${p[0]}" y="${p[1] - (chip ? 86 : 72)}" text-anchor="middle">${esc(n.name)}${n.extra ? (n.ems ? " ＊수급" : " ＊") : ""}</text>
         ${chip ? `<text class="tp-chip" x="${p[0]}" y="${p[1] - 72}" text-anchor="middle">${esc(chip)}</text>` : ""}</g>`; }).join("");
 
