@@ -59,7 +59,7 @@ class FleetLiveTest(unittest.TestCase):
             self.assertTrue(self._wait(lambda: pv()["n"] == want and len(pv()["units"]) == want), f"PV {want}대 인식")
         r = unitctl.change(e, "PV", -1, "시험"); self.assertEqual((r["ok"], r["unit"]), (True, "PV3"))
         self.assertTrue(self._wait(lambda: [u["id"] for u in pv()["units"]] == ["PV", "PV2"] and "PV3" not in e.rt.seen), "뺀 장치는 목록에서 사라진다")
-        self.assertFalse([k for k in act() if k.startswith(("link.PV", "absent.PV"))], {n: (e.rt.lm.state.get(n), e.rt.links[n].err, dict(e.rt.links[n].alive)) for n in ("PV", "PV2", "PV3", "DG")})      # 일부러 뺀 장치는 두절 경보가 아니다
+        self.assertFalse([k for k in act() if k.startswith(("link.PV", "absent.PV"))], {"link": {n: (e.rt.lm.state.get(n), e.rt.links[n].err) for n in ("PV", "PV2", "PV3", "DG")}, "scan": (round(e.rt.max_scan_s, 2), e.rt.n_over, e.rt.n_scan), "events": [x["text"][:40] for x in e.rt.events[-14:]]})      # 일부러 뺀 장치는 두절 경보가 아니다
         time.sleep(7.0); self.assertEqual(unitctl.change(e, "PV", 1, "시험")["unit"], "PV3"); self.assertTrue(self._wait(lambda: pv()["n"] == 3)); time.sleep(3.0)      # 뺀 자리에 다시 놓을 수 있다
         self.assertFalse([x["text"] for x in e.rt.events if "PV3 생존 계수 정지" in x["text"]])                                       # 다시 놓을 때 묵은 생존 계수로 '정지' 경보가 뜨지 않는다
         self.assertEqual(e.rt.fleet.span("PV.kw", "MTR"), 3); self.assertEqual((e.rt.fleet.span("PV.kw", "PV"), e.rt.fleet.span("LOAD.kw", "MTR")), (1, 1))      # 게이트웨이가 재는 합계의 범위는 대수만큼 넓어진다
