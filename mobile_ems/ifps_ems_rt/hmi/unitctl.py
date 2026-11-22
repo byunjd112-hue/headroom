@@ -18,9 +18,9 @@ def change(eng, k, delta, who):
     rt = eng.rt; names = rt.fleet.slots.get(k) or []; drop = _drop(eng)
     if not names or delta not in (1, -1): raise ValueError("대수를 바꿀 수 없는 종류")
     if delta > 0:
-        free = [n for n in names if n not in rt.seen and n not in drop and (not eng.sim or n in eng.plant.gone)]      # 가상 장치: 이미 놓아 인식을 기다리는 자리는 다시 잡지 않는다(연달아 눌러도 한 자리씩)
+        free = [n for n in names if n not in rt.seen and (not eng.sim or n in eng.plant.gone)]      # 가상 장치: 이미 놓아 인식을 기다리는 자리는 다시 잡지 않는다(연달아 눌러도 한 자리씩)
         if not free: return {"ok": False, "why": f"{k} 자리가 더 없습니다(최대 {len(names)}대). 더 늘리려면 설정 파일의 devices 에 다음 자리를 넣습니다"}
-        for m in free: rt.fleet.park.pop(m, None); rt.hb_seen.pop(m, None); rt.hb_stop.pop(m, None)      # 기다리지 않고 지금 불러 본다. 예전에 있던 장치의 묵은 생존 계수는 지운다(다시 놓을 때 '정지' 경보가 뜨지 않게)
+        for m in free: rt.fleet.park.pop(m, None); rt.hb_seen.pop(m, None); rt.hb_stop.pop(m, None); drop.pop(m, None); rt.hb_skip.discard(m)      # 기다리지 않고 지금 불러 본다. 예전에 있던 장치의 묵은 생존 계수는 지운다(다시 놓을 때 '정지' 경보가 뜨지 않게)
         n = free[0]
         if eng.sim: eng.plant.gone.discard(n); rt.note("장치", f"{n} 가상 장치 놓기(대수 조정)", actor=who); return {"ok": True, "unit": n, "msg": f"{n} 을 놓았습니다. 몇 초 안에 자동으로 인식됩니다"}
         return {"ok": True, "unit": n, "msg": f"빈 자리를 지금 다시 찾습니다. 장치를 연결해 켜면 자동으로 인식됩니다(다음 자리 {n} · {eng.cfg['devices'][n]['paths'][0][0]})"}
