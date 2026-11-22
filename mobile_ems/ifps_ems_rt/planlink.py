@@ -23,6 +23,7 @@ class PlanPolicy:
         self.site, self.hist, self.demo = site, hist_csv, demo_csv; self.md = model_dir; self._lock = RLock(); self.reload()
         self.pl = dp.Planner(site); self.kappa = dp.kappa_for(days_since_deploy); self.clock = clock
         self.V = None; self.k = 0; self.rows = 0; self.fc = None; self.note = ""; self.t_plan = None; self.src = ""; self.sh = None
+        self.pv_adjust = None                # (태양광 예측, 하한) → (고친 예측, 하한). 화면부가 날씨 입력 반영을 여기에 건다
 
     def reload(self):
         """적용 중인 예측 모델을 다시 읽는다(지속 학습이 새 모델을 적용했을 때)."""
@@ -46,6 +47,7 @@ class PlanPolicy:
             q = int(hr * 4) % 96; same = np.nonzero((np.round(d["hour"] * 4).astype(int) % 96) == q)[0]; same = same[same >= MIN_ROWS - 1]
             if len(same): o = int(same[-1])
         l50, _, lhi, _ = learner.predict(self.fl, d, o, "load", self.site, self.meta); p50, plo, _, _ = learner.predict(self.fp, d, o, "pv", self.site, self.meta)
+        if self.pv_adjust: p50, plo = self.pv_adjust(p50, plo)
         lf = l50 + self.kappa * (lhi - l50); pf = np.clip(p50 - self.kappa * (p50 - plo), 0, None)       # 보수적 수급: 부하는 높게, PV는 낮게
         sh = d["load_p"][max(0, o + 1 - HORIZON):o + 1]; sh = sh / np.maximum(sh.sum(1, keepdims=True), 1e-9)
         if len(sh) < HORIZON: sh = np.vstack([np.tile(sh[:1], (HORIZON - len(sh), 1)), sh])

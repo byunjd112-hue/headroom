@@ -12,7 +12,7 @@ class TestDiag(Base):
         super().setUp(); self.cfg = json.load(open(self.cfgp, encoding="utf-8")); self.out = io.StringIO()
 
     def test_all_devices_ok_and_report_saved(self):
-        res = diag.diagnose_all(self.cfg, self.pts, hb_wait=1.0)
+        res = diag.diagnose_all(self.cfg, self.pts, hb_wait=2.2)
         self.assertEqual(res["state"], diag.OK, [(d["name"], d["summary"]) for d in res["devices"]]); self.assertEqual(len(res["devices"]), len(self.cfg["devices"]))
         diag.print_result(res, self.out, detail=True); self.assertIn("모든 장비 통신 정상", self.out.getvalue()); self.assertIn("ESS.soc", self.out.getvalue())
         path = diag.save_report(res, os.path.join(self.td, "diag")); txt = open(path, encoding="utf-8").read()

@@ -122,6 +122,7 @@ function chart(s, name, x, y, w) { const h = w * 620 / 1200; s.addImage({ path: 
 function fcard(s, x, y, w, h, title, formulas, desc, o = {}) { card(s, x, y, w, h, title, "", { ts: o.ts || 12.5 });
   T(s, formulas.map(t => ({ text: t, options: { fontFace: MATH, fontSize: o.fs || 12.5, bold: true, color: DARK, breakLine: true } })).concat(desc ? [{ text: desc, options: { fontSize: o.ds || 9.8, color: INK } }] : []), { x: x + 0.16, y: y + 0.42, w: w - 0.32, h: h - 0.48, paraSpaceAfter: 3 }); }
 const BN = E.bench, BA = BN.agg;
+const WX = JSON.parse(fs.readFileSync(path.join(__dirname, "wx_eval.json"), "utf8")), WXK = Object.keys(WX.cases);      // 날씨 입력 반영의 측정 결과(docs/ppt/wx_eval.py)
 const SYN = "수치는 합성 현장 자료(씨앗 고정) 결과다. 실제 효과는 현장 자료로 다시 재야 한다.";
 const foot = (s, t) => T(s, t, { x: 0.5, y: 6.82, w: 12.33, h: 0.2, fontSize: 8.5, color: GRAY, valign: "middle" });
 
@@ -288,6 +289,19 @@ pres.addSection({ title: "표지·목차" });
   foot(s, `1회 예측 계산 시간(중앙값): 부하 ${Math.max(...BN.rows.filter(r => r.kind === "load").map(r => r.ms)).toFixed(0)} ms 이하, 태양광 ${Math.max(...BN.rows.filter(r => r.kind === "pv").map(r => r.ms)).toFixed(0)} ms 이하(주의집중은 카메라 열이 없으면 쉬는 경우가 많다). ` + SYN); }
 
 // ═══ 8. 한계 · 결론
+{ const s = page(7, "날씨 정보의 결합 — 장병의 휴대폰 날씨 입력과 군 통신망 날씨 자료", "있으면 쓰고 없으면 AI 예측 그대로 — 넣은 날씨로 만든 예측을 AI 예측과 섞고, 섞는 비율과 날씨 표기의 환산값을 실측으로 스스로 고친다",
+    "작전지에서는 장병이 휴대폰 날씨 앱에 보이는 날씨 표기와 강수 확률을 넣고, 주둔지에서는 군 통신망의 시간별 날씨 자료를 받습니다. 넣은 날씨로 태양광 예측을 따로 만들어 AI 예측과 섞습니다. 섞는 비율은 선행시간마다 그동안의 실측에 가장 잘 맞았을 값으로 정하므로, 도움이 안 되는 구간에서는 스스로 0 에 가까워집니다.");
+  fcard(s, 0.5, 1.72, 6.1, 2.55, "방법 — 식", ["P_wx(t) = P_clear(t) · k(날씨) · c", "k = 1 − 0.75 · (N / 10)^3.4        N: 운량(0~10할)", "P(t) = (1 − w_h) · P_AI(t) + w_h · P_wx(t)", "w_h = Σ(y − P_AI)(P_wx − P_AI) / Σ(P_wx − P_AI)²"],
+    "P_clear 맑은 하늘 발전량, c 설비 보정(최근 14일 맑은 때의 실측 비율). 날씨 표기(맑음 … 흐림 · 비)는 환산표로 N 이 되고, 같은 표기의 실측이 쌓이면 k 를 그 현장의 값으로 옮긴다(6건 = 표 값 한 번의 무게). w_h 는 선행시간 묶음 h(≤1 · ≤3 · ≤6 · 그 뒤 시간)마다 따로, 0 ~ 0.8 로 자른다. 비교가 쌓이기 전에는 0.3.");
+  const R = (k, m, i) => WX.cases[k][m].rows[i], fx = v => v == null ? "—" : v.toFixed(2), hs = WX.cases[WXK[0]].full.rows.map(r => r.h);
+  table(s, 6.73, 1.72, 6.1, ["선행시간", "작전지 수기: AI → 반영", "주둔지 통신망: AI → 반영"], hs.map((h, i) => [h.replace("(날씨 기록이 있는 낮 시간)", ""), `${fx(R(WXK[0], "full", i).ai)} → ${fx(R(WXK[0], "full", i).mix)}`, `${fx(R(WXK[1], "full", i).ai)} → ${fx(R(WXK[1], "full", i).mix)}`]), [28, 36, 36], { bold: [0], center: [1, 2], rowH: 0.36, fs: 10 });
+  const T0 = WX.cases[WXK[0]].full.rows[hs.length - 1], T1 = WX.cases[WXK[1]].full.rows[hs.length - 1], S0 = WX.cases[WXK[0]].full.rows[0], cutp = (a, b) => ((a - b) / a * 100).toFixed(1);
+  note(s, 6.73, 4.05, 6.1, 2.62, "측정 결과 읽기(합성 자료)", [`전체: 수기 입력 ${fx(T0.ai)} → ${fx(T0.mix)}%(${cutp(T0.ai, T0.mix)}% 감소), 통신망 ${fx(T1.ai)} → ${fx(T1.mix)}%(${cutp(T1.ai, T1.mix)}% 감소). 먼 시간(6~24시간)일수록 효과가 크다.`,
+    `1시간 이내는 직전 실측을 아는 AI 가 이미 정확하다 — 수기 입력에서는 ${fx(S0.ai)} → ${fx(S0.mix)}% 로 ${S0.mix > S0.ai ? "조금 나빠졌다" : "거의 같다"}. 가까운 시간에는 기대하지 않는다.`,
+    "가정: 앱 예보가 한 칸 어긋날 확률 오늘 25% · 내일 35%, 통신망 운량 오차 표준편차 1.0 + 0.05 × 선행시간. 합성 자료는 날씨가 하루 단위로 바뀌게 만든 것이다."]);
+  card(s, 0.5, 4.42, 6.1, 2.25, "운용 — 누가 무엇을 넣나", "작전지: 장병이 휴대폰 날씨 앱을 보고 하루 두세 번 날씨 표기 · 강수 확률 · 기온 · 기간(지금부터 3 · 6 · 12시간, 내일, 모레)을 넣는다. 운량 같은 전문 값은 묻지 않는다.\n주둔지: 설정한 주소에서 30분마다 시간별 날씨 자료를 받는다(주소를 못 쓰면 받은 파일을 붙여 넣는다). 받지 못하면 직전 자료와 AI 예측으로 그대로 운전한다.\n겹치면 손으로 넣은 것(현지에서 본 것)이 먼저다. EMS 는 인터넷에 연결하지 않는다.", { ts: 12.5 });
+  foot(s, `오차: 설비 용량 400 kW 대비 평균 절대 오차(%), 날씨 기록이 있는 낮 시간만. 마지막 ${WX.method.hold_days}일을 1시간마다 발행, 씨앗 ${WX.method.seeds.length}개. 재현: python docs/ppt/wx_eval.py. ` + SYN); }
+
 { const s = page(8, "한계와 다음 단계", "지금까지는 합성 자료로 확인했다 — 실제 효과는 현장 자료로 다시 재야 한다",
     "이 자료의 한계를 분명히 밝힙니다.");
   table(s, 0.5, 1.72, 12.33, ["한계", "내용", "다음 단계"], [

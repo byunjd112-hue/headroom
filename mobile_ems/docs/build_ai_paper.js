@@ -5,6 +5,7 @@ const { Paragraph, ImageRun, AlignmentType } = require("docx");
 const E = JSON.parse(fs.readFileSync(path.join(__dirname, "ppt", "ai_paper_eval.json"), "utf8")), LE = JSON.parse(fs.readFileSync(path.join(__dirname, "ppt", "ai_learn_eval.json"), "utf8"));
 const REV = process.argv[2] || "Rev00", DATE = process.argv[3] || "", OUT = process.argv[4] || path.join(__dirname, "out", `이동형전력체계EMS_AI예측_논문_${REV}.docx`);
 const BN = E.bench, BA = BN.agg;
+const WX = JSON.parse(fs.readFileSync(path.join(__dirname, "ppt", "wx_eval.json"), "utf8")), WXK = Object.keys(WX.cases);
 const b = [], PV = E.pv, P0 = PV[0], P1 = PV[1], P3 = PV[2], pc = v => v === null || v === undefined ? "—" : Number(v).toFixed(2) + "%", cut = (a, c) => Math.round((1 - c / a) * 100), NP = E.cost.params_ridge + E.cost.params_att + E.cost.params_alpha;
 let figN = 0, tabN = 0, eqN = 0;
 const C = (t, o = {}) => new Paragraph(Object.assign({ alignment: AlignmentType.CENTER, spacing: { after: 100 }, children: [run(t, o.run || {})] }, o.p || {}));
@@ -108,6 +109,15 @@ para("가중치 후보는 0, 0.25, 0.5, 0.75, 1 이다. 유효 표본이 40개 �
 m3("now", `식 (${EQN})의 보정량 응답면. 실제 결합 함수에 기존 예측 100 kW, 참조와의 차이 −50~+50 kW 를 넣어 계산했다. 가중치는 첫 시험 세트에서 채택된 값(부하 [${E.viz.nowcast.load.w.join(", ")}], 태양광 [${E.viz.nowcast.pv.w.join(", ")}])이다`);
 
 // ── 5. 실험
+b.push(H2("4.8 운용자 · 통신망 날씨 정보의 결합(선택 입력)"));
+para("앞의 방법은 외부 기상 예보 없이 동작한다. 다만 사람이 얻을 수 있는 날씨 정보가 있으면 버릴 이유가 없다. 작전지에서는 장병이 개인 휴대폰의 날씨 앱에서 본 날씨 표기(맑음, 대체로 흐림, 비 등)와 강수 확률, 그 날씨가 이어질 기간을 손으로 넣고, 주둔지에서는 군 통신망으로 시간별 운량 자료를 받는다. EMS 자체는 외부망에 연결하지 않는다. 이 입력은 선택 사항이며, 없는 시간에는 AI 예측을 그대로 쓴다.");
+para("날씨 기록이 있는 시각 t 에 대해 날씨 기반 예측을 따로 만든다. 운량 N(0~10할)과 일사의 관계는 Kasten 과 Czeplak 의 식[11]을 쓴다(원식은 8분위 운량).");
+eq("P_wx(t) = P_clear(t) · k · c,      k = 1 − 0.75 · (N / 10)^3.4");
+para("여기서 P_clear 는 청천 출력, c 는 설비 보정(최근 14일 낮 시간의 실측 ÷ 청천 출력의 위쪽 10% 값)이다. 날씨 표기는 환산표로 N 이 되고(맑음 0.5, 대체로 맑음 2.5, 구름 조금 4, 대체로 흐림 7, 흐림 9, 비 · 눈 10), 강수 확률 p% 가 있으면 N ≥ p/10 − 1 로 본다. 환산표는 현장마다 맞지 않을 수 있으므로, 같은 표기가 쓰인 시각의 실측 비율 y/(P_clear · c) 를 모아 k 를 그 평균 쪽으로 옮긴다(실측 n 건일 때 k ← (6·k_표 + Σ 실측) / (6 + n), 오래된 실측은 2%씩 잊는다).");
+para("최종 예측은 두 예측의 가중 합이다. 가중치 w_h 는 선행시간 묶음 h(1 · 3 · 6시간 이내와 그 뒤)마다 따로 두며, 그동안 적어 둔 예측과 실측에서 제곱 오차를 가장 작게 하는 값으로 정하고 0 ~ 0.8 로 자른다.");
+eq("P(t) = (1 − w_h) · P_AI(t) + w_h · P_wx(t),      w_h = Σ (y − P_AI)(P_wx − P_AI) / Σ (P_wx − P_AI)²");
+para("비교가 쌓이기 전(묶음마다 6건 미만, 전체 8건 미만)에는 w = 0.3 을 쓴다. 날씨 정보가 도움이 되지 않던 묶음에서는 w_h 가 0 에 가까워지므로, 틀린 입력이 이어져도 예측이 계속 나빠지지 않는다. 같은 시각에 수기 입력과 통신망 자료가 겹치면 현지에서 본 수기 입력을 쓴다. 이 결합은 화면의 예측, 자립 지속시간의 하루 태양광 예상량, 운전계획의 태양광 입력에 함께 적용된다.");
+
 b.push(H1("5. 실험"));
 b.push(H2("5.1 기본 예측 비교 시험의 설정"));
 para(`현장 실측이 아직 없어 합성 현장 자료를 썼다. 자료는 ${E.data.days}일(15분 간격)이며 난수 씨앗을 고정해 다시 만들 수 있다. 날씨는 맑음·구름·비의 세 상태를 하루 단위로 옮겨 다니고, 구름에 의한 투과율은 평균으로 돌아가는 1차 자기회귀 과정으로 만들었다. 부하는 고정 부하와 주간 활동 부하, 기온에 따른 냉방 부하, 편성 단계에 따른 배율로 구성했다. 하늘 카메라 구름량은 '카메라가 하늘 전체를 보므로 15~30분 뒤 태양을 가릴 구름을 미리 본다'는 가정에 따라, 한두 구간 뒤 투과율의 평균에 잡음을 더해 만들었다. 설비 용량은 ${E.data.kwp} kW, 시험 기간 평균 부하는 ${E.data.mean_load} kW 이다.`);
@@ -139,6 +149,13 @@ para(`5.1~5.2절의 시험은 합성 하늘 카메라 열을 포함한다. 이 �
   para(`예측 구간은 재점검에서 문제가 드러난 부분이다. 학습 때 한 번만 보정한 구간으로 학습 8~22일 뒤를 재면 태양광의 24시간 포함률이 세트에 따라 ${BA.pv.cov24_static[0]}%까지 내려갔다. 실제 운용에서는 학습 주기(24시간)마다 구간을 다시 맞추므로 시험도 그렇게 재도록 고쳤고, 여기에 4.2절의 변동 여유를 더했다. 그 결과 24시간 포함률은 부하 ${BA.load.cov24[0]}~${BA.load.cov24[1]}%(평균 ${BA.load.cov24[2]}%), 태양광 ${BA.pv.cov24[0]}~${BA.pv.cov24[1]}%(평균 ${BA.pv.cov24[2]}%)로 목표 80% 부근에 모였다. 다만 배율을 모든 선행시간 구간에 같이 쓰기 때문에 15분~1시간 구간의 태양광 포함률은 90% 안팎으로 목표보다 넓게 나온다.`); }
 
 // ── 6. 고찰
+b.push(H2("5.5 날씨 정보 결합의 평가"));
+{ const R = (k, m) => WX.cases[k][m].rows, fx = v => v == null ? "—" : v.toFixed(2), cutp = (a, b) => ((a - b) / a * 100).toFixed(1), A = R(WXK[0], "full"), B = R(WXK[1], "full"), Ap = R(WXK[0], "plain"), n = A.length - 1;
+  para(`합성 자료 ${WX.method.days}일 가운데 마지막 ${WX.method.hold_days}일을 빼고 학습한 뒤, 그 ${WX.method.hold_days}일을 시간 순서대로 지나가며 1시간마다 24시간 예측을 내고 제품과 같은 코드로 날씨 기록을 섞었다. 수기 입력은 하루 세 번(07 · 12 · 17시) 넣는 것으로, 앱의 표기는 그 기간의 실제 평균 구름에 가장 가까운 다섯 가지 가운데 하나이고 한 칸 어긋날 확률을 오늘 25%, 내일 35% 로 두었다. 통신망 자료는 6시간마다 받는 시간별 운량이며 오차의 표준편차를 1.0 + 0.05 × 선행시간(시간)으로 두었다. 씨앗 ${WX.method.seeds.length}개의 결과를 합쳤고, 오차는 날씨 기록이 있는 낮 시간만 설비 용량 대비 평균 절대 오차로 쟀다.`);
+  tbl("날씨 정보 결합의 효과(설비 용량 대비 평균 절대 오차 %, 합성 자료)", ["선행시간", "수기: AI", "수기: 날씨만", "수기: 결합", "통신망: AI", "통신망: 날씨만", "통신망: 결합"], A.map((r, i) => [r.h.replace("(날씨 기록이 있는 낮 시간)", ""), fx(r.ai), fx(r.wx), fx(r.mix), fx(B[i].ai), fx(B[i].wx), fx(B[i].mix)]), [22, 13, 13, 13, 13, 13, 13], { bold: [0], center: [1, 2, 3, 4, 5, 6] });
+  para(`날씨 기록이 있는 낮 시간 전체에서 수기 입력은 ${fx(A[n].ai)}% 를 ${fx(A[n].mix)}% 로(${cutp(A[n].ai, A[n].mix)}% 감소), 통신망 자료는 ${fx(B[n].ai)}% 를 ${fx(B[n].mix)}% 로(${cutp(B[n].ai, B[n].mix)}% 감소) 줄였다. 효과는 먼 선행시간에서 크다 — 6~24시간에서 수기 ${fx(A[3].ai)} → ${fx(A[3].mix)}%, 통신망 ${fx(B[3].ai)} → ${fx(B[3].mix)}%. 1시간 이내는 직전 실측을 쓰는 기본 예측이 이미 정확해서 수기 입력에서는 ${fx(A[0].ai)}% 가 ${fx(A[0].mix)}% 로 ${A[0].mix > A[0].ai ? "오히려 조금 커졌고" : "거의 같았고"}, 통신망 자료에서는 ${fx(B[0].ai)} → ${fx(B[0].mix)}% 였다. 표기별 실측 보정은 수기 입력의 '날씨만' 오차를 ${fx(Ap[n].wx)}% 에서 ${fx(A[n].wx)}% 로 줄였다.`);
+  para("이 결과는 합성 자료가 날씨를 하루 단위의 맑음 · 구름 · 흐림 상태로 바꾸게 만들어져 '내일 날씨'가 실제 정보가 되는 조건에서 얻은 것이다. 앱과 통신망 예보의 오차 크기는 가정이다. 현장에서는 화면에 표시되는 견준 오차와 선행시간별 가중치로 효과를 다시 확인해야 한다."); }
+
 b.push(H1("6. 고찰과 한계"));
 para("효과는 가까운 구간에 집중되었다. 하늘 카메라는 태양을 가리기 전의 구름을 먼저 보므로 수십 분~2시간의 예측을 돕지만, 반나절 뒤의 날씨에 대해서는 정보를 주지 못한다. 외부 예보를 쓸 수 없는 조건에서 먼 구간의 오차는 계절과 최근 추세가 설명하는 수준에 머문다. EMS 의 발전기 기동과 ESS 충·방전 판단은 가까운 구간의 예측에 민감하므로 이 개선은 실용적 의미가 있으나, 연료 절감량으로 환산한 효과는 본 논문에서 측정하지 않았다.");
 para("본 연구의 가장 큰 한계는 합성 자료이다. 예측 정확도만 쟀으며 발전기 기동 횟수, ESS 여유, 연료 소비에 주는 운전 효과는 재지 않았다. 실제 부하와 날씨는 합성 과정보다 불규칙하며, 특히 '카메라가 15~30분 뒤의 구름을 본다'는 가정은 결과에 직접 영향을 준다. 실제 선행 시간은 구름 높이와 풍속에 따라 달라지고, 색 비율과 고정 경계값에 의한 구름 판정은 태양 주변의 눈부심, 렌즈 오염, 박무에 약하다고 알려져 있다. 따라서 표의 개선 폭을 현장에서 그대로 기대할 수는 없다. 다만 섞는 비율과 모델 교체가 모두 검증 오차로 결정되므로, 현장에서 카메라나 주의집중이 도움이 되지 않으면 해당 요소가 자동으로 꺼지고 릿지 회귀 수준의 성능이 유지되도록 설계되어 있다.");
@@ -159,7 +176,8 @@ b.push(H1("참고문헌"));
  "[7] C. W. Chow et al., “Intra-hour forecasting with a total sky imager at the UC San Diego solar energy testbed,” Solar Energy, vol. 85, no. 11, pp. 2881–2893, 2011.",
  "[8] A. Vaswani et al., “Attention is all you need,” in Advances in Neural Information Processing Systems 30, 2017.",
  "[9] E. A. Nadaraya, “On estimating regression,” Theory of Probability and Its Applications, vol. 9, no. 1, pp. 141–142, 1964.",
- "[10] G. S. Watson, “Smooth regression analysis,” Sankhyā: The Indian Journal of Statistics, Series A, vol. 26, no. 4, pp. 359–372, 1964."].forEach(t => b.push(P(t, { spacing: { after: 60, line: 280 }, indent: { left: 420, hanging: 420 } })));
+ "[10] G. S. Watson, “Smooth regression analysis,” Sankhyā: The Indian Journal of Statistics, Series A, vol. 26, no. 4, pp. 359–372, 1964.",
+ "[11] F. Kasten and G. Czeplak, “Solar and terrestrial radiation dependent on the amount and type of cloud,” Solar Energy, vol. 24, no. 2, pp. 177–189, 1980."].forEach(t => b.push(P(t, { spacing: { after: 60, line: 280 }, indent: { left: 420, hanging: 420 } })));
 b.push(H1("부록 A. 재현 방법과 설정값"));
 tbl("주요 설정값", ["항목", "값", "항목", "값"], [["시간 간격 / 예측 범위", "15분 / 96구간", "릿지 벌점 λ", "3"], ["선행시간 구간", "≤1·2·4·8·16·24시간", "전일 값 혼합", "20%"], ["보정 구간", "최근 7일", "예측 구간", "10~90% 분위수"], ["변동 여유", "최근 2일, 하한 75%", "배율 후보", "1 ~ 2.5 (7단계)"], ["실측 가중치 후보", "0, ¼, ½, ¾, 1", "실측 채택 조건", "40표본, MAE 2%↓, 포함률 −2%p 이내"], ["구름 판정 경계", "ρ > −0.12", "사진 유효 시간", "180초"], ["기억 간격", "1시간", "중요도 후보", "×2, ×½, 0 (2회)"], ["섞는 비율 후보", "0, ¼, ½, ¾, 1", "최소 개선", "2%"], ["검증 구간", "최근 3일", "재학습 주기", "24시간"], ["정확도 한도", "NMAE 15%", "보관 판 수", "10"]], [26, 24, 26, 24], { bold: [0, 2] });
 para("수치와 그림은 다음 순서로 다시 만들 수 있다: python docs/ppt/ai_paper_eval.py (수치) → node docs/ppt/ai_render3d.js (입체 그림) → node docs/ppt/ai_charts.js (그래프) → python docs/build_all.py (문서). 독립 시험은 python -m tools.forecast_benchmark --out docs/forecast_benchmark.json (매일 보정) 과 --static-interval (한 번 보정) 로 다시 잴 수 있다. 구현은 ifps_ems/forecast.py, attn.py, skycam.py, nowcast.py, learner.py 에 있으며 시험은 tests/test_sky.py, test_learner.py, test_nowcast.py, test_interval.py 이다.");

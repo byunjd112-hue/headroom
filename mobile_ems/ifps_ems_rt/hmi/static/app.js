@@ -110,7 +110,8 @@ const P_OV = {
     [["tLoad", 1, TV("--load")], ["tPv", 2, TV("--pv")], ["tSoc", 6, TV("--ess")], ["tFuel", 7, TV("--fc")], ["tRes", 8, TV("--g1")], ["tAuto", 3, TV("--dg")]].forEach(([id, ci, col]) => { const c = $("#tsp-" + id); if (c) spark(c, tw.map(r => r[ci]), col, 30, id === "tSoc" ? 0 : null, id === "tSoc" ? 100 : null); });
     siteUpdate(s);
     const sst = siteState(s), nbad = Object.values(sst).filter(x => x.st === "bad").length;
-    $("#siteSum").className = "pill " + (nbad ? "bad" : "ok"); $("#siteSum").textContent = nbad ? `이상 ${nbad}개소` : `전 장비 정상 · ${Object.keys(sst).length}개소`;
+    const rs = RingView.sum(s), nb = nbad + (rs ? rs.n : 0);                          // 환망의 차단 구간 · 정전 마디도 이상 개소에 넣는다
+    $("#siteSum").className = "pill " + (nb ? "bad" : "ok"); $("#siteSum").textContent = nb ? `이상 ${nb}개소` : `전 장비 정상 · ${Object.keys(sst).length}개소`; $("#siteSum").title = rs ? "환망: " + rs.text : "";
     const mix = [["태양광", k.pv, TV("--pv")], ["디젤", k.dg, TV("--dg")], ["연료전지", k.fc, TV("--fc")], ["ESS 방전", Math.max(0, k.ess), TV("--ess")]].concat(o.mode === "grid" ? [["상전", Math.max(0, k.grid || 0), TV("--g1")], ["주둔지 발전기", Math.max(0, k.gdg || 0), TV("--warn")]] : []), gsum = mix.reduce((x, mm) => x + mm[1], 0);
     $("#mixDn").innerHTML = mixDonut(mix, gsum, 132); $("#mixSub").textContent = `부하 ${F.kw(k.load)} kW`;
     $("#mixLeg").innerHTML = mix.map(([n, v, c]) => `<div><i style="background:${c}"></i><span>${n}</span><b class="mono">${F.kw(v)}</b><em>${gsum > 0 ? F.n(v / gsum * 100, 0) : 0}%</em></div>`).join("") + `<div class="ren"><span>재생에너지 비율</span><b>${F.n(k.renew, 0)}%</b></div>`;
@@ -135,6 +136,7 @@ const P_SLD = {
     $("#sldLeg").innerHTML = this.chart.o.series.map(x => `<span><i style="background:${x.color}"></i>${x.label}</span>`).join("");
   },
   update(s) {
+    if (!!s.ring !== this.ring) { this.ring = !!s.ring; $(".sldbox").innerHTML = sldSvg(); }       // 환망이 생기거나 없어지면 그림 틀을 다시 짠다(부하가 환망 아래로 간다)
     sldUpdate(s);
     const k = s.kpi, gw = s.devices.MTR && s.devices.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? -1) : -1;
     $("#busKv").innerHTML = `<span class="k">모선 A 전압</span><span class="v">${F.n(val("BUS.a_v"), 1)} V</span><span class="k">모선 B 전압</span><span class="v">${F.n(val("BUS.b_v"), 1)} V</span>
@@ -174,7 +176,7 @@ const P_CTL = {
           <div style="display:flex;gap:8px;align-items:center;margin-top:6px"><span class="lab" style="width:54px">운용 태세</span><div class="seg" id="postSeg"><button data-v="평시">평시</button><button data-v="저소음">저소음</button><button data-v="자립">자립</button></div></div>
           <div class="kv band" style="margin-top:10px" id="ctlKv"></div><div class="interlock" id="ctlNote"></div></div></div>
         <div class="panel"><div class="hd"><h3>⑥ 차단기 · 부하 관리</h3><div class="spacer"></div><span class="sub">보호 차단은 IED 수행</span></div>
-          <div class="bd np"><table class="t tc"><tbody id="cbRows"></tbody></table></div></div>
+          <div style="overflow:auto" class="bd np"><table class="t tc"><tbody id="cbRows"></tbody><tbody id="ringRows"></tbody></table></div></div>
         <div class="panel"><div class="hd"><h3>${t("ctl.log", "최근 지령")}</h3><div class="spacer"></div><span class="sub" id="qInfo"></span></div><div class="bd np fill-scroll"><table class="t tc"><tbody id="cmdlog"></tbody></table></div></div>
       </div></div>`;
     const POST_MSG = { "평시": "평시 태세로 바꿉니까?", "저소음": "저소음 태세로 바꿉니까?\n· 디젤 발전기를 기동하지 않습니다(연료전지는 사용)\n· 3등급 부하를 자동으로 차단합니다", "자립": "자립 태세로 바꿉니까?\n· 외부 보급 없이 목표 시간을 버티도록 부하를 단계적으로 관리합니다" };
@@ -248,6 +250,10 @@ const P_CTL = {
       const spb = $(`#devs [data-sp="${u.id}"]`); if (spb) spb.disabled = !can("operator") || lost;
     }
     const ld = { L1: k.l1, L2: k.l2, L3: k.l3 };
+    const rg = s.ring, rr = $("#ringRows");                                          // 환망 구간 개폐기(감시 전용 — 조작은 보호 · 배전 자동화가 한다)
+    if (rr) { const sig = rg ? JSON.stringify([rg.sections.map(x => x.state), rg.fsu.map(f => [f.name, f.live])]) : ""; if (rr.dataset.sig !== sig) { rr.dataset.sig = sig;
+      rr.innerHTML = !rg ? "" : `<tr><td colspan="5" class="muted" style="font-size:11.5px;padding-top:10px">환망 구간 개폐기 · <a href="#ring" style="color:var(--accent);text-decoration:none">환망 화면 →</a></td></tr>` + rg.sections.map(x => { const [a, b] = RingView.ends(rg, x.i);
+        return `<tr title="감시 전용"><td class="mono"><b>구간 ${x.i}</b></td><td>${x.state == null ? '<span class="pill">미상</span>' : x.state === 1 ? '<span class="pill ok">투입</span>' : x.state === 2 ? '<span class="pill bad">차단</span>' : '<span class="pill warn">개방</span>'}</td><td colspan="3" class="muted" style="font-size:11.5px">${esc(a)} ↔ ${esc(b)}${x.open ? " · 상시 개방점" : ""}</td></tr>`; }).join(""); } }
     for (const [f] of CB_ROWS) {
       const c = cb(f), code = Math.round(val("FLT." + f) || 0);
       $("#cbs2-" + f).innerHTML = c === 1 ? `<span class="pill ok">투입</span>` : c === 2 ? `<span class="pill bad">트립</span>` : c === 0 ? `<span class="pill warn">개방</span>` : `<span class="pill">미상</span>`;

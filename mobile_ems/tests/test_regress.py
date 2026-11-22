@@ -140,7 +140,7 @@ class TestForecastWithoutSampleFiles(unittest.TestCase):
                     while eng._fc_busy and time.time() - t0 < 60: time.sleep(0.1)
                     nxt = datetime.strptime(eng.fc_cache["issued"], "%Y-%m-%d %H:%M"); self.assertEqual(nxt - issued, timedelta(minutes=15))    # 구간이 넘어가면 발행 시각이 따라 움직인다
                 finally:
-                    type(eng)._slot_now = real
+                    type(eng)._slot_now = staticmethod(real)
                 eng.sim = False; shutil.rmtree(empty); eng._compute_forecast()                       # 실장치: 이력이 모자라면 이유를 알려 준다
                 self.assertFalse(eng.fc_cache["ok"]); self.assertIn("8일", eng.fc_cache["why"]); self.assertNotIn("FileNotFound", eng.fc_cache["why"])
             finally:

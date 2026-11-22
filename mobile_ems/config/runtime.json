@@ -249,6 +249,16 @@
   "bias_slots": 8,
   "bias_tau": 8
  },
+ "weather": {
+  "enabled": true,
+  "url": "",
+  "interval_min": 30,
+  "timeout_s": 5,
+  "only_garrison": true,
+  "w0": 0.3,
+  "w_max": 0.8,
+  "keep_days": 30
+ },
  "hmi": {
   "bind": "127.0.0.1",
   "port": 8080,

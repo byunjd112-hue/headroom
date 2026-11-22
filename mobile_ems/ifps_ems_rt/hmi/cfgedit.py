@@ -11,7 +11,7 @@
 import csv, difflib, hashlib, io, json, math, os, re, tempfile, time
 from .. import pointmap as pm
 from .. import opsmode as om
-from .. import archive, ring
+from .. import archive, ring, weather
 from ..modbus import NREG, ORDERS
 
 MASK = "********"; SECRET = re.compile(r"^(pin_|audit_key)"); KEEP = 20
@@ -122,7 +122,7 @@ def _check_sections(cfg, bad):
     if not isinstance(ai, dict): bad.append("ai: 객체여야 함"); ai = {}
     for k, (lo, hi) in AI_RANGE.items():
         if k in ai and not _in(ai[k], lo, hi): bad.append(f"ai.{k}: {lo}~{hi} 범위의 숫자")
-    _check_archive(cfg.get("archive"), bad); ring.check(cfg.get("ring"), bad)
+    _check_archive(cfg.get("archive"), bad); ring.check(cfg.get("ring"), bad); weather.check(cfg.get("weather"), bad)
 
 
 def _check_archive(ar, bad):

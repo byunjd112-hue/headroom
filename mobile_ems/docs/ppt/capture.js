@@ -67,6 +67,9 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   // 4) 작전지 저소음 태세 → 3등급 자동 차단
   await post("/api/ops", { posture: "저소음" }); await p.waitForTimeout(7000); await go("control", "r18_ctl_quiet"); await go("overview", "r18_ov_quiet", 1500);
   await post("/api/ops", { posture: "평시" });
+  // 4-0) 날씨 입력(흐림) → 예측에 반영된 모습
+  await post("/api/weather", { do: "manual", sky: "대체로 흐림", pop: 40, temp: 11, hours: 12, note: "날씨 앱 기준" }); await p.waitForTimeout(9000); await go("energy", null, 7000);
+  await p.evaluate(() => document.querySelector("#wxPanel")?.scrollIntoView({ block: "end" })); await p.waitForTimeout(1500); await p.screenshot({ path: D + "weather.png" });
   // 4-1) 같은 종류 장치를 한 대씩 더 놓는다 → 조작 없이 개요·결선도가 다시 짜인다
   for (const n of ["DG2", "ESS2", "PV2"]) await sim({ action: "unit", target: n, on: true });
   await p.waitForTimeout(16000); await post("/api/ack", { ids: "all" }); await go("overview", "fleet_ov", 2500); await go("sld", "fleet_sld", 2500);

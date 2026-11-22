@@ -16,7 +16,16 @@ const RingView = {
           return `<g class="rv-ppdu" data-unit="${esc(p.id)}"><line class="rg-l ${pc === "on" ? "on" : pc === "off" ? "trip" : "na"} thin" x1="${X}" y1="${j ? py - 30 : y + 19}" x2="${X}" y2="${py - 14}"/><rect class="rg-p ${pc} ${p.vital ? "vital" : ""}" x="${X - 62}" y="${py - 14}" width="124" height="30" rx="5"/>
             <text class="rg-nt" x="${X}" y="${py + 5}" text-anchor="middle">${esc(p.id)}${p.kw == null ? "" : " · " + p.kw.toFixed(1) + " kW"}${p.vital ? " ★" : ""}</text></g>`; }).join(""); }).join("");
     return `<svg viewBox="0 0 ${W} ${H}" class="rg-svg ${o.cls || ""}"><path class="rg-back" d="M${x0} ${y} V26 H${x1} V${y}"/><path class="rg-l on" d="M${x0} ${y} H${x0 + 20}"/><path class="rg-l on" d="M${x1 - 20} ${y} H${x1}"/>
-      <rect class="rg-src" x="${W / 2 - 80}" y="12" width="160" height="28" rx="6"/><text class="rg-nt" x="${W / 2}" y="31" text-anchor="middle">전원(배전반 · 모선 B)</text>${seg}${nodes}</svg>`;
+      <rect class="rg-src" x="${W / 2 - 80}" y="12" width="160" height="28" rx="6"/><text class="rg-nt" x="${W / 2}" y="31" text-anchor="middle">전원(배전반 · 모선 A ↔ B)</text>${seg}${nodes}</svg>`;
+  },
+  /* 다른 화면(개요 · 결선도 · 설비 제어)이 같이 쓰는 것: 지금 상태(snapshot 의 ring)로 그림용 모형 · 한 줄 요약 · 구간 이름을 만든다 */
+  fromSnap(s) { const r = s && s.ring; return r ? { sections: r.sections, fsu: r.fsu, ppdu: r.ppdu } : null; },
+  ends(r, i) { return [i === 0 ? "전원" : r.fsu[i - 1].name, i === r.fsu.length ? "전원" : r.fsu[i].name]; },
+  sum(s) {
+    const r = s && s.ring; if (!r) return null;
+    const cut = r.cut.map(i => `구간 ${i}(${this.ends(r, i).join(" ↔ ")}) 차단`), dead = r.fsu.filter(f => f.live === false).map(f => f.name), pd = r.ppdu.filter(p => p.live === false || p.mccb === 2).map(p => p.name);
+    const bad = dead.length || pd.length, txt = [...cut, dead.length ? `정전: ${dead.join(", ")}` : "", pd.length ? `배전체계 정전·트립: ${pd.join(", ")}` : "", r.switched && !dead.length ? "반대쪽에서 공급 중(여유 없음)" : ""].filter(Boolean).join(" · ");
+    return { cls: bad ? "bad" : cut.length || r.switched ? "warn" : "ok", text: txt || `전 마디 공급 · 구간분전함 ${r.fsu.length} · 배전체계 ${r.ppdu.length}`, cut: r.cut, n: cut.length + dead.length + pd.length };
   },
   /* 시나리오 검증기가 단계마다 남긴 값(snap)에서 그림용 모형을 만든다 */
   fromValues(cfg, v) {

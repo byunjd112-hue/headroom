@@ -7,7 +7,7 @@
   · 배전체계가 어느 구간분전함에 물렸는지는 PPDUk.up(상위 구간분전함의 ID)으로 안다. 이 신호가 없으면 목록의 값(at)을 쓴다.
   · ID 의 윗자리(0x46 = FSU, 0x50 = PPDU)로 종류를 가린다. ID 체계와 PPDUk.up 신호는 가정이다 — 실제 장치의 사양이 정해지면 맞춘다.
 
-  전원(배전반) ─[RING.sw0]─ FSU1 ─[FSU1.sw]─ FSU2 ─[FSU2.sw]─ … ─ FSUn ─[FSUn.sw]─ 전원
+  모선 A ─[RING.sw0]─ FSU1 ─[FSU1.sw]─ FSU2 ─[FSU2.sw]─ … ─ FSUn ─[FSUn.sw]─ 모선 B      (고리의 양 끝이 배전반의 두 모선에 하나씩 물린다)
   · FSU(구간분전함): 고리의 마디. 신호 FSUk.id(장치 ID) · FSUk.v(마디 전압) · FSUk.sw(다음 구간으로 나가는 개폐기: 0 개방 · 1 투입 · 2 차단)
   · PPDU(20 kW급 초경량 휴대용 배전체계, PPDU-20): FSU 에서 받아 시설 부하로 나누어 준다(전력 흐름: ⑥ 배전체계 → FSU → PPDU → 6회로 → 시설 부하).
     주 차단기(MCCB 40 A) 아래 분기 6회로 — CH1·CH2 3상 16 A(10.5 kW), CH3~CH6 단상 20 A(4.4 kW). CH2 는 PPDU 끼리의 환상 연결용.
@@ -270,9 +270,10 @@ class Model:
 
     def _fsu_live(self, e):
         """구간 개폐기와 단선으로 구간분전함마다 전기가 들어오는지 계산해 전압을 넣는다. 반환: {FSU: 공급 여부}"""
-        sw = sw_tags(e); src = "BUS.b_v" not in self.p.by_tag or self.p.get("BUS.b_v") > V_LIVE; self.armed = self.armed or src; src = src or not self.armed       # 모선 전압을 한 번 본 뒤부터 전원 정전을 따진다
+        sw = sw_tags(e); bus = lambda t: t not in self.p.by_tag or self.p.get(t) > V_LIVE; a, b = bus("BUS.a_v"), bus("BUS.b_v")       # 왼쪽 끝은 모선 A, 오른쪽 끝은 모선 B
+        self.armed = self.armed or a or b; a, b = (a, b) if self.armed else (True, True)                                              # 모선 전압을 한 번 본 뒤부터 전원 정전을 따진다
         ok = [int(round(self.p.get(t))) == 1 and not self._broken(i) for i, t in enumerate(sw)]; live = {}
-        for f, on in zip(e["fsu"], _fed(ok, len(e["fsu"]))): live[f["id"]] = src and on
+        for k, f in enumerate(e["fsu"]): live[f["id"]] = (a and all(ok[:k + 1])) or (b and all(ok[k + 1:]))
         for k in range(1, self._n("fsu") + 1):
             if f"FSU{k}.v" in self.p.by_tag: self.p.set(f"FSU{k}.v", 380.0 if live.get(f"FSU{k}") else 0.0)
         return live

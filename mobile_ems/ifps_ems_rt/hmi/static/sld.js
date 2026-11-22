@@ -2,6 +2,7 @@
    통전 판정: 모선 전압(BUS.a_v/b_v, 보호 IED 게이트웨이)이 있으면 실측을 쓰고, 없으면 차단기·운전 상태로 추정한다. */
 "use strict";
 const BUS_Y = 316, SY = 78, SR = 48, LY = 474, LR = 42;
+const RG = { YR: 410, X0: 42, X1: 958, H: 668 };      // 환망이 있으면 부하는 구간분전함 아래에 달고(등급별 합계는 맨 아래 글), 그림 높이는 H      // 환망: 모선 A(X0) 와 모선 B(X1) 에서 내려와 구간분전함 줄(YR)에서 만난다. 환망이 있으면 부하는 그 아래로 DY 만큼 내려 환망에 단다
 const SRC = [
   { id: "GRID", name: "상전 수전", en: "UTILITY GRID", x: 70, col: "g1", kw: "GRID.kw", sub: "22.9kV 수전", bus: "A" },
   { id: "PV", name: "태양광 PV", en: "SOLAR PV", x: 195, col: "pv", kw: "PV.kw", sub: "80kWp × 5", bus: "A" },
@@ -38,7 +39,7 @@ function faultMark(id, x, y) {
     <g transform="translate(${x + 18},${y - 10})"><rect width="118" height="20" rx="10"/><text x="10" y="14" id="fmt-${id}">고장</text></g></g>`;
 }
 function sldSvg() {
-  const ko = S.lang === "ko";
+  const ko = S.lang === "ko", ring = !!(S.snap && S.snap.ring), LO = BUS_Y, LYY = LY, SLD_H = ring ? RG.H : 610;      // 환망이 있으면 등급별 부하 그림은 감추고(값은 맨 아래 글과 오른쪽 표) 부하를 구간분전함 아래에 그린다
   const hex = (n, cy, r, color, icon, isLoad) => `<g class="node" id="n-${n.id}">
     <clipPath id="cp-${n.id}"><rect x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" rx="12"/></clipPath>
     <rect class="hexbg" x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" rx="12"/>
@@ -57,21 +58,21 @@ function sldSvg() {
     <text class="fv" id="fv-${n.id}" x="${n.x - 12}" y="${BUS_Y - 18}" text-anchor="end"></text>
     ${cbSym(n.id, n.x, BUS_Y - 54)}${faultMark(n.id, n.x, top + 14)}${hex(n, SY, SR, `var(--${n.col})`, ICON[n.id], false)}`).join("");
   const lds = LOADS.map(n => `
-    <path class="ln" id="lu-${n.id}" d="M${n.x} ${BUS_Y} V${BUS_Y + 37}"/><path class="ln" id="ld-${n.id}" d="M${n.x} ${BUS_Y + 55} V${LY - LR}"/>
-    <path class="flow" id="f-${n.id}" d="M${n.x} ${BUS_Y + 57} V${LY - LR - 2}" stroke="var(--live)"/>
-    <text class="fv" id="fv-${n.id}" x="${n.x - 12}" y="${BUS_Y + 88}" text-anchor="end"></text>
-    ${cbSym(n.id, n.x, BUS_Y + 46)}${faultMark(n.id, n.x, BUS_Y + 92)}${hex(n, LY, LR, n.col, ICON.L, true)}`).join("");
-  return `<svg class="sld" viewBox="0 0 1000 610" preserveAspectRatio="xMidYMid meet">
+    <path class="ln" id="lu-${n.id}" d="M${n.x} ${LO} V${LYY - 121}"/><path class="ln" id="ld-${n.id}" d="M${n.x} ${LYY - 103} V${LYY - LR}"/>
+    <path class="flow" id="f-${n.id}" d="M${n.x} ${LYY - 101} V${LYY - LR - 2}" stroke="var(--live)"/>
+    <text class="fv" id="fv-${n.id}" x="${n.x - 12}" y="${LYY - 70}" text-anchor="end"></text>
+    ${cbSym(n.id, n.x, LYY - 112)}${faultMark(n.id, n.x, LYY - 66)}${hex(n, LYY, LR, n.col, ICON.L, true)}`).join("");
+  return `<svg class="sld" viewBox="0 0 1000 ${SLD_H}" preserveAspectRatio="xMidYMid meet">
     <defs><radialGradient id="hexFill" cx="50%" cy="40%" r="65%"><stop offset="0" style="stop-color:var(--hexA)"/><stop offset="1" style="stop-color:var(--hexB)"/></radialGradient>
       <linearGradient id="hexStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--hexS1)"/><stop offset="1" style="stop-color:var(--hexS2)"/></linearGradient>
-      <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="1000" height="610"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+      <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="1000" height="${SLD_H}"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
     ${src}
     <path class="bus" id="busA" d="M40 ${BUS_Y} H478"/><path class="bus" id="busB" d="M522 ${BUS_Y} H960"/>
     <path class="flow" id="f-TIE" d="M430 ${BUS_Y} H570" stroke="var(--live)"/>
     ${cbSym("TIE", 500, BUS_Y, true)}${faultMark("TIE", 500, BUS_Y - 46)}
-    <text class="buslbl" x="44" y="${BUS_Y + 22}" id="blA">${ko ? "모선 A" : "BUS A"}</text><text class="buslbl" x="530" y="${BUS_Y + 22}" id="blB">${ko ? "모선 B" : "BUS B"}</text>
+    <text class="buslbl" x="${ring ? 58 : 44}" y="${BUS_Y + 22}" id="blA">${ko ? "모선 A" : "BUS A"}</text><text class="buslbl" x="530" y="${BUS_Y + 22}" id="blB">${ko ? "모선 B" : "BUS B"}</text>
     <text class="fv" id="fv-TIE" x="500" y="${BUS_Y + 46}" text-anchor="middle"></text>
-    ${lds}</svg>`;
+    <g id="sldRingG" class="sring"></g><g ${ring ? 'style="display:none"' : ""}>${lds}</g></svg>`;
 }
 function setFlow(id, kw, cap, on = true) {
   const f = document.getElementById("f-" + id); if (!f) return; const a = Math.abs(kw || 0);
@@ -85,6 +86,38 @@ function sldUnits(id) {
   const g = document.getElementById("un-" + id); if (!g) return; const f = KF(id), us = f && f.units.length > 1 ? f.units : [], sig = JSON.stringify(us.map(u => [u.id, u.live, u.on])); if (g.dataset.sig === sig) return; g.dataset.sig = sig;
   const x0 = +g.dataset.x - us.length * 17 + 1, y = +g.dataset.y;
   g.innerHTML = us.map((u, i) => `<g class="uchip ${u.live ? (u.on ? "on" : "off") : "lost"}"><title>${u.id} · ${u.live ? (u.on ? "운전" : "정지") : "통신 두절"}</title><rect x="${x0 + i * 34}" y="${y - 8}" width="32" height="15" rx="4"/><text x="${x0 + i * 34 + 16}" y="${y + 3.5}" text-anchor="middle">${u.id}</text></g>`).join("");
+}
+/* 환망(구간분전함 · 휴대용 배전체계)을 결선도 안에 그린다 — 모선과 부하 사이에: 모선 A ─(구간 0)─ 구간분전함 1 … n ─(구간 n)─ 모선 B.
+   등급별 부하는 이 고리 아래에 등급별 차단기를 거쳐 달린다(모선 → 환망 → 차단기 → 부하). 자동 인식한 대수가 바뀌면 스스로 다시 그린다 */
+function sldRing(s, live) {
+  const g = document.getElementById("sldRingG"); if (!g) return; const r = s.ring;
+  const sig = r ? JSON.stringify([live, S.lang, [1, 2, 3].map(c => [Math.round(val("CB.L" + c) ?? 1), Math.round((val("LOAD.p" + c + "_kw") || 0) * 2)]), !!(S.sprites && S.sprites.l1), r.ppdu.map(p => p.ch.map(q => Math.round((q.kw || 0) * 5))), r.sections.map(x => x.state), r.fsu.map(f => [f.id, f.name, f.live]), r.ppdu.map(p => [p.id, p.name, p.at, p.live, p.mccb, p.vital, Math.round((p.kw || 0) * 2), p.ch.filter(c => c.cb === 2 && c.cls > 0).length])]) : "";
+  if (g.dataset.sig === sig) return; g.dataset.sig = sig; if (!r) { g.innerHTML = ""; return; }
+  const { YR, X0, X1 } = RG, n = r.fsu.length, xs = k => X0 + (X1 - X0) * (k + 1) / (n + 1), ym = (BUS_Y + YR) / 2, sm = RingView.sum(s);
+  const liveAt = k => k < 0 ? live.A : k >= n ? live.B : r.fsu[k].live === true;                                             // 구간 양 끝 가운데 한쪽이라도 살아 있으면 그 구간에 전압이 있다
+  const sw = (x, y, st) => `<g class="cbk ${st == null ? "unk" : st === 1 ? "closed" : st === 2 ? "trip" : "open"}"><rect x="${x - 7}" y="${y - 7}" width="14" height="14" rx="2.5"/><path class="x" d="M${x - 4} ${y - 4}l8 8M${x + 4} ${y - 4}l-8 8"/></g>`;
+  let h = `<text class="cbl" x="${X0 + 14}" y="${ym + 2}">환망 급전 A</text><text class="cbl" x="${X1 - 14}" y="${ym + 2}" text-anchor="end">환망 급전 B</text>
+    <text class="sring-t ${sm.cls}" x="${X0 + 118}" y="${YR - 46}">${esc("환망 · " + (sm.cut.length ? "구간 " + sm.cut.join(", ") + " 차단" + (r.switched ? " · 반대쪽에서 공급 중" : "") : r.ok ? "전 마디 공급" : "확인 필요"))}</text>`;
+  r.sections.forEach(x => { const i = x.i, cls = x.state === 2 ? "flt" : x.state === 0 || x.state == null ? "off" : (liveAt(i - 1) || liveAt(i)) ? "on" : "off";
+    const d = i === 0 ? `M${X0} ${BUS_Y} V${YR} H${xs(0) - 13}` : i === n ? `M${xs(n - 1) + 13} ${YR} H${X1} V${BUS_Y}` : `M${xs(i - 1) + 13} ${YR} H${xs(i) - 13}`;
+    const [px, py] = i === 0 ? [X0, ym + 16] : i === n ? [X1, ym + 16] : [(xs(i - 1) + xs(i)) / 2, YR], side = i === 0 ? 1 : i === n ? -1 : 0;
+    const lab = x.state === 2 ? "구간 " + i + " 차단" : x.open ? (x.state === 0 ? "상시 개방점" : "개방점 닫힘") : x.state === 0 ? "구간 " + i + " 개방" : "";
+    h += `<path class="ln ${cls}" d="${d}"/>${sw(px, py, x.state)}<text class="sring-s ${x.state === 2 ? "t" : x.state === 0 || x.open ? "o" : ""}" x="${px + side * 12}" y="${side ? py + 4 : py - 33}" text-anchor="${side > 0 ? "start" : side < 0 ? "end" : "middle"}">${lab}</text>`; });
+  const CLS = [["1", "#ff6b8a"], ["2", "#ffb547"], ["3", TV("--load")]], cbl = c => { const v = val("CB.L" + c); return v == null ? null : Math.round(v); }, shed = c => cbl(c) != null && cbl(c) !== 1;      // 등급별 차단기가 열렸으면 그 등급 회로는 끊긴 것으로 보인다
+  const PIC = ["L1", "L2", "L3"]; let tile = 0; h += `<defs>${SPRITE_FILTERS.replace(/id="sp/g, 'id="spRG')}</defs>`;
+  r.fsu.forEach((f, k) => { const x = xs(k), c = f.live == null ? "na" : f.live ? "on" : "off", pp = r.ppdu.filter(p => p.at === f.id), one = pp.length === 1;
+    h += `<circle class="sring-n ${c}" cx="${x}" cy="${YR}" r="13"/><text class="sring-k" x="${x}" y="${YR + 4}" text-anchor="middle">${k + 1}</text><text class="sring-nm ${c}" x="${x}" y="${YR - 19}" text-anchor="middle">${esc(f.name)}</text>` +
+      pp.map((p, j) => { const bad = p.live === false || p.mccb === 2, tr = p.ch.filter(q => q.cb === 2 && q.cls > 0).length, y = YR + 26 + j * 46, w = 108, st = bad ? "off" : tr || p.over || p.gnd_bad ? "warn" : "on", fed = !bad && f.live === true;
+        const kw = cl => p.ch.filter(q => q.cls === cl).reduce((a, q) => a + (q.kw || 0), 0), has = cl => p.ch.some(q => q.cls === cl), ty = y + 52, sp = one ? spriteSvg(PIC[tile++ % 3], { on: fed, fault: bad }, x, ty + 62, 92) : null;
+        return `<path class="ln ${bad ? "flt" : fed ? "on" : "off"}" d="M${x} ${j ? y - 10 : YR + 13} V${y}"/><rect class="sring-p ${st}" x="${x - w / 2}" y="${y}" width="${w}" height="16" rx="4"/>
+          <text class="sring-pt" x="${x}" y="${y + 11.5}" text-anchor="middle">${esc(p.name.length > 9 ? p.name.slice(0, 9) + "…" : p.name)}${p.vital ? " ★" : ""}</text>` +
+          CLS.map(([cl, col], q) => !has(+cl) ? "" : `<rect class="sring-c ${bad || shed(cl) ? "off" : ""}" x="${x - 54 + q * 37}" y="${y + 20}" width="34" height="14" rx="3" style="stroke:${col}"/><text class="sring-ct" x="${x - 37 + q * 37}" y="${y + 30.5}" text-anchor="middle" style="fill:${bad || shed(cl) ? "var(--muted)" : col}">${cl}급 ${bad || shed(cl) ? "✕" : kw(+cl).toFixed(1)}</text>`).join("") +
+          (!one ? "" : `<path class="ln ${bad ? "flt" : fed ? "on" : "off"}" d="M${x} ${y + 34} V${ty}"/><rect class="sring-ld ${bad ? "off" : fed ? "on" : ""}" x="${x - 50}" y="${ty}" width="100" height="64" rx="9"/>${sp ? sp.replace(/url\(#sp/g, "url(#spRG") : ""}
+            <text class="nm" x="${x}" y="${ty + 82}" text-anchor="middle">${esc(p.name)} 부하</text><text x="${x}" y="${ty + 103}" text-anchor="middle"><tspan class="kw" style="font-size:19px">${bad ? "0.0" : p.kw == null ? "—" : F.kw(p.kw)}</tspan><tspan class="u" dx="4">kW</tspan></text>
+            <text class="st" x="${x}" y="${ty + 119}" text-anchor="middle" fill="${bad ? "var(--alarm)" : fed ? "var(--ok)" : "var(--warn)"}">${bad ? (p.mccb === 2 ? "주 차단기 트립 · 정전" : "정전") : fed ? "급전 중" : "무전압"}</text>`); }).join(""); });
+  const tot = [["1", "LOAD.p1_kw"], ["2", "LOAD.p2_kw"], ["3", "LOAD.p3_kw"]].map(([cl, t], q) => `<tspan style="fill:${CLS[q][1]}" dx="${q ? 16 : 8}">${cl}등급 ${F.kw(val(t))} kW</tspan><tspan class="${cbl(cl) === 2 ? "t" : cbl(cl) === 0 ? "o" : ""}" dx="5">CB-L${cl} ${cbl(cl) == null ? "미상" : ["개방", "투입", "트립"][cbl(cl)]}</tspan>`).join("");
+  h += `<text class="sring-s" x="${X0}" y="${RG.H - 12}">작전지 전체 등급별 합계(배전체계에 물리지 않은 부하 포함) · 등급별 차단기${tot}</text>`;
+  g.innerHTML = h; g.onclick = () => { location.hash = "#ring"; };
 }
 /* 상태 갱신 */
 function sldArt(id, st) {
@@ -161,4 +194,5 @@ function sldUpdate(s) {
   $("#blA").textContent = (ko ? "모선 A" : "BUS A") + vtxt(va, aLive); $("#blB").textContent = (ko ? "모선 B" : "BUS B") + vtxt(vb, bLive);
   const bb = $("#busbal"); if (bb) bb.textContent = (val("BUS.hz") > 1 && gw ? `${F.n(val("BUS.hz"), 2)} Hz · ` : "") + `Σ${ko ? "공급" : "GEN"} ${F.kw(k.gen)} · Σ${ko ? "부하" : "LOAD"} ${F.kw(k.load)} kW`;
   $("#blA").setAttribute("fill", aLive ? "var(--text2)" : "var(--warn)"); $("#blB").setAttribute("fill", bLive ? "var(--text2)" : "var(--warn)");
+  sldRing(s, live);
 }

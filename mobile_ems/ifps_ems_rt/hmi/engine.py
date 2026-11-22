@@ -18,7 +18,7 @@ from ..runtime import Runtime
 from ..simplant import Plant
 from .cfgedit import ConfigEditor
 from ifps_ems.dataio import sky_from_clearness as dataio_sky
-from . import fuelwatch, fcstats, archwatch, ringwatch, autodev
+from . import fuelwatch, fcstats, archwatch, ringwatch, autodev, weatherwatch
 from .skywatch import SkyWatch
 
 PRIO_TXT = {1: "긴급", 2: "높음", 3: "보통", 4: "낮음"}
@@ -252,7 +252,7 @@ class Engine:
         self.fuel_cfg = dict({"dg_tank_l": 1000.0, "warn_pct": 50.0, "warn_h": 8.0, "repeat_min": 30.0}, **(self.cfg.get("fuel") or {})); self._fuel_t = {}
         self.ai_cfg = dict({"enabled": True, "retrain_h": 24.0, "sim_retrain_h": 2.0, "first_min": 3.0}, **(self.cfg.get("ai") or {}))
         self.skyw = SkyWatch(self)                                                      # 하늘 카메라(구름량 → 태양광 예측 입력)
-        self.archw = archwatch.ArchWatch(self); self.ringw = ringwatch.RingWatch(self)       # 기록 보관소(검침 누적값·상황 기록·점검 기록) · 환망 감시(구간분전함·분전반)
+        self.archw = archwatch.ArchWatch(self); self.ringw = ringwatch.RingWatch(self); self.wxw = weatherwatch.WeatherWatch(self); self.rt.policy and setattr(self.rt.policy, "pv_adjust", self.wxw.adjust)       # 기록 보관소(검침 누적값·상황 기록·점검 기록) · 환망 감시(구간분전함·분전반)
         self.ai_busy = False; self.ai_last = None; self.ai_next = time.time() + 60.0 * float(self.ai_cfg["first_min"])
         self._tag_dev = {p["tag"]: p["device"] for p in self.rt.pts}
         self.cfged = ConfigEditor(self.cfg_path, note=self.rt.note)                      # 설정 편집기(원본 설정 파일 대상, 재기동 후 적용)
@@ -316,7 +316,7 @@ class Engine:
                 self.rt.note("오류", f"수집 주기 예외: {type(e).__name__}: {e}")
             dt = time.monotonic() - a; k += 1
             self.scan_ms.append(dt * 1000); self.rt.max_scan_s = max(self.rt.max_scan_s, dt)
-            if dt > period:
+            if dt > period and k > 1:                                            # 첫 주기는 모든 장치에 접속을 맺는 시간이 들어 있어 세지 않는다
                 self.rt.n_over += 1; self.rt.note("주기", f"주기 초과 {dt:.2f}초")
             stuck = self.rt.wd.check(self.rt.now())
             self.alarms.set("wd", bool(stuck), 1, "EMS", "프로세스 정지 감지: " + ", ".join(stuck) if stuck else "프로세스 정지")
@@ -369,7 +369,7 @@ class Engine:
     def _ai_loop(self):
         while self.running:
             time.sleep(5.0)
-            try: self.skyw.step(self)
+            try: self.skyw.step(self); self.wxw.step(self)
             except Exception as e: self.rt.note("예측", f"하늘 카메라 처리 실패: {type(e).__name__}: {e}")          # 카메라 문제로 학습 주기가 멈추면 안 된다
             if self.ai_cfg.get("enabled") and not self.ai_busy and time.time() >= self.ai_next: self.ai_train("주기")
 
@@ -428,7 +428,7 @@ class Engine:
             fl, fp = LoadForecaster(site), PVForecaster(site); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp) and fp.trained
             from ifps_ems import learner
             meta = learner.active(md); o = n - 1                                # 적용 중인 모델 정보(최근 오차 보정을 켤지 포함)
-            l50, llo, lhi, bl = learner.predict(fl, d, o, "load", site, meta); p50, plo, phi, bp = learner.predict(fp, d, o, "pv", site, meta)
+            l50, llo, lhi, bl = learner.predict(fl, d, o, "load", site, meta); p50, plo, phi, bp = learner.predict(fp, d, o, "pv", site, meta); p50, plo, phi, wx = self.wxw.apply(d, p50, plo, phi)      # 날씨 입력을 섞는다
             acc, daily = fcstats.backtest(d, fl, fp, site, meta)
             r = lambda a: [round(float(x), 2) for x in a]; ts = d["ts"]
             out = {"ok": True, "source": src, "trained": {"load": tl, "pv": tp}, "issued": ts[-1], "hist_ts": ts[-96:], "load_act": r(d["load"][-96:]), "pv_act": r(d["pv"][-96:]),
@@ -436,7 +436,7 @@ class Engine:
                    "acc": acc,
                    "daily": daily, "_t": time.time(), "_slot": self._slot_now(), "calc_s": None,
                    "ai": {"ver": meta.get("ver"), "t": meta.get("t"), "bias_load": None if bl is None else round(bl, 2), "bias_pv": None if bp is None else round(bp, 3)},
-                   "sky": self.skyw.status(), "pv_ai": fp.explain(d, o)}
+                   "sky": self.skyw.status(), "pv_ai": fp.explain(d, o), "weather": wx}
             self.rt.pv_day_kwh = float(np.sum(p50)) * 0.25                     # 자립 지속시간 계산에 쓰는 하루 태양광 예상량
             with self.fc_lock: self.fc_cache = out
         except Exception as e:

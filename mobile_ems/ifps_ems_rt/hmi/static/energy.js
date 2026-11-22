@@ -53,14 +53,27 @@ function drawHourly(c, hrs, H = 230) { if (H === "fill") H = Math.max(80, c.pare
 }
 
 function drawScatter(c, pts, H = 230) { if (H === "fill") H = Math.max(80, c.parentElement.clientHeight);
-  const [g, W] = canvasCtx(c, H), L = 52, R = 16, T = 14, B = 26, ph = H - T - B, pw = Math.min(W - L - R, ph * 1.6);
-  const all = pts.flat(), mn = Math.floor(Math.min(...all) / 10) * 10, mx = Math.ceil(Math.max(...all) / 10) * 10;
-  const X = v => L + (v - mn) / (mx - mn) * pw, Y = v => T + ph - (v - mn) / (mx - mn) * ph;
-  g.strokeStyle = "rgba(96,140,240,.15)"; g.strokeRect(L, T, pw, ph); g.fillStyle = TV("--muted"); g.textAlign = "right";
-  for (let v = mn; v <= mx; v += (mx - mn) / 4) { g.fillText(v.toFixed(0), L - 6, Y(v) + 4); g.textAlign = "center"; g.fillText(v.toFixed(0), X(v), H - 7); g.textAlign = "right"; }
+  /* 왼쪽: 산점도(가로 실측 · 세로 예측, 점선 = 완전 일치, 옅은 띠 = ±10%). 오른쪽: 읽는 법과 요약 수치 — 점 위에 글을 겹치지 않는다 */
+  const [g, W] = canvasCtx(c, H), L = 52, T = 12, B = 40, ph = H - T - B, side = W > 430 ? Math.min(250, W * 0.36) : 0, pw = Math.max(120, W - L - 18 - side);
+  if (!pts || !pts.length) { g.fillStyle = TV("--muted"); g.textAlign = "center"; g.fillText("견줄 자료가 아직 없습니다", W / 2, H / 2); return; }
+  const all = pts.flat(), mn = Math.floor(Math.min(...all) / 10) * 10, mx = Math.max(mn + 10, Math.ceil(Math.max(...all) / 10) * 10);
+  const X = v => L + (v - mn) / (mx - mn) * pw, Y = v => T + ph - (v - mn) / (mx - mn) * ph, mut = TV("--muted");
+  g.save(); g.beginPath(); g.rect(L, T, pw, ph); g.clip();                                          // ±10% 띠
+  g.fillStyle = TA("--acc", .07); g.beginPath(); g.moveTo(X(mn), Y(mn * 1.1)); g.lineTo(X(mx), Y(mx * 1.1)); g.lineTo(X(mx), Y(mx * 0.9)); g.lineTo(X(mn), Y(mn * 0.9)); g.closePath(); g.fill(); g.restore();
+  g.strokeStyle = "rgba(96,140,240,.15)"; g.strokeRect(L, T, pw, ph); g.fillStyle = mut;
+  for (let k = 0; k <= 4; k++) { const v = mn + (mx - mn) * k / 4; g.textAlign = "right"; g.fillText(v.toFixed(0), L - 6, Y(v) + 4); g.textAlign = "center"; g.fillText(v.toFixed(0), X(v), T + ph + 15);
+    if (k > 0 && k < 4) { g.strokeStyle = "rgba(96,140,240,.07)"; g.beginPath(); g.moveTo(X(v), T); g.lineTo(X(v), T + ph); g.moveTo(L, Y(v)); g.lineTo(L + pw, Y(v)); g.stroke(); } }
+  g.textAlign = "center"; g.fillText("실측 kW", L + pw / 2, H - 6); g.save(); g.translate(13, T + ph / 2); g.rotate(-Math.PI / 2); g.fillText("예측 kW", 0, 0); g.restore();
   g.strokeStyle = TA("--acc", .55); g.setLineDash([4, 4]); g.beginPath(); g.moveTo(X(mn), Y(mn)); g.lineTo(X(mx), Y(mx)); g.stroke(); g.setLineDash([]);
-  pts.forEach(([p, a]) => { g.fillStyle = TV("--load") + "99"; g.beginPath(); g.arc(X(a), Y(p), 2.6, 0, 7); g.fill(); });
-  g.textAlign = "left"; g.fillStyle = "#aab8dc"; g.fillText("가로: 실측 kW · 세로: 예측 kW", L + 10, T + 14); g.fillText("점선 = 완전 일치", L + 10, T + 30);
+  pts.forEach(([p, a]) => { g.fillStyle = TV("--load") + "99"; g.beginPath(); g.arc(X(a), Y(p), 2.8, 0, 7); g.fill(); });
+  if (!side) return;
+  const n = pts.length, err = pts.map(([p, a]) => p - a), mae = err.reduce((x, e) => x + Math.abs(e), 0) / n, bias = err.reduce((x, e) => x + e, 0) / n, mean = pts.reduce((x, q) => x + q[1], 0) / n;
+  const within = pts.filter(([p, a]) => Math.abs(p - a) <= 0.1 * Math.max(a, 1e-6)).length / n * 100, x0 = L + pw + 26, rows = [["견준 점", n + "개"], ["평균 오차", mae.toFixed(1) + " kW (" + (mae / Math.max(mean, 1e-6) * 100).toFixed(1) + "%)"],
+    ["치우침", (bias >= 0 ? "+" : "") + bias.toFixed(1) + " kW " + (Math.abs(bias) < 0.5 ? "" : bias > 0 ? "(높게 예측)" : "(낮게 예측)")], ["±10% 안", within.toFixed(0) + "%"]];
+  g.textAlign = "left"; let y = T + 10; const f0 = g.font, fam = getComputedStyle(document.body).getPropertyValue("--sans");       // 한 줄에 이름과 값 — 칸이 낮아도 겹치지 않게
+  rows.forEach(([k, v]) => { g.fillStyle = mut; g.font = f0; g.fillText(k, x0, y); g.fillStyle = TV("--text"); g.font = "600 12px " + fam; g.fillText(v, x0 + 64, y); y += 19; });
+  g.font = f0; g.fillStyle = mut; y += 6;
+  [["점선", "예측 = 실측"], ["옅은 띠", "오차 ±10% 안"], ["점", "6시간마다 낸 예측"]].forEach(([k, v]) => { if (y <= H - 6) { g.fillText(k + " — " + v, x0, y); y += 15; } });
 }
 
 function donut(parts, size = 150) {
@@ -78,13 +91,14 @@ const P_EN = {
     <div class="pg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
       <div class="panel"><div class="hd"><h3>부하 예측 · 24시간</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--load)"></i>실측</span><span><i style="background:#fff"></i>예측(중앙)</span><span><i style="background:color-mix(in srgb, var(--load) 33%, transparent)"></i>80% 예측 구간</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="fcL"></canvas></div></div></div>
       <div class="panel"><div class="hd"><h3>PV 발전 예측 · 24시간</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--pv)"></i>실측</span><span><i style="background:#fff"></i>예측(중앙)</span><span><i style="background:color-mix(in srgb, var(--pv) 33%, transparent)"></i>80% 예측 구간</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="fcP"></canvas></div><div class="pvai" id="pvAi"></div></div></div>
-      <div class="panel"><div class="hd"><h3>예측 정밀도</h3><div class="spacer"></div><span class="sub" id="accSub"></span></div><div class="bd"><div class="accbig" id="accBig"></div>
+      <div class="panel"><div class="hd"><h3 style="white-space:nowrap;flex:none">예측 정밀도</h3><div class="spacer"></div><span class="sub" id="accSub" style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span></div><div class="bd" style="overflow:auto"><div class="accbig" id="accBig"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:10px"><div><div class="lab" style="margin-bottom:6px">선행시간별 오차 — 부하 (기준선 15%)</div><div id="accL"></div></div><div><div class="lab" style="margin-bottom:6px">선행시간별 오차 — PV (설비용량 대비)</div><div id="accP"></div></div></div></div></div>
     </div><div class="pg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
       <div class="panel"><div class="hd"><h3>예측 vs 실측 (부하)</h3><div class="spacer"></div><span class="sub">최근 7일, 6시간 간격 발행</span></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="scat"></canvas></div></div></div>
       <div class="panel"><div class="hd"><h3>금일 시간대별 발전량</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--pv)"></i>PV</span><span><i style="background:var(--dg)"></i>DG</span><span><i style="background:var(--fc)"></i>FC</span><span><i style="background:var(--ess)"></i>ESS 방전</span><span><i style="background:var(--load)"></i>부하</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="hrC"></canvas></div></div></div>
       <div class="panel"><div class="hd"><h3>일별 발전·부하 (최근 14일)</h3><div class="spacer"></div><div class="legend"><span><i style="background:var(--load)"></i>부하 kWh</span><span><i style="background:var(--pv)"></i>PV kWh</span><span><i style="background:color-mix(in srgb, var(--pv) 60%, transparent)"></i>청천 PV 가능량</span></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="dayC"></canvas></div></div></div>
     </div></div>`;
+    m.insertAdjacentHTML("beforeend", WX.html()); WX.bind();                      // 날씨 입력 · AI 예측과 비교
     $("#enAi").onclick = () => this.aiDialog();
     $("#enRe").onclick = async () => { if (!can("operator")) { toast("운용자 권한 필요", "bad"); return loginDialog(); } const r = await api("/api/forecast?force=1"); if (r.ok === false && !r.why) return; toast("예측 재계산 요청", "ok"); setTimeout(() => this.load(), 2500); };
     clearTimeout(this._retry); this._retry = null;
@@ -113,6 +127,7 @@ const P_EN = {
     });
   },
   async load() {
+    WX.load();
     const [f, e] = await Promise.all([api("/api/forecast"), api("/api/energy")]);
     if (S.page !== "energy" || !$("#accSub")) return;                       // 응답이 오기 전에 화면을 떠났다
     if (e.hours) this.hrs = e.hours;
@@ -126,7 +141,8 @@ const P_EN = {
     const mix = a.on ? `섞는 비율 ${a.alpha.map((x, i) => "≤" + f.acc.buckets[i] / 4 + "h " + Math.round(x * 100) + "%").filter((_, i) => a.alpha[i] > 0).join(" · ")}` : "검증에서 도움이 안 되어 쉬는 중(릿지 회귀만 사용)";
     const refs = !a.on ? "" : a.refs.length ? "가장 닮은 과거: " + a.refs.map(r => `${esc(r[0].slice(5))} (${r[1]}%)`).join(", ") : "닮은 과거 표시는 낮에만";
     const imp = a.on ? "중요하게 본 것: " + a.near.slice(0, 3).map(r => esc(r[0])).join(", ") : "";
-    return `${img}<div><div><span class="tag">하늘 카메라</span> ${cam}</div><div><span class="tag">주의집중 예측</span> ${mix}</div><div class="muted">${refs}${refs && imp ? " · " : ""}${imp}</div></div>`;
+    const tip = x => esc(String(x).replace(/<[^>]+>/g, ""));
+    return `${img}<div><div title="${tip(cam)}"><span class="tag">하늘 카메라</span> ${cam}</div><div title="${tip(mix)}"><span class="tag">주의집중 예측</span> ${mix}</div><div class="muted" title="${tip(refs + " " + imp)}">${refs}${refs && imp ? " · " : ""}${imp}</div></div>`;
   },
   draw() {
     if (!$("#fcL")) return; const f = this.fc;

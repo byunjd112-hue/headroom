@@ -104,6 +104,11 @@ class RingWatchTest(unittest.TestCase):
         self.assertTrue(w.configure(e, {"ppdu": []}, "시험").get("same"))
         self.assertRaises(ValueError, w.sim, {"action": "모름"}); self.assertRaises(ValueError, w.sim, {"action": "swap", "a": "PPDU1", "b": "PPDU6"}); self.assertRaises(ValueError, w.sim, {"action": "swap", "a": "FSU1", "b": "PPDU1"})
         self.assertRaises(ValueError, w.configure, e, {"ppdu": [], "open": -1}, "시험")
+        import io, zipfile
+        from ifps_ems_rt.hmi import report
+        w.sim({"action": "restore"}); w.sim({"action": "break", "section": 5}); self.assertTrue(self._wait(lambda: w.status()["cut"] == [5]))
+        x = zipfile.ZipFile(io.BytesIO(report.build(e, e.archw.store, {"days": "1"})[1])).read("word/document.xml").decode("utf-8")                    # 보고서에도 환망 화면과 같은 이름 · 상태가 들어간다
+        for t in ("1.4 환망", "구간분전함 5", "차단된 구간 5", "상시 개방점", "지휘·통신 배전"): self.assertIn(t, x)
 
     def test_units_removed_added_and_shuffled_without_any_setting(self):
         e = self.eng; w = e.ringw; n = lambda: (len(w.status()["fsu"]), len(w.status()["ppdu"])); act = lambda: {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}

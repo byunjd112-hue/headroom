@@ -1,6 +1,6 @@
 {
- "date": "2026-11-21 10:41",
- "unittest_s": 476.6,
+ "date": "2026-11-22 03:30",
+ "unittest_s": 544.5,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -174,20 +174,25 @@
   "test_extra_units_are_recognized_summed_and_commanded | ok",
   "test_kind_not_brought_is_marked_absent_and_replaced | ok",
   "test_kind_slot_and_pointmap_expand | ok",
-  "test_merge_sum_any_mean_and_empty_slot | ok"
+  "test_merge_sum_any_mean_and_empty_slot | ok",
+  "test_blend_and_score_weight_follows_error | ok",
+  "test_book_manual_wins_over_network_and_replace | ok",
+  "test_clearness_record_and_settings_check | ok",
+  "test_parse_json_and_csv | ok",
+  "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 173,
+ "n_tests": 178,
  "tests_ok": true,
- "coverage_pct": 91.0,
+ "coverage_pct": 91.8,
  "stmt": {
-  "n": 5821,
-  "hit": 5475,
-  "pct": 94.1
+  "n": 6075,
+  "hit": 5762,
+  "pct": 94.8
  },
  "branch": {
-  "n": 2096,
-  "hit": 1726,
-  "pct": 82.3
+  "n": 2170,
+  "hit": 1810,
+  "pct": 83.4
  },
  "coverage_files": [
   [
@@ -197,14 +202,6 @@
    58.3,
    12,
    "21-23, 53-62, 67-80"
-  ],
-  [
-   "ifps_ems_rt/hmi/report.py",
-   61.1,
-   131,
-   13.9,
-   36,
-   "23-30, 48-50, 53-60, 104-121, 147-152, 154, 161-167"
   ],
   [
    "ifps_ems_rt/archview.py",
@@ -218,7 +215,7 @@
    "ifps_ems_rt/hmi/server.py",
    77.1,
    218,
-   67.4,
+   68.1,
    144,
    "65-66, 80-82, 87-88, 105-106, 125-128, 130-138, 140, 154-156, 187-192, 194-198, 201-203, 213-214, 233-240"
   ],
@@ -271,6 +268,14 @@
    "160, 198-210, 214-216"
   ],
   [
+   "ifps_ems_rt/hmi/weatherwatch.py",
+   91.1,
+   101,
+   50.0,
+   22,
+   "59-60, 68, 134-139"
+  ],
+  [
    "ifps_ems_rt/hmi/archapi.py",
    93.1,
    58,
@@ -287,18 +292,26 @@
    "74, 126-127, 263-264, 309, 321-322, 345, 358, 362, 364, 366, 391-396, 426"
   ],
   [
+   "ifps_ems_rt/hmi/report.py",
+   93.6,
+   140,
+   73.7,
+   38,
+   "124, 128, 175-181"
+  ],
+  [
    "ifps_ems_rt/hmi/scenarios.py",
-   94.0,
+   94.4,
    250,
-   84.3,
+   85.2,
    108,
-   "59, 67, 70, 80, 90, 92, 94, 106, 110, 124, 133, 138, 217, 264, 267"
+   "59, 67, 70, 80, 90, 92, 94, 106, 110, 124, 133, 138, 217, 264"
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
    94.6,
    789,
-   82.1,
+   82.4,
    290,
    "29-30, 55-56, 67-72, 195-196, 315-316, 329, 373, 389-390, 404-407, 410-412, 465, 512-513, 606-607, 738-739, 901-906, 915-917, 945-946"
   ],
@@ -437,6 +450,14 @@
    86.8,
    38,
    "134"
+  ],
+  [
+   "ifps_ems_rt/weather.py",
+   99.3,
+   141,
+   94.0,
+   50,
+   "65"
   ],
   [
    "ifps_ems/forecast.py",
@@ -601,7 +622,7 @@
   [
    "ifps_ems_rt/planlink.py",
    100.0,
-   49,
+   51,
    80.0,
    10,
    ""
@@ -617,7 +638,7 @@
   [
    "ifps_ems_rt/ring.py",
    100.0,
-   237,
+   238,
    92.2,
    90,
    ""
@@ -625,11 +646,11 @@
  ],
  "pylint": {
   "E": 1,
-  "W": 40,
+  "W": 48,
   "by_id": [
    [
     "W0718 broad-exception-caught",
-    13
+    16
    ],
    [
     "W0613 unused-argument",
@@ -644,11 +665,15 @@
     5
    ],
    [
-    "W0640 cell-var-from-loop",
-    3
+    "W0707 raise-missing-from",
+    4
    ],
    [
     "W0106 expression-not-assigned",
+    4
+   ],
+   [
+    "W0640 cell-var-from-loop",
     3
    ],
    [
@@ -757,9 +782,41 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/planlink.py",
-    65,
+    67,
     "PlanPolicy.__call__",
     "Catching too general exception Exception"
+   ],
+   [
+    "W0707",
+    "raise-missing-from",
+    "ifps_ems_rt/weather.py",
+    65,
+    "_num",
+    "Consider explicitly re-raising using 'except (TypeError, ValueError) as exc' and 'raise ValueError(f'{name}: 숫자가 아님') from exc'"
+   ],
+   [
+    "W0707",
+    "raise-missing-from",
+    "ifps_ems_rt/weather.py",
+    73,
+    "_time",
+    "Consider explicitly re-raising using 'except ValueError as exc' and 'raise ValueError(f\"{name}: 시각은 'YYYY-MM-DD HH:MM' 꼴\") from exc'"
+   ],
+   [
+    "W0707",
+    "raise-missing-from",
+    "ifps_ems_rt/weather.py",
+    98,
+    "_rows",
+    "Consider explicitly re-raising using 'raise ValueError(f'JSON 형식 오류: {e}') from e'"
+   ],
+   [
+    "W0707",
+    "raise-missing-from",
+    "ifps_ems_rt/weather.py",
+    123,
+    "parse",
+    "Consider explicitly re-raising using 'raise ValueError(f'{i + 1}번째: {e}') from e'"
    ],
    [
     "W0718",
@@ -781,7 +838,7 @@
     "W0106",
     "expression-not-assigned",
     "ifps_ems_rt/ring.py",
-    290,
+    291,
     "Model._one",
     "Expression \"[P.set(f'{i}.ch{n}', 1) for n in range(1, 7)]\" is assigned to nothing"
    ],
@@ -805,7 +862,7 @@
     "W0012",
     "unknown-option-value",
     "ifps_ems_rt/hmi/report.py",
-    104,
+    118,
     "",
     "Unknown option value for 'disable', expected a valid pylint message and got 'scenarios'"
    ],
@@ -813,7 +870,7 @@
     "W0012",
     "unknown-option-value",
     "ifps_ems_rt/hmi/report.py",
-    104,
+    118,
     "",
     "Unknown option value for 'disable', expected a valid pylint message and got 'engine'"
    ],
@@ -884,10 +941,42 @@
    [
     "W0718",
     "broad-exception-caught",
+    "ifps_ems_rt/hmi/weatherwatch.py",
+    59,
+    "WeatherWatch.apply",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/hmi/weatherwatch.py",
+    68,
+    "WeatherWatch.adjust",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/hmi/weatherwatch.py",
+    100,
+    "WeatherWatch.fetch",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
     195,
     "SimDriver.loop",
     "Catching too general exception Exception"
+   ],
+   [
+    "W0106",
+    "expression-not-assigned",
+    "ifps_ems_rt/hmi/engine.py",
+    255,
+    "Engine.__init__",
+    "Expression \"self.rt.policy and setattr(self.rt.policy, 'pv_adjust', self.wxw.adjust)\" is assigned to nothing"
    ],
    [
     "W0718",
@@ -1004,7 +1093,7 @@
   ]
  },
  "metrics": {
-  "n_func": 709,
+  "n_func": 755,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1139,7 +1228,7 @@
     "ifps_ems_rt/hmi/engine.py",
     "__init__",
     226,
-    13,
+    14,
     45,
     4,
     2
@@ -1335,7 +1424,7 @@
    ],
    [
     "ifps_ems_rt/ring.py",
-    353
+    354
    ],
    [
     "ifps_ems_rt/hmi/scenarios.py",
@@ -1362,16 +1451,20 @@
     236
    ],
    [
+    "ifps_ems_rt/weather.py",
+    236
+   ],
+   [
     "ifps_ems_rt/hmi/seqppt.py",
     217
    ],
    [
-    "ifps_ems_rt/archive.py",
-    204
+    "ifps_ems_rt/hmi/report.py",
+    209
    ],
    [
-    "ifps_ems_rt/hmi/report.py",
-    195
+    "ifps_ems_rt/archive.py",
+    204
    ],
    [
     "ifps_ems_rt/simplant.py",
@@ -1408,6 +1501,10 @@
    [
     "ifps_ems_rt/hmi/ringwatch.py",
     150
+   ],
+   [
+    "ifps_ems_rt/hmi/weatherwatch.py",
+    140
    ],
    [
     "ifps_ems_rt/hmi/archwatch.py",
@@ -1471,7 +1568,7 @@
    ],
    [
     "ifps_ems_rt/planlink.py",
-    68
+    70
    ],
    [
     "ifps_ems_rt/archrecv.py",
@@ -1550,9 +1647,9 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 7280,
+   "loc": 7660,
    "nosec": 0,
-   "skipped_tests": 21
+   "skipped_tests": 22
   },
   "results": []
  },
@@ -1672,6 +1769,14 @@
   [
    "B310",
    "MEDIUM",
+   "ifps_ems_rt/hmi/weatherwatch.py",
+   98,
+   "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.",
+   "CWE-22"
+  ],
+  [
+   "B310",
+   "MEDIUM",
    "tools/build_training.py",
    28,
    "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.",
@@ -1726,12 +1831,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.87,
- "cc_n": 721,
+ "cc_avg": 5.85,
+ "cc_n": 770,
  "cc_rank": {
-  "A": 425,
-  "B": 179,
-  "C": 117,
+  "A": 458,
+  "B": 190,
+  "C": 122,
   "D": 0,
   "E": 0,
   "F": 0
@@ -1821,7 +1926,7 @@
   ],
   [
    "ifps_ems_rt/ring.py",
-   3.0,
+   2.7,
    "C"
   ],
   [
@@ -1830,13 +1935,13 @@
    "B"
   ],
   [
-   "ifps_ems_rt/hmi/seqppt.py",
-   21.1,
-   "A"
+   "ifps_ems_rt/hmi/report.py",
+   18.4,
+   "B"
   ],
   [
-   "ifps_ems_rt/hmi/report.py",
-   22.1,
+   "ifps_ems_rt/hmi/seqppt.py",
+   21.1,
    "A"
   ],
   [
@@ -1865,6 +1970,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/weather.py",
+   28.5,
+   "A"
+  ],
+  [
    "ifps_ems_rt/simplant.py",
    28.8,
    "A"
@@ -1875,13 +1985,18 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/weatherwatch.py",
+   35.4,
+   "A"
+  ],
+  [
    "ifps_ems/nowcast.py",
    36.8,
    "A"
   ],
   [
    "ifps_ems_rt/hmi/server.py",
-   37.3,
+   37.2,
    "A"
   ],
   [
@@ -1981,7 +2096,7 @@
   ],
   [
    "ifps_ems_rt/planlink.py",
-   59.4,
+   59.3,
    "A"
   ],
   [
@@ -2071,14 +2186,14 @@
   ]
  ],
  "loc_py": {
-  "files": 54,
-  "sloc": 6079,
-  "comments": 773
+  "files": 56,
+  "sloc": 6341,
+  "comments": 823
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   561,
+   567,
    true
   ],
   [
@@ -2098,7 +2213,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/energy.js",
-   155,
+   171,
    true
   ],
   [
@@ -2113,7 +2228,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/ring.js",
-   97,
+   106,
    true
   ],
   [
@@ -2128,17 +2243,17 @@
   ],
   [
    "ifps_ems_rt/hmi/static/site.js",
-   243,
+   270,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/sld.js",
-   164,
+   198,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/train.js",
-   171,
+   172,
    true
   ],
   [
@@ -2154,6 +2269,11 @@
   [
    "ifps_ems_rt/hmi/static/viewer.js",
    4,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/weather.js",
+   48,
    true
   ]
  ],

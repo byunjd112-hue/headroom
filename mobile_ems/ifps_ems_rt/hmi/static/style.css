@@ -616,7 +616,8 @@ td.nw, th.nw { white-space: nowrap; } table.tc td.ell { max-width: 120px; }
 /* 넓은 대화상자(AI 학습 상태 등) */
 .modal:has(> .wide) { width: min(1080px, calc(100vw - 32px)); }
 
-.pvai{display:flex;gap:10px;align-items:center;padding:6px 2px 0;font-size:12px;line-height:1.55;min-height:58px}
+.pvai{display:flex;gap:10px;align-items:center;padding:6px 2px 0;font-size:12px;line-height:1.5;min-height:58px;max-height:62px;overflow:hidden}
+.pvai>div{min-width:0;flex:1}.pvai>div>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* 한 줄씩만 — 그래프 자리를 눌러 줄이지 않게(전체 글은 마우스를 올리면 보인다) */
 .pvai img,.pvai .noimg{width:72px;height:54px;border-radius:6px;object-fit:cover;border:1px solid var(--line);flex:none}
 .pvai .noimg{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10.5px}
 .pvai .tag{display:inline-block;font-size:10.5px;padding:0 6px;border-radius:9px;border:1px solid var(--line);color:var(--muted);margin-right:4px}
@@ -848,3 +849,18 @@ html.tr-d .train { top: 8px; right: 8px; bottom: 8px; width: 392px; max-height: 
 .sld .uchip rect { fill: var(--panel2); stroke: rgba(var(--edge),.35); stroke-width: 1; } .sld .uchip text { font-size: 8.5px; font-weight: 700; fill: var(--muted); letter-spacing: .2px; }
 .sld .uchip.on rect { stroke: var(--ok); } .sld .uchip.on text { fill: var(--ok); } .sld .uchip.lost rect { stroke: var(--alarm); stroke-dasharray: 3 2; } .sld .uchip.lost text { fill: var(--alarm); }
 .sld .node.absent { opacity: .32; }
+
+/* 환망을 다른 화면에 잇는 것: 결선도 아래의 환망 띠, 개요 배치도의 구간분전함 이름표 */
+.sitemap .mfsu { font-size: 12px; font-weight: 700; fill: #dfe7c8; paint-order: stroke; stroke: rgba(10,14,8,.85); stroke-width: 3px; } .sitemap .mfsu.bad { fill: #ff8a80; }
+/* 결선도 안의 환망(구간분전함 · 배전체계) */
+.sld .sring { cursor: pointer; } .sld .sjn { fill: var(--dead); } .sld .sjn.on { fill: var(--live); }
+.sld .sring-n { fill: var(--panel2); stroke: var(--dead); stroke-width: 2.2; } .sld .sring-n.on { stroke: var(--live); fill: rgba(88,192,138,.16); } .sld .sring-n.off { stroke: #ff4d64; fill: rgba(255,77,100,.2); }
+.sld .sring-k { font-size: 11px; font-weight: 700; fill: var(--text); } .sld .sring-nm { font-size: 9.5px; font-weight: 600; fill: var(--text2); } .sld .sring-nm.off { fill: #ff8a80; }
+.sld .sring-s { font-size: 9.5px; font-weight: 700; fill: var(--muted); } .sld .sring-s.t { fill: #ff6b81; } .sld .sring-s.o { fill: #ffb547; }
+.sld .sring-t { font-size: 10.5px; font-weight: 700; fill: var(--ok); } .sld .sring-t.warn { fill: #ffb547; } .sld .sring-t.bad { fill: #ff6b81; }
+.sld .sring-p { fill: var(--panel2); stroke: var(--live); stroke-width: 1.2; } .sld .sring-p.off { stroke: #ff4d64; } .sld .sring-p.warn { stroke: #ffb547; } .sld .sring-pt { font-size: 8.5px; font-weight: 600; fill: var(--text); }
+.sitemap .mfsu.sec { font-size: 11.5px; fill: #c8d0b4; } .sitemap .mfsu.sec.open { fill: #ffcf7a; } .sitemap .mfsu.sec.bad { fill: #ff8a80; }
+.sld .ln.thin { stroke-width: 2; } .sld .sring-col { stroke: var(--text2); stroke-width: 1.6; stroke-dasharray: 3 4; fill: none; }
+.sld .sring-drop { stroke: var(--text2); stroke-width: 1.6; stroke-dasharray: 3 4; fill: none; } .sld .sring-drop.off { stroke: #ff4d64; }
+.sld .sring-c { fill: var(--panel2); stroke-width: 1.1; } .sld .sring-c.off { stroke: var(--dead) !important; } .sld .sring-ct { font-size: 8px; font-weight: 700; }
+.sld .sring-ld { fill: var(--panel2); stroke: rgba(var(--edge),.3); stroke-width: 1.6; } .sld .sring-ld.on { stroke: var(--live); } .sld .sring-ld.off { stroke: #ff4d64; stroke-dasharray: 5 4; }
