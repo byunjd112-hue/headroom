@@ -4,7 +4,7 @@
 장치 번호(unit)마다 레지스터 묶음을 두고, 지령 규약(hal.py)에 따라 응답한다. 한 프로세스가 통신 경로 A·B 두 포트를 연다.
 시험용 조작: mute(장치) 무응답, noack(장치) 지령을 받고도 동작하지 않음, path_down(경로) 경로 단절.
 """
-import math, socketserver, struct, threading, time
+import math, socket, socketserver, struct, threading, time
 from . import modbus as mb, fleet
 
 
@@ -137,7 +137,8 @@ class Plant:
                 try:
                     while plant.run:
                         try: head = self.request.recv(7)
-                        except OSError: continue
+                        except socket.timeout: continue                   # 조용한 접속: 계속 기다린다
+                        except OSError: return                            # 끊긴 접속(상대가 닫음 · 재설정): 붙잡고 헛돌지 않는다 — 헛도는 스레드가 쌓이면 모든 장치의 응답이 늦어진다
                         if len(head) < 7: return
                         tid, _, length, unit = struct.unpack(">HHHB", head); pdu = b""
                         while len(pdu) < length - 1:
