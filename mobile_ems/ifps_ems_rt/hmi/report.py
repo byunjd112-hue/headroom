@@ -54,11 +54,20 @@ def _current(doc, s):
     doc.table(["부하", "태양광", "디젤", "연료전지", "ESS(+방전)", "수전", "주둔지 발전기"], [[_n(k["load"], 1, " kW"), _n(k["pv"], 1, " kW"), _n(k["dg"], 1, " kW"), _n(k["fc"], 1, " kW"), _n(k["ess"], 1, " kW"), _n(k.get("grid"), 1, " kW"), _n(k.get("gdg"), 1, " kW")]])
     doc.table(["ESS 충전율", "수소 잔량", "디젤 연료", "1·2·3등급 부하", "예비력 여유"], [[_n(k["soc"], 1, " %"), _n(k["h2"], 0, " Nm³"), _n(k["fuel"], 0, " L"), f"{_n(k['l1'], 0)} / {_n(k['l2'], 0)} / {_n(k['l3'], 0)} kW", _n(k["reserve_margin"], 0, " kW")]])
     doc.h2("1.2 장치 상태")
-    doc.table(["장치", "통신", "운전", "현장 수동", "생존 계수"], [[n, d["link"], "운전" if d["on"] else "정지", "예" if d["manual"] else "아니오", "정지" if d["hb_stop"] else "정상"] for n, d in s["devices"].items()], [20, 20, 20, 20, 20])
+    doc.table(["장치", "통신", "운전", "현장 수동", "생존 계수"], [[n, "미설치" if d.get("absent") else d["link"], "운전" if d["on"] else "정지", "예" if d["manual"] else "아니오", "정지" if d["hb_stop"] else "정상"] for n, d in s["devices"].items() if not (d.get("slot") and d.get("absent"))], [20, 20, 20, 20, 20])      # 빈 자리(인식된 적 없는 추가 자리)는 적지 않는다
     act = [a for a in s["alarms"] if a["state"] == "ACT"]
     doc.h2(f"1.3 발생 중인 경보 ({len(act)}건)")
     doc.table(["등급", "대상", "내용", "발생 시각", "확인"], [[a["prio"], a["src"], a["text"], datetime.fromtimestamp(a["t_on"]).strftime("%m-%d %H:%M:%S"), "확인" if a["acked"] else "미확인"] for a in act[:60]], [8, 12, 52, 18, 10])
-    _ring(doc, s.get("ring"))
+    _ring(doc, s.get("ring")); _fleet(doc, s.get("fleet"))
+
+
+def _fleet(doc, fl):
+    """1.5 장치 구성(자동 인식) — 설비 제어 화면의 대수와 같은 자료."""
+    if not fl: return
+    nm = {"DG": "디젤 발전기", "FC": "연료전지", "ESS": "ESS", "PV": "태양광", "ELZ": "수전해"}; st = lambda u: "두절" if not u["live"] else "운전" if u["on"] else "정지"
+    doc.h2("1.5 장치 구성(자동 인식한 대수)")
+    doc.p("EMS 가 응답을 받아 인식한 장치다. 자리 수는 설정에 둔 추가 자리까지의 수이고, 대수의 변화(놓기 · 빼기 · 두절)는 3장 상황 기록의 '자동 인식' · '장치'에 시각과 함께 남는다. 장치별 자료(7장)에는 그때 있던 장치의 값만 들어간다.")
+    doc.table(["종류", "인식 / 자리", "지금 통신되는 대수", "장치별 상태"], [[nm.get(k, k), f"{len(f['units'])} / {f['slots']}", f["n"], ", ".join(f"{u['id']} {st(u)}" + ("" if u.get("kw") is None else f" {_n(u['kw'], 1)} kW") for u in f["units"]) or "미설치"] for k, f in fl.items()], [18, 16, 18, 48])
 
 
 def _ring(doc, r):

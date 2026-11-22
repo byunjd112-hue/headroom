@@ -12,12 +12,12 @@ from ..simplant import Plant
 from . import scenextra
 from .scenario_policy import METRICS, ScenarioPolicy, run_policy_case
 
-MAX_CASES = 48
+MAX_CASES = 64
 MAX_STEPS = 30
 TICK_MS = 50
 MAX_MS = 10000
 # 구성도 재생용으로 단계마다 남기는 상태: 차단기·고장 코드·부하 차단·모선, 장비의 운전 상태·출력·충전율
-SNAP_PREFIX = ("CB.", "FLT.", "LDS.", "BUS.", "LOAD.", "GF.", "STK.", "RING.", "BRK.", "FSU", "PPDU")
+SNAP_PREFIX = ("CB.", "FLT.", "LDS.", "BUS.", "LOAD.", "GF.", "STK.", "RING.", "BRK.", "FSU", "PPDU", "UNIT.")
 SNAP_SUFFIX = (".status", ".kw", ".soc", ".load_pct")
 OPS = {"eq": lambda a, b: math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-9),
        "ge": operator.ge, "le": operator.le}

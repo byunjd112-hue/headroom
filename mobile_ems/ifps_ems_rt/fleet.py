@@ -95,6 +95,11 @@ class Fleet:
         if not xs: return
         val[f"{k}.{suf}"] = sum(xs) if how == "sum" else float(any(x > 0.5 for x in xs)) if how == "any" else sum(xs) / len(xs); mark(f"{k}.{suf}", True)
 
+    def clean(self, val):
+        """기록 보관용 값: 지금 없는 장치(빈 자리 · 뺀 장치 · 두절)의 묵은 값을 뺀다. 종류 이름의 값(DG.kw 등)은 그 종류가 한 대도 없을 때만 뺀다."""
+        gone = {n for k, names in self.slots.items() if len(names) > 1 for n in names if n not in self.live_now[k] and (is_slot(n) or not self.live_now[k])}
+        return {t: v for t, v in val.items() if t.partition(".")[0] not in gone} if gone and self.ever else dict(val)
+
     def span(self, tag, dev):
         """다른 장치(계측 게이트웨이)가 재는 종류 합계(PV.kw 등)의 범위 배율: 그 종류가 여러 대면 정격도 그만큼 는다."""
         k, _, suf = tag.partition(".")

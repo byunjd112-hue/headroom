@@ -3527,5 +3527,384 @@
   "cat": "고장 대응 (FMEA)",
   "ref": "C-09",
   "fat": "협조 검토서 승인, 저주파·역전력 모의 시험"
+ },
+ {
+  "name": "장치 구성 · 디젤 2대 인식 후 동시 기동",
+  "note": "디젤 한 대를 더 놓은 뒤 ESS 저충전에서 EMS 가 두 대 모두에 기동 지령을 내는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "UNIT.DG2",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 300
+   },
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "DG2.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-52",
+  "fat": "장치를 한 대씩 추가하며 인식 대수·합산값·지령 분배 확인(추가한 장치까지 기동 지령이 가는지)"
+ },
+ {
+  "name": "장치 구성 · 디젤 1대 철수 뒤 남은 장치로 계속 운전",
+  "note": "두 대로 운전하다 한 대를 빼도 남은 디젤이 계속 운전하고 모선 전압이 유지되는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "UNIT.DG2",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 300
+   },
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "DG2.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "set",
+    "tag": "UNIT.DG2",
+    "value": 0
+   },
+   {
+    "type": "wait",
+    "ms": 500
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "BUS.a_v",
+    "value": 300,
+    "op": "ge",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-53",
+  "fat": "운전 중 한 대 분리 시험: 남은 장치 운전 지속, 예비력 재계산, 경보·기록 확인"
+ },
+ {
+  "name": "장치 구성 · 디젤 미휴대 → 연료전지 대체",
+  "note": "디젤을 가져가지 않은 편성에서 ESS 저충전 때 연료전지로 바꿔 기동하는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "UNIT.DG",
+    "value": 0
+   },
+   {
+    "type": "wait",
+    "ms": 300
+   },
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "FC",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "FC.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-54",
+  "fat": "디젤을 빼고 켠 조건에서 연료전지 대체 기동 확인"
+ },
+ {
+  "name": "장치 구성 · ESS 2대 충전율 평균으로 판단",
+  "note": "ESS 두 대의 충전율이 다를 때 평균으로 보강 전원 기동을 정하는지 봅니다(20%·90% → 기동 안 함, 둘 다 20% → 기동).",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "UNIT.ESS2",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 300
+   },
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "ESS2.soc",
+    "value": 90
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "set",
+    "tag": "ESS2.soc",
+    "value": 20
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-55",
+  "fat": "ESS 2대의 충전율을 달리 준 조건에서 평균으로 판단하는지 확인"
+ },
+ {
+  "name": "장치 구성 · 태양광 3대로 늘려도 계통 유지",
+  "note": "태양광을 세 대로 늘려 잉여가 커져도 모선 전압이 유지되고 추가한 장치가 연결 상태인지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "UNIT.PV2",
+    "value": 1
+   },
+   {
+    "type": "set",
+    "tag": "UNIT.PV3",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "PV2.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "PV3.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "BUS.a_v",
+    "value": 300,
+    "op": "ge",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "BUS.b_v",
+    "value": 300,
+    "op": "ge",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-56",
+  "fat": "태양광을 5대까지 늘려 합계가 범위 경보 없이 반영되는지 확인(단위 시험 test_unit_count_buttons_add_and_remove)"
+ },
+ {
+  "name": "장치 구성 · ESS 1대 철수 뒤 남은 ESS 로 모선 유지",
+  "note": "ESS 두 대 가운데 한 대를 빼도 남은 ESS 로 모선 전압이 유지되는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "UNIT.ESS2",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 500
+   },
+   {
+    "type": "set",
+    "tag": "UNIT.ESS2",
+    "value": 0
+   },
+   {
+    "type": "wait",
+    "ms": 1000
+   },
+   {
+    "type": "expect",
+    "tag": "BUS.a_v",
+    "value": 300,
+    "op": "ge",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "BUS.b_v",
+    "value": 300,
+    "op": "ge",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "ESS.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-57",
+  "fat": "응답 중인 장치에 − 를 눌러 거부되는지, 철수 처리 뒤 경보가 사라지는지 확인"
  }
 ]

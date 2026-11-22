@@ -30,6 +30,8 @@ class FleetUnitTest(unittest.TestCase):
         f.merge({"DG": None, "DG2": {"DG2.kw": 45.0, "DG2.status": 1.0}}, dict(st, DG="두절"), val, mark)                      # 첫 장치가 끊기고 둘째만 있어도 종류 값이 나온다
         self.assertEqual((f.live("DG"), val["DG.kw"], f.share("DG")), (["DG2"], 45.0, 2)); v = f.view(dict(st, DG="두절"), {}, val)
         self.assertEqual((v["DG"]["n"], v["DG"]["seen"], v["DG"]["slots"], [u["id"] for u in v["DG"]["units"]], v["ESS"]["on"]), (1, 2, 2, ["DG", "DG2"], True))
+        self.assertEqual(set(f.clean({"DG.kw": 1.0, "DG2.kw": 45.0, "ESS.kw": 2.0, "ESS2.kw": 3.0, "LOAD.kw": 9.0})), {"DG.kw", "DG2.kw", "ESS.kw", "ESS2.kw", "LOAD.kw"})                 # 종류 값(DG.kw)은 한 대라도 있으면 남긴다
+        f.merge({"DG": None, "DG2": None}, dict(st, DG="두절", DG2="두절"), val, mark); self.assertEqual(set(f.clean({"DG.kw": 1.0, "DG2.kw": 45.0, "ESS.kw": 2.0, "LOAD.kw": 9.0})), {"ESS.kw", "LOAD.kw"})   # 그 종류가 한 대도 없으면 종류 값도 뺀다
         self.assertTrue(f.skip("ESS3", 0.0) is False and not f.skip("DG", 0.0)); g = fleet.Fleet(["PV", "PV2"]); self.assertFalse(g.skip("PV2", 0.0)); self.assertTrue(g.skip("PV2", 5.0)); self.assertFalse(g.skip("PV2", fleet.PROBE_S + 1))
 
 
@@ -68,6 +70,23 @@ class FleetLiveTest(unittest.TestCase):
         self.assertRaises(ValueError, unitctl.change, e, "MTR", 1, "시험"); self.assertRaises(ValueError, unitctl.change, e, "PV", 2, "시험")
         for _ in range(4): unitctl.change(e, "PV", -1, "시험")
         self.assertTrue(self._wait(lambda: len(pv()["units"]) == 1))
+
+    def test_archive_follows_unit_changes(self):
+        """장치를 놓고 빼도 기록 · 보고가 사실대로 남는다: 있는 장치의 값만 저장하고, 보고서에 장치 구성 표가 들어간다."""
+        import io, zipfile
+        from ifps_ems_rt import archdev
+        from ifps_ems_rt.hmi import report, unitctl
+        e = self.eng; rt = e.rt; pv = lambda: e.snapshot()["fleet"]["PV"]
+        self.assertTrue(self._wait(lambda: pv()["n"] == 1)); unitctl.change(e, "PV", 1, "시험"); self.assertTrue(self._wait(lambda: pv()["n"] == 2 and "PV2.lim" in rt.val))
+        c = rt.fleet.clean(rt.val); self.assertIn("PV2.lim", c); self.assertIn("PV.kw", c); self.assertNotIn("PV3.lim", c)                       # 있는 장치의 값은 남는다
+        x = zipfile.ZipFile(io.BytesIO(report.build(e, e.archw.store, {"days": "1"})[1])).read("word/document.xml").decode("utf-8")
+        for w in ("1.5 장치 구성", "2 / 5", "PV2 "): self.assertIn(w, x)                                                                          # 보고서: 인식 / 자리, 장치별 상태
+        self.assertNotIn(">PV5<", x); self.assertNotIn(">DG4<", x)                                                                              # 빈 자리는 장치 상태 표에 적지 않는다
+        self.assertTrue([t for t in rt.events if "PV 2대 인식" in t["text"]]); self.assertTrue([t for t in rt.events if "PV2 가상 장치 놓기" in t["text"]])      # 대수 변화가 기록에 남는다
+        unitctl.change(e, "PV", -1, "시험"); self.assertTrue(self._wait(lambda: len(pv()["units"]) == 1 and pv()["n"] == 1))
+        self.assertIn("PV2.lim", rt.val); c = rt.fleet.clean(rt.val); self.assertNotIn("PV2.lim", c); self.assertNotIn("PV2.status", c); self.assertIn("PV.kw", c); self.assertIn("LOAD.kw", c)      # 뺀 장치의 묵은 값은 저장하지 않는다
+        self.assertTrue([t for t in rt.events if "PV2 빼기" in t["text"]])
+        self.assertEqual((archdev._name("DG2"), archdev._name("ESS3"), archdev._name("DG"), archdev._name("FSU2")), ("디젤발전기 2", "ESS 3", "디젤발전기", "FSU2"))      # 장치별 자료의 이름
 
     def test_extra_units_are_recognized_summed_and_commanded(self):
         e = self.eng; rt = e.rt; fl = lambda: e.snapshot()["fleet"]; act = lambda: {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}

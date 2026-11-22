@@ -16,7 +16,7 @@
 """
 import json, os, re
 
-from . import scenring
+from . import scenring, scenunit
 
 FILE = "scenario_extra.json"
 MAX = {"feeders": 12, "transformers": 4, "relays": 16}
@@ -140,7 +140,9 @@ def points(extra):
 def merge(pts, extra):
     """실제 대응표의 신호 목록에 모의 신호를 덧붙인다(이미 있는 이름은 건너뛴다 — 여러 번 불러도 같다)."""
     have = {p["tag"] for p in pts}
-    return list(pts) + [p for p in points(extra) if p["tag"] not in have and "MTR" in {q["device"] for q in pts}]
+    add = [p for p in points(extra) if p["tag"] not in have and "MTR" in {q["device"] for q in pts}]
+    more = scenunit.points(pts, max([p["addr"] for p in add], default=ADDR0) + 1) if "MTR" in {q["device"] for q in pts} else []      # 장치 놓기 · 빼기 신호(대수 변화 시나리오)
+    return list(pts) + add + [p for p in more if p["tag"] not in have]
 
 
 def save(profile, extra, pts):
@@ -179,7 +181,7 @@ class Model:
         self.kw = dict(BUILTIN); self.kw.update({f["id"]: f"{f['id']}.kw" for f in self.x["feeders"]})
         for f in self.x["feeders"]:
             if f"CB.{f['id']}" in plant.by_tag: plant.set(f"CB.{f['id']}", 1); plant.set(f"{f['id']}.kw", f["kw"])
-        self.ring = scenring.Ring(self.x.get("ring"), plant)
+        self.ring = scenring.Ring(self.x.get("ring"), plant); scenunit.start(plant)
 
     def _has(self, tag): return tag in self.p.by_tag
     def _is(self, tag, value): return self._has(tag) and int(round(self.p.get(tag))) == value
@@ -243,4 +245,4 @@ class Model:
         for t in self.x["transformers"]:
             if self._has(f"{t['id']}.load_pct"): self.p.set(f"{t['id']}.load_pct", min(1000.0, 100.0 * self.flow(t["on"]) / (t["kva"] * t["pf"])))
         for r in self.relays: self._relay(r, now, dt)
-        self.ring.tick(now); self._balance()
+        scenunit.tick(self.p); self.ring.tick(now); self._balance()

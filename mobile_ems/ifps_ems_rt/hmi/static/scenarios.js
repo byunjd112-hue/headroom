@@ -11,7 +11,7 @@ const P_SCENARIOS = (() => {
   const metrics = {executed: "급전 판단 실행", writes: "쓰기 건수", tied: "상전 연계", outage: "정전 감지",
     DG: "디젤 목표", FC: "연료전지 목표", GDG: "예비 발전기 목표", ELZ: "수전해 목표", reserve: "예비력 규칙",
     ess_target: "ESS 목표 (kW)", grid_target: "수전 목표 (kW)", full_hours: "전 부하 자립 예상 (h)"};
-  const maxDrafts = 96, maxBatch = 48;
+  const maxDrafts = 96, maxBatch = 64;
   const isModeCase = item => (item.cat || "").endsWith("운전 모드") || (!item.cat && /^(AUTO|MANUAL) · /.test(item.name));
   let cases;
   try { cases = JSON.parse(localStorage.getItem(key)); } catch (_) { /* use built-in presets */ }
@@ -40,6 +40,7 @@ const P_SCENARIOS = (() => {
     if (step.type === "command") return step.value === 1 ? "기동 지령" : "정지 지령";
     if (step.type === "wait") return `대기 ${step.ms} ms`;
     if (step.type === "response") return step.ms === -1 ? "지령 응답 없음" : `상태 응답 지연 ${step.ms} ms`;
+    if (step.type === "set" && String(step.tag).startsWith("UNIT.")) return `${deviceName(step.tag.slice(5))} ${+step.value > 0.5 ? "놓기(추가)" : "빼기(철수 · 미휴대)"}`;      // 장치 구성 변화
     if (step.type === "set") return `${step.tag} ← ${step.value}`;
     const op = {eq: "=", ge: "≥", le: "≤"}[step.op];
     return `${step.tag} ${op} ${step.value}`;

@@ -118,13 +118,11 @@ function layCables(items) {
 }
 /* 자동 인식한 대수대로 배치도를 다시 짠다(편집 중에는 저장된 배치 그대로): 같은 종류가 더 있으면 첫 장비 옆에 덧그리고, 없는 종류는 한 대만 흐리게 두며, 빈 자리의 구간분전함은 뺀다 */
 const LAY_FLEET = { DG: "DG", ESS: "ESS", PV: "PV", FC: "FC" };
-/* 늘어난 장치를 놓을 빈 자리: 같은 종류 첫 장비에서 가까운 순으로 격자 자리를 훑어, 이미 놓인 것들과 겹치지 않는 첫 자리(장비 크기만큼 타원 거리로 띄운다) */
-const LAY_GAP = { PV: [200, 104], DG: [170, 74], ESS: [180, 74], FC: [190, 78], DIST: [250, 130], EMS: [210, 110], FSU: [70, 50], L1: [180, 100], L2: [180, 100], L3: [170, 96], BARRACK: [180, 100] };
-function layFree(it, taken) {
-  const [gx, gy] = LAY_GAP[it.kind] || [140, 80], clear = (x, y) => taken.every(o => { const [ox, oy] = LAY_GAP[o.kind] || [170, 100], rx = (gx + ox) / 2, ry = (gy + oy) / 2; return ((x - o.x) / rx) ** 2 + ((y - o.y) / ry) ** 2 >= 1; });
-  const cand = []; for (let i = -12; i <= 12; i++) for (let j = -8; j <= 8; j++) { const x = it.x + i * 46, y = it.y + j * 30; if ((i || j) && x >= 110 && x <= 1500 && y >= 215 && y <= 850) cand.push([x, y, (i * 46) ** 2 + (j * 30 * 1.6) ** 2]); }
-  const hit = cand.sort((a, b) => a[2] - b[2]).find(c => clear(c[0], c[1])); return hit ? [hit[0], hit[1]] : [Math.min(1510, it.x + 70), Math.min(850, it.y + 40)];
-}
+/* 같은 종류가 여러 대면: 그림을 대수에 맞춰 줄이고(layScale), 자리를 정해 두지 않은 장치는 첫 장비 뒤로 비스듬히 겹쳐 세운다(layStack).
+   흩어 놓으면 다른 장비 · 구간분전함과 겹치고 선이 엉키므로, 한 무리로 모아 배치도의 균형을 지킨다. 자리를 따로 정하려면 [배치 편집]에서 끌어 옮겨 저장한다 */
+const LAY_STEP = { PV: [62, -30], DG: [44, -24], ESS: [46, -24], FC: [48, -25] };
+const layScale = n => n <= 1 ? 1 : Math.max(.58, 1 - .11 * (n - 1));
+function layStack(it, j, sc) { const [dx, dy] = LAY_STEP[it.kind] || [44, -24]; return [Math.min(1540, it.x + dx * sc * j), Math.max(215, it.y + dy * sc * j)]; }
 /* 배치 편집에 들어갈 때: 자동으로 놓인 장치를 실제 항목으로 넣어 끌어 옮길 수 있게 한다(저장하면 그 자리가 기억된다) */
 function layAdopt() {
   const add = layAuto(L.items).filter(i => String(i.uid).startsWith("auto-")).map((i, k) => ({ uid: "u" + Date.now().toString(36) + k, kind: i.kind, bind: i.bind, name: i.name, x: Math.round(i.x), y: Math.round(i.y) }));
@@ -139,7 +137,9 @@ function layAuto(items) {
     if (i <= Math.max(1, f.units.length)) out.push(Object.assign({}, it, { unit: (f.units[i - 1] || {}).id, absent: !f.units.length }));
     else out.push(Object.assign({}, it, { absent: true, spare: true })); });      // 배치 편집으로 미리 놓아 둔 자리: 흐리게 두었다가 그 장치가 인식되면 켜진다(저장한 배치가 사라져 보이지 않게)
   Object.keys(first).forEach(kd => { const f = fl[kd], it = first[kd];
-    for (let i = cnt[kd]; i < f.units.length; i++) { const [x, y] = layFree(it, out); out.push(Object.assign({}, it, { uid: `auto-${kd}-${i}`, name: `${it.name} #${i + 1}`, unit: f.units[i].id, x, y })); } });
+    const sc = layScale(f.units.length);
+    for (let i = cnt[kd]; i < f.units.length; i++) { const [x, y] = layStack(it, i - cnt[kd] + 1, sc); out.push(Object.assign({}, it, { uid: `auto-${kd}-${i}`, name: `${it.name} #${i + 1}`, unit: f.units[i].id, x, y })); } });
+  out.forEach(o => { const f = LAY_FLEET[o.kind] && fl[LAY_FLEET[o.kind]]; if (f && f.units.length > 1) o.sc = layScale(f.units.length); });      // 그 종류의 그림을 모두 같은 비율로 줄인다
   return out;
 }
 function mapEqSt(s, it) {
@@ -177,7 +177,7 @@ function siteMapSvg(s) {
   items.slice().sort((a, b) => a.y - b.y).forEach(it => {
     const kind = it.kind === "BARRACK" ? "BARRACK" : it.kind, [Lx, Ly] = ISO_EXT[kind] || ISO_EXT.FSU, [wx, wy] = mapWorld(it.x, it.y), [px, py] = I.p(wx - Lx / 2, wy - Ly / 2, 0);
     const sel = L.edit && L.sel === it.uid;
-    g += `<g class="meq ${L.edit ? "editable" : ""} ${sel ? "sel" : ""}" data-uid="${it.uid}">${sel ? `<ellipse cx="${it.x}" cy="${it.y}" rx="${(Lx + Ly) * ISO_C * MAP_S * .62}" ry="${(Lx + Ly) * ISO_S * MAP_S * .62}" class="msel"/>` : ""}${spriteSvg(kind, mapEqSt(s, it), it.x, it.y + (Lx + Ly) * ISO_S * MAP_S / 2 + 6, (Lx + Ly) * ISO_C * MAP_S * (kind === "FSU" ? 1.5 : kind === "PV" ? .78 : 1.12)) || isoPlace(kind, mapEqSt(s, it), px, py, MAP_S)}</g>`;
+    g += `<g class="meq ${L.edit ? "editable" : ""} ${sel ? "sel" : ""}" data-uid="${it.uid}">${sel ? `<ellipse cx="${it.x}" cy="${it.y}" rx="${(Lx + Ly) * ISO_C * MAP_S * .62}" ry="${(Lx + Ly) * ISO_S * MAP_S * .62}" class="msel"/>` : ""}${spriteSvg(kind, mapEqSt(s, it), it.x, it.y + (Lx + Ly) * ISO_S * MAP_S / 2 + 6, (Lx + Ly) * ISO_C * MAP_S * (kind === "FSU" ? 1.5 : kind === "PV" ? .78 : 1.12) * (it.sc || 1)) || isoPlace(kind, mapEqSt(s, it), px, py, MAP_S)}</g>`;
   });
   if (ems && !L.edit) g += `<text x="${ems.x}" y="${ems.y + 58}" text-anchor="middle" class="mfsu sec">EMS 전원: 배전 모선(주) · 차량 28 V(예비) · 내장 무정전 전원</text>`;      // 하드웨어 설계의 전원 이중화
   const rg = !L.edit && s.ring ? s.ring : null;                                    // 구간분전함 이름표(환망 화면의 이름과 같다)

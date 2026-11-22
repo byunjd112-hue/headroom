@@ -27,6 +27,15 @@ ESS_STEP = 60                      # ESS 안전 운영정보 저장 주기(초) 
 NAN = float("nan")
 
 
+def _base(dev):
+    """같은 종류의 추가 장치(DG2 …)는 첫 장치 이름으로 묶는다."""
+    b = dev.rstrip("0123456789"); return b if b != dev and b in NAMES else dev
+
+
+def _name(dev):
+    b = _base(dev); return NAMES.get(dev) or (f"{NAMES[b]} {dev[len(b):]}" if b != dev else dev)
+
+
 def load_items(path):
     """ESS 안전 운영정보 항목 파일. 없으면 빈 목록(기록하지 않음)."""
     if not os.path.isfile(path): return []
@@ -129,10 +138,10 @@ class DevLog:
             spec = self._spec("dev"); out = {}
             if not spec: return []
             for cid, n, a, b in self.a.db.execute("SELECT cid, COUNT(*), MIN(ts), MAX(ts) FROM dev GROUP BY cid"):
-                dev, sig = spec[cid]; o = out.setdefault(dev, {"dev": dev, "name": NAMES.get(dev, dev), "signals": sig, "rows": 0, "first": a, "last": b})
+                dev, sig = spec[cid]; o = out.setdefault(dev, {"dev": dev, "name": _name(dev), "signals": sig, "rows": 0, "first": a, "last": b})
                 o["rows"] += n; o["first"] = min(o["first"], a); o["last"] = max(o["last"], b); o["signals"] = sig
         f = lambda t: datetime.fromtimestamp(t).strftime("%Y-%m-%d %H:%M")
-        return [dict(o, first=f(o["first"]), last=f(o["last"])) for o in sorted(out.values(), key=lambda o: list(NAMES).index(o["dev"]) if o["dev"] in NAMES else 99)]
+        return [dict(o, first=f(o["first"]), last=f(o["last"])) for o in sorted(out.values(), key=lambda o: (list(NAMES).index(_base(o["dev"])) if _base(o["dev"]) in NAMES else 99, o["dev"]))]
 
     def dev_series(self, dev, unit, t0, t1):
         """장치 한 대의 신호별 평균·최소·최대를 단위로 묶는다. 반환: {signals: [{tag, unit}], rows: [{k, n, v: {tag: [평균, 최소, 최대]}}]}"""

@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from . import scenunit
 from .engine import Engine
 from ..runtime import Runtime
 
@@ -55,6 +56,7 @@ class ScenarioPolicy:
         self.writes.clear()
         self.last_decision = None
         rt.val = {p["tag"]: self.plant.get(p["tag"]) for p in rt.pts if p["rw"] == "r"}
+        scenunit.fleet_merge(rt, self.plant)  # units placed or removed by UNIT.<device> signals
         for dev, state in rt.dev.items():
             state.on = bool(rt.val.get(f"{dev}.status"))
             state.manual = bool(rt.val.get(f"{dev}.mode"))

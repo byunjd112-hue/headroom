@@ -39,7 +39,7 @@ class ArchWatch:
     def step(self, eng, k):
         """감시 주기에서 불린다. 값만 줄에 넣고 바로 돌아간다 — 보관소 쓰기가 늦어도 감시·제어 주기를 붙잡지 않는다."""
         if self.store is None: return
-        try: self.q.put_nowait((time.time(), time.monotonic(), archive.instant(k, eng.rt.val), dict(eng.rt.val), eng))
+        try: self.q.put_nowait((time.time(), time.monotonic(), archive.instant(k, eng.rt.val), eng.rt.fleet.clean(eng.rt.val), eng))      # 장치별 자료에는 지금 있는 장치의 값만(뺀 장치의 묵은 값을 운전 중인 것처럼 남기지 않는다)
         except queue.Full: self.dropped += 1; self.err = f"보관소 쓰기가 밀려 {self.dropped}건을 건너뜀"
 
     def _work(self):
