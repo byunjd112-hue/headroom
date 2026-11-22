@@ -50,7 +50,8 @@ class Fleet:
         """이번 주기에 읽지 않을 자리인가: 응답한 적 없는 추가 자리는 PROBE_S 마다만 불러 본다(없는 장치의 시간 초과가 주기를 잡아먹지 않게)."""
         if n in self.ever or not is_slot(n): return False
         if t < self.park.get(n, -1e9): return True
-        self.park[n] = t + PROBE_S; return False
+        nxt = next((m for m in self.slots.get(kind(n), ()) if is_slot(m) and m not in self.ever), None)      # 그 종류의 다음 빈 자리는 자주, 그 뒤 자리는 드물게(빈 자리가 많아도 불러 보는 부담이 늘지 않게)
+        self.park[n] = t + (PROBE_S if n == nxt else 3 * PROBE_S); return False
 
     def empty(self, n):
         """빈 자리(응답한 적 없는 추가 자리)인가."""

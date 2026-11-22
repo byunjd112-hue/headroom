@@ -1,6 +1,6 @@
 {
- "date": "2026-11-22 12:03",
- "unittest_s": 740.2,
+ "date": "2026-11-22 13:43",
+ "unittest_s": 700.7,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -173,7 +173,7 @@
   "test_check_scans_and_module_entry | ok",
   "test_extra_units_are_recognized_summed_and_commanded | ok",
   "test_kind_not_brought_is_marked_absent_and_replaced | ok",
-  "설비 제어 화면의 − · ＋: 가상 장치를 놓으면 조작 없이 인식되고, 빼면 두절 경보 없이 빈 자리로 돌아간다. | FAIL",
+  "설비 제어 화면의 − · ＋: 가상 장치를 놓으면 조작 없이 인식되고, 빼면 두절 경보 없이 빈 자리로 돌아간다. | ok",
   "test_kind_slot_and_pointmap_expand | ok",
   "test_merge_sum_any_mean_and_empty_slot | ok",
   "test_blend_and_score_weight_follows_error | ok",
@@ -183,17 +183,17 @@
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
  "n_tests": 179,
- "tests_ok": false,
- "coverage_pct": 91.9,
+ "tests_ok": true,
+ "coverage_pct": 92.0,
  "stmt": {
-  "n": 6120,
-  "hit": 5809,
+  "n": 6123,
+  "hit": 5813,
   "pct": 94.9
  },
  "branch": {
   "n": 2192,
-  "hit": 1830,
-  "pct": 83.5
+  "hit": 1833,
+  "pct": 83.6
  },
  "coverage_files": [
   [
@@ -245,14 +245,6 @@
    "33-34, 48-50"
   ],
   [
-   "ifps_ems_rt/hmi/unitctl.py",
-   85.7,
-   28,
-   55.6,
-   18,
-   "26, 31, 41, 46"
-  ],
-  [
    "ifps_ems_rt/hmi/ringwatch.py",
    88.3,
    111,
@@ -275,6 +267,14 @@
    68.8,
    80,
    "160, 198-210, 214-216"
+  ],
+  [
+   "ifps_ems_rt/hmi/unitctl.py",
+   89.7,
+   29,
+   72.2,
+   18,
+   "26, 31, 47"
   ],
   [
    "ifps_ems_rt/hmi/weatherwatch.py",
@@ -431,10 +431,10 @@
   [
    "ifps_ems_rt/simplant.py",
    98.7,
-   150,
+   151,
    92.9,
    56,
-   "152-153"
+   "153-154"
   ],
   [
    "ifps_ems_rt/hal.py",
@@ -559,7 +559,7 @@
   [
    "ifps_ems_rt/fleet.py",
    100.0,
-   63,
+   64,
    100.0,
    26,
    ""
@@ -1477,7 +1477,7 @@
    ],
    [
     "ifps_ems_rt/simplant.py",
-    187
+    188
    ],
    [
     "ifps_ems_rt/opsmode.py",
@@ -1545,7 +1545,7 @@
    ],
    [
     "ifps_ems_rt/fleet.py",
-    110
+    111
    ],
    [
     "ifps_ems/nowcast.py",
@@ -1601,7 +1601,7 @@
    ],
    [
     "ifps_ems_rt/hmi/unitctl.py",
-    47
+    48
    ],
    [
     "ifps_ems_rt/hmi/fcstats.py",
@@ -1660,7 +1660,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 7718,
+   "loc": 7721,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -1844,11 +1844,11 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.85,
+ "cc_avg": 5.86,
  "cc_n": 778,
  "cc_rank": {
-  "A": 464,
-  "B": 190,
+  "A": 463,
+  "B": 191,
   "C": 124,
   "D": 0,
   "E": 0,
@@ -1989,7 +1989,7 @@
   ],
   [
    "ifps_ems_rt/simplant.py",
-   28.8,
+   29.3,
    "A"
   ],
   [
@@ -2083,13 +2083,13 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hal.py",
-   48.6,
+   "ifps_ems_rt/fleet.py",
+   48.4,
    "A"
   ],
   [
-   "ifps_ems_rt/fleet.py",
-   48.9,
+   "ifps_ems_rt/hal.py",
+   48.6,
    "A"
   ],
   [
@@ -2159,7 +2159,7 @@
   ],
   [
    "ifps_ems_rt/hmi/unitctl.py",
-   69.0,
+   69.1,
    "A"
   ],
   [
@@ -2205,8 +2205,8 @@
  ],
  "loc_py": {
   "files": 57,
-  "sloc": 6386,
-  "comments": 839
+  "sloc": 6389,
+  "comments": 843
  },
  "js": [
   [
