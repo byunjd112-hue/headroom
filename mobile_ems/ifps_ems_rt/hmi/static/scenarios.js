@@ -127,19 +127,14 @@ const P_SCENARIOS = (() => {
   function liveView() {
     const html = ScTopo.html(liveCtx());
     return `<div class="sq-summary"><span>실시간 상태</span><span class="muted">${S.snap?.sim ? "가상 장치" : "실장비"} · 1초마다 갱신 · 표시 전용(지령 없음)</span><span class="sc-spacer"></span>
-        <span class="sq-legend"><i class="l-pow"></i>전력 흐름</span>${ScTopo.custom() ? button("layout-reset", "배치 초기화") : ""}</div><div class="tp-wrap" id="tpLive">${html}</div><div id="tpLiveRing">${liveRing()}</div>
+        <span class="sq-legend"><i class="l-pow"></i>전력 흐름</span>${ScTopo.custom() ? button("layout-reset", "배치 초기화") : ""}</div><div class="tp-wrap" id="tpLive">${html}</div>
       <p class="muted tp-pick">차단기 색: 초록 투입 · 회색 개방 · 빨강 트립. 값이 없는 신호(대응표에 없거나 통신 두절)는 회색으로 보입니다.${S.snap?.sim ? "" : " 시나리오 편집·실행과 추가 설비는 가상 장치 모드에서만 쓸 수 있습니다."}</p>`;
   }
   const liveCtx = () => ({steps: [], rows: [{step: 0, snap: liveSnap()}], stepIndex: 0, describe: description, picked: "", part: "", live: true, fleet: S.snap?.fleet || null});
-  /* 실시간 보기의 환망: 환망 · 개요 · 결선도 화면과 같은 자료(자동 인식한 구간분전함 · 배전체계, 구간 상태)로 그린다 */
-  function liveRing() {
-    const r = RingView.fromSnap(S.snap), sm = RingView.sum(S.snap); if (!r) return "";
-    return `<div class="rg"><div class="rg-h"><b>환망</b><span class="${sm.cls === "bad" ? "bad" : "muted"}">${esc(sm.text)}</span></div>${RingView.svg(r)}</div>`;
-  }
   function refreshLive() {
-    const box = $("#tpLive"), rb = $("#tpLiveRing");
+    const box = $("#tpLive");
     if (!box || ScTopo.dragging()) return;
-    box.innerHTML = ScTopo.html(liveCtx()); if (rb) rb.innerHTML = liveRing();
+    box.innerHTML = ScTopo.html(liveCtx());
     ScTopo.bind(box, () => {}, refreshLive);
   }
 
@@ -148,15 +143,8 @@ const P_SCENARIOS = (() => {
     return `<div class="sq-summary"><span>${ctx.steps.length}단계</span>${ctx.rows.length ? `<span class="sc-ok">통과 ${ctx.rows.filter(r => r.state === "pass").length}</span>${ctx.rows.some(r => r.state === "fail") ? `<span class="sc-fail">실패 ${ctx.rows.filter(r => r.state === "fail").length}</span>` : ""}` : '<span class="muted">아직 검증하지 않음</span>'}
         <span class="sc-spacer"></span><span class="sq-legend"><i class="l-call"></i>지령·입력 <i class="l-ret"></i>응답 판정 <i class="l-inj"></i>고장 주입 <i class="l-pow"></i>전력 흐름</span>
         ${button("extra", "설비 구성")}${ScTopo.custom() ? button("layout-reset", "배치 초기화") : ""}</div>
-      <div class="tp-wrap">${ScTopo.html(ctx)}</div>${ringStrip(ctx)}${pickPanel()}`;
+      <div class="tp-wrap">${ScTopo.html(ctx)}</div>${pickPanel()}`;
   }
-  /* 환망: 구간분전함(FSU)·휴대용 배전체계(PPDU)·구간 개폐기를 한 줄 그림으로(환망 화면과 같은 그림). 단계마다 검증기가 남긴 값을 쓴다 */
-  function ringStrip(ctx) {
-    const R = config?.extra?.ring; if (!R || !R.fsu || !R.fsu.length) return "";
-    const rows = ctx.rows || [], row = rows.filter(r => r.step <= ctx.stepIndex && r.snap).pop(), v = row ? row.snap : null;
-    return `<div class="rg"><div class="rg-h"><b>${esc(R.name || "환망")}</b><span class="muted">전원에서 나가 구간분전함(FSU)을 돌아 다시 전원으로 — 한 구간이 끊어지면 그 구간을 떼어 내고 상시 개방점을 닫아 반대쪽에서 공급한다${v ? "" : " · 검증하면 단계별 상태가 나온다"}</span></div>${RingView.svg(RingView.fromValues(R, v))}</div>`;
-  }
-
   // 구성도에서 블록(장비·차단기·배전반)을 누르면 그 블록의 신호로 단계를 바로 넣는다
   function pickPanel() {
     if (!picked) return '<p class="muted tp-pick">블록을 누르면 그 장비·차단기의 신호로 단계를 바로 넣을 수 있습니다. 블록을 끌면 배치가 바뀌고 이 브라우저에 저장됩니다.</p>';

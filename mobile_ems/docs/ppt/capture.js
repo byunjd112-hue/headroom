@@ -36,7 +36,8 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await p.evaluate(() => P_SCENARIOS.use("주둔지 · 정전·예비 발전기·복전")); await p.waitForTimeout(600); await p.click('[data-sc="verify"]').catch(() => {}); await p.waitForTimeout(8000); await p.click('.sq-row[data-step="4"]').catch(() => {}); await p.waitForTimeout(500); await p.screenshot({ path: D + "scenarios.png" });
   await p.click('[data-view="topo"]').catch(() => {}); await p.waitForTimeout(600); await p.click('.sp-dot[data-step="12"]').catch(() => {}); await p.waitForTimeout(900); await p.evaluate(() => document.querySelector(".tp-wrap")?.scrollIntoView({ block: "center" })); await p.waitForTimeout(400); await p.screenshot({ path: D + "scen_topo.png" });
   await p.evaluate(() => P_SCENARIOS.use("환망 · 구간 단선 → 구간 차단 → 반대쪽 공급")); await p.waitForTimeout(500); await p.click('[data-sc="verify"]').catch(() => {}); await p.waitForTimeout(8000);
-  await p.click('.sp-dot[data-step="8"]').catch(() => {}); await p.waitForTimeout(900); await p.evaluate(() => document.querySelector(".rg")?.scrollIntoView({ block: "end" })); await p.waitForTimeout(400); await p.screenshot({ path: D + "scen_ring.png" });
+  await post("/api/ring", { do: "sim", action: "break", section: 2, on: true }); await go("ring", "scen_ring", 9000); await post("/api/ring", { do: "sim", action: "break", section: 2, on: false }); await p.waitForTimeout(7000);      // 환망 그림은 환망 화면에서 찍는다(시나리오 화면에는 환망 그림을 두지 않는다)
+  await go("scenarios", null, 1500);
   await p.evaluate(() => P_SCENARIOS.use("보호 협조 · 3등급 과부하 선택 차단")); await p.waitForTimeout(500);
   await p.click('[data-sc="verify"]').catch(() => {}); await p.waitForTimeout(8000);
   await p.click('.sp-dot[data-step="2"]').catch(() => {}); await p.waitForTimeout(900); await p.evaluate(() => document.querySelector(".tp-wrap")?.scrollIntoView({ block: "center" })); await p.waitForTimeout(400); await p.screenshot({ path: D + "scen_prot.png" });

@@ -864,3 +864,9 @@ html.tr-d .train { top: 8px; right: 8px; bottom: 8px; width: 392px; max-height: 
 .sld .sring-drop { stroke: var(--text2); stroke-width: 1.6; stroke-dasharray: 3 4; fill: none; } .sld .sring-drop.off { stroke: #ff4d64; }
 .sld .sring-c { fill: var(--panel2); stroke-width: 1.1; } .sld .sring-c.off { stroke: var(--dead) !important; } .sld .sring-ct { font-size: 8px; font-weight: 700; }
 .sld .sring-ld { fill: var(--panel2); stroke: rgba(var(--edge),.3); stroke-width: 1.6; } .sld .sring-ld.on { stroke: var(--live); } .sld .sring-ld.off { stroke: #ff4d64; stroke-dasharray: 5 4; }
+/* 스크롤 표의 붙박이 머리: 스크롤 상자에 위쪽 여백이 있으면 머리가 그만큼 내려와 붙고, 올라가는 줄이 머리 위로 비친다 — 여백을 없애고 머리를 줄 위에 둔다 */
+.panel > .bd.np, :root[data-theme] .panel > .bd.np { padding-top: 0; }
+table.t th { z-index: 2; background-clip: padding-box; }
+/* 도움말: 화면 높이 안에 가두고 목차 · 본문이 저마다 스크롤한다(가두지 않으면 긴 본문이 아래로 잘린다) */
+:root[data-theme] main > .hp { flex: 1; min-height: 0; }
+.hp > .panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; } .hp > .panel > .bd { flex: 1; min-height: 0; overflow: auto; }

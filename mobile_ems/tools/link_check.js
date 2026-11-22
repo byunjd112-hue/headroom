@@ -1,5 +1,5 @@
 // 화면 연동 점검: 가상 장치에 상황을 하나씩 넣고(환망 구간 단선 · 해제, 장치 추가 · 제거, 구간분전함 빼기 · 뒤섞기),
-// 개요 · 결선도 · 환망 · 설비 제어 · 운영 시나리오(실시간) · 경보 화면이 모두 같은 상태를 보이는지 화면의 글자로 대조한다.
+// 개요 · 결선도 · 환망 · 설비 제어 · 경보 화면이 모두 같은 상태를 보이는지(운영 시나리오는 장비 목록이 자동 인식과 맞는지) 화면의 글자로 대조한다.
 //   python -m ifps_ems_rt.hmi config/runtime.json --sim --plan results --port 8088   (다른 창에서 먼저 실행)
 //   node tools/link_check.js [주소] [결과 파일]
 // 기준은 서버가 내보낸 상태(스냅샷의 ring · fleet)다. 약 6분 걸린다.
@@ -21,14 +21,14 @@ const WAIT = 7000, PAGE = 2200;
   // 한 상황에서 모든 화면을 본다. 기준(t)과 어긋나는 화면을 모은다
   async function look(name) {
     const bad = [], see = {};
-    see.ov = await text("overview", "#siteMap"); see.sld = await text("sld", "#sldRingG"); see.rg = await text("ring", "main"); see.ctl = await text("control", "#ringRows"); see.sc = await text("scenarios", "#tpLiveRing");
+    see.ov = await text("overview", "#siteMap"); see.sld = await text("sld", "#sldRingG"); see.rg = await text("ring", "main"); see.ctl = await text("control", "#ringRows"); await text("scenarios", "#tpLive");
     const pal = await p.evaluate(() => [...document.querySelectorAll("#scWorkspace summary")].map(e => e.textContent.replace(/\s+/g, " ").trim()).join("|"));
     see.al = await text("alarms", "main");
     const t = await truth(), r = t.ring, cut = r.cut || [];
     const need = (k, ok, what) => { if (!ok) bad.push(`${k}: ${what}`); };
-    for (const k of ["ov", "sld", "rg", "ctl", "sc"]) {
+    for (const k of ["ov", "sld", "rg", "ctl"]) {
       if (see[k] == null) { bad.push(`${k}: 화면에 환망 없음`); continue; }
-      for (const f of r.fsu) if (k !== "ctl" || r.fsu.length) need(k, see[k].includes(k === "sc" ? f.id.replace("FSU", "F") : f.name), `${f.name} 없음`);      // 시나리오의 환망 그림은 마디 안에 짧은 이름(F1 …)을 쓴다
+      for (const f of r.fsu) if (k !== "ctl" || r.fsu.length) need(k, see[k].includes(f.name), `${f.name} 없음`);
       for (const s of r.sections) { const shown = new RegExp(`구간 ${s.i}(?:\\([^)]*\\)| · 상시 개방점)? ?(?:단선 · )?차단(?!된)`).test(see[k]);
         need(k, shown === cut.includes(s.i), `구간 ${s.i} ${cut.includes(s.i) ? "차단이 안 보임" : "차단으로 잘못 보임"}`); }
     }
