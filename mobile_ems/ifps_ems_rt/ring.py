@@ -156,6 +156,11 @@ def _ppdus(r, g, fsu_live):
     return out
 
 
+def _fsus(r, g, fed):
+    """구간분전함들의 읽은 값. kw · kwh 는 그 구간분전함의 분기 전력계다."""
+    return [dict(_unit(f, g, fed[k]), kw=g(f"{f['id']}.kw"), kwh=g(f"{f['id']}.kwh")) for k, f in enumerate(r["fsu"])]
+
+
 def _recog(r, units):
     """자동 인식 요약: 쓰는지, 빈 자리, 처음 보는 장치."""
     return {"auto": bool(r.get("eff")), "empty": r.get("empty", []), "new": [x["id"] for x in units if x["new"]]}
@@ -173,7 +178,7 @@ def status(r, val, lost=False):
     g = (lambda t: None) if lost else val.get; r = layout(r, g); n = len(r["fsu"]); sw = sw_tags(r)
     secs = [{"i": i, "tag": t, "state": None if g(t) is None else int(round(g(t))), "open": i == r["open"]} for i, t in enumerate(sw)]
     fed = _fed([s["state"] == 1 for s in secs], n) if all(s["state"] is not None for s in secs) else [None] * n
-    fsu = [dict(_unit(f, g, fed[k]), kw=g(f"{f['id']}.kw"), kwh=g(f"{f['id']}.kwh")) for k, f in enumerate(r["fsu"])]; auto = g("RING.auto")      # kw · kwh: 그 구간분전함 분기 전력계
+    fsu = _fsus(r, g, fed); auto = g("RING.auto")
     _comm(secs, fsu)
     ppdu = _ppdus(r, g, {f["id"]: f["live"] for f in fsu})
     return {"name": r["name"], "sections": secs, "fsu": fsu, "ppdu": ppdu, "open": r["open"], "auto": None if auto is None else auto > 0.5,

@@ -80,7 +80,7 @@ const P_RING = {
   },
   branch(b, s) {
     if (!b) return ""; const n = (x, d = 1) => x == null ? "—" : Number(x).toFixed(d), t = b.total, miss = (s.meters_missing || []).length;
-    const row = r => `<tr><td class="mono">${esc(r.id)}</td><td>${esc(r.name)}</td><td>${r.kind === "FSU" ? "구간분전함" : "배전체계 · " + esc(r.at)}</td><td class="n">${n(r.kw)}</td><td class="n">${n(r.today_kwh)}</td><td class="n">${n(r.kwh, 0)}</td>
+    const row = r => `<tr><td class="mono">${esc(r.id)}</td><td>${esc(r.name)}</td><td>${r.kind === "FSU" ? "구간분전함" : "배전체계 · " + esc(r.at)}</td><td class="n">${n(r.kw)}</td><td class="n">${n(r.today_kwh)}</td><td class="n">${n(r.kwh, 1)}</td>
       <td class="n">${n(r.next1h)}</td><td class="n">${n(r.next24_kwh, 0)}</td><td class="n">${r.peak_kw == null ? "—" : `${n(r.peak_kw)} <span class="muted">(${r.peak_at})</span>`}</td><td>${this.spark(r.spark)}</td><td class="n">${r.err_pct == null ? '<span class="muted">재는 중</span>' : r.err_pct + "%"}</td></tr>`;
     return `<div class="panel" style="margin-bottom:14px"><div class="hd"><h3>분기별 전력 · 전력량 · 부하 예측</h3><div class="spacer"></div><span class="sub">분기 전력계(구간분전함 · 배전체계) 실측으로 15분마다 고친다${b.demo ? ' · <b class="warnc">시연용 초기값(실측이 하루치 쌓이면 실측으로 바뀐다)</b>' : ""}</span></div>
       <div class="bd np scroll arc-table"><table class="t"><thead><tr><th>분기</th><th>이름</th><th>종류 · 연결</th><th class="n">지금 kW</th><th class="n">오늘 kWh</th><th class="n">누적 kWh</th><th class="n">다음 1시간 kW</th><th class="n">24시간 kWh</th><th class="n">최대 예상 kW(시각)</th><th>24시간 예측</th><th class="n">1시간 앞 오차</th></tr></thead>
