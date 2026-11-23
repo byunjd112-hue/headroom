@@ -56,7 +56,7 @@ class TestDiag(Base):
 
     def test_watch_scan_and_menu(self):
         self.assertEqual(diag.watch(self.cfg, self.pts, "ESS", "A", period=0.05, count=2, out=self.out), 2); self.assertIn("ESS.soc", self.out.getvalue())
-        c = diag.client_for(self.cfg, "DG"); found = diag.scan_addresses(c, 3, 0, 12, self.out); c.close(); self.assertEqual(sorted(found), [0, 1, 2, 3, 4, 6, 10, 11])      # 대응표에 있는 주소만 응답(나머지는 예외 02)
+        c = diag.client_for(self.cfg, "DG"); found = diag.scan_addresses(c, 3, 0, 12, self.out); c.close(); self.assertEqual(sorted(found), [0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12])      # 대응표에 있는 주소만 응답(나머지는 예외 02)
         keys = iter(["8", "6", "4", "1", "A", "3", "4", "4", "5", "2", "", "3", "0", "5", "7", "1", "1", "아니오", "9", "0"])
         with contextlib.redirect_stdout(self.out): self.assertEqual(diag.menu(self.cfg, self.pts, os.path.join(self.td, "diag"), inp=lambda *_: next(keys), out=self.out), 0)
         txt = self.out.getvalue(); self.assertIn("대응표 정상", txt); self.assertIn("응답 주소", txt); self.assertIn("취소", txt)

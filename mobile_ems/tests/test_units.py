@@ -15,6 +15,27 @@ class FleetUnitTest(unittest.TestCase):
         self.assertNotIn("FC2.nm3", tags); self.assertEqual(sum(1 for p in pts if p["tag"] == "H2.nm3"), 1); self.assertEqual(pm.validate(pts, dev), [])   # 공용 계측은 본뜨지 않는다
         self.assertEqual(len(fleet.expand(pts, dev)), len(pts))                                                                     # 이미 줄이 있으면 다시 넣지 않는다
 
+    def test_hybrid_pcs_modes(self):
+        """복합전력 PCS 의 운전 모드 선택: 디젤이 필요하면 발전기 + ESS 충전(가득이면 발전기 단독), 필요 없으면 ESS 방전. 복합전력 ESS 가 낮으면 발전기로 충전(이력)."""
+        from ifps_ems_rt import hybrid
+        c = hybrid.settings(None); self.assertEqual((hybrid.mode_for(True, 60.0, c), hybrid.mode_for(True, 95.0, c), hybrid.mode_for(True, None, c), hybrid.mode_for(False, 60.0, c)), (2, 1, 2, 3))
+        bad = []; hybrid.check({"soc_low": 60, "soc_ok": 50, "soc_full": 90}, bad); self.assertTrue(bad); bad = []; hybrid.check({"soc_low": 20, "soc_ok": 50, "soc_full": 90}, bad); hybrid.check(None, bad); self.assertEqual(bad, [])
+        class F:                                              # 실행기 흉내: 복합전력 PCS 두 대
+            live = staticmethod(lambda k: ["DG", "DG2"]); soc = {"DG": 60.0, "DG2": 60.0}
+            def unit(self, n, suf, val): return self.soc[n]
+        class L: by_tag = {"DG.mode_set": 1, "DG2.mode_set": 1}
+        class RT:
+            cfg = {}; fleet = F(); val = {}; links = {"DG": L, "DG2": L}; dev = {}; wrote = []; notes = []
+            def _write1(self, n, tag, v, tol): self.wrote.append((tag, v)); return True
+            def note(self, kind, text, actor=""): self.notes.append(text)
+        rt = RT(); w = {"DG": False}; hybrid.need(rt, w); self.assertEqual((w["DG"], rt.hy_charge), (False, False))
+        self.assertEqual(hybrid.apply(rt, w), [("DG", 3), ("DG2", 3)]); self.assertEqual(hybrid.apply(rt, w), [])                 # 같은 모드는 다시 알리지 않는다
+        F.soc["DG2"] = 15.0; w = {"DG": False}; hybrid.need(rt, w); self.assertEqual((w["DG"], w.get("_hybrid")), (True, True)); self.assertEqual(hybrid.apply(rt, w), [("DG", 2), ("DG2", 2)])   # 한 대라도 낮으면 발전기로 충전
+        F.soc["DG2"] = 40.0; w = {"DG": False}; hybrid.need(rt, w); self.assertTrue(w["DG"])                                       # soc_ok 를 넘을 때까지 이어 간다
+        F.soc["DG2"] = 55.0; w = {"DG": False}; hybrid.need(rt, w); self.assertFalse(w["DG"])
+        F.soc["DG2"] = 15.0; w = {"DG": False, "_quiet": True}; hybrid.need(rt, w); self.assertFalse(w["DG"])                      # 저소음 태세에서는 켜지 않는다
+        F.soc["DG"] = 95.0; self.assertEqual(dict(hybrid.apply(rt, {"DG": True}))["DG"], 1)                                        # 가득 찬 장치는 발전기 단독
+
     def test_merge_sum_any_mean_and_empty_slot(self):
         f = fleet.Fleet(["DG", "DG2", "ESS", "ESS2", "MTR"]); val = {}; seen = []; mark = lambda tag, ok: seen.append((tag, ok)); st = {"DG": "정상", "DG2": "정상", "ESS": "정상", "ESS2": "정상"}
         self.assertEqual((f.live("DG"), f.n("DG"), f.live("MTR")), (["DG"], 1, ["MTR"]))                                             # 아직 읽기 전: 한 대로 본다

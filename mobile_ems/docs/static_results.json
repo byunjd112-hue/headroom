@@ -1,6 +1,6 @@
 {
- "date": "2026-11-23 00:41",
- "unittest_s": 889.4,
+ "date": "2026-11-23 02:38",
+ "unittest_s": 845.4,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -176,6 +176,7 @@
   "test_kind_not_brought_is_marked_absent_and_replaced | ok",
   "설비 제어 화면의 − · ＋: 가상 장치를 놓으면 조작 없이 인식되고, 빼면 두절 경보 없이 빈 자리로 돌아간다. | ok",
   "차량 단위 대수: ④ 수소 차량은 연료전지와 수전해가 함께 늘고 줄며, ① 복합전력의 계통 형성 용량은 인식한 디젤 대수를 따른다. | ok",
+  "복합전력 PCS 의 운전 모드 선택: 디젤이 필요하면 발전기 + ESS 충전(가득이면 발전기 단독), 필요 없으면 ESS 방전. 복합전력 ESS 가 낮으면 발전기로 충전(이력). | ok",
   "test_kind_slot_and_pointmap_expand | ok",
   "test_merge_sum_any_mean_and_empty_slot | ok",
   "test_blend_and_score_weight_follows_error | ok",
@@ -184,17 +185,17 @@
   "test_parse_json_and_csv | ok",
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 181,
+ "n_tests": 182,
  "tests_ok": true,
  "coverage_pct": 92.1,
  "stmt": {
-  "n": 6187,
-  "hit": 5881,
-  "pct": 95.1
+  "n": 6234,
+  "hit": 5925,
+  "pct": 95.0
  },
  "branch": {
-  "n": 2204,
-  "hit": 1846,
+  "n": 2220,
+  "hit": 1860,
   "pct": 83.8
  },
  "coverage_files": [
@@ -226,7 +227,7 @@
    "ifps_ems_rt/hmi/archwatch.py",
    79.4,
    102,
-   59.1,
+   56.8,
    44,
    "29-30, 43, 56, 59-63, 67-68, 108-110, 114-116, 126-128, 131"
   ],
@@ -271,20 +272,20 @@
    "160, 198-210, 214-216"
   ],
   [
+   "ifps_ems_rt/hmi/weatherwatch.py",
+   91.1,
+   101,
+   50.0,
+   22,
+   "59-60, 68, 134-139"
+  ],
+  [
    "ifps_ems_rt/hmi/archapi.py",
    93.1,
    58,
    90.6,
    32,
    "62-63, 65-66"
-  ],
-  [
-   "ifps_ems_rt/hmi/weatherwatch.py",
-   93.1,
-   101,
-   50.0,
-   22,
-   "68, 134-139"
   ],
   [
    "ifps_ems_rt/diag.py",
@@ -333,6 +334,14 @@
    83.3,
    18,
    "52, 72"
+  ],
+  [
+   "ifps_ems_rt/hybrid.py",
+   96.3,
+   27,
+   90.0,
+   10,
+   "29"
   ],
   [
    "ifps_ems/skycam.py",
@@ -432,11 +441,11 @@
   ],
   [
    "ifps_ems_rt/simplant.py",
-   98.7,
-   151,
-   92.9,
-   56,
-   "153-154"
+   98.8,
+   165,
+   93.5,
+   62,
+   "172-173"
   ],
   [
    "ifps_ems_rt/hal.py",
@@ -657,7 +666,7 @@
   [
    "ifps_ems_rt/ring.py",
    100.0,
-   245,
+   251,
    92.6,
    94,
    ""
@@ -665,7 +674,7 @@
  ],
  "pylint": {
   "E": 1,
-  "W": 48,
+  "W": 49,
   "by_id": [
    [
     "W0718 broad-exception-caught",
@@ -701,6 +710,10 @@
    ],
    [
     "W0125 using-constant-test",
+    1
+   ],
+   [
+    "W0201 attribute-defined-outside-init",
     1
    ],
    [
@@ -854,10 +867,18 @@
     "Catching too general exception Exception"
    ],
    [
+    "W0201",
+    "attribute-defined-outside-init",
+    "ifps_ems_rt/simplant.py",
+    83,
+    "Plant._tick_power",
+    "Attribute '_dt' defined outside __init__"
+   ],
+   [
     "W0106",
     "expression-not-assigned",
     "ifps_ems_rt/ring.py",
-    291,
+    300,
     "Model._one",
     "Expression \"[P.set(f'{i}.ch{n}', 1) for n in range(1, 7)]\" is assigned to nothing"
    ],
@@ -1112,7 +1133,7 @@
   ]
  },
  "metrics": {
-  "n_func": 778,
+  "n_func": 787,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1154,9 +1175,9 @@
    [
     "ifps_ems_rt/ring.py",
     "alarms",
-    213,
+    221,
     20,
-    22,
+    23,
     2,
     2
    ],
@@ -1172,7 +1193,7 @@
    [
     "ifps_ems_rt/simplant.py",
     "_tick_bus",
-    119,
+    138,
     20,
     10,
     1,
@@ -1443,7 +1464,7 @@
    ],
    [
     "ifps_ems_rt/ring.py",
-    363
+    372
    ],
    [
     "ifps_ems_rt/hmi/scenarios.py",
@@ -1482,16 +1503,16 @@
     217
    ],
    [
+    "ifps_ems_rt/simplant.py",
+    207
+   ],
+   [
     "ifps_ems_rt/archive.py",
     204
    ],
    [
     "ifps_ems_rt/archdev.py",
     190
-   ],
-   [
-    "ifps_ems_rt/simplant.py",
-    188
    ],
    [
     "ifps_ems_rt/opsmode.py",
@@ -1598,6 +1619,10 @@
     61
    ],
    [
+    "ifps_ems_rt/hybrid.py",
+    60
+   ],
+   [
     "ifps_ems/config.py",
     56
    ],
@@ -1674,7 +1699,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 7800,
+   "loc": 7869,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -1858,11 +1883,11 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.84,
- "cc_n": 793,
+ "cc_avg": 5.85,
+ "cc_n": 802,
  "cc_rank": {
-  "A": 474,
-  "B": 193,
+  "A": 479,
+  "B": 197,
   "C": 126,
   "D": 0,
   "E": 0,
@@ -1937,13 +1962,13 @@
    "C"
   ],
   [
-   "ifps_ems_rt/hmi/engine.py",
+   "ifps_ems_rt/ring.py",
    0.0,
    "C"
   ],
   [
-   "ifps_ems_rt/ring.py",
-   0.1,
+   "ifps_ems_rt/hmi/engine.py",
+   0.0,
    "C"
   ],
   [
@@ -1977,6 +2002,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/simplant.py",
+   25.8,
+   "A"
+  ],
+  [
    "ifps_ems_rt/archive.py",
    26.5,
    "A"
@@ -1999,11 +2029,6 @@
   [
    "ifps_ems_rt/weather.py",
    28.5,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/simplant.py",
-   29.3,
    "A"
   ],
   [
@@ -2088,7 +2113,7 @@
   ],
   [
    "ifps_ems_rt/fleet.py",
-   45.8,
+   46.2,
    "A"
   ],
   [
@@ -2107,13 +2132,13 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/scenario_policy.py",
-   50.8,
+   "ifps_ems_rt/hmi/fcstats.py",
+   52.2,
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/fcstats.py",
-   52.2,
+   "ifps_ems_rt/hmi/scenario_policy.py",
+   52.9,
    "A"
   ],
   [
@@ -2177,6 +2202,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hybrid.py",
+   69.2,
+   "A"
+  ],
+  [
    "ifps_ems_rt/hmi/scenunit.py",
    72.8,
    "A"
@@ -2223,14 +2253,14 @@
   ]
  ],
  "loc_py": {
-  "files": 58,
-  "sloc": 6454,
-  "comments": 855
+  "files": 59,
+  "sloc": 6501,
+  "comments": 877
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   570,
+   575,
    true
   ],
   [
@@ -2280,7 +2310,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/site.js",
-   287,
+   290,
    true
   ],
   [

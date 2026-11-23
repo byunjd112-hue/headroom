@@ -182,7 +182,7 @@ function siteMapSvg(s) {
     const sel = L.edit && L.sel === it.uid;
     g += `<g class="meq ${L.edit ? "editable" : ""} ${sel ? "sel" : ""}" data-uid="${it.uid}">${sel ? `<ellipse cx="${it.x}" cy="${it.y}" rx="${(Lx + Ly) * ISO_C * MAP_S * .62}" ry="${(Lx + Ly) * ISO_S * MAP_S * .62}" class="msel"/>` : ""}${spriteSvg(kind, mapEqSt(s, it), it.x, it.y + (Lx + Ly) * ISO_S * MAP_S / 2 + 6, (Lx + Ly) * ISO_C * MAP_S * (kind === "FSU" ? 1.5 : kind === "PV" ? .78 : 1.12) * (it.sc || 1)) || isoPlace(kind, mapEqSt(s, it), px, py, MAP_S)}</g>`;
   });
-  if (ems && !L.edit) g += `<text x="${ems.x}" y="${ems.y + 58}" text-anchor="middle" class="mfsu sec">EMS 전원: 배전 모선(주) · 차량 28 V(예비) · 내장 무정전 전원</text><text x="${ems.x}" y="${ems.y + 72}" text-anchor="middle" class="mfsu sec">통신: 전력 케이블과 같은 경로 · 구간분전함은 환형(한 구간이 끊겨도 반대 방향으로)</text>`;      // 하드웨어 설계의 전원 이중화
+  if (ems && !L.edit) g += `<text x="${ems.x}" y="${ems.y + 58}" text-anchor="middle" class="mfsu sec">EMS 전원: 배전 모선(주) · 차량 28 V(예비) · 내장 무정전 전원</text><text x="${ems.x}" y="${ems.y + 72}" text-anchor="middle" class="mfsu sec">통신: 전력 케이블과 같은 경로 · 구간분전함은 환형</text>`;      // 하드웨어 설계의 전원 이중화
   const rg = !L.edit && s.ring ? s.ring : null;                                    // 구간분전함 이름표(환망 화면의 이름과 같다)
   const dst = rg && items.find(i => i.kind === "DIST");                            // 고리가 닫히는 곳: 첫 · 마지막 구간분전함은 배전 · 변압 안의 모선에서 만난다
   if (dst && rg.fsu.length > 1) g += `<text x="${dst.x}" y="${dst.y + 96}" text-anchor="middle" class="mfsu sec open">${esc(rg.fsu[0].name)} ↔ ${esc(rg.fsu[rg.fsu.length - 1].name)} 은 이 안의 모선 A · B 로 이어져 고리가 닫힘</text>`;

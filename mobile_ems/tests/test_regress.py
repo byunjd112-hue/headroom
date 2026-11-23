@@ -48,7 +48,7 @@ class TestCommandSafety(Base):
         r = self.rt.scan(); self.assertEqual(r["bad"].get("ESS.f"), 5); self.assertNotIn("ESS.f", self.rt.val)
 
     def test_R08_blocks_do_not_span_undefined_addresses(self):
-        blk = pm.blocks(self.pts, "DG"); spans = [(a, a + n - 1) for _, a, n, _ in blk]; self.assertIn((0, 4), spans); self.assertIn((6, 6), spans)
+        blk = pm.blocks(self.pts, "DG"); spans = [(a, a + n - 1) for _, a, n, _ in blk]; self.assertIn((0, 4), spans); self.assertIn((6, 9), spans)      # 6~9: 연료 · 복합전력 PCS 모드 · ESS 충전율 · ESS 전력(5 는 없는 주소라 건너뛴다)
         self.assertEqual(len(pm.blocks(self.pts, "DG", gap=4)), 1)
         c = mb.Client("127.0.0.1", self.pa, 1, 0.3)
         with self.assertRaises(mb.ModbusError) as cm: c.read(0, 8)

@@ -225,6 +225,7 @@ const P_CTL = {
       if (d) { const best = kf && kf.units.find(x => x.live); lk.className = "pill " + (gone ? "" : LINK_CLS[best ? best.link : d.link]); lk.textContent = gone ? "미설치" : linkTxt(best ? best.link : d.link) + (kf ? kCnt(u.dev) : ""); lk.title = kf && kf.units.length > 1 ? kf.units.map(x => `${x.id}: ${x.live ? (x.on ? "운전" : "정지") : "두절"}${x.kw == null ? "" : " " + F.kw(x.kw) + " kW"}`).join(" / ") + " — 지령은 있는 장치 모두에게 간다" : ""; }
       else if (u.id === "EMS") { lk.className = "pill " + (s.alarm_cnt[1].act ? "bad" : "ok"); lk.textContent = s.alarm_cnt[1].act ? `긴급 ${s.alarm_cnt[1].act}` : "정상"; }
       else if (u.id === "GRID" && !lost) { const g2 = s.ops || {}, t2 = g2.mode !== "grid" ? "미연계" : g2.outage ? "정전" : "연계"; lk.className = "pill " + (t2 === "정전" ? "bad" : t2 === "연계" ? "ok" : "info"); lk.textContent = t2; }
+      else if (u.id === "G1") { lk.className = "pill " + (lost ? "bad" : "ok"); lk.textContent = lost ? "PCS 두절" : "PCS 정상" + kCnt("DG"); }      // 복합전력 ESS 는 발전기와 같은 PCS 로 감시한다
       else { lk.className = "pill " + (lost ? "bad" : "info"); lk.textContent = lost ? "게이트웨이 두절" : "미계측"; }
       const big = u.id === "EMS" ? `${F.n(s.stats.last_ms, 0)}<small>ms</small>` : u.id === "G1" && val("DG.ess_kw") == null ? `${F.n(k.g1_kw, 0)}<small>kW 형성</small>` : `${lost ? "####" : F.kw(val(u.kw))}<small>kW</small>`;
       $("#kw2-" + u.id).innerHTML = big;

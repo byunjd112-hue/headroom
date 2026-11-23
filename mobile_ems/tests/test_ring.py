@@ -30,6 +30,9 @@ class RingTest(unittest.TestCase):
     def test_status_normal_cut_and_isolated(self):
         s = ring.status(R, values()); self.assertTrue(s["ok"]); self.assertFalse(s["switched"]); self.assertEqual(s["missing"], []); self.assertTrue(all(f["fed"] for f in s["fsu"]))
         s = ring.status(R, values(open_at=99, cut=(2,))); self.assertEqual(s["cut"], [2]); self.assertTrue(s["switched"]); self.assertTrue(all(f["fed"] for f in s["fsu"]))       # 구간 2 차단 + 상시 개방점 닫힘 → 모두 공급
+        self.assertTrue(all(f["comm"] for f in s["fsu"])); self.assertTrue(all(f["comm"] for f in ring.status(R, values())["fsu"]))                                              # 통신은 환형: 한 구간이 끊겨도(상시 개방점이 열려 있어도) 모두 닿는다
+        s2 = ring.status(R, values(open_at=99, cut=(2, 5))); self.assertEqual([f["id"] for f in s2["fsu"] if f["comm"] is False], ["FSU3", "FSU4", "FSU5"])                       # 두 구간이 끊기면 그 사이만 통신 고립
+        a2 = {k: on for k, on, *_ in ring.alarms(R, s2)}; self.assertTrue(a2["ring.comm.FSU4"]); self.assertFalse(a2["ring.comm.FSU1"]); self.assertFalse({k: on for k, on, *_ in ring.alarms(R, s)}["ring.comm.FSU3"])
         s = ring.status(R, values(open_at=99, cut=(2, 3), dead=("FSU3",))); self.assertEqual(s["isolated"], ["FSU3"]); self.assertFalse(s["ok"]); self.assertFalse(s["fsu"][2]["fed"])
         s = ring.status(R, {}, lost=True); self.assertFalse(s["ok"]); self.assertIsNone(s["fsu"][0]["live"]); self.assertEqual(len(s["missing"]), 77)
 

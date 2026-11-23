@@ -3968,5 +3968,210 @@
   "cat": "고장 대응 (FMEA)",
   "ref": "FM-59",
   "fat": "수소 차량을 한 대 더 놓았을 때 연료전지와 수전해가 함께 인식되고 지령이 추가 차량까지 가는지 확인"
+ },
+ {
+  "name": "복합전력 · 디젤 필요 시 발전기 + ESS 충전 모드",
+  "note": "이동형 ESS 가 저충전이라 디젤이 필요할 때 EMS 가 복합전력 PCS 에 '발전기 + ESS 충전' 모드를 내리고, 복합전력 ESS 가 충전되는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "set",
+    "tag": "DG.ess_soc",
+    "value": 60
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "DG.pcs_mode",
+    "value": 2,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "DG.ess_kw",
+    "value": 0,
+    "op": "le",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-61",
+  "fat": "모드 3가지를 차례로 지령해 발전기 · ESS 의 실제 거동과 pcs_mode 회신을 확인"
+ },
+ {
+  "name": "복합전력 · ESS 가득이면 발전기 단독, 디젤 불필요면 ESS 방전",
+  "note": "복합전력 ESS 가 가득 차면 '발전기 단독'으로, 디젤이 필요 없어지면 'ESS 방전'으로 모드가 바뀌는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "set",
+    "tag": "DG.ess_soc",
+    "value": 95
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "DG.pcs_mode",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 80
+   },
+   {
+    "type": "set",
+    "tag": "PV.kw",
+    "value": 200
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 0,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "DG.pcs_mode",
+    "value": 3,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-61",
+  "fat": "모드 3가지를 차례로 지령해 발전기 · ESS 의 실제 거동과 pcs_mode 회신을 확인"
+ },
+ {
+  "name": "복합전력 · ESS 저충전이면 발전기로 충전",
+  "note": "이동형 ESS 는 넉넉해 디젤이 필요 없지만 복합전력 ESS 가 낮을 때, 발전기를 돌려 충전 모드로 넘어가는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 80
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "set",
+    "tag": "PV.kw",
+    "value": 200
+   },
+   {
+    "type": "set",
+    "tag": "DG.ess_soc",
+    "value": 15
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "DG.pcs_mode",
+    "value": 2,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-23",
+  "fat": "저소음 태세 모의에서 단계별 사전 경보 발생 확인"
  }
 ]

@@ -156,6 +156,12 @@ def _recog(r, units):
     return {"auto": bool(r.get("eff")), "empty": r.get("empty", []), "new": [x["id"] for x in units if x["new"]]}
 
 
+def _comm(secs, fsu):
+    """구간분전함마다 통신이 닿는지(comm)를 적는다. 통신선은 전력 케이블과 같은 경로의 고리다: 차단된(끊긴) 구간만 막히고 상시 개방점은 지나간다."""
+    n = len(fsu); link = _fed([s["state"] != 2 for s in secs], n) if all(s["state"] is not None for s in secs) else [None] * n
+    for k, f in enumerate(fsu): f["comm"] = link[k]
+
+
 def status(r, val, lost=False):
     """지금 상태. val: 신호 값(없으면 None). lost: 그 신호를 가져오는 통신이 끊겼는지.
     반환: {sections: [{i, tag, state, open}], fsu: [{id, name, v, live, id_read, id_ok, fed}], ppdu: [...], ok, switched, isolated, missing}"""
@@ -163,8 +169,7 @@ def status(r, val, lost=False):
     secs = [{"i": i, "tag": t, "state": None if g(t) is None else int(round(g(t))), "open": i == r["open"]} for i, t in enumerate(sw)]
     fed = _fed([s["state"] == 1 for s in secs], n) if all(s["state"] is not None for s in secs) else [None] * n
     fsu = [_unit(f, g, fed[k]) for k, f in enumerate(r["fsu"])]; auto = g("RING.auto")
-    link = _fed([s["state"] != 2 for s in secs], n) if all(s["state"] is not None for s in secs) else [None] * n      # 통신선은 전력 케이블과 같은 경로의 고리다: 차단된(끊긴) 구간만 막히고 상시 개방점은 지나간다
-    for k, f in enumerate(fsu): f["comm"] = link[k]
+    _comm(secs, fsu)
     ppdu = _ppdus(r, g, {f["id"]: f["live"] for f in fsu})
     return {"name": r["name"], "sections": secs, "fsu": fsu, "ppdu": ppdu, "open": r["open"], "auto": None if auto is None else auto > 0.5,
             "ok": n > 0 and all(f["live"] for f in fsu), "switched": bool(secs) and secs[r["open"]]["state"] == 1,
