@@ -25,10 +25,12 @@ class TestCommandSafety(Base):
         self.assertLess(max(b - a for a, b in zip(kicks, kicks[1:])), SUP["wd_s"])                     # 감시 한도(3초)보다 촘촘히 갱신
 
     def test_R09a_slow_starting_device_needs_done_s(self):
-        self.plant.slow["DG"] = 2.0; self.plant.no_ack.add("FC"); self.rt.scan()
+        self.plant.slow["DG"] = 2.0; self.plant.no_ack.add("FC"); self.rt.scan(); self.rt.cmd.done_default = 0.0           # 완료 한도가 없으면(0) 느린 기동을 실패로 본다
         ok, _ = self.rt.cmd.send("DG", "start"); self.assertFalse(ok); self.assertTrue(any("수용했으나 상태 미변화" in e["text"] for e in self.rt.cmd.log))
         time.sleep(2.2); self.rt.cmd.send("DG", "stop"); time.sleep(2.4); self.rt.scan(); self.assertEqual(int(self.plant.get("DG.status")), 0)
         self.rt.cmd.done_s = {"DG": 4.0}; ok, dt = self.rt.cmd.send("DG", "start"); self.assertTrue(ok); self.assertGreater(dt, 1.9)       # 장치별 완료 한도를 주면 기다린다
+        self.rt.cmd.send("DG", "stop"); time.sleep(2.4); self.rt.scan(); self.rt.cmd.done_s = {}; self.rt.cmd.done_default = 20.0
+        ok, dt = self.rt.cmd.send("DG", "start"); self.assertTrue(ok); self.assertGreater(dt, 1.9)                                         # 장치별 값이 없어도 공통 한도(기본 20초)까지 기다린다
 
     def test_R09b_seq_and_cmd_go_in_one_frame(self):
         frames = []; self.rt.scan()
