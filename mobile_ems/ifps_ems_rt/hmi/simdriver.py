@@ -29,6 +29,8 @@ class SimDriver:
         p1 = 28 + random.gauss(0, 0.4)
         p2 = 22 + 18 * day + random.gauss(0, 0.8)
         p3 = 9 + 16 * day * (0.6 + 0.4 * math.sin(math.pi * max(0.0, min(1.0, (hr - 7) / 12)))) + random.gauss(0, 0.8) + self.extra_load
+        k = self.p.load_scale; sv = lambda f: (1 - self.p.save_frac.get(f, 0.0)) if f in self.p.save else 1.0      # 부하 목록의 정격에 맞춘 배율 · 절감 공급 중이면 줄인 몫
+        p1 *= k[1]; p2 *= k[2] * sv("L2"); p3 = max(0.0, p3 - self.extra_load) * k[3] * sv("L3") + self.extra_load      # 시나리오로 얹은 부하(extra_load)는 그대로
         clear = float(clear_pv_kw(self.site, doy, hr)); self._cloud_step(clear); pv = max(0.0, clear * self.cloud * (1 + random.gauss(0, 0.01)))
         if "PV.status" in self.p.by_tag:                                    # 인버터 분리 → 0, 출력 제한 적용. 여러 대면 대수만큼 더한다
             pv = sum(0.0 if self.p.get(f"{u}.status") < .5 else min(pv, self.p.get(f"{u}.lim_set") or 400.0) for u in self.p.us("PV"))

@@ -79,6 +79,7 @@ class AlarmsMixin:
         rt = self.rt; A = self.alarms; s = rt.site; soc = rt.val.get("ESS.soc", 60.0) / 100; h = rt.auto_h or {}
         for f, nm in (("L3", "3등급"), ("L2", "2등급")):
             A.set(f"shed.{f}", f in rt.shedder.mine, 2 if f == "L2" else 3, "EMS", f"{nm} 부하 자동 차단 중 — {rt.shedder.why.get(f, '')}")
+            A.set(f"save.{f}", f in rt.shedder.saved, 3, "EMS", f"{nm} 부하 절감 공급 중 — {rt.shedder.why.get(f, '')}. 모자람이 이어지면 차단으로 넘어간다")
         A.set("quiet.low", rt.posture == "저소음" and soc < s.soc_min + 0.06, 1, "EMS", f"저소음 태세: ESS {soc * 100:.0f}% — 자원 고갈 임박. 디젤을 쓰려면 운용 태세를 바꾸십시오")
         tgt = max(0.0, rt.auto_target_h - (rt.now() - rt.t_posture) / 3600.0)
         A.set("auto.short", rt.posture == "자립" and bool(h) and h.get("p1", 999) < tgt, 1, "EMS", f"자립 태세: 1등급 부하만으로도 {h.get('p1', 0):.0f}시간 — 남은 목표 {tgt:.0f}시간 미달, 보급 필요")

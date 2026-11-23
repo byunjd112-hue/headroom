@@ -13,6 +13,7 @@ class Plant:
         self.pts = pts; self.units = units; self.rev = {u: d for d, u in units.items()}
         self.reg = {d: {} for d in units}; self.lock = threading.Lock(); self.ack_delay = ack_delay
         self.gone = {d for d in units if fleet.is_slot(d)}                # 놓지 않은 장치(접속을 바로 끊는다). 같은 종류 추가 자리는 처음에 비어 있다
+        self.save = set(); self.save_frac = {"L2": 0.3, "L3": 0.3}; self.load_scale = {1: 1.0, 2: 1.0, 3: 1.0}      # 절감 공급 중인 급전선 · 절감 비율 · 부하 배율(부하 목록이 넣는다)
         self.muted = set(); self.no_ack = set(); self.down = set(); self.pending = {}; self.srv = []; self.run = False; self._exp_t = None
         self.slow = {}             # {장치: 초} 지령 수용(seq_ack) 뒤 상태가 바뀌기까지 걸리는 시간(기동이 느린 장비 모사)
         self.later = {}            # {장치: (시각, 상태)} 예약된 상태 변화
@@ -74,11 +75,17 @@ class Plant:
         if dev in self.later and now >= self.later[dev][0]: self.set(f"{dev}.status", self.later.pop(dev)[1])
 
     def _tick_shed(self):
-        """EMS 부하 차단(2)·복구(1) 지령 → 보호 IED가 차단기 조작."""
-        for f in ("L2", "L3"):
-            t = f"LDS.{f}"
-            if t in self.by_tag and int(round(self.get(t))) in (1, 2):
-                self.set(f"CB.{f}", 1 if int(round(self.get(t))) == 1 else 0); self.set(f"FLT.{f}", 0); self.set(t, 0)
+        """EMS 부하 지령 → 복구(1) · 차단(2)은 보호 IED 가 차단기를 조작하고, 절감 공급(3)은 그 급전선의 줄일 수 있는 부하만 줄인다(차단기는 그대로)."""
+        for f, tag in (("L2", "LOAD.p2_kw"), ("L3", "LOAD.p3_kw")):
+            t = f"LDS.{f}"; v = int(round(self.get(t))) if t in self.by_tag else 0
+            if v not in (1, 2, 3): continue
+            was = f in self.save; now = v == 3; fr = self.save_frac.get(f, 0.0)
+            if now != was and tag in self.by_tag and 0 < fr < 1:        # 절감에 들어가거나 풀릴 때 그 급전선의 부하를 한 번 바꾼다(가상 장치 구동기가 있으면 그쪽이 매초 다시 계산한다)
+                p = self.get(tag); q = p * (1 - fr) if now else p / (1 - fr); self.set(tag, q)
+                if "LOAD.kw" in self.by_tag: self.set("LOAD.kw", max(0.0, self.get("LOAD.kw") + q - p))
+            (self.save.add if now else self.save.discard)(f)
+            if v != 3: self.set(f"CB.{f}", 1 if v == 1 else 0); self.set(f"FLT.{f}", 0)
+            self.set(t, 0)
 
     def _g(self, t): return self.get(t) if t in self.by_tag else 0.0
     def _cb(self, f): return (int(round(self.get(f"CB.{f}"))) == 1) if f"CB.{f}" in self.by_tag else True     # 차단기 투입(1)일 때만 모선과 연결

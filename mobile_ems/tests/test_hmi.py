@@ -58,6 +58,36 @@ class TestHmi(unittest.TestCase):
         with self.assertRaises(ValueError): e.sim_action({"action": "replay", "op": "start", "text": "t,PV.kw\n0,1\n", "speed": 7}, "시험")
         e.sim_action({"action": "replay", "op": "stop"}, "시험"); self.assertFalse(e.sim_state()["replay"]["on"]); self.assertNotIn("LOAD.p1_kw", e.simdrv.hold); self.assertNotIn("PV.kw", e.simdrv.hold)
 
+    def test_load_book_changes_follow_everywhere(self):
+        """부하 관리: 종류 · 수량을 바꾸면 스냅샷(모든 화면의 자료) · 가상 부하 배율 · 절감 가능 비율 · 저장 파일이 함께 바뀐다. 틀린 입력은 막는다."""
+        from ifps_ems_rt import loads
+        e = self.eng; tok = self.login("4321"); v0 = e.snapshot()["loads"]; self.assertEqual([i["id"] for i in v0["items"]], ["c2", "med", "brk", "ammo"]); self.assertEqual([g["rated"] for g in v0["grades"]], [30.0, 40.0, 25.0])
+        self.assertEqual(self.req("/api/loads", {"op": "count", "id": "brk", "delta": 1})[0], 403)                                     # 로그인 없이 못 바꾼다
+        try:
+            r = self.req("/api/loads", {"op": "count", "id": "brk", "delta": 1}, tok)[1]; self.assertTrue(r["ok"]); g2 = r["loads"]["grades"][1]; self.assertEqual((g2["n"], g2["rated"]), (4, 52.0))
+            self.assertAlmostEqual(e.plant.load_scale[2], 52.0 / 40.0); self.assertAlmostEqual(e.rt.load_frac["L2"], (16 * 0.1 + 36 * 0.3) / 52.0)
+            r = self.req("/api/loads", {"op": "add", "kind": "hvac"}, tok)[1]; nid = r["loads"]["items"][-1]["id"]; self.assertEqual(r["loads"]["items"][-1]["feeder"], "L3"); self.assertEqual(r["loads"]["items"][-1]["spr"], "BARRACK")
+            r = self.req("/api/loads", {"op": "set", "id": nid, "name": "냉난방 A", "grade": 2, "kw": 10, "save_pct": 60}, tok)[1]; it = r["loads"]["items"][-1]; self.assertEqual((it["name"], it["grade"], it["feeder"], it["rated"]), ("냉난방 A", 2, "L2", 10.0))
+            for bad in ({"op": "count", "id": "brk", "delta": 30}, {"op": "set", "id": "c2", "save_pct": 20}, {"op": "set", "id": nid, "kw": 0}, {"op": "set", "id": "ammo", "kw": 300}, {"op": "add", "kind": "nope"}, {"op": "del", "id": "nope"}):
+                self.assertFalse(self.req("/api/loads", bad, tok)[1]["ok"], bad)                                                    # 수량 · 1등급 절감 · 정격 · 계측 범위 초과 · 모르는 종류
+            self.assertEqual(json.load(open(e.loadw.path, encoding="utf-8"))["rev"], e.loadw.rev); self.assertTrue(any(x["kind"] == "부하" for x in e.rt.events))
+            snap = e.snapshot()["loads"]; self.assertEqual(len(snap["items"]), 5); self.assertTrue(all(i["est_kw"] is not None for i in snap["items"])); self.assertIn(snap["grades"][2]["stage"], ("on", "save", "off"))
+            self.assertAlmostEqual(sum(i["est_kw"] for i in snap["items"] if i["feeder"] == "L2"), e.rt.val["LOAD.p2_kw"], delta=0.2)   # 추정 전력의 합 = 급전선 계측값
+            self.assertTrue(self.req("/api/loads", {"op": "del", "id": nid}, tok)[1]["ok"])
+            from ifps_ems_rt.hmi.loadctl import LoadBook
+            b2 = LoadBook(e); self.assertEqual([i["n"] for i in b2.items], [1, 1, 3, 1])                                             # 다시 켜도 그대로
+        finally:
+            self.assertTrue(self.req("/api/loads", {"op": "reset"}, tok)[1]["ok"]); self.assertEqual(e.plant.load_scale, {1: 1.0, 2: 1.0, 3: 1.0})
+        self.assertEqual(loads.check([dict(loads.DEFAULT[0], grade=1, save_pct=10)]), ["1번째(지휘통제(C2)): 1등급 부하는 절감하지 않는다(절감 비율 0)"])
+        st = {"L1": "on", "L2": "save", "L3": "off"}; sh = loads.share(loads.DEFAULT, {"L1": 28.0, "L2": 30.0, "L3": 0.0}, st); self.assertEqual(sh["ammo"], 0.0); self.assertAlmostEqual(sh["med"] + sh["brk"], 30.0)
+
+    def test_reduce_command_scales_the_virtual_load(self):
+        """절감 공급 지령(LDS = 3): 가상 부하가 절감 비율만큼 줄고 차단기는 그대로다. 복구(1)하면 돌아온다. 화면 상태도 따라간다."""
+        e = self.eng; p = e.plant; self.assertEqual(int(p.get("CB.L3")), 1); fr = p.save_frac["L3"]; self.assertGreater(fr, 0)
+        e._do_cmd({"dev": "MTR", "cmd": "set", "tag": "LDS.L3", "value": 3.0, "who": "시험"}); time.sleep(0.4); e.simdrv.step(); time.sleep(1.3)
+        self.assertIn("L3", p.save); self.assertEqual(int(p.get("CB.L3")), 1); self.assertEqual(e.snapshot()["loads"]["grades"][2]["stage"], "save")
+        e._do_cmd({"dev": "MTR", "cmd": "set", "tag": "LDS.L3", "value": 1.0, "who": "시험"}); time.sleep(0.4); self.assertNotIn("L3", p.save); time.sleep(1.3); self.assertEqual(e.snapshot()["loads"]["grades"][2]["stage"], "on")
+
     def test_late_operator_command_is_dropped(self):
         """앞선 지령에 밀려 늦어진 운용자 지령은 버린다(잊은 지령이 뒤늦게 나가지 않게)."""
         e = self.eng; n0 = len(e.rt.cmd.log); on = e.rt.dev["FC"].on

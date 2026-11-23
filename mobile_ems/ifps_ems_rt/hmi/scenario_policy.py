@@ -53,6 +53,7 @@ class ScenarioPolicy:
             rt.set_ops(step["mode"], step["posture"], "시나리오")
         rt.auto_enabled = step["control"] == "auto"
         rt.hr_off = step["hour"]
+        rt.load_frac = dict(self.plant.save_frac)  # staged load reduction (save supply before shedding) uses the plant's reducible share
         self.writes.clear()
         self.last_decision = None
         rt.val = {p["tag"]: self.plant.get(p["tag"]) for p in rt.pts if p["rw"] == "r"}

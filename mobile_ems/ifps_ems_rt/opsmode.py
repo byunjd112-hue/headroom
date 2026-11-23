@@ -145,40 +145,60 @@ class LoadShedder:
     """부하 우선순위 자동 차단·복구. 3등급 → 2등급 순으로 끊고 반대 순서로 살린다. 1등급은 끊지 않는다.
 
     차단 조건이 hold_s(기본 3초) 이어지면 차단하고, 해소된 상태가 restore_s(기본 60초) 이어지면 복구한다.
+    공급 능력이 부하를 따라가지 못해서 끊어야 할 때는 단계를 밟는다: 먼저 '절감 공급'(그 급전선의 줄일 수 있는 몫만 줄임)을 하고,
+    save_s(기본 10초) 뒤에도 모자라면 그때 차단한다. 순서는 3등급 절감 → 3등급 차단 → 2등급 절감 → 2등급 차단. 절감할 몫이 없는 급전선은 바로 차단한다.
+    태세(저소음 · 자립)나 ESS 충전율 때문에 끊는 것은 절감을 거치지 않는다(자원을 아끼는 것이 목적이므로 바로 끊는다).
     EMS 가 스스로 끊은 급전선만 되살린다(운용자·보호 IED 가 연 차단기는 건드리지 않는다)."""
 
-    def __init__(self, hold_s=3.0, restore_s=60.0):
-        self.hold_s, self.restore_s = hold_s, restore_s; self.t_bad = {}; self.t_ok = {}; self.mine = set(); self.why = {}
+    def __init__(self, hold_s=3.0, restore_s=60.0, save_s=10.0):
+        self.hold_s, self.restore_s, self.save_s = hold_s, restore_s, save_s; self.t_bad = {}; self.t_ok = {}; self.mine = set(); self.why = {}
+        self.saved = set(); self.t_save = {}; self.held = {}        # saved: EMS 가 절감 공급 중인 급전선. held: 절감 · 차단으로 덜어 낸 전력(kW) — 되살리면 돌아올 부하
 
     @staticmethod
     def want(site, posture, soc, src_avail_kw, load12_kw, load_kw, auto_h=None, target_h=72.0):
-        """지금 끊어야 할 등급과 이유. 반환: {"L3": 사유 또는 "", "L2": 사유 또는 ""}"""
-        w = {"L3": "", "L2": ""}; lo = site.soc_min
+        """지금 끊어야 할 등급과 이유. 반환: {"L3": 사유 또는 "", "L2": 사유 또는 "", "_soft": 공급 능력 부족만으로 끊는 급전선(절감을 먼저 해 볼 수 있다)}"""
+        w = {"L3": "", "L2": ""}; lo = site.soc_min; soft = set()
         if posture == "저소음": w["L3"] = "저소음 태세: 3등급 차단으로 지속시간 연장"
         if posture == "자립" and auto_h:
             if auto_h["full"] < target_h: w["L3"] = f"자립 태세: 전 부하 {auto_h['full']:.0f}시간 < 목표 {target_h:.0f}시간"
             if auto_h["shed3"] < target_h * 0.5: w["L2"] = f"자립 태세: 3등급 차단 후에도 {auto_h['shed3']:.0f}시간"
         if soc < lo + 0.06: w["L3"] = w["L3"] or f"ESS 충전율 {soc * 100:.0f}% — 자원 부족"
         if soc < lo + 0.03: w["L2"] = w["L2"] or f"ESS 충전율 {soc * 100:.0f}% — 자원 고갈 임박"
-        if src_avail_kw is not None and load_kw > src_avail_kw + 1.0: w["L3"] = w["L3"] or f"공급 능력 {src_avail_kw:.0f}kW < 부하 {load_kw:.0f}kW"
-        if src_avail_kw is not None and load12_kw > src_avail_kw + 1.0: w["L2"] = w["L2"] or f"공급 능력 {src_avail_kw:.0f}kW < 1·2등급 {load12_kw:.0f}kW"
+        if src_avail_kw is not None and load_kw > src_avail_kw + 1.0 and not w["L3"]: w["L3"] = f"공급 능력 {src_avail_kw:.0f}kW < 부하 {load_kw:.0f}kW"; soft.add("L3")
+        if src_avail_kw is not None and load12_kw > src_avail_kw + 1.0 and not w["L2"]: w["L2"] = f"공급 능력 {src_avail_kw:.0f}kW < 1·2등급 {load12_kw:.0f}kW"; soft.add("L2")
         if w["L2"] and not w["L3"]: w["L3"] = w["L2"]                # 2등급을 끊을 상황이면 3등급은 당연히 끊는다
-        return w
+        w["_soft"] = soft; return w
 
-    def step(self, t, want, cb, soc, soc_min):
-        """t: 시각(초), want: want() 결과, cb: {"L2": 0/1/2/None, "L3": …}. 반환: [(급전선, "shed"|"restore", 사유)]"""
-        acts = []
+    def step(self, t, want, cb, soc, soc_min, kw=None, frac=None):
+        """t: 시각(초), want: want() 결과(_keep: 되살리면 다시 모자랄 급전선), cb: {"L2": 0/1/2/None, "L3": …}, kw: 급전선별 지금 전력, frac: 급전선별 절감 가능 비율.
+        반환: [(급전선, "save"|"shed"|"restore", 사유)]. 절감에서 되살린 것은 지령이 성공한 뒤 restored() 로 알린다."""
+        acts = []; kw = kw or {}; frac = frac or {}
         for f in ("L3", "L2"):
             if want[f]:
                 self.t_ok.pop(f, None); self.t_bad.setdefault(f, t)
-                if cb.get(f) == 1 and t - self.t_bad[f] >= self.hold_s: acts.append((f, "shed", want[f])); self.mine.add(f); self.why[f] = want[f]
+                if cb.get(f) == 1 and t - self.t_bad[f] >= self.hold_s: self._down(f, t, want, kw.get(f) or 0.0, frac.get(f, 0.0), acts)
             else:
                 self.t_bad.pop(f, None)
-                if f in self.mine:
-                    if cb.get(f) == 1: self.mine.discard(f); self.why.pop(f, None); continue      # 운용자가 이미 살렸다
-                    self.t_ok.setdefault(f, t)
-                    ready = soc is None or soc > soc_min + 0.10
-                    if ready and t - self.t_ok[f] >= self.restore_s and (f == "L2" or "L2" not in self.mine or cb.get("L2") == 1):
-                        acts.append((f, "restore", "차단 사유 해소")); self.t_ok.pop(f, None)
-        order = {"shed": {"L3": 0, "L2": 1}, "restore": {"L2": 0, "L3": 1}}
+                if f in self.mine and cb.get(f) == 1: self.mine.discard(f); self.why.pop(f, None); self.held.pop(f, None); continue      # 운용자가 이미 살렸다
+                if f not in self.mine and f not in self.saved: continue
+                if f in want.get("_keep", ()): self.t_ok.pop(f, None); continue      # 되살리면 다시 모자란다: 그대로 둔다
+                self.t_ok.setdefault(f, t)
+                ready = soc is None or soc > soc_min + 0.10
+                if ready and t - self.t_ok[f] >= self.restore_s and (f == "L2" or "L2" not in self.mine or cb.get("L2") == 1):
+                    acts.append((f, "restore", "절감 사유 해소" if f in self.saved else "차단 사유 해소")); self.t_ok.pop(f, None)
+        order = {"save": {"L3": -1, "L2": 0.5}, "shed": {"L3": 0, "L2": 1}, "restore": {"L2": 0, "L3": 1}}      # 3등급 절감 → 3등급 차단 → 2등급 절감 → 2등급 차단(차단 · 복구의 순번은 C++ 판과 같게 둔다)
         return sorted(acts, key=lambda a: order[a[1]][a[0]])
+
+    def _down(self, f, t, want, kw, frac, acts):
+        """한 단계 내린다: 공급 능력 부족이고 줄일 몫이 있으면 절감부터, 절감 뒤 save_s 가 지나도 모자라면(또는 다른 사유면) 차단."""
+        soft = f in want.get("_soft", ())
+        if soft and frac > 0 and f not in self.saved:
+            acts.append((f, "save", want[f])); self.saved.add(f); self.t_save[f] = t; self.why[f] = want[f]; self.held[f] = kw * frac
+        elif soft and f in self.saved and t - self.t_save.get(f, t) < self.save_s: return      # 절감의 효과를 지켜보는 중
+        else:
+            acts.append((f, "shed", want[f])); self.mine.add(f); self.why[f] = want[f]
+            self.held[f] = kw + (self.held.get(f, 0.0) if f in self.saved else 0.0); self.saved.discard(f)
+
+    def restored(self, f):
+        """절감 공급을 푼 지령이 성공했다."""
+        self.saved.discard(f); self.t_save.pop(f, None); self.held.pop(f, None); self.why.pop(f, None)

@@ -58,7 +58,7 @@ def _current(doc, s):
     act = [a for a in s["alarms"] if a["state"] == "ACT"]
     doc.h2(f"1.3 발생 중인 경보 ({len(act)}건)")
     doc.table(["등급", "대상", "내용", "발생 시각", "확인"], [[a["prio"], a["src"], a["text"], datetime.fromtimestamp(a["t_on"]).strftime("%m-%d %H:%M:%S"), "확인" if a["acked"] else "미확인"] for a in act[:60]], [8, 12, 52, 18, 10])
-    _ring(doc, s.get("ring")); _fleet(doc, s.get("fleet"))
+    _ring(doc, s.get("ring")); _fleet(doc, s.get("fleet")); _loads(doc, s.get("loads"))
 
 
 def _fleet(doc, fl):
@@ -68,6 +68,16 @@ def _fleet(doc, fl):
     doc.h2("1.5 장치 구성(자동 인식한 대수)")
     doc.p("EMS 가 응답을 받아 인식한 장치다. 자리 수는 설정에 둔 추가 자리까지의 수이고, 대수의 변화(놓기 · 빼기 · 두절)는 3장 상황 기록의 '자동 인식' · '장치'에 시각과 함께 남는다. 장치별 자료(7장)에는 그때 있던 장치의 값만 들어간다.")
     doc.table(["종류", "인식 / 자리", "지금 통신되는 대수", "장치별 상태"], [[nm.get(k, k), f"{len(f['units'])} / {f['slots']}", f["n"], ", ".join(f"{u['id']} {st(u)}" + ("" if u.get("kw") is None else f" {_n(u['kw'], 1)} kW") for u in f["units"]) or "미설치"] for k, f in fl.items()], [18, 16, 18, 48])
+
+
+def _loads(doc, ld):
+    """1.6 부하 구성 — 부하 관리 화면과 같은 목록."""
+    if not ld or not ld.get("items"): return
+    st = {"on": "공급", "save": "절감 공급", "off": "차단", None: "값 없음"}; g = {x["feeder"]: x for x in ld["grades"]}
+    doc.h2("1.6 부하 구성(부하 관리 목록)")
+    doc.p("운용자가 부하 관리 화면에 적어 둔 부하의 종류 · 수량이다. 정격 합은 목록의 값이고, 지금 전력은 급전선(등급)별 계측값이다. 부하 하나하나의 전력은 재지 않는다. 목록을 바꾼 기록은 3장 상황 기록의 '부하'에 남는다.")
+    doc.table(["부하", "등급", "대당 정격", "수량", "정격 합", "절감 비율"], [[i["name"], f"{i['grade']}등급", f"{_n(i['kw'], 1)} kW", i["n"], f"{_n(i['rated'], 0)} kW", "—" if i["grade"] == 1 else f"{_n(i['save_pct'], 0)} %"] for i in ld["items"]])
+    doc.table(["등급", "부하 수", "정격 합", "지금 전력", "공급 상태"], [[f"{x['grade']}등급", x["n"], f"{_n(x['rated'], 0)} kW", "—" if x["kw"] is None else f"{_n(x['kw'], 1)} kW", st.get(x["stage"], "값 없음")] for x in g.values()])
 
 
 def _ring(doc, r):

@@ -128,6 +128,9 @@ B_DESIGN = [  # FM, 보완설계 반영 내용, 반영 대상, 검증 방법, �
  ["FM-67", "자동 제어 켬/끔 · 인식한 장치 · 자동 차단 급전선을 재기동 뒤에도 유지(Rev54 반영)", "runtime.py(save_ops), fleet.py(restore·store)", "test_auto_off_and_shed_feeders_survive_restart, test_seen_units_survive_restart, EMS 재기동 시험", "FAT", "EMS 개발"],
  ["FM-68", "수집 주기의 단계별 실패 처리, 이력 쓰기 실패 경보, 응답 시각 = 읽기 완료 때(Rev54 반영)", "hmi/engine.py(_scan_loop), runtime.py(scan·_accumulate), modbus.py", "test_history_write_failure_keeps_the_cycle, test_slow_scan_does_not_mark_live_devices_lost", "FAT", "EMS 개발"],
  ["FM-69", "'없는 주소' 응답은 그 블록만 빼고 읽음 · 일부 신호 경보(Rev54 반영)", "hal.py(read_blocks), eng_alarms.py", "test_one_bad_block_does_not_kill_the_device, 실장비 주소표 대조", "FAT", "체계통합(SI)"],
+ ["FM-70", "공급 능력 부족 때 단계적 절감 후 차단(Rev55 반영), 되살리면 다시 모자랄 부하는 되살리지 않음", "opsmode.py(LoadShedder), runtime.py(fast_control·_shed_want)", "test_staged_reduction_then_shed, 시나리오 '부하 관리 · …' 3건", "FAT", "EMS 개발"],
+ ["FM-71", "절감 지령(LDS = 3)의 부하 쪽 제어 방식 확정과 절감 비율 실측", "하드웨어 구성 기술자료, loads.py(save_pct)", "절감 지령 뒤 급전선 전력 감소 확인", "FAT", "체계통합(SI)"],
+ ["FM-72", "부하 목록 관리 화면과 범위 검사(Rev55 반영), 부하 반입 · 철수 점검표", "loads.py(check), hmi/loadctl.py", "test_load_book_changes_follow_everywhere", "운용", "운용부대"],
 ]
 B_DESIGN_NOTE = "※ [신규] 표기는 현 리비전 소프트웨어에 없는 기능으로, 다음 리비전 설계 반영이 필요한 제안 사항이다. 구현·검증 전에는 해당 고장모드의 개선 후 RPN 을 인정하지 않는다."
 B_AFTER = ["RPN 상위 항목과 단일 고장점은 FAT·SAT 시험 절차서의 필수 시험 항목으로 넣는다.", "실장비 연동 후 실제 고장·경보 이력으로 발생도(O)를 다시 평가한다(시운전 종료 시, 이후 연 1회).",

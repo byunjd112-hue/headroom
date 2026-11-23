@@ -49,7 +49,7 @@ function sldSvg() {
     <g class="ico" style="display:none" stroke="${color}" transform="translate(${n.x - 16.8},${cy - 16.8}) scale(1.4)">${icon}</g>
     <text class="nm" x="${n.x}" y="${cy + r + 22}" text-anchor="middle">${ko ? n.name : n.en}</text>
     <text x="${n.x}" y="${cy + r + 47}" text-anchor="middle"><tspan class="kw" id="kw-${n.id}">—</tspan><tspan class="u" dx="4">kW</tspan></text>
-    <text class="st" x="${n.x}" y="${cy + r + 64}" text-anchor="middle" id="st-${n.id}" fill="var(--muted)">—</text>
+    <text class="st" x="${n.x}" y="${cy + r + 64}" text-anchor="middle" id="st-${n.id}" fill="var(--muted)">—</text><text class="st" x="${n.x}" y="${cy + r + 80}" text-anchor="middle" id="ldn-${n.id}" fill="var(--muted)"></text>
     ${isLoad ? "" : `<text class="tag" x="${n.x}" y="${cy + r + 80}" text-anchor="middle" id="tg-${n.id}" fill="var(--muted)">${n.sub}</text>`}</g>`;
   const top = SY + SR + 92;                 // 급전선 시작(이름·값 아래)
   const src = SRC.map(n => `
@@ -115,7 +115,7 @@ function sldRing(s, live) {
           (!one ? "" : `<path class="ln ${bad ? "flt" : fed ? "on" : "off"}" d="M${x} ${y + 34} V${ty}"/><rect class="sring-ld ${bad ? "off" : fed ? "on" : ""}" x="${x - 50}" y="${ty}" width="100" height="64" rx="9"/>${sp ? sp.replace(/url\(#sp/g, "url(#spRG") : ""}
             <text class="nm" x="${x}" y="${ty + 82}" text-anchor="middle">${esc(p.name)} 부하</text><text x="${x}" y="${ty + 103}" text-anchor="middle"><tspan class="kw" style="font-size:19px">${bad ? "0.0" : p.kw == null ? "—" : F.kw(p.kw)}</tspan><tspan class="u" dx="4">kW</tspan></text>
             <text class="st" x="${x}" y="${ty + 119}" text-anchor="middle" fill="${bad ? "var(--alarm)" : fed ? "var(--ok)" : "var(--warn)"}">${bad ? (p.mccb === 2 ? "주 차단기 트립 · 정전" : "정전") : fed ? "급전 중" : "무전압"}</text>`); }).join(""); });
-  const tot = [["1", "LOAD.p1_kw"], ["2", "LOAD.p2_kw"], ["3", "LOAD.p3_kw"]].map(([cl, t], q) => `<tspan style="fill:${CLS[q][1]}" dx="${q ? 16 : 8}">${cl}등급 ${F.kw(val(t))} kW</tspan><tspan class="${cbl(cl) === 2 ? "t" : cbl(cl) === 0 ? "o" : ""}" dx="5">CB-L${cl} ${cbl(cl) == null ? "미상" : ["개방", "투입", "트립"][cbl(cl)]}</tspan>`).join("");
+  const tot = [["1", "LOAD.p1_kw"], ["2", "LOAD.p2_kw"], ["3", "LOAD.p3_kw"]].map(([cl, t], q) => `<tspan style="fill:${CLS[q][1]}" dx="${q ? 16 : 8}">${cl}등급 ${F.kw(val(t))} kW</tspan><tspan class="${cbl(cl) === 2 ? "t" : cbl(cl) === 0 ? "o" : ""}" dx="5">CB-L${cl} ${cbl(cl) == null ? "미상" : ["개방", "투입", "트립"][cbl(cl)]}${LD.stage("L" + cl) === "save" ? " · 절감 공급" : ""}</tspan><tspan dx="5" style="fill:var(--muted)">(${LD.g("L" + cl) ? LD.g("L" + cl).n + "개 · 정격 " + F.n(LD.g("L" + cl).rated, 0) : "—"})</tspan>`).join("");
   h += `<text class="sring-s" x="${X0}" y="${RG.H - 12}">작전지 전체 등급별 합계(배전체계에 물리지 않은 부하 포함) · 등급별 차단기${tot}</text>`;
   g.innerHTML = h; g.onclick = () => { location.hash = "#ring"; };
 }
@@ -183,7 +183,9 @@ function sldUpdate(s) {
     $("#fv-" + n.id).textContent = fed && kw > 0.5 ? `▼ ${F.kw(kw)}` : "";
     if (trip) st(n.id, (ko ? "트립 · " : "TRIP · ") + (ANSI_TXT[code(n.id)] || code(n.id)), "var(--alarm)");
     else if (!fed) st(n.id, c === 0 ? (ko ? "차단기 개방 · 정전" : "CB OPEN · DE-ENERGIZED") : (ko ? "무전압 · 정전" : "DE-ENERGIZED"), "var(--warn)");
+    else if (LD.stage(n.id) === "save") st(n.id, ko ? "절감 공급 중" : "REDUCED SUPPLY", "var(--warn)");
     else st(n.id, ko ? "급전 중" : "ENERGIZED", "var(--ok)");
+    const ln = $("#ldn-" + n.id); if (ln) ln.textContent = LD.sum(n.id);      // 부하 목록(부하 관리)의 종류 · 수량 · 정격
   });
   // 모선·연계
   cbDraw("TIE"); setCls("busA", "bus " + (aLive ? "on" : "off")); setCls("busB", "bus " + (bLive ? "on" : "off"));

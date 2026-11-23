@@ -81,6 +81,27 @@ class TestOpsLogic(unittest.TestCase):
         q = om.autonomy(self.s, 0.9, 1000, 1500, (30, 40, 50), quiet=True); self.assertEqual(q["dg_kwh"], 0); self.assertLess(q["full"], a["full"])           # 저소음: 디젤 연료 제외
         self.assertEqual(om.autonomy(self.s, 0.9, 1000, 1500, (30, 40, 50), pv_kwh_day=24 * 200)["full"], 999.0)                                               # 태양광이 부하보다 크면 무기한
 
+    def test_staged_reduction_then_shed(self):
+        """공급 능력 부족: 절감 공급을 먼저 하고, 그래도 모자라면 차단한다. 절감으로 풀리면 끊지 않는다. 태세 · 충전율 사유는 바로 끊는다."""
+        s = self.s; W = om.LoadShedder.want; cb = {"L2": 1, "L3": 1}; fr = {"L3": 0.3, "L2": 0.2}; kw = {"L3": 50.0, "L2": 40.0}
+        w = W(s, "평시", 0.8, 100, 70, 120); self.assertEqual(w["_soft"], {"L3"}); self.assertFalse(w["L2"])
+        sh = om.LoadShedder(); self.assertEqual(sh.step(0, w, cb, 0.8, s.soc_min, kw, fr), []); a = sh.step(3, w, cb, 0.8, s.soc_min, kw, fr)
+        self.assertEqual([(f, x) for f, x, _ in a], [("L3", "save")]); self.assertEqual(sh.saved, {"L3"}); self.assertAlmostEqual(sh.held["L3"], 15.0)
+        self.assertEqual(sh.step(8, w, cb, 0.8, s.soc_min, kw, fr), [])                                       # 절감의 효과를 10초 지켜본다
+        a = sh.step(13.1, w, cb, 0.8, s.soc_min, {"L3": 35.0, "L2": 40.0}, fr); self.assertEqual([(f, x) for f, x, _ in a], [("L3", "shed")])      # 그래도 모자라면 차단
+        self.assertEqual(sh.mine, {"L3"}); self.assertEqual(sh.saved, set()); self.assertAlmostEqual(sh.held["L3"], 50.0)                    # 되살리면 돌아올 부하 = 절감 전 크기
+        sh = om.LoadShedder(); sh.step(0, w, cb, 0.8, s.soc_min, kw, fr); sh.step(3, w, cb, 0.8, s.soc_min, kw, fr)
+        ok = W(s, "평시", 0.8, 100, 70, 98); self.assertFalse(ok["L3"]); ok["_keep"] = {"L3"}                # 절감으로 풀렸다. 되살리면 다시 모자란다 → 그대로 둔다
+        for t in (20, 60, 200): self.assertEqual(sh.step(t, ok, cb, 0.8, s.soc_min, kw, fr), [])
+        self.assertEqual(sh.saved, {"L3"}); ok["_keep"] = set(); self.assertEqual(sh.step(210, ok, cb, 0.8, s.soc_min, kw, fr), [])
+        a = sh.step(271, ok, cb, 0.8, s.soc_min, kw, fr); self.assertEqual([(f, x) for f, x, _ in a], [("L3", "restore")]); sh.restored("L3"); self.assertEqual((sh.saved, sh.held), (set(), {}))
+        sh = om.LoadShedder(); q = W(s, "저소음", 0.8, 700, 60, 100); self.assertEqual(q["_soft"], set()); sh.step(0, q, cb, 0.8, s.soc_min, kw, fr)
+        self.assertEqual([(f, x) for f, x, _ in sh.step(3, q, cb, 0.8, s.soc_min, kw, fr)], [("L3", "shed")])  # 태세 사유는 절감을 거치지 않는다
+        sh = om.LoadShedder(); sh.step(0, w, cb, 0.8, s.soc_min, kw, {"L3": 0.0}); self.assertEqual([(f, x) for f, x, _ in sh.step(3, w, cb, 0.8, s.soc_min, kw, {"L3": 0.0})], [("L3", "shed")])   # 줄일 몫이 없으면 바로 차단
+        both = W(s, "평시", 0.8, 60, 70, 120); self.assertEqual(both["_soft"], {"L2", "L3"}); sh = om.LoadShedder(); sh.step(0, both, cb, 0.8, s.soc_min, kw, fr)
+        self.assertEqual([(f, x) for f, x, _ in sh.step(3, both, cb, 0.8, s.soc_min, kw, fr)], [("L3", "save"), ("L2", "save")])                 # 3등급 먼저
+        self.assertEqual([(f, x) for f, x, _ in sh.step(14, both, cb, 0.8, s.soc_min, kw, fr)], [("L3", "shed"), ("L2", "shed")])
+
     def test_shedder_order_hold_and_restore(self):
         sh = om.LoadShedder(hold_s=3, restore_s=60); s = self.s; cb = {"L2": 1, "L3": 1}
         w = om.LoadShedder.want(s, "평시", 0.20, 700, 60, 100); self.assertTrue(w["L3"]); self.assertFalse(w["L2"])

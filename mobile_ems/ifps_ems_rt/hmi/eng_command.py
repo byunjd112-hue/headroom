@@ -78,6 +78,7 @@ class CommandMixin:
     def _set1(self, n, tag, value):
         ok = self.rt.links[n].write(tag, value)
         if ok: self.rt._w[tag] = value                                      # pylint: disable=protected-access — 자동 제어가 같은 값을 다시 쓰지 않게, 다른 값이면 다시 쓰게
+        if ok and tag.startswith("LDS."): (self.rt.feeder_save.add if int(round(value)) == 3 else self.rt.feeder_save.discard)(tag[4:])      # 손으로 낸 절감 · 차단 · 복구도 화면 상태에 반영
         return ok
 
     # ── 선택-실행(SBO) 지령: 선택 후 sbo_s초 안에 실행해야 한다

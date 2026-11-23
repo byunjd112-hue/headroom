@@ -142,7 +142,7 @@ const P_SLD = {
     $("#busKv").innerHTML = `<span class="k">모선 A 전압</span><span class="v">${F.n(val("BUS.a_v"), 1)} V</span><span class="k">모선 B 전압</span><span class="v">${F.n(val("BUS.b_v"), 1)} V</span>
       <span class="k">주파수</span><span class="v">${F.n(val("BUS.hz"), 2)} Hz</span><span class="k">연계 차단기</span><span class="v">${cb("TIE") === 1 ? "투입" : cb("TIE") === 0 ? "개방" : cb("TIE") === 2 ? "트립" : "미상"}</span>
       <span class="k">Σ 발전 / Σ 부하</span><span class="v">${F.kw(k.gen)} / ${F.kw(k.load)} kW</span><span class="k">ESS</span><span class="v">${k.ess < -.5 ? "충전 " + F.kw(-k.ess) : k.ess > .5 ? "방전 " + F.kw(k.ess) : "대기"} kW</span>`;
-    $("#sldCb").innerHTML = CB_ROWS.map(([f, nm]) => { const c = cb(f), code = Math.round(val("FLT." + f) || 0);
+    $("#sldCb").innerHTML = cbRows().map(([f, nm]) => { const c = cb(f), code = Math.round(val("FLT." + f) || 0);
       return `<tr><td class="mono nw"><b>CB-${f}</b></td><td class="ell">${nm}</td><td class="nw" style="text-align:right">${c === 1 ? `<span class="pill ok">투입</span>` : c === 2 ? `<span class="pill bad">트립${code ? " · " + esc(String(ANSI_TXT[code] || code)) : ""}</span>` : c === 0 ? `<span class="pill warn">개방</span>` : `<span class="pill">미상</span>`}</td></tr>`; }).join("");
     this.chart.set(["t", "load", "pv", "dg", "fc", "ess", "soc", "h2", "reserve"], S.trend);
   },
@@ -162,7 +162,9 @@ const CTL_UNITS = [
   { id: "GDG", no: "주", nm: "주둔지 기존 디젤발전기 · 1MW급 컨테이너형(고정식)", en: "Garrison standby diesel generator", col: "dg", dev: "GDG", kw: "GDG.kw", ctl: true },
   { id: "GRID", no: "주", nm: "주둔지 상전 수전점 · 22.9kV", en: "Utility incoming (no export)", col: "g1", dev: null, kw: "GRID.kw", need: "GRID.kw" },
 ];
-const CB_ROWS = [["PV", "③ PV 인입"], ["DG", "① 디젤 인입"], ["FC", "④ 연료전지 인입"], ["ESS", "② ESS 인입"], ["G1", "① 복합전력 인입"], ["TIE", "모선 A·B 연계"], ["L1", "1등급 부하 (지휘통제·의무)"], ["L2", "2등급 부하 (막사·정비)"], ["L3", "3등급 부하 (일반·탄약)"]];
+/* 차단기 줄의 이름: 부하 급전선은 부하 목록(부하 관리)의 이름을 붙인다 */
+const cbRows = () => CB_ROWS.map(([f, nm]) => /^L[123]$/.test(f) && LD.names(f).length ? [f, `${f[1]}등급 부하 (${LD.names(f).slice(0, 3).join(" · ")}${LD.names(f).length > 3 ? " …" : ""})`] : [f, nm]);
+const CB_ROWS = [["PV", "③ PV 인입"], ["DG", "① 디젤 인입"], ["FC", "④ 연료전지 인입"], ["ESS", "② ESS 인입"], ["G1", "① 복합전력 인입"], ["TIE", "모선 A·B 연계"], ["L1", "1등급 부하"], ["L2", "2등급 부하"], ["L3", "3등급 부하"]];
 /* 복합전력 PCS 의 운전 모드: 값과 이름은 설정(runtime.json 의 hybrid — 관리자 화면에서 고친다)에서 온다. 스냅샷 kpi.hy = {code: {stop, gen, charge, ess}, label: {...}} */
 const HY_KEYS = ["gen", "charge", "ess", "stop"], HY0 = { code: { stop: 0, gen: 1, charge: 2, ess: 3 }, label: { stop: "정지", gen: "발전기 단독", charge: "발전기 + ESS 충전", ess: "ESS 방전" } };
 const hyCfg = () => (S.snap && S.snap.kpi && S.snap.kpi.hy) || HY0;
@@ -210,9 +212,9 @@ const P_CTL = {
       if (dv < 0 && f && f.units.length <= 1 && !confirm("이 종류의 마지막 장치를 뺍니다. 계속합니까?")) return;
       const r = await api("/api/units", { kind: k, delta: dv }); toast(r.ok ? r.msg : r.why, r.ok ? "ok" : "bad"); poll(); });
     $$("#devs [data-sp]").forEach(b => b.onclick = () => { const u = CTL_UNITS.find(x => x.id === b.dataset.sp), v = parseFloat($("#sp-" + u.id).value); if (!(v >= 0)) return toast("설정값을 입력하세요", "bad"); sbo(u.dev, "set", { tag: u.sp[0], value: v, label: `${u.no} ${u.sp[1]} ${v} kW` }); });
-    $("#cbRows").innerHTML = CB_ROWS.map(([f, nm]) => `<tr title="${nm}"><td class="mono"><b>CB-${f}</b></td><td id="cbs2-${f}"></td><td class="mono muted" id="cbf-${f}"></td><td class="n" id="cbk-${f}"></td>
-      <td style="text-align:right">${["L2", "L3"].includes(f) ? `<button class="btn sm stop" data-shed="${f}" data-v="2">차단</button> <button class="btn sm go" data-shed="${f}" data-v="1">복구</button>` : `<span class="muted" style="font-size:11px">${f === "L1" ? "차단 금지" : ""}</span>`}</td></tr>`).join("");
-    $$("#cbRows [data-shed]").forEach(b => b.onclick = () => sbo("MTR", "set", { tag: "LDS." + b.dataset.shed, value: +b.dataset.v, label: `${b.dataset.shed === "L2" ? "2등급" : "3등급"} 부하 ${b.dataset.v === "2" ? "차단" : "복구"}` }));
+    $("#cbRows").innerHTML = cbRows().map(([f, nm]) => `<tr title="${nm}"><td class="mono"><b>CB-${f}</b></td><td id="cbs2-${f}"></td><td class="mono muted" id="cbf-${f}"></td><td class="n" id="cbk-${f}"></td>
+      <td style="text-align:right">${["L2", "L3"].includes(f) ? `<button class="btn sm" data-shed="${f}" data-v="3">절감</button> <button class="btn sm stop" data-shed="${f}" data-v="2">차단</button> <button class="btn sm go" data-shed="${f}" data-v="1">복구</button>` : `<span class="muted" style="font-size:11px">${f === "L1" ? "차단 금지" : ""}</span>`}</td></tr>`).join("");
+    $$("#cbRows [data-shed]").forEach(b => b.onclick = () => sbo("MTR", "set", { tag: "LDS." + b.dataset.shed, value: +b.dataset.v, label: `${b.dataset.shed === "L2" ? "2등급" : "3등급"} 부하 ${{ 1: "복구", 2: "차단", 3: "절감 공급" }[b.dataset.v]}` }));
     this.built = true;
   },
   update(s) {
@@ -549,7 +551,7 @@ function regsView(regs, ord) {
   if (ord === "CDAB" || ord === "DCBA") w = w.slice().reverse();
   const dv = new DataView(new ArrayBuffer(2 * w.length)); w.forEach((x, k) => dv.setUint16(2 * k, x)); return dv;
 }
-const PAGES = { overview: P_OV, sld: P_SLD, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG, scenarios: P_SCENARIOS, archive: P_ARCHIVE, help: P_HELP, ring: P_RING };
+const PAGES = { overview: P_OV, sld: P_SLD, control: P_CTL, alarms: P_ALM, energy: P_EN, trends: P_TR, comm: P_CM, eng: P_ENG, scenarios: P_SCENARIOS, archive: P_ARCHIVE, help: P_HELP, ring: P_RING, loads: P_LOADS };
 let mounted = null;
 function render() {
   if (!S.snap) return; const p = PAGES[S.page] ? S.page : "overview";

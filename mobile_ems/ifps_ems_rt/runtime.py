@@ -20,6 +20,8 @@ from . import opsmode as om
 from dataclasses import replace
 from ifps_ems.solar import clear_pv_kw
 
+LDS = {"restore": 1, "shed": 2, "save": 3}      # 부하 지령 값(LDS.L2 · L3): 1 복구(전부 공급) · 2 차단 · 3 절감 공급
+LDS_TXT = {"restore": "복구", "shed": "차단", "save": "절감 공급"}
 BLIND_S = 20.0                    # 수전점 계측 두절 중 ESS 출력으로 정전을 미루어 보는 지속 시간(초)
 HIST_COLS = ["ts", "load_kw", "load_p1", "load_p2", "load_p3", "pv_kw", "temp", "press", "rh", "plan", "mode", "sky"]
 
@@ -69,7 +71,7 @@ class Runtime:
         self.gar = om.Garrison.from_cfg(self.cfg.get("garrison")); self.posture = "평시"; self.auto_enabled = True; self.shedder = om.LoadShedder()
         self.auto_h = None; self.auto_target_h = float(self.cfg.get("autonomy_target_h", 72.0)); self.t_posture = self.now(); self.pv_day_kwh = None
         self.grid_lost = False; self.t_grid_ok = None; self.t_outage = None; self._grid_reset_pending = False; self.gdg_last = None; self.gar_last = None; self._gdg_t0 = None; self._w = {}; self._pvday = (None, 0.0)
-        self._t_blind = None; self._tags = {p["tag"] for p in self.pts}; self.rewrite = set(); self._grid_was = True; self.hist_err = ""; self.ops_auto = None; self._load_ops(); self._shed_saved = set(self.shedder.mine)
+        self._t_blind = None; self._tags = {p["tag"] for p in self.pts}; self.rewrite = set(); self._grid_was = True; self.hist_err = ""; self.ops_auto = None; self.feeder_save = set(); self.load_frac = {}; self._load_ops(); self._shed_saved = (set(self.shedder.mine), set(self.shedder.saved))      # load_frac: 급전선별 절감 가능 비율(부하 목록이 넣는다. 비어 있으면 절감 단계 없이 바로 차단)
         ok, why = security.crypto_gate(self.audit.c, self.cfg.get("run_mode", "개발"))
         if not ok: raise RuntimeError(why)
 
@@ -220,6 +222,7 @@ class Runtime:
             if o.get("posture") in om.POSTURES: self.posture = o["posture"]
             if isinstance(o.get("auto"), bool): self.ops_auto = o["auto"]
             self.shedder.mine = {f for f in o.get("shed", ()) if f in ("L2", "L3")}; self.shedder.why = {f: "재기동 전 자동 차단" for f in self.shedder.mine}
+            self.shedder.saved = {f for f in o.get("saved", ()) if f in ("L2", "L3")} - self.shedder.mine; self.shedder.why.update({f: "재기동 전 자동 절감" for f in self.shedder.saved}); self.feeder_save = set(self.shedder.saved)
         except (OSError, ValueError):
             pass
 
@@ -235,7 +238,7 @@ class Runtime:
 
     def save_ops(self):
         """운용 상태를 적어 둔다: 운용 장소 · 태세, 자동 제어 켬/끔, EMS 가 스스로 끊은 급전선. 재기동해도 운용자가 끈 자동 제어가 켜지지 않고, 끊어 둔 부하를 되살릴 수 있다."""
-        o = {"mode": self.mode, "posture": self.posture, "shed": sorted(self.shedder.mine)}
+        o = {"mode": self.mode, "posture": self.posture, "shed": sorted(self.shedder.mine), "saved": sorted(self.shedder.saved)}
         if self.ops_auto is not None: o["auto"] = bool(self.ops_auto)
         fsio.write_json(self._ops_path(), o)
 
@@ -305,7 +308,11 @@ class Runtime:
         avail = (s.ess_kw if ess_ok else 0.0) + self.g1_kw() * (g("CB.G1", 1) == 1) + s.dg_kw * (g("DG.status") > 0.5) + s.fc_kw * (g("FC.status") > 0.5) + max(0.0, g("PV.kw"))
         avail += sum(self.gar.gdg_kw for n in self.gdgs if g(f"{n}.status") > 0.5 and g(f"CB.{n}", 1) == 1)
         target = max(0.0, self.auto_target_h - (t - self.t_posture) / 3600.0) if self.posture == "자립" else self.auto_target_h
-        return om.LoadShedder.want(s, self.posture, soc, avail, g("LOAD.p1_kw") + g("LOAD.p2_kw"), g("LOAD.kw"), self.auto_h, target)
+        sh = self.shedder; h2, h3 = sh.held.get("L2", 0.0), sh.held.get("L3", 0.0); a = (s, self.posture, soc, avail)
+        w = om.LoadShedder.want(*a, g("LOAD.p1_kw") + g("LOAD.p2_kw"), g("LOAD.kw"), self.auto_h, target)
+        if h2 or h3:                                                 # 절감 · 차단으로 덜어 낸 부하를 되살렸을 때도 모자라는가 — 모자라면 되살리지 않는다(되살렸다 다시 끊는 일을 막는다)
+            k = om.LoadShedder.want(*a, g("LOAD.p1_kw") + g("LOAD.p2_kw") + h2, g("LOAD.kw") + h2 + h3, self.auto_h, target); w["_keep"] = {f for f in ("L2", "L3") if k[f]}
+        return w
 
     def _garrison_control(self, tied, hr, soc):
         """수전 차단기가 투입된 동안의 ESS·태양광 설정값(역송 방지·피크 억제·시간대 충방전). 반환: 한 일 목록.
@@ -339,10 +346,11 @@ class Runtime:
         want = {"L3": "", "L2": ""} if tied else self._shed_want(t, soc)
         mtr = self.links.get("MTR")
         if self.auto_enabled and mtr is not None and "LDS.L3" in mtr.by_tag and self.lm.controllable("MTR"):
-            for f, act, why in self.shedder.step(t, want, cb, soc, s.soc_min):
-                ok = self.links["MTR"].write(f"LDS.{f}", 2 if act == "shed" else 1); nm = "2등급" if f == "L2" else "3등급"
-                self.note("지령", f"부하 자동 {'차단' if act == 'shed' else '복구'}: {nm}({f}) — {why}{'' if ok else ' (쓰기 실패)'}"); done.append((f, act))
-            if self.shedder.mine != self._shed_saved: self._save_shed()
+            kw = {"L2": self.val.get("LOAD.p2_kw"), "L3": self.val.get("LOAD.p3_kw")}
+            for f, act, why in self.shedder.step(t, want, cb, soc, s.soc_min, kw, self.load_frac):
+                ok = self.links["MTR"].write(f"LDS.{f}", LDS[act]); nm = "2등급" if f == "L2" else "3등급"; self._lds_done(f, act, ok)
+                self.note("지령", f"부하 자동 {LDS_TXT[act]}: {nm}({f}) — {why}{'' if ok else ' (쓰기 실패)'}"); done.append((f, act))
+            if (self.shedder.mine, self.shedder.saved) != self._shed_saved: self._save_shed()
         return done
 
     def _blind_outage(self, t):
@@ -356,8 +364,16 @@ class Runtime:
             self.grid_lost = True; self.t_outage = t; self.t_grid_ok = None; self._grid_was = False; self._t_blind = None; self.t_ctl = -1e9
             self.note("운용", f"상전 정전 추정 — 수전점 계측을 못 읽는 중 ESS 가 설정값보다 {self.val['ESS.kw'] - sum(sp):.0f}kW 더 내보냄({BLIND_S:.0f}초). 자립 운전으로 전환")
 
+    def _lds_done(self, f, act, ok):
+        """부하 지령(절감 · 차단 · 복구)을 쓴 뒤의 정리: 그 급전선이 절감 공급 중인지 기억한다(화면 표시 · 추정 전력에 쓴다)."""
+        if not ok: return
+        if act == "save": self.feeder_save.add(f)
+        else:
+            if act == "restore" and f in self.shedder.saved: self.shedder.restored(f)
+            self.feeder_save.discard(f)
+
     def _save_shed(self):
-        self._shed_saved = set(self.shedder.mine)
+        self._shed_saved = (set(self.shedder.mine), set(self.shedder.saved))
         try: self.save_ops()
         except OSError: pass                                         # 저장 실패는 운전을 막지 않는다
 

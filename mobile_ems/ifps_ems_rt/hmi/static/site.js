@@ -16,7 +16,7 @@ function siteState(s) {
     EMS: r(s.alarm_cnt[1].act ? "bad" : "ok", `${s.auto ? "AUTO" : "MANUAL"} · ${F.n(s.stats.last_ms, 0)} ms`, s.alarm_cnt[1].act ? `긴급 경보 ${s.alarm_cnt[1].act}` : "정상"),
   };
   [["G1", "DG"], ["ESS", "ESS"], ["PV", "PV"], ["FC", "FC"]].forEach(([b, kd]) => { if (out[b].st !== "bad" && out[b].t !== "미설치") out[b].t += kCnt(kd); });       // 같은 종류 여러 대면 대수를 붙인다
-  ["L1", "L2", "L3"].forEach((f, i) => { const kw = [k.l1, k.l2, k.l3][i], c = cb(f); out[f] = !gw ? r("bad", "####", "게이트웨이 두절") : c === 2 ? r("bad", "0 kW", "트립 · 정전") : c === 0 ? r("idle", "0 kW", "개방") : r("ok", `${F.kw(kw)} kW`, "급전 중"); });
+  ["L1", "L2", "L3"].forEach((f, i) => { const kw = [k.l1, k.l2, k.l3][i], c = cb(f); out[f] = !gw ? r("bad", "####", "게이트웨이 두절") : c === 2 ? r("bad", "0 kW", "트립 · 정전") : c === 0 ? r("idle", "0 kW", "개방") : LD.stage(f) === "save" ? r("warn", `${F.kw(kw)} kW`, "절감 공급 중") : r("ok", `${F.kw(kw)} kW`, "급전 중"); });
   return out;
 }
 /* 장비 카드: photos/ 폴더에 실사 이미지가 있으면 사진, 없으면 자체 벡터 일러스트 + 상태 띠 */
@@ -128,7 +128,26 @@ function layAdopt() {
   const add = layAuto(L.items).filter(i => String(i.uid).startsWith("auto-")).map((i, k) => ({ uid: "u" + Date.now().toString(36) + k, kind: i.kind, bind: i.bind, name: i.name, x: Math.round(i.x), y: Math.round(i.y) }));
   if (add.length) { L.items = L.items.concat(add); L.dirty = true; toast(`자동으로 놓인 장비 ${add.length}대를 편집 목록에 넣었습니다 — 옮긴 뒤 저장하면 그 자리가 기억됩니다`, "ok"); }
 }
-function layAuto(items) {
+/* 부하 그림을 부하 목록(부하 관리 화면)에 맞춘다: 목록의 수량만큼 그림을 두고, 모자라면 같은 부하 뒤로 겹쳐 세우고, 목록에서 빠진 그림은 '예비 자리'로 흐리게 둔다.
+   그림과 목록은 그림 종류(지휘통제 · 의무 · 탄약 · 막사)와 급전선으로 짝짓는다. 이름은 목록의 이름을 쓴다. 자리를 따로 정하려면 [배치 편집]에서 끌어 옮겨 저장한다 */
+const LOAD_SPR = ["L1", "L2", "L3", "BARRACK"], LOAD_AT = { L1: [230, 740], L2: [780, 820], L3: [1380, 770] };
+function layLoads(items) {
+  const d = S.snap && S.snap.loads; if (L.edit || !d || !d.items) return items;
+  const out = items.filter(i => !LOAD_SPR.includes(i.kind)), pool = {}, made = {};
+  items.filter(i => LOAD_SPR.includes(i.kind)).forEach(i => (pool[i.kind + "/" + i.bind] = pool[i.kind + "/" + i.bind] || []).push(i));
+  d.items.forEach(ld => { const have = pool[ld.spr + "/" + ld.feeder] || []; let anchor = null, k = 0; const grp = [];
+    for (let j = 0; j < ld.n; j++) { const it = have.shift(), name = ld.n > 1 ? `${ld.name} #${j + 1}` : ld.name;
+      if (it) { anchor = it; k = 0; grp.push(Object.assign({}, it, { name, load: ld.id })); continue; }
+      const m = made[ld.feeder] = (made[ld.feeder] || 0) + (anchor ? 0 : 1), b = anchor || { x: LOAD_AT[ld.feeder][0] + 150 * (m - 1) * (ld.feeder === "L3" ? -1 : 1), y: LOAD_AT[ld.feeder][1] - 70 };
+      if (!anchor) { anchor = { x: Math.max(60, Math.min(1540, b.x)), y: b.y }; grp.push({ uid: `auto-ld-${ld.id}-${j}`, kind: ld.spr, bind: ld.feeder, name, x: anchor.x, y: anchor.y, load: ld.id }); continue; }
+      k++; grp.push({ uid: `auto-ld-${ld.id}-${j}`, kind: ld.spr, bind: ld.feeder, name, x: Math.min(1540, anchor.x + 46 * k), y: Math.max(215, anchor.y - 24 * k), load: ld.id, stack: true }); }
+    const st = grp.filter(g => g.stack).length; if (st) grp.forEach(g => { g.sc = layScale(st + 1); });      // 겹쳐 세운 무리는 같은 비율로 줄인다
+    out.push(...grp); });
+  Object.values(pool).forEach(rest => rest.forEach(it => out.push(Object.assign({}, it, { absent: true, spare: true }))));      // 목록에서 빠진 그림: 흐리게 둔다(다시 늘리면 켜진다)
+  return out;
+}
+function layAuto(items) { return layLoads(layFleet(items)); }
+function layFleet(items) {
   const fl = S.snap && S.snap.fleet; if (L.edit || !fl) return items; const out = [], cnt = {}, first = {}, rmap = fsuRing(items);
   items.forEach(it => { const kd = LAY_FLEET[it.kind], f = kd && fl[kd];
     if (it.kind === "FSU") { if (!rmap) out.push(it); else if (rmap.get(it.uid)) out.push(Object.assign({}, it, { rid: rmap.get(it.uid) })); return; }
@@ -237,7 +256,8 @@ function siteUpdate(s, force) {
     const kf = KF(LAY_FLEET[it.kind]), u = kf && kf.units.length > 1 && kf.units.find(q => q.id === it.unit);
     if (u) x = { st: !u.live ? "bad" : u.on || it.kind === "ESS" || it.kind === "PV" ? "ok" : "idle", v: `${u.id}${u.kw == null ? "" : " · " + F.kw(u.kw) + " kW"}${it.kind === "ESS" && u.soc != null ? " · " + F.n(u.soc, 0) + "%" : ""}`, t: !u.live ? "통신 두절" : it.kind === "ESS" || it.kind === "PV" ? "연결" : u.on ? "운전" : "정지" };
     e.className = `spt ${e.classList.contains("mini") ? "mini" : ""} ${x.st}`; e.querySelector(".sv .mono").textContent = x.v; e.querySelector(".ss").textContent = x.t; });
-  const sum = $("#layCnt"); if (sum) { const c = k => L.items.filter(i => i.kind === k).length; sum.textContent = `장비 ${L.items.filter(i => !["FSU", "BARRACK", "L1", "L2", "L3"].includes(i.kind)).length} · 막사 ${c("BARRACK")} · 시설 ${c("L1") + c("L2") + c("L3")} · FSU ${c("FSU")}`; }
+  const sum = $("#layCnt"); if (sum) { const A = L.edit ? L.items : layAuto(L.items).filter(i => !i.spare), c = k => A.filter(i => i.kind === k).length, ld = LD.s().grades.reduce((a, g) => a + g.n, 0);      // 화면에 놓인 것(자동으로 놓인 장치 · 부하 포함)
+    sum.textContent = `장비 ${A.filter(i => !["FSU", "BARRACK", "L1", "L2", "L3"].includes(i.kind)).length} · 부하 ${L.edit ? c("BARRACK") + c("L1") + c("L2") + c("L3") : ld} · FSU ${c("FSU")}`; }
 }
 
 /* ── 편집: 선택·끌기·추가·복제·삭제·저장 */

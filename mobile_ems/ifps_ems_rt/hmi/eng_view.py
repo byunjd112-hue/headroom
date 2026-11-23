@@ -58,7 +58,7 @@ class ViewMixin:
                           "avg_ms": round(sum(sm) / len(sm), 1) if sm else None, "p95_ms": round(st[int(len(st) * 0.95) - 1], 1) if len(st) > 20 else None,
                           "scan_s": float(self.cfg.get("scan_s", 1.0)), "wd": {k: (None if t is None else round(now - t, 1)) for k, t in rt.wd.last.items()},
                           "trace_n": self.trace_n, "audit_seq": rt.audit.seq, "hist": hist, "hist_top": round(top, 1)},
-                "sim_state": self.sim_state() if self.sim else None, "ring": self.ringw.status(), "fleet": rt.fleet.view(rt.lm.state, rt.dev, rt.val), "ops": self.ops(), "energy": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in self.energy.items() if k != "hours"}}
+                "sim_state": self.sim_state() if self.sim else None, "ring": self.ringw.status(), "fleet": rt.fleet.view(rt.lm.state, rt.dev, rt.val), "loads": self.loadw.view(), "ops": self.ops(), "energy": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in self.energy.items() if k != "hours"}}
 
     def sim_state(self):
         p = self.plant
