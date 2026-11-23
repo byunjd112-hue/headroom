@@ -9,6 +9,7 @@
   · 저장한 설정은 EMS 를 다시 기동해야 적용된다(운전 중인 값은 바꾸지 않는다).
 """
 import csv, difflib, hashlib, io, json, math, os, re, tempfile, time
+from .. import modbus as mb
 from .. import pointmap as pm
 from .. import opsmode as om
 from .. import archive, ring, weather, hybrid
@@ -18,7 +19,7 @@ MASK = "********"; SECRET = re.compile(r"^(pin_|audit_key)"); KEEP = 20
 COLS = ["tag", "device", "fc", "addr", "type", "scale", "unit", "lo", "hi", "rw", "order"]
 BAK = re.compile(r"^(runtime|pointmap)\.\d{8}-\d{6}(-\d+)?\.bak$")
 # 운전 설정 값 범위(없는 키는 검사하지 않는다)
-RANGE = {"scan_s": (0.2, 60), "ctrl_s": (1, 3600), "timeout_s": (0.05, 10), "autonomy_target_h": (1, 720), "g1_kw": (0, 10000)}
+RANGE = {"scan_s": (0.2, 1.5), "ctrl_s": (1, 3600), "timeout_s": (0.05, 1.0), "sup_s": (0.1, 2), "autonomy_target_h": (1, 720), "g1_kw": (0, 10000)}      # 수집 주기 · 응답 한도는 통신 두절 판정 시간(2초)보다 짧아야 한다
 AI_RANGE = {"retrain_h": (0.5, 720), "sim_retrain_h": (0.1, 720), "first_min": (0, 1440), "holdout_days": (1, 14), "min_gain": (0, 50), "keep": (2, 100), "max_days": (20, 720),
             "max_gap": (0, 1), "bias_slots": (3, 96), "bias_tau": (1, 96), "nmae_limit": (1, 100)}
 SKY_RANGE = {"max_age_s": (10, 3600), "period_s": (2, 600)}
@@ -60,21 +61,25 @@ def _in(v, lo, hi):
     return _num(v) and lo <= v <= hi
 
 
-def _check_path(n, p, u, bad, units):
+HMI_RANGE = {"sbo_s": (3, 300), "session_min": (1, 1440), "port": (0, 65535)}
+
+
+def _check_path(n, p, u, bad, units, allow=None):
     ok = isinstance(p, list) and len(p) == 2 and isinstance(p[0], str) and re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", p[0]) and isinstance(p[1], int) and 1 <= p[1] <= 65535
     if not ok: bad.append(f"devices.{n}.paths: [\"IP\", 포트] 형식 오류 {p}")
     elif any(int(x) > 255 for x in p[0].split(".")): bad.append(f"devices.{n}.paths: IP 범위 오류 {p[0]}")
+    elif allow is not None and not mb.allowed(p[0], allow): bad.append(f"devices.{n}.paths: {p[0]} 는 허용 대역(allow) 밖 — 이대로 저장하면 EMS 가 기동하지 못함")
     elif (p[0], p[1], u) in units: bad.append(f"devices.{n}: 주소·Unit ID 가 {units[(p[0], p[1], u)]} 과 같음 ({p[0]}:{p[1]} unit {u})")
     else: units[(p[0], p[1], u)] = n
 
 
-def _check_device(n, d, bad, units):
+def _check_device(n, d, bad, units, allow=None):
     if not isinstance(d, dict): bad.append(f"devices.{n}: 객체여야 함"); return
     u = d.get("unit")
     if not (isinstance(u, int) and not isinstance(u, bool) and 0 <= u <= 247): bad.append(f"devices.{n}.unit: 0~247 정수")
     ps = d.get("paths")
     if not (isinstance(ps, list) and 1 <= len(ps) <= 2): bad.append(f"devices.{n}.paths: 경로 1~2개"); ps = []
-    for p in ps: _check_path(n, p, u, bad, units)
+    for p in ps: _check_path(n, p, u, bad, units, allow)
     if "order" in d and str(d["order"]).upper() not in ORDERS: bad.append(f"devices.{n}.order: {'/'.join(ORDERS)} 중 하나")
     for k in ("done_s", "gap"):
         if k in d and not (_num(d[k]) and d[k] >= 0): bad.append(f"devices.{n}.{k}: 0 이상 숫자")
@@ -146,11 +151,16 @@ def check_runtime(cfg):
     devs = cfg.get("devices")
     if not isinstance(devs, dict) or not devs: bad.append("devices: 장치가 하나 이상 있어야 함"); devs = {}
     units = {}
-    for n, d in devs.items(): _check_device(n, d, bad, units)
+    al = cfg.get("allow"); al = al if isinstance(al, list) and all(isinstance(a, str) for a in al) else None
+    for n, d in devs.items(): _check_device(n, d, bad, units, al)
+    slow = [n for n, d in devs.items() if isinstance(d, dict) and re.fullmatch(r"(DG|FC|GDG)\d*", n) and "done_s" not in d]
+    if slow: warn.append(f"{', '.join(slow)}: 완료 한도(done_s) 없음 — 지령을 받은 뒤 상태가 바뀌기까지 1.5초 넘게 걸리는 장비면 devices.<장치>.done_s 를 넣어야 함(없으면 기동 실패로 보고 대체 전원을 기동)")
     if "MTR" not in devs: warn.append("MTR(계측 게이트웨이) 장치가 없음 — 부하 계측·부하 자동 차단 불가")
     _check_garrison(cfg.get("garrison") or {}, bad)
     _check_sections(cfg, bad)
     h = cfg.get("hmi") or {}
+    for k, (lo, hi) in HMI_RANGE.items():
+        if isinstance(h, dict) and k in h and not _in(h[k], lo, hi): bad.append(f"hmi.{k}: {lo}~{hi} 범위의 숫자")
     if isinstance(h, dict) and str(h.get("bind", "127.0.0.1")) not in ("127.0.0.1", "localhost", "::1"): warn.append(f"제어화면이 {h.get('bind')} 에 열림 — 폐쇄망 내부 단말에서만 사용")
     return bad, warn
 

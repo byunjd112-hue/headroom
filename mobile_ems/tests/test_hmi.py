@@ -44,6 +44,12 @@ class TestHmi(unittest.TestCase):
             time.sleep(0.2)
         self.fail("조건 미충족")
 
+    def test_late_operator_command_is_dropped(self):
+        """앞선 지령에 밀려 늦어진 운용자 지령은 버린다(잊은 지령이 뒤늦게 나가지 않게)."""
+        e = self.eng; n0 = len(e.rt.cmd.log); on = e.rt.dev["FC"].on
+        e._do_cmd({"dev": "FC", "cmd": "stop" if on else "start", "who": "시험", "exp": time.monotonic() - 30.0})
+        self.assertIn("버림", e.rt.cmd.log[-1]["text"]); self.assertEqual(len(e.rt.cmd.log), n0 + 1); self.assertEqual(e.rt.dev["FC"].on, on)
+
     def test_1_static_and_snapshot(self):
         with urllib.request.urlopen(self.base + "/", timeout=5) as f:
             html = f.read().decode(); self.assertIn("IFPS", html); self.assertIn("default-src 'self'", f.headers["Content-Security-Policy"])
@@ -144,7 +150,7 @@ class TestHmi(unittest.TestCase):
         self.assertTrue(self.req("/api/layout/reset", {}, op)[1]["ok"]); self.assertIsNone(self.req("/api/layout")[1]["items"])
 
     def test_10_security_lockout_hash_and_gate(self):
-        from ifps_ems_rt.hmi.engine import pin_hash, pin_verify
+        from ifps_ems_rt.hmi.engdefs import pin_hash, pin_verify
         h = pin_hash("482915"); self.assertTrue(pin_verify("482915", h)); self.assertFalse(pin_verify("482916", h)); self.assertNotIn("482915", h)
         eng = self.eng; src = "10.9.9.9"
         for _ in range(eng.LOCK_N): self.assertFalse(eng.login("0000", "공격", src)["ok"])

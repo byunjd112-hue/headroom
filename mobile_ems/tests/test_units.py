@@ -15,6 +15,57 @@ class FleetUnitTest(unittest.TestCase):
         self.assertNotIn("FC2.nm3", tags); self.assertEqual(sum(1 for p in pts if p["tag"] == "H2.nm3"), 1); self.assertEqual(pm.validate(pts, dev), [])   # 공용 계측은 본뜨지 않는다
         self.assertEqual(len(fleet.expand(pts, dev)), len(pts))                                                                     # 이미 줄이 있으면 다시 넣지 않는다
 
+    def test_seen_units_survive_restart(self):
+        """인식한 장치는 재기동 뒤에도 기억한다: 그사이 고장 난 장치가 '미설치'로 낮춰지지 않는다. 철수 처리(forget)한 장치는 잊는다."""
+        td = tempfile.mkdtemp(); path = os.path.join(td, "seen.json")
+        try:
+            f = fleet.Fleet(["DG", "DG2", "ESS", "MTR"]); f.restore(path); self.assertEqual(f.ever, set())                     # 파일이 없으면 처음 켠 것과 같다
+            f.merge({"DG": {"DG.kw": 1.0}, "DG2": {"DG2.kw": 2.0}, "ESS": None}, {}, {}, lambda t, ok: None); f.ever.add("MTR"); f.store()
+            g = fleet.Fleet(["DG", "DG2", "ESS", "MTR"]); g.restore(path); self.assertEqual(g.ever, {"DG", "DG2", "MTR"}); self.assertFalse(g.empty("DG2"))   # 묶지 않는 장치(MTR)도 기억한다
+            g.forget("DG2"); h = fleet.Fleet(["DG", "DG2", "ESS", "MTR"]); h.restore(path); self.assertEqual(h.ever, {"DG", "MTR"}); self.assertTrue(h.empty("DG2"))
+            k = fleet.Fleet(["DG", "ESS"]); k.restore(path); self.assertEqual(k.ever, {"DG"})                                   # 설정에서 뺀 장치는 되살리지 않는다
+            with open(path, "w", encoding="utf-8") as fh: fh.write("{깨진 파일")
+            m = fleet.Fleet(["DG"]); m.restore(path); self.assertEqual(m.ever, set())                                           # 깨진 파일은 무시한다
+            n = fleet.Fleet(["DG"]); n.keep = False; n.restore(os.path.join(td, "none.json")); n.merge({"DG": {"DG.kw": 1.0}}, {}, {}, lambda t, ok: None); self.assertFalse(os.path.exists(os.path.join(td, "none.json")))   # 가상 장치 모드는 남기지 않는다
+        finally: shutil.rmtree(td, ignore_errors=True)
+
+    def test_missed_poll_keeps_the_last_total(self):
+        """여러 대 가운데 한 대를 한 주기 못 읽으면 직전 합계를 둔다(첫 장치의 값만 합계 자리에 남지 않는다)."""
+        f = fleet.Fleet(["ESS", "ESS2"]); val = {}; st = {}; mark = lambda t, ok: None
+        f.merge({"ESS": {"ESS.kw": 100.0, "ESS.soc": 80.0, "ESS.status": 1.0}, "ESS2": {"ESS2.kw": 120.0, "ESS2.soc": 20.0, "ESS2.status": 1.0}}, st, val, mark)
+        self.assertEqual((val["ESS.kw"], val["ESS.soc"]), (220.0, 50.0))
+        val.update({"ESS.kw": 100.0, "ESS.soc": 80.0}); f.merge({"ESS": {"ESS.kw": 100.0, "ESS.soc": 80.0, "ESS.status": 1.0}, "ESS2": None}, st, val, mark)      # 수집이 첫 장치 값을 종류 이름으로 넣은 뒤
+        self.assertEqual((val["ESS.kw"], val["ESS.soc"]), (220.0, 50.0))
+        val.update({"ESS.kw": 100.0}); flags = {}; f.merge({"ESS": {"ESS.kw": 100.0, "ESS.soc": 80.0}, "ESS2": {"ESS2.soc": 20.0}}, st, val, lambda t, ok: flags.__setitem__(t, ok), {"ESS2.kw"})
+        self.assertEqual(val["ESS.kw"], 220.0); self.assertIs(flags["ESS.kw"], False)                       # 범위 밖 점이 낀 합계도 직전 값(품질 표시)
+        st["ESS2"] = "두절"; val.update({"ESS.kw": 100.0}); f.merge({"ESS": {"ESS.kw": 100.0, "ESS.soc": 80.0}, "ESS2": None}, st, val, mark); self.assertEqual(val["ESS.kw"], 100.0)   # 두절로 판정되면 남은 장치만
+
+    def test_config_check_blocks_unsafe_values(self):
+        import json
+        from ifps_ems_rt.hmi import cfgedit
+        cfg = json.load(open(os.path.join(ROOT, "config", "runtime.json"), encoding="utf-8")); bad, warn = cfgedit.check_runtime(cfg); self.assertEqual(bad, [])
+        self.assertTrue(any("done_s" in w for w in warn))
+        c = json.loads(json.dumps(cfg)); c["devices"]["DG"]["paths"][0][0] = "10.9.9.9"; self.assertTrue(any("허용 대역" in b for b in cfgedit.check_runtime(c)[0]))
+        for k, v in (("scan_s", 3), ("timeout_s", 2.5), ("sup_s", 0)):
+            c = json.loads(json.dumps(cfg)); c[k] = v; self.assertTrue(any(b.startswith(k) for b in cfgedit.check_runtime(c)[0]), k)
+        c = json.loads(json.dumps(cfg)); c.setdefault("hmi", {})["sbo_s"] = 0; self.assertTrue(any("hmi.sbo_s" in b for b in cfgedit.check_runtime(c)[0]))
+
+    def test_hybrid_alarms(self):
+        """복합전력 PCS 경보: 지령한 모드와 PCS 모드가 30초 넘게 다르면, ESS 충전율이 낮으면, 모르는 모드 값이면 알린다. 없는 장치의 경보는 꺼진다."""
+        from ifps_ems_rt import hybrid
+        class F:
+            slots = {"DG": ["DG", "DG2"]}; live = staticmethod(lambda k: ["DG"]); v = {"ess_soc": 60.0, "pcs_mode": 3.0}
+            def unit(self, n, suf, val): return self.v[suf]
+        class L: by_tag = {"DG.mode_set": 1}
+        class RT: cfg = {}; fleet = F(); val = {}; links = {"DG": L}; dev = {}; _w = {"DG.mode_set": 3.0}; posture = "평시"
+        rt = RT(); A = lambda now: {k: on for k, on, *_ in hybrid.alarms(rt, now)}
+        a = A(0.0); self.assertEqual((a["hy.mode.DG"], a["hy.soc.DG"], a["hy.unknown.DG"], a["hy.mode.DG2"], a["hy.soc.DG2"]), (False, False, False, False, False))
+        rt._w["DG.mode_set"] = 2.0; self.assertFalse(A(10.0)["hy.mode.DG"]); self.assertFalse(A(35.0)["hy.mode.DG"]); self.assertTrue(A(41.0)["hy.mode.DG"])      # 다르기 시작한 뒤 30초
+        F.v["pcs_mode"] = 2.0; self.assertFalse(A(50.0)["hy.mode.DG"]); F.v["pcs_mode"] = 3.0; self.assertFalse(A(60.0)["hy.mode.DG"])                      # 같아지면 꺼지고, 다시 달라지면 처음부터 잰다
+        F.v["ess_soc"] = 12.0; t = {k: txt for k, on, _, _, txt in hybrid.alarms(rt, 70.0) if on}; self.assertIn("발전기로 충전 중", t["hy.soc.DG"])
+        rt.posture = "저소음"; t = {k: txt for k, on, _, _, txt in hybrid.alarms(rt, 71.0) if on}; self.assertIn("저소음 태세", t["hy.soc.DG"])
+        F.v["pcs_mode"] = 9.0; self.assertTrue(A(72.0)["hy.unknown.DG"]); rt.cfg = {"hybrid": {"modes": {"ess": 9}}}; self.assertFalse(A(73.0)["hy.unknown.DG"])   # 설정에서 값을 맞추면 사라진다
+
     def test_hybrid_pcs_modes(self):
         """복합전력 PCS 의 운전 모드 선택: 디젤이 필요하면 발전기 + ESS 충전(가득이면 발전기 단독), 필요 없으면 ESS 방전. 복합전력 ESS 가 낮으면 발전기로 충전(이력)."""
         from ifps_ems_rt import hybrid

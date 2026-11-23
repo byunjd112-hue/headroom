@@ -16,10 +16,11 @@ def main(argv=None):
     ap.add_argument("--bind"); ap.add_argument("--port", type=int); ap.add_argument("--open", action="store_true", help="기동 후 브라우저 열기")
     a = ap.parse_args(argv)
     from .engine import Engine
+    from ..modbus import ModbusError
     from .server import serve
     try:
         eng = Engine(a.config, sim=a.sim, plan_dir=a.plan, days_since_deploy=a.days)
-    except (ValueError, RuntimeError, OSError) as e:
+    except (ValueError, RuntimeError, OSError, ModbusError) as e:
         print(f"[기동 실패] {e}", file=sys.stderr); return 2
     bad, warn = eng.security_check()
     for w in warn: print(f"[보안 경고] {w}", file=sys.stderr)

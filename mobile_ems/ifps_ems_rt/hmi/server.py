@@ -8,7 +8,7 @@ import json, math, mimetypes, os, threading, time, traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from .. import modbus as mb
-from .engine import ROLES
+from .engdefs import ROLES
 from . import scenarios, scenextra, archwatch, archcfg, seqppt, ringwatch, weatherwatch, unitctl
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")

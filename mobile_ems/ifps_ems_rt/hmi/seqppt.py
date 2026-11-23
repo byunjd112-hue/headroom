@@ -206,7 +206,7 @@ def http_post(hd, eng, p):
     b = json.loads(raw.decode("utf-8")); cases = b["cases"]; res = None
     if b.get("verify") is True: res = scenarios.verify(cases, eng.rt.pts, eng.cfg["devices"], profile=eng.cfg_path)["results"]
     else: scenarios_check(cases)
-    from .engine import PKG_REV                        # pylint: disable=import-outside-toplevel
+    from .engdefs import PKG_REV                        # pylint: disable=import-outside-toplevel
     return hd._send(200, export(cases, res, PKG_REV, eng.rt.site.name), "application/vnd.openxmlformats-officedocument.presentationml.presentation", {"Content-Disposition": "attachment; filename=EMS_sequence.pptx"})     # pylint: disable=protected-access
 
 

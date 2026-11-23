@@ -48,6 +48,82 @@ class TestModbus(Base):
         self.assertGreaterEqual(len(pm.validate(bad, self.units)), 3)
 
 
+class TestFieldGuards(Base):
+    """실전 대비: 지령 대체 · 묵은 값 · 저장 실패 · 재기동에 대한 안전 처리."""
+    def fake(self):
+        """시각을 손으로 넘길 수 있는 실행기(같은 설정 · 같은 가상 장치)."""
+        clk = [100.0]; rt = runtime.Runtime(self.cfgp, clock=lambda: clk[0]); self.addCleanup(rt.close); return rt, clk
+
+    def test_stop_failure_never_stops_the_other_source(self):
+        self.rt.scan(); self.assertTrue(self.rt.cmd.send("DG", "start")[0]); self.assertTrue(self.rt.cmd.send("FC", "start")[0])
+        self.plant.no_ack.add("DG"); ok, _ = self.rt.cmd.send("DG", "stop")
+        self.assertFalse(ok); self.assertEqual(int(self.plant.get("FC.status")), 1)                       # 디젤 정지 실패가 연료전지 정지로 바뀌지 않는다
+        self.assertFalse([e for e in self.rt.cmd.log if "대체 전원" in e["text"] and e["cmd"] == "stop"])
+
+    def test_slow_scan_does_not_mark_live_devices_lost(self):
+        rt, clk = self.fake(); rt.scan(); read = rt._read_parallel
+        def slow():
+            got = read(); clk[0] += 2.6; return got                                                       # 읽는 데 두절 판정 시간(2초)보다 오래 걸렸다
+        rt._read_parallel = slow; rt.scan(); self.assertEqual(rt.lm.check(rt.now()), {}); self.assertEqual(rt.lm.state["ESS"], "정상")
+
+    def test_stale_soc_runs_a_generator(self):
+        rt, clk = self.fake(); rt.scan(); self.assertFalse(rt.soc_blind()); self.assertFalse(rt.decide()["DG"])
+        self.plant.muted.add("ESS"); clk[0] += 3.0; rt.scan(); clk[0] += 3.0; rt.scan()
+        self.assertEqual(rt.lm.state["ESS"], "두절"); self.assertTrue(rt.soc_blind()); self.assertTrue(rt.decide()["DG"])          # 충전율을 모르면 발전기를 돌린다
+        rt.posture = "저소음"; w = rt.decide(); self.assertFalse(w["DG"]); self.assertTrue(w["FC"])                                # 저소음 태세에서는 연료전지
+        self.plant.muted.discard("ESS"); clk[0] += 1.0; rt.scan(); clk[0] += 1.0; rt.scan(); rt.posture = "평시"
+        self.assertFalse(rt.soc_blind()); self.assertFalse(rt.decide()["DG"])
+
+    def test_grid_state_held_while_meter_is_unreadable(self):
+        rt, clk = self.fake(); rt.set_ops(mode="grid"); self.plant.set("CB.GRID", 1); rt.scan(); rt.fast_control(); self.assertTrue(rt.tied()); self.assertFalse(rt.grid_blind())
+        self.plant.muted.add("MTR"); clk[0] += 3.0; rt.scan(); clk[0] += 3.0; rt.scan(); rt.fast_control()
+        self.assertTrue(rt.grid_blind()); self.assertTrue(rt.tied()); self.assertFalse(rt.grid_lost); self.assertTrue(rt.decide().get("_hold"))      # 정전으로 단정하지 않고 보류
+        self.assertEqual(rt.control(force=True), [])
+        self.plant.set("ESS.soc", 18.0); clk[0] += 1.0; rt.scan(); w = rt.decide(); self.assertFalse(w.get("_hold")); self.assertTrue(w["DG"] or w["FC"] or w.get("GDG"))   # ESS 가 낮아지면 자립 논리로 기동
+        rt.close(); rt2 = runtime.Runtime(self.cfgp, clock=lambda: clk[0]); self.addCleanup(rt2.close); self.assertEqual(rt2.mode, "grid")     # 재기동: 처음부터 수전점을 못 읽는다
+        for _ in range(4): clk[0] += 1.0; rt2.scan(); rt2.fast_control()
+        self.assertTrue(rt2.grid_blind()); self.assertTrue(rt2.tied()); self.assertFalse(rt2.grid_lost)
+        self.plant.muted.discard("MTR"); self.plant.set("CB.GRID", 0)
+        for _ in range(3): clk[0] += 1.0; rt2.scan(); rt2.fast_control()
+        self.assertFalse(rt2.grid_blind()); self.assertTrue(rt2.grid_lost)                                 # 읽히면 실제 상태로 판정한다
+
+    def test_history_write_failure_keeps_the_cycle(self):
+        self.rt.scan(); os.mkdir(os.path.join(self.rt.state_dir, "history.csv"))                           # 쓸 수 없는 이력 파일
+        self.rt.slot = self.rt.slot.replace(year=self.rt.slot.year - 1); self.rt.acc = [[1.0] * 8]; self.rt.acc_sky = [float("nan")]
+        r = self.rt.scan(); self.assertIn("t", r); self.assertTrue(self.rt.hist_err); self.assertEqual(len(self.rt.acc), 1)       # 예외 없이 주기를 마치고 다음 구간을 쌓는다
+
+    def test_setpoints_rewritten_after_device_returns(self):
+        rt, clk = self.fake(); rt.scan(); self.assertTrue(rt._write1("ESS", "ESS.kw_set", 12.0, 0.5)); self.assertIn("ESS.kw_set", rt._w)
+        self.plant.muted.add("ESS"); clk[0] += 3.0; rt.scan(); self.assertFalse(rt._write1("ESS", "ESS.kw_set", 30.0, 0.5))      # 두절 중에는 쓰지 않는다
+        self.plant.muted.discard("ESS"); self.plant.set("ESS.kw_set", 0.0); clk[0] += 1.0; rt.scan(); clk[0] += 1.0; rt.scan()   # 장치가 재기동하며 기본값으로 돌아갔다
+        self.assertNotIn("ESS.kw_set", rt._w); self.assertIn("ESS", rt.rewrite)
+        self.assertTrue(rt._write1("ESS", "ESS.kw_set", 12.0, 0.5)); self.assertAlmostEqual(self.plant.get("ESS.kw_set"), 12.0, places=1)     # 같은 값이라도 다시 쓴다
+
+    def test_no_setpoint_to_a_unit_in_local_mode(self):
+        self.rt.scan(); self.assertTrue(self.rt._write1("PV", "PV.lim_set", 50.0, 0.5))
+        self.plant.set("PV.mode", 1); self.rt.scan(); self.assertFalse(self.rt.can_write("PV")); self.assertFalse(self.rt._write1("PV", "PV.lim_set", 10.0, 0.5))
+        self.assertAlmostEqual(self.plant.get("PV.lim_set"), 50.0, places=1)
+
+    def test_auto_off_and_shed_feeders_survive_restart(self):
+        self.assertIsNone(self.rt.ops_auto); self.rt.ops_auto = False; self.rt.shedder.mine = {"L3"}; self.rt.save_ops()
+        rt2 = runtime.Runtime(self.cfgp); self.addCleanup(rt2.close); self.assertIs(rt2.ops_auto, False); self.assertEqual(rt2.shedder.mine, {"L3"})
+
+    def test_one_bad_block_does_not_kill_the_device(self):
+        lk = self.rt.links["MTR"]; real = lk.cl["A"]; first = lk.blk[0][1]; self.assertGreater(len(lk.blk), 1)
+        class Part:
+            timeout = 0.3
+            def read(self, addr, n, fc):
+                if addr == first: raise mb.DeviceException(2, "장치 예외 응답 2 (주소 불가)")
+                return real.read(addr, n, fc)
+        v = lk.read_blocks(Part()); self.assertTrue(v); self.assertTrue(lk.miss); self.assertFalse(set(lk.miss) & set(v))       # 나머지 블록은 읽는다
+        class Dead(Part):
+            def read(self, addr, n, fc): raise mb.DeviceException(11, "게이트웨이 대상 무응답")
+        with self.assertRaises(mb.ModbusError): lk.read_blocks(Dead())                                      # 게이트웨이 무응답은 통신 실패
+        class Never(Part):
+            def read(self, addr, n, fc): raise mb.DeviceException(2, "주소 불가")
+        with self.assertRaises(mb.ModbusError): lk.read_blocks(Never())                                     # 모든 블록이 예외면 살아 있다고 보지 않는다
+
+
 class TestByteOrder(Base):
     """16·32·64비트 자료형과 바이트·워드 순서(ABCD/CDAB/BADC/DCBA)."""
     def test_known_vectors(self):

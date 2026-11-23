@@ -46,6 +46,29 @@ def check(cfg, bad):
         if k not in CODE: bad.append(f"hybrid: 모르는 모드 열쇠 {k}(stop · gen · charge · ess)")
 
 
+MISMATCH_S = 30.0                 # 지령한 모드와 PCS 가 알려 주는 모드가 이 시간 넘게 다르면 알린다
+
+
+def alarms(rt, now):
+    """복합전력 PCS 경보: [(열쇠, 발생 여부, 등급, 대상, 글)]. 없는 장치의 경보는 꺼진 것으로 돌려준다(철수한 장치의 경보가 남지 않게)."""
+    c = settings(rt.cfg.get("hybrid")); live = set(units(rt)); t0 = rt.__dict__.setdefault("hy_t", {}); out = []; name = {v: k for k, v in c["code"].items()}
+    for n in rt.fleet.slots.get("DG", ()):
+        soc = rt.fleet.unit(n, "ess_soc", rt.val) if n in live else None; mode = rt.fleet.unit(n, "pcs_mode", rt.val) if n in live else None
+        want = rt._w.get(f"{n}.mode_set") if n in live else None      # pylint: disable=protected-access
+        differ = want is not None and mode is not None and int(round(mode)) != int(round(want)) and not (n in rt.dev and rt.dev[n].manual)
+        if not differ: t0.pop(n, None)
+        late = differ and now - t0.setdefault(n, now) >= MISMATCH_S
+        known = mode is None or int(round(mode)) in name
+        out.append((f"hy.mode.{n}", bool(late), 2, n, f"{n} 복합전력 모드 불일치 — EMS 지령 {_txt(c, name, want)} / PCS {_txt(c, name, mode)}. PCS 의 현장 수동 · 보호 동작 · 모드 값 설정을 확인"))
+        out.append((f"hy.soc.{n}", soc is not None and soc < c["soc_low"], 2, n, f"{n} 복합전력 ESS 충전율 낮음({0.0 if soc is None else soc:.0f}% < {c['soc_low']:.0f}%) — " + ("저소음 태세라 발전기로 충전하지 않음. 태세를 바꾸거나 수동으로 충전" if rt.posture == "저소음" else "발전기로 충전 중인지 확인")))
+        out.append((f"hy.unknown.{n}", not known, 3, n, f"{n} 복합전력 PCS 가 모르는 모드 값({0 if mode is None else int(round(mode))})을 알려 옴 — 설정 편집의 '복합전력 PCS' 탭에서 모드 값을 사양에 맞춤"))
+    return out
+
+
+def _txt(c, name, v):
+    return "—" if v is None else c["label"].get(name.get(int(round(v))), f"값 {int(round(v))}")
+
+
 def units(rt):
     """모드 지령을 받을 수 있는 복합전력 PCS(있는 장치)."""
     return [n for n in rt.fleet.live("DG") if n in rt.links and f"{n}.mode_set" in rt.links[n].by_tag]

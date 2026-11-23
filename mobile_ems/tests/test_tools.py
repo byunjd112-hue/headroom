@@ -111,7 +111,7 @@ class TestHmiStartup(Base):
         r, txt = quiet(hmi_main.main, [os.path.join(self.td, "none.json"), "--sim"]); self.assertEqual(r, 2); self.assertIn("기동 실패", txt)
 
     def test_pin_tool_hashes_and_rejects_mismatch(self):
-        from ifps_ems_rt.hmi.engine import pin_verify
+        from ifps_ems_rt.hmi.engdefs import pin_verify
         real = getpass.getpass; seq = iter(["4821-ops", "4821-ops", "1", "2"]); getpass.getpass = lambda *_: next(seq)
         try:
             _, txt = quiet(runpy.run_module, "ifps_ems_rt.hmi.pin", run_name="__main__"); self.assertTrue(pin_verify("4821-ops", txt.strip()))

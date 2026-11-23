@@ -23,7 +23,9 @@ def link_alarm(eng, n, st):
 def cycle(eng):
     """주기마다 하는 자동 인식 쪽 일(엔진의 줄 수를 늘리지 않으려고 한데 모았다)."""
     from . import unitctl
+    from .. import hybrid
     ems_power(eng); unitctl.cycle(eng)
+    for key, on, prio, src, text in hybrid.alarms(eng.rt, eng.rt.now()): eng.alarms.set(key, on, prio, src, text)
 
 
 def ems_power(eng):

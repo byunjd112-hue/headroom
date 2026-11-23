@@ -11,6 +11,12 @@ class ModbusError(Exception):
     pass
 
 
+class DeviceException(ModbusError):
+    """장치가 예외 응답을 돌려줌(통신은 살아 있다). code: Modbus 예외 코드."""
+    def __init__(self, code, text):
+        super().__init__(text); self.code = code
+
+
 EXC = {1: "기능 코드 불가", 2: "주소 불가", 3: "값 불가", 4: "장치 고장", 5: "수락·처리 중", 6: "장치 바쁨", 10: "게이트웨이 경로 없음", 11: "게이트웨이 대상 무응답"}
 
 
@@ -53,11 +59,12 @@ class Client:
             chunk = self.sock.recv(n - len(buf))
             if not chunk: raise ModbusError("연결 끊김")
             buf += chunk
+            if len(buf) < n and time.monotonic() > getattr(self, "t_end", float("inf")): raise ModbusError("응답 시간 초과(전체 한도)")
         return buf
 
     def _request(self, pdu):
         with self.lock:
-            t0 = time.monotonic(); tr = self.trace
+            t0 = time.monotonic(); tr = self.trace; self.t_end = t0 + 2.0 * self.timeout      # 요청 하나의 전체 한도(접속 + 응답). 바이트를 조금씩 흘리는 장치가 수집 주기를 붙잡지 못하게
             try:
                 self._open(); self.tid = (self.tid + 1) & 0xFFFF
                 frame = struct.pack(">HHHB", self.tid, 0, len(pdu) + 1, self.unit) + pdu
@@ -71,7 +78,7 @@ class Client:
                 if tid != self.tid or unit != self.unit: raise ModbusError("응답 식별 번호 불일치")
                 if body[0] & 0x80:
                     code = body[1] if len(body) > 1 else 0
-                    raise ModbusError(f"장치 예외 응답 {code} ({EXC.get(code, '알 수 없음')})")
+                    raise DeviceException(code, f"장치 예외 응답 {code} ({EXC.get(code, '알 수 없음')})")
                 if body[0] != pdu[0]: raise ModbusError(f"응답 기능 코드 불일치 {body[0]} (요청 {pdu[0]})")
                 self.n_ok += 1; self.last_rtt = time.monotonic() - t0; self.t_last_ok = time.time()
                 return body

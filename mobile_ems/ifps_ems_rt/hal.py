@@ -24,15 +24,20 @@ class DeviceLink:
     def __init__(self, name, paths, unit, pts, allow, timeout=0.5, gap=0):
         self.name = name; self.pts = [p for p in pts if p["device"] == name]; self.by_tag = {p["tag"]: p for p in self.pts}
         self.cl = {k: mb.Client(h, pt, unit, timeout, allow) for k, (h, pt) in zip("AB", paths)}
-        self.blk = blocks(pts, name, gap); self.alive = {k: False for k in self.cl}; self.err = ""
+        self.blk = blocks(pts, name, gap); self.alive = {k: False for k in self.cl}; self.err = ""; self.miss = []      # miss: 장치가 '없는 주소'라고 답해 읽지 못한 점 이름
 
     def read_blocks(self, cl):
-        vals = {}
+        vals = {}; miss = []; t0 = time.monotonic()
         for fc, addr, n, ps in self.blk:
-            regs = cl.read(addr, n, fc)
+            if time.monotonic() - t0 > 2.0 * cl.timeout: raise mb.ModbusError("장치 응답 지연(읽기 전체 한도 초과)")
+            try: regs = cl.read(addr, n, fc)
+            except mb.DeviceException as e:
+                if e.code not in (1, 2, 3): raise                  # 장치 고장 · 게이트웨이 무응답은 통신 실패로 본다
+                miss += [p["tag"] for p in ps]; continue           # 없는 주소 · 기능: 그 블록만 빼고 나머지는 읽는다(장치는 살아 있다)
             for p in ps:
                 o = p["addr"] - addr; vals[p["tag"]] = mb.decode(regs[o:o + NREG[p["type"]]], p["type"], p["scale"], p.get("order", "ABCD"))
-        return vals
+        if miss and not vals: raise mb.ModbusError("장치 예외 응답(모든 블록) — 주소 대응표 확인")
+        self.miss = miss; return vals
 
     def read_all(self):
         """두 경로를 모두 확인한다. 값은 먼저 성공한 경로 것을 쓴다. 반환: 값 사전(둘 다 실패하면 None)."""
@@ -116,12 +121,15 @@ class RtCommander(sv.Commander):
                     self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": True, "text": f"{did} {cmd} 응답 확인(순번 {self.seq}" + (f", 재지령 {n}회" if n else "") + ")"})
                     return True, self.clock() - t0
                 time.sleep(self.poll_s)
-            if not sent: time.sleep(max(0.0, t_end - self.clock()))
+            while not sent and self.clock() < t_end:                 # 쓰기 실패: 같은 시간만큼 기다렸다 다시 보낸다(기다리는 동안에도 프로세스 감시를 갱신)
+                if self.tick: self.tick()
+                time.sleep(self.poll_s)
             self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} {cmd} " + (f"수용했으나 상태 미변화({self.clock() - t_try:.1f}초)" if acked else f"무응답({SUP['ack_s']:.1f}초)")})
         # 응답 없이 끝난 지령은 취소(cmd=0)해 둔다. 남겨 두면 장치가 늦게 회복될 때 잔류 지령이 뒤늦게 실행된다
+        if self.tick: self.tick()
         cancelled = self.links[did].write(f"{did}.cmd", 0)
         self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} {cmd} 지령 취소(cmd=0) {'완료' if cancelled else '실패 — 현장 확인 필요'}"})
-        for alt in self.fallback.get(did, []) if _depth == 0 else []:
+        for alt in self.fallback.get(did, []) if _depth == 0 and cmd == "start" else []:      # 대체는 기동 실패 때만(정지 실패를 다른 전원의 정지로 바꾸지 않는다)
             self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} 지령 실패 → 대체 전원 {alt} 지령, 경보"})
             ok, _ = self.send(alt, cmd, _depth=1)
             if ok: return True, self.clock() - t0

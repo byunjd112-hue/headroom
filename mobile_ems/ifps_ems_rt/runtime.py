@@ -56,6 +56,7 @@ class Runtime:
         self.lm = sv.LinkMonitor(list(self.links)); self.wd = sv.Watchdog(["수집", "제어"])
         self.val = {}; self.flag = {}; self.t_upd = {}; self.hb_seen = {}; self.hb_stop = {}; self.hb_skip = set(); self.t0 = clock(); self.events = []; self.ev_n = 0; self.audit_err = ""; self.n_scan = 0; self.n_over = 0; self.max_scan_s = 0.0
         self.state_dir = os.path.join(base, self.cfg.get("state_dir", "state")); os.makedirs(self.state_dir, exist_ok=True)
+        self.fleet.restore(os.path.join(self.state_dir, "seen.json"))                # 재기동 전에 인식했던 장치(그사이 고장 난 장치를 '미설치'로 낮추지 않게)
         self.key_note = ""
         if key is None: key, self.key_note = security.load_or_create_key(self.state_dir)
         self.audit = security.AuditLog(os.path.join(self.state_dir, "audit.log"), security.CryptoProvider(key))
@@ -67,7 +68,7 @@ class Runtime:
         self.gar = om.Garrison.from_cfg(self.cfg.get("garrison")); self.posture = "평시"; self.auto_enabled = True; self.shedder = om.LoadShedder()
         self.auto_h = None; self.auto_target_h = float(self.cfg.get("autonomy_target_h", 72.0)); self.t_posture = self.now(); self.pv_day_kwh = None
         self.grid_lost = False; self.t_grid_ok = None; self.t_outage = None; self._grid_reset_pending = False; self.gdg_last = None; self.gar_last = None; self._gdg_t0 = None; self._w = {}; self._pvday = (None, 0.0)
-        self._load_ops()
+        self._tags = {p["tag"] for p in self.pts}; self.rewrite = set(); self._grid_was = True; self.hist_err = ""; self.ops_auto = None; self._load_ops(); self._shed_saved = set(self.shedder.mine)
         ok, why = security.crypto_gate(self.audit.c, self.cfg.get("run_mode", "개발"))
         if not ok: raise RuntimeError(why)
 
@@ -112,15 +113,16 @@ class Runtime:
         except Exception: return None                              # 어떤 오류든 '아직 없음'으로 본다
 
     def scan(self):
-        t = self.now(); got = self._read_parallel(); bad = set()
+        got = self._read_parallel(); t = self.now(); bad = set()      # 응답 시각은 읽기를 마친 때다(읽기가 길어져도 살아 있는 장치를 두절로 보지 않는다)
         for n, lk in self.links.items():
             was = self.lm.state[n]; v = got[n]
             for k, a in lk.alive.items():
                 if a: self.lm.heartbeat(n, t, k)
+            if len(lk.cl) == 1 and lk.alive.get("A"): self.lm.heartbeat(n, t, "B")      # 경로가 하나뿐인 장치: '경로 저하'로 보지 않는다
             if v is None: continue
-            self.seen.add(n)
+            if n not in self.seen: self.seen.add(n); self.fleet.store()            # 처음 응답한 장치: 인식 목록에 넣고 적어 둔다(재기동 뒤에도 기억)
             if was == "재조회 대기":                                 # 복구 뒤 첫 수집: 달라진 값을 반영한 뒤 제어 재개
-                diff = self.lm.resync(n, v, {k: self.val.get(k) for k in v}, t); self.note("통신", f"{n} 복구, 변경 {len(diff)}건 반영")
+                diff = self.lm.resync(n, v, {k: self.val.get(k) for k in v}, t); self.note("통신", f"{n} 복구, 변경 {len(diff)}건 반영"); self._forget_writes(n)
             self._take(lk, v, t); got[n] = {tag: x for tag, x in v.items() if self.flag.get(tag) == 0}      # 합산에는 품질 검사를 통과한 값만 넘긴다
             bad.update(tag for tag in v if self.flag.get(tag) != 0)
         for n, st in self.lm.check(t).items():                                              # check 는 바뀐 것만 돌려준다
@@ -159,7 +161,9 @@ class Runtime:
             last = self.hb_seen.get(n)
             if last is None or last[0] != hb: self.hb_seen[n] = (hb, t)
             stop = t - self.hb_seen[n][1] > SUP["stale_s"]
-            if stop != self.hb_stop.get(n, False): self.note("통신", f"{n} 생존 계수 {'정지 — 지령 차단' if stop else '재개'}")
+            if stop != self.hb_stop.get(n, False):
+                self.note("통신", f"{n} 생존 계수 {'정지 — 지령 차단' if stop else '재개'}")
+                if not stop: self._forget_writes(n)
             self.hb_stop[n] = stop
 
     def _refresh_devices(self):
@@ -168,6 +172,33 @@ class Runtime:
             st = self.fleet.unit(n, "status", self.val)                           # 장치 하나의 상태(종류 이름의 값은 여러 대의 합산이다)
             if st is not None: self.dev[n].on = int(round(st)) == 1
             if f"{n}.mode" in self.val: self.dev[n].manual = int(round(self.val[f"{n}.mode"])) == 1
+
+    def _forget_writes(self, n):
+        """장치가 통신 두절 · 제어기 정지에서 돌아왔다: 그 장치에 써 둔 설정값을 잊는다. 장치가 재기동하며 기본값으로 돌아갔을 수 있으므로 다음 제어 때 다시 쓴다."""
+        for k in [k for k in self._w if k.partition(".")[0] == n]: del self._w[k]
+        self.__dict__.get("hy_last", {}).pop(n, None); self.rewrite.add(n)
+
+    def can_write(self, n):
+        """설정값을 써도 되는가: 지령 가능하고 현장 수동이 아니다(수동인 장치의 설정은 현장 운용자의 것이다)."""
+        return self.controllable(n) and int(round(self.val.get(f"{n}.mode", 0))) != 1
+
+    def fresh(self, tag):
+        """그 값이 지금 것인가(품질 정상). 범위 밖이거나 갱신이 멈췄으면(통신 두절 포함) 아니다."""
+        return self.flag.get(tag) == 0
+
+    def _blind(self, tag, wait=0):
+        """판단에 꼭 필요한 값을 믿을 수 없는가: 읽다가 끊겼거나 값이 이상하거나, 대응표에 있는데 켠 뒤 한 번도 읽지 못했다."""
+        if tag in self.flag: return self.flag[tag] != 0
+        return tag not in self.val and tag in self._tags and self.n_scan >= wait
+
+    def soc_blind(self): return self._blind("ESS.soc", 3)
+
+    def grid_blind(self): return self.mode == "grid" and self._blind("CB.GRID")
+
+    def _grid_closed(self):
+        """수전 차단기 투입 여부. 읽지 못하는 동안은 직전 판정을 그대로 둔다(처음부터 못 읽었으면 '연계 중' — 정전으로 단정해 발전기를 돌리지 않는다)."""
+        if not self.grid_blind(): self._grid_was = int(round(self.val.get("CB.GRID", 0))) == 1
+        return self._grid_was
 
     def controllable(self, n):
         """지령 가능: 통신 경로가 살아 있고 장치 생존 계수(hb)가 멈추지 않았다."""
@@ -183,6 +214,8 @@ class Runtime:
             with open(self._ops_path(), encoding="utf-8") as f: o = json.load(f)
             if o.get("mode") in om.PLACES: self.mode = o["mode"]
             if o.get("posture") in om.POSTURES: self.posture = o["posture"]
+            if isinstance(o.get("auto"), bool): self.ops_auto = o["auto"]
+            self.shedder.mine = {f for f in o.get("shed", ()) if f in ("L2", "L3")}; self.shedder.why = {f: "재기동 전 자동 차단" for f in self.shedder.mine}
         except (OSError, ValueError):
             pass
 
@@ -194,18 +227,23 @@ class Runtime:
         if posture is not None:
             if posture not in om.POSTURES: raise ValueError(f"운용 태세 오류: {posture}")
             if posture != self.posture: self.posture = posture; self.t_posture = self.now(); self.note("운용", f"운용 태세 변경 → {posture}", actor=who)
-        tmp = self._ops_path() + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f: json.dump({"mode": self.mode, "posture": self.posture}, f, ensure_ascii=False)
+        self.save_ops()
+
+    def save_ops(self):
+        """운용 상태를 적어 둔다: 운용 장소 · 태세, 자동 제어 켬/끔, EMS 가 스스로 끊은 급전선. 재기동해도 운용자가 끈 자동 제어가 켜지지 않고, 끊어 둔 부하를 되살릴 수 있다."""
+        tmp = self._ops_path() + ".tmp"; o = {"mode": self.mode, "posture": self.posture, "shed": sorted(self.shedder.mine)}
+        if self.ops_auto is not None: o["auto"] = bool(self.ops_auto)
+        with open(tmp, "w", encoding="utf-8") as f: json.dump(o, f, ensure_ascii=False)
         os.replace(tmp, self._ops_path())
 
     def tied(self):
         """상전에 연계되어 있는가(주둔지이고 수전 차단기 투입, 복전 뒤 안정 시간 경과)."""
-        return self.mode == "grid" and not self.grid_lost and int(round(self.val.get("CB.GRID", 0))) == 1
+        return self.mode == "grid" and not self.grid_lost and self._grid_closed()
 
     def _grid_watch(self, t):
         """주둔지: 수전 차단기 상태로 정전·복전을 판정한다. 정전이면 곧바로 자립 운전 논리로 넘어간다."""
-        if self.mode != "grid": return
-        closed = int(round(self.val.get("CB.GRID", 0))) == 1
+        if self.mode != "grid" or self.grid_blind(): return        # 수전 차단기 상태를 못 읽는 동안은 판정을 바꾸지 않는다
+        closed = self._grid_closed()
         if not closed:
             self.t_grid_ok = None
             if not self.grid_lost:
@@ -213,9 +251,8 @@ class Runtime:
                 self.note("운용", "상전 정전(수전 차단기 개방) — 자립 운전으로 전환")
                 self._grid_reset_pending = True
             if self.auto_enabled and self._grid_reset_pending:
-                self._grid_reset_pending = False
-                self._write("ESS", "ESS.kw_set", 0.0, 0.5)
-                self._write("PV", "PV.lim_set", 0.0, 0.5)
+                a = self._write("ESS", "ESS.kw_set", 0.0, 0.5) or not self._writable("ESS", "ESS.kw_set"); b = self._write("PV", "PV.lim_set", 0.0, 0.5) or not self._writable("PV", "PV.lim_set")
+                self._grid_reset_pending = not (a and b)              # 쓰기에 실패했으면 다음 주기에 다시 쓴다
         elif self.grid_lost:
             self._grid_reset_pending = False
             if self.t_grid_ok is None: self.t_grid_ok = t
@@ -227,10 +264,14 @@ class Runtime:
         for n in us: ok = self._write1(n, n + tag[len(dev):], value / max(den, len(us)), tol) or ok
         return ok
 
+    def _writable(self, dev, tag):
+        """그 종류에 이 설정 점이 있는가(없는 점은 쓰기 실패로 세지 않는다)."""
+        return any(n in self.links and n + tag[len(dev):] in self.links[n].by_tag for n in self.fleet.live(dev))
+
     def _write1(self, dev, tag, value, tol):
         """장치 하나에 쓰기. 직전에 쓴 값과 tol 이내면 다시 쓰지 않는다. 지령 가능 상태가 아니면 쓰지 않는다."""
         lk = self.links.get(dev)
-        if lk is None or tag not in lk.by_tag or not self.lm.controllable(dev): return False
+        if lk is None or tag not in lk.by_tag or not self.can_write(dev): return False
         if tag in self._w and abs(self._w[tag] - value) <= tol: return True
         ok = lk.write(tag, value)
         if ok: self._w[tag] = value
@@ -283,8 +324,9 @@ class Runtime:
         t = self.now(); g = lambda k, d=0.0: self.val.get(k, d); s = self.site; done = []; hr = self.hr()
         self._grid_watch(t); tied = self.tied(); soc = g("ESS.soc", 60.0) / 100
         self._autonomy_update(soc)
-        phys = self.mode == "grid" and int(round(g("CB.GRID", 0))) == 1      # 수전 차단기가 실제로 투입되어 있는가(복전 확인 시간 중 포함)
-        if tied or phys: done += self._garrison_control(tied, hr, soc)
+        phys = self.mode == "grid" and self._grid_closed()         # 수전 차단기가 실제로 투입되어 있는가(복전 확인 시간 중 포함)
+        if self.grid_blind(): self.gar_last = None                   # 수전점 계측을 못 읽는다: 묵은 부하 값으로 ESS · 태양광 설정을 바꾸지 않는다
+        elif tied or phys: done += self._garrison_control(tied, hr, soc)
         else:
             self.gar_last = None
             if self.mode != "grid": self._w.pop("ESS.kw_set", None)
@@ -297,7 +339,13 @@ class Runtime:
             for f, act, why in self.shedder.step(t, want, cb, soc, s.soc_min):
                 ok = self.links["MTR"].write(f"LDS.{f}", 2 if act == "shed" else 1); nm = "2등급" if f == "L2" else "3등급"
                 self.note("지령", f"부하 자동 {'차단' if act == 'shed' else '복구'}: {nm}({f}) — {why}{'' if ok else ' (쓰기 실패)'}"); done.append((f, act))
+            if self.shedder.mine != self._shed_saved: self._save_shed()
         return done
+
+    def _save_shed(self):
+        self._shed_saved = set(self.shedder.mine)
+        try: self.save_ops()
+        except OSError: pass                                         # 저장 실패는 운전을 막지 않는다
 
     def _gdg_ready(self):
         """지령할 수 있는 주둔지 발전기(통신 정상, 원격 모드)."""
@@ -318,14 +366,16 @@ class Runtime:
         if self.auto_enabled: self._write("ESS", "ESS.kw_set", r["ess"] if running else 0.0, 2.0)
 
     def decide(self):
-        g = lambda k, d=0.0: self.val.get(k, d); hr = self.hr()
-        if self.tied():                                               # 주둔지 상전 연계: 디젤·연료전지는 쉬고 상전과 ESS 로 운전(수전해는 남는 전력이 있을 때만)
+        g = lambda k, d=0.0: self.val.get(k, d); hr = self.hr(); hold = self._decide_hold()
+        if hold is not None: return hold
+        if self.tied() and not self.grid_blind():                                               # 주둔지 상전 연계: 디젤·연료전지는 쉬고 상전과 ESS 로 운전(수전해는 남는 전력이 있을 때만)
             r = self.gar_last or {}; dg, fc = self._self_supply_sources(r) if self.posture == "자립" else (False, False)
             w = {"DG": dg, "FC": fc, "_policy": (int(dg), int(fc), int(bool(r.get("elz")))), "_garrison": True}
             if self.gdgs: w["GDG"] = False                            # 주둔지 발전기는 대기(상전과 병렬 운전하지 않는다)
             return w
         if self.policy and not self.ai_degraded: a = self.policy(dict(self.val), hr)
         else: a = dp.rule_action(self.site, g("ESS.soc", 60.0) / 100, g("H2.nm3", self.site.h2_nm3 * 0.7), int(g("DG.status")), int(g("FC.status")), g("LOAD.kw"), g("PV.kw"), hr)
+        if self.soc_blind(): a = (1, int(a[1]), 0)                   # ESS 충전율을 믿을 수 없다: 안전 쪽으로 발전기를 돌린다(묵은 값만 믿다가 방전되는 일을 막는다)
         if self.posture == "저소음" and a[0]:                         # 저소음 태세: 디젤 금지. 연료전지로 대신하고(수소가 있으면) 3등급 부하는 자동 차단
             h2_ok = g("H2.nm3") > self.site.h2_nm3 * self.site.h2_min * 1.2
             a = (0, 1 if h2_ok else int(a[1]), 0)
@@ -336,6 +386,14 @@ class Runtime:
             online = self.online_kw(self._ready("DG") if want["DG"] else 0, self._ready("FC") if want["FC"] else 0) + [self.gar.gdg_kw] * int(gdg_on)
             if not gdg_on and dp.reserve_need(g("LOAD.p1_kw") + g("LOAD.p2_kw"), online): want["FC"] = True; want["_reserve"] = True
         return want
+
+    def _decide_hold(self):
+        """수전 차단기 상태를 못 읽는 동안(주둔지): 발전기 기동 · 정지를 보류한다(상전이 살아 있는지 모른다). 반환: 보류 결정 또는 None.
+        다만 ESS 가 낮거나 충전율도 못 읽으면 보류하지 않고 자립 운전 논리로 넘어간다 — 상전이 실제로 끊긴 것일 수 있다."""
+        if not self.grid_blind(): return None
+        if self.soc_blind() or self.val.get("ESS.soc", 60.0) / 100 < self.site.soc_min + 0.06: return None
+        dg = self.fleet.running("DG", self.val) > 0; fc = self.fleet.running("FC", self.val) > 0
+        return {"DG": dg, "FC": fc, "_policy": (int(dg), int(fc), 0), "_hold": True}
 
     def online_kw(self, n_dg, n_fc):
         """N-1 예비력 계산에 넣는 병렬 전원의 용량 목록: 운전 중인 ESS(대수만큼), 복합전력 G1, 디젤 n_dg 대, 연료전지 n_fc 대."""
@@ -384,7 +442,7 @@ class Runtime:
         if not force and t - self.t_ctl < self.cfg.get("ctrl_s", 60.0):
             self.wd.kick("제어", t); return []                       # 제어 주기 전이어도 제어 과정은 살아 있다
         self.t_ctl = t; want = self.decide(); done = []
-        for n, k in self.targets(("DG", "FC")):
+        for n, k in self.targets(("DG", "FC")) if not want.get("_hold") else ():
             if n not in self.dev or (n in self.gdgs and "GDG" not in want): continue
             d = self.dev[n]; w_n = want["GDG"] if n in self.gdgs else want[k]
             if w_n != d.on:
@@ -405,11 +463,14 @@ class Runtime:
         if self.slot is not None and slot != self.slot and self.acc:
             m = [sum(c) / len(c) for c in zip(*self.acc)]; pth = os.path.join(self.state_dir, "history.csv"); new = not os.path.exists(pth)
             sk = [x for x in self.acc_sky if x == x]; sky = f"{sum(sk) / len(sk):.3f}" if sk else ""              # 구름량은 값이 있을 때만 적는다
-            if not new: _add_sky_header(pth)
-            with open(pth, "a", newline="", encoding="utf-8") as f:
-                wr = csv.writer(f)
-                if new: wr.writerow(HIST_COLS)
-                wr.writerow([self.slot.strftime("%Y-%m-%d %H:%M")] + [f"{x:.2f}" for x in m] + [self.plan, {"grid": 0, "direct": 1, "island": 2}.get(self.mode, 2), sky])
+            try:                                                     # 이력 쓰기 실패(저장 공간 · 권한)가 수집 · 제어 · 경보 주기를 멈추면 안 된다
+                if not new: _add_sky_header(pth)
+                with open(pth, "a", newline="", encoding="utf-8") as f:
+                    wr = csv.writer(f)
+                    if new: wr.writerow(HIST_COLS)
+                    wr.writerow([self.slot.strftime("%Y-%m-%d %H:%M")] + [f"{x:.2f}" for x in m] + [self.plan, {"grid": 0, "direct": 1, "island": 2}.get(self.mode, 2), sky])
+                self.hist_err = ""
+            except OSError as e: self.hist_err = f"{type(e).__name__}: {e}"
             self.acc = []; self.acc_sky = []
         self.slot = slot
         row = [g("LOAD.kw"), g("LOAD.p1_kw"), g("LOAD.p2_kw"), g("LOAD.p3_kw"), g("PV.kw"), g("ENV.temp"), g("ENV.press"), g("ENV.rh")]

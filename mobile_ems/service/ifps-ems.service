@@ -22,7 +22,8 @@ User=ems
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/opt/ifps_ems/config/state
+# 쓰는 곳: 운전 상태(config/state), 설정 편집 · 백업(config), 학습한 예측 모델(results)
+ReadWritePaths=/opt/ifps_ems/config /opt/ifps_ems/results
 RestrictAddressFamilies=AF_INET AF_UNIX
 IPAddressDeny=any
 IPAddressAllow=192.168.10.0/24 127.0.0.0/8

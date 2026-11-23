@@ -6,7 +6,7 @@ sys.path.insert(0, ROOT); sys.path.insert(0, HERE)
 from ifps_ems import dataio, security
 from ifps_ems.config import Site, SUP
 from ifps_ems_rt import modbus as mb, pointmap as pm
-from ifps_ems_rt.hmi.engine import AlarmManager
+from ifps_ems_rt.hmi.alarmmgr import AlarmManager
 from test_rt import Base
 from test_hmi import TestHmi as HmiBase
 
