@@ -248,7 +248,7 @@ class Engine:
             from ..planlink import PlanPolicy
             # 실측 이력이 8일 미만이면: 가상 장치 시연은 합성 자료로 계획하고, 실장치는 이력이 쌓일 때까지 규칙 운전한다
             self.rt.policy = PlanPolicy(self.rt.site, os.path.join(self.rt.state_dir, "history.csv"), plan_dir, days_since_deploy,
-                                        demo_csv=os.path.join(plan_dir, "sample_site_data.csv") if sim else None); self.plan_note = "예측 기반 운전계획(동적계획법)"
+                                        demo_csv=os.path.join(plan_dir, "sample_site_data.csv") if sim else None); self.plan_note = "예측 기반 운전계획(동적계획법)"; self.rt.policy.background = True
         self.fuel_cfg = dict({"dg_tank_l": 1000.0, "warn_pct": 50.0, "warn_h": 8.0, "repeat_min": 30.0}, **(self.cfg.get("fuel") or {})); self._fuel_t = {}
         self.ai_cfg = dict({"enabled": True, "retrain_h": 24.0, "sim_retrain_h": 2.0, "first_min": 3.0}, **(self.cfg.get("ai") or {}))
         self.skyw = SkyWatch(self)                                                      # 하늘 카메라(구름량 → 태양광 예측 입력)

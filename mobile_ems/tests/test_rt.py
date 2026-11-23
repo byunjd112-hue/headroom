@@ -179,6 +179,28 @@ class TestPlanLink(Base):
         self.assertAlmostEqual(float((pol3.V is not None) and 14.25), 14.25); clk[0] = 1900.0; pol3(dict(self.rt.val), 14.5); self.assertEqual(pol3.k, 2)   # 15분 칸을 시간으로 따라간다
         t_old = pol3.t_plan; clk[0] = 3700.0; pol3(dict(self.rt.val), 15.0); self.assertGreater(pol3.t_plan, t_old)               # 1시간 지나면 다시 계획
 
+    def test_background_plan_does_not_block_commands(self):
+        """운전계획을 뒤에서 계산하면(화면부의 설정) 계산 중에도 판단이 바로 나온다 — 지령 처리가 계획 계산을 기다리지 않는다."""
+        import threading
+        from ifps_ems_rt.planlink import PlanPolicy
+        res = os.path.join(CORE, "results"); ensure_sample(res); clk = [0.0]
+        pol = PlanPolicy(self.rt.site, os.path.join(res, "sample_site_data.csv"), res, clock=lambda: clk[0]); pol.background = True
+        gate = threading.Event(); real = pol.replan
+        def slow(hr=None): gate.wait(10.0); real(hr)                                                     # 계획 계산이 오래 걸리는 상황
+        pol.replan = slow; self.rt.scan()
+        t0 = time.monotonic(); a = pol(dict(self.rt.val), 14.0); dt = time.monotonic() - t0
+        self.assertLess(dt, 0.5); self.assertEqual(pol.note, "운전계획 계산 중 → 규칙 운전"); self.assertEqual(len(a), 3)      # 기다리지 않고 규칙 운전으로 답한다
+        pol(dict(self.rt.val), 14.0); self.assertEqual(threading.active_count(), threading.active_count())                  # 계산 중에 또 불러도 가닥을 더 만들지 않는다
+        self.assertEqual(sum(1 for t in threading.enumerate() if t.name == "plan"), 1)
+        gate.set(); pol._bg.join(20.0); a2 = pol(dict(self.rt.val), 14.0); self.assertEqual(pol.note, "계획 운전(실측 이력)"); self.assertEqual(len(a2), 3)
+        v_old = pol.V; clk[0] = 3700.0; gate.clear(); t0 = time.monotonic(); pol(dict(self.rt.val), 15.0); self.assertLess(time.monotonic() - t0, 0.5)
+        self.assertIs(pol.V, v_old); self.assertEqual(pol.note, "계획 운전(실측 이력)")                                      # 다시 세우는 동안에는 직전 계획을 쓴다
+        gate.set(); pol._bg.join(20.0); self.assertIsNot(pol.V, v_old)
+        short = os.path.join(self.td, "short_bg.csv")
+        with open(os.path.join(res, "sample_site_data.csv"), encoding="utf-8") as f, open(short, "w", encoding="utf-8") as g: g.writelines(f.readlines()[:200])
+        pol2 = PlanPolicy(self.rt.site, short, res); pol2.background = True; pol2(dict(self.rt.val), 14.0); pol2._bg.join(20.0); pol2(dict(self.rt.val), 14.0)
+        self.assertIn("이력", pol2.note); self.assertIn("규칙 운전", pol2.note)                                              # 뒤에서 난 실패(이력 부족)도 사유가 남는다
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,7 +6,5 @@
 import os as _os
 for _k in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):      # 수치 계산(예측 · 학습)을 한 가닥으로 묶는다: 여러 가닥이 바쁘게 돌며 수집 · 제어 주기와 CPU 를 다투지 않게(numpy 를 불러오기 전에 정해야 한다)
     _os.environ.setdefault(_k, "1")
-import sys as _sys
-_sys.setswitchinterval(0.001)      # 실행 차례를 1 ms 마다 넘긴다(기본 5 ms): 예측 · 학습처럼 계산이 긴 가닥이 돌 때도 수집 · 통신 가닥이 오래 밀리지 않게
 
 __version__ = "0.1.0"
