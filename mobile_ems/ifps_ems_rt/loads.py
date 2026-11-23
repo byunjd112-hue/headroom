@@ -27,21 +27,27 @@ def check(items, limit=None):
     if not isinstance(items, list) or len(items) > MAX_ITEMS: return [f"부하는 {MAX_ITEMS}줄까지"]
     for i, it in enumerate(items, 1):
         if not isinstance(it, dict): bad.append(f"{i}번째: 형식 오류"); continue
-        nm = it.get("name"); tag = f"{i}번째({nm})" if isinstance(nm, str) else f"{i}번째"
-        if not (isinstance(it.get("id"), str) and it["id"] and len(it["id"]) <= 16) or it.get("id") in ids: bad.append(f"{tag}: 식별자 없음 · 중복")
-        ids.add(it.get("id"))
-        if it.get("kind") not in KINDS: bad.append(f"{tag}: 모르는 종류")
-        if not (isinstance(nm, str) and 1 <= len(nm.strip()) <= 24): bad.append(f"{tag}: 이름은 1~24자")
-        if it.get("grade") not in (1, 2, 3): bad.append(f"{tag}: 등급은 1 · 2 · 3")
-        if not _num(it.get("kw"), 0.1, 500): bad.append(f"{tag}: 대당 정격은 0.1~500 kW")
-        if not (isinstance(it.get("n"), int) and not isinstance(it.get("n"), bool) and 0 <= it["n"] <= MAX_N): bad.append(f"{tag}: 수량은 0~{MAX_N}")
-        if not _num(it.get("save_pct"), 0, 80): bad.append(f"{tag}: 절감 비율은 0~80 %")
-        elif it.get("grade") == 1 and it["save_pct"] > 0: bad.append(f"{tag}: 1등급 부하는 절감하지 않는다(절감 비율 0)")
-    if not bad:
-        for g, kw in rated(items).items():
-            if limit and limit.get(g) is not None and kw > limit[g]: bad.append(f"{g}등급 정격 합 {kw:.0f} kW 가 그 급전선의 계측 범위({limit[g]:.0f} kW)를 넘음 — 수량을 줄이거나 대응표(LOAD.p{g}_kw)의 범위를 먼저 늘린다")
-        if limit and limit.get(0) is not None and sum(rated(items).values()) > limit[0]: bad.append(f"전체 정격 합 {sum(rated(items).values()):.0f} kW 가 부하 합계의 계측 범위({limit[0]:.0f} kW)를 넘음 — 대응표(LOAD.kw)의 범위를 먼저 늘린다")
+        _check1(i, it, ids, bad); ids.add(it.get("id"))
+    if not bad and limit: _check_limit(items, limit, bad)
     return bad
+
+
+def _check1(i, it, ids, bad):
+    """부하 한 줄의 검사."""
+    nm = it.get("name"); tag = f"{i}번째({nm})" if isinstance(nm, str) else f"{i}번째"; n = it.get("n")
+    rules = ((isinstance(it.get("id"), str) and 0 < len(it["id"]) <= 16 and it["id"] not in ids, "식별자 없음 · 중복"), (it.get("kind") in KINDS, "모르는 종류"),
+             (isinstance(nm, str) and 1 <= len(nm.strip()) <= 24, "이름은 1~24자"), (it.get("grade") in (1, 2, 3), "등급은 1 · 2 · 3"), (_num(it.get("kw"), 0.1, 500), "대당 정격은 0.1~500 kW"),
+             (isinstance(n, int) and not isinstance(n, bool) and 0 <= n <= MAX_N, f"수량은 0~{MAX_N}"), (_num(it.get("save_pct"), 0, 80), "절감 비율은 0~80 %"))
+    bad.extend(f"{tag}: {why}" for ok, why in rules if not ok)
+    if _num(it.get("save_pct"), 0, 80) and it.get("grade") == 1 and it["save_pct"] > 0: bad.append(f"{tag}: 1등급 부하는 절감하지 않는다(절감 비율 0)")
+
+
+def _check_limit(items, limit, bad):
+    """정격 합이 급전선 계측 범위를 넘는지."""
+    r = rated(items)
+    for g, kw in r.items():
+        if limit.get(g) is not None and kw > limit[g]: bad.append(f"{g}등급 정격 합 {kw:.0f} kW 가 그 급전선의 계측 범위({limit[g]:.0f} kW)를 넘음 — 수량을 줄이거나 대응표(LOAD.p{g}_kw)의 범위를 먼저 늘린다")
+    if limit.get(0) is not None and sum(r.values()) > limit[0]: bad.append(f"전체 정격 합 {sum(r.values()):.0f} kW 가 부하 합계의 계측 범위({limit[0]:.0f} kW)를 넘음 — 대응표(LOAD.kw)의 범위를 먼저 늘린다")
 
 
 def rated(items):

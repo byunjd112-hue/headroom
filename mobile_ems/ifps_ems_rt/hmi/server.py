@@ -15,6 +15,12 @@ STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_BODY = 128 * 1024
 
 
+def _quiet_write(out, body):
+    """응답 본문을 쓴다. 받는 쪽(브라우저)이 먼저 끊은 것은 오류로 남기지 않는다."""
+    try: out.write(body)
+    except (BrokenPipeError, ConnectionResetError): pass
+
+
 def make_handler(eng):
     scenario_slot = threading.BoundedSemaphore(1)
 
@@ -37,9 +43,7 @@ def make_handler(eng):
             self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()"); self.send_header("Cross-Origin-Opener-Policy", "same-origin")
             self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'")
             for k, v in (extra or {}).items(): self.send_header(k, v)
-            self.end_headers()
-            try: self.wfile.write(body)
-            except (BrokenPipeError, ConnectionResetError): pass     # 받는 쪽(브라우저)이 먼저 끊었다
+            self.end_headers(); _quiet_write(self.wfile, body)
 
         def _err(self, code, why):
             self._send(code, {"ok": False, "why": why})

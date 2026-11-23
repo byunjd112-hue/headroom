@@ -29,22 +29,9 @@ class LoadBook:
 
     def change(self, b, who):
         """op: add(kind) · count(id, delta) · set(id, name · grade · kw · save_pct) · del(id) · reset. 반환: {ok, why | msg}"""
-        op = b.get("op"); items = [dict(i) for i in self.items]; it = next((i for i in items if i["id"] == b.get("id")), None)
-        if op == "add":
-            k = b.get("kind")
-            if k not in loads.KINDS: return {"ok": False, "why": "모르는 부하 종류"}
-            nm, g, kw, sv, _ = loads.KINDS[k]; n = sum(1 for i in items if i["kind"] == k)
-            it = {"id": "l" + secrets.token_hex(3), "kind": k, "name": nm + (f" {n + 1}" if n else ""), "grade": g, "kw": kw, "n": 1, "save_pct": sv}; items.append(it); msg = f"부하 추가: {it['name']}({g}등급 · {kw:.0f} kW)"
-        elif op == "reset": items = [dict(i) for i in loads.DEFAULT]; msg = "부하 목록을 기본으로 되돌림"
-        elif it is None: return {"ok": False, "why": "없는 부하"}
-        elif op == "count": it["n"] = it["n"] + int(b.get("delta", 0)); msg = f"{it['name']} 수량 {it['n']}"
-        elif op == "del": items.remove(it); msg = f"부하 삭제: {it['name']}"
-        elif op == "set":
-            for k in ("name", "grade", "kw", "save_pct"):
-                if k in b: it[k] = b[k].strip() if k == "name" and isinstance(b[k], str) else b[k]
-            if it["grade"] == 1 and "grade" in b and "save_pct" not in b: it["save_pct"] = 0
-            msg = f"{it['name']} 변경: {it['grade']}등급 · 대당 {it['kw']:g} kW · 절감 {it['save_pct']:g}%"
-        else: return {"ok": False, "why": f"동작 없음: {op}"}
+        items = [dict(i) for i in self.items]
+        try: items, msg = _edit(items, b)
+        except ValueError as e: return {"ok": False, "why": str(e)}
         bad = loads.check(items, self.limit())
         if bad: return {"ok": False, "why": " / ".join(bad[:3])}
         self.items = items; self.rev += 1; self.by = who; self.t = wall_iso()
@@ -67,6 +54,29 @@ class LoadBook:
                    "auto": "save" if f in rt.shedder.saved else "shed" if f in rt.shedder.mine else "", "why": rt.shedder.why.get(f, "")} for g, f in loads.FEEDER.items()]
         return {"rev": self.rev, "by": self.by, "t": self.t, "items": items, "grades": grades, "limit": self.limit(),
                 "kinds": [{"id": k, "name": v[0], "grade": v[1], "kw": v[2], "save_pct": v[3]} for k, v in loads.KINDS.items()], "max_n": loads.MAX_N, "max_items": loads.MAX_ITEMS}
+
+
+def _add(items, k):
+    """종류의 기본값(등급 · 정격 · 절감 비율)으로 새 부하 한 줄을 넣는다."""
+    if k not in loads.KINDS: raise ValueError("모르는 부하 종류")
+    nm, g, kw, sv, _ = loads.KINDS[k]; n = sum(1 for i in items if i["kind"] == k)
+    it = {"id": "l" + secrets.token_hex(3), "kind": k, "name": nm + (f" {n + 1}" if n else ""), "grade": g, "kw": kw, "n": 1, "save_pct": sv}
+    return items + [it], f"부하 추가: {it['name']}({g}등급 · {kw:.0f} kW)"
+
+
+def _edit(items, b):
+    """목록에 한 가지 변경을 한다. 반환: (새 목록, 기록할 글). 할 수 없으면 ValueError."""
+    op = b.get("op"); it = next((i for i in items if i["id"] == b.get("id")), None)
+    if op == "add": return _add(items, b.get("kind"))
+    if op == "reset": return [dict(i) for i in loads.DEFAULT], "부하 목록을 기본으로 되돌림"
+    if it is None: raise ValueError("없는 부하")
+    if op == "count": it["n"] = it["n"] + int(b.get("delta", 0)); return items, f"{it['name']} 수량 {it['n']}"
+    if op == "del": items.remove(it); return items, f"부하 삭제: {it['name']}"
+    if op != "set": raise ValueError(f"동작 없음: {op}")
+    for k in ("name", "grade", "kw", "save_pct"):
+        if k in b: it[k] = b[k].strip() if k == "name" and isinstance(b[k], str) else b[k]
+    if it["grade"] == 1 and "grade" in b and "save_pct" not in b: it["save_pct"] = 0
+    return items, f"{it['name']} 변경: {it['grade']}등급 · 대당 {it['kw']:g} kW · 절감 {it['save_pct']:g}%"
 
 
 def http_post(eng, b, sess):

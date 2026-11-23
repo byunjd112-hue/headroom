@@ -1,6 +1,6 @@
 {
- "date": "2026-11-23 16:28",
- "unittest_s": 580.1,
+ "date": "2026-11-23 21:23",
+ "unittest_s": 521.6,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -68,6 +68,9 @@
   "test_8_breaker_trip_shown_and_deenergizes_feeder | ok",
   "test_9_layout_edit_persist_and_validate | ok",
   "앞선 지령에 밀려 늦어진 운용자 지령은 버린다(잊은 지령이 뒤늦게 나가지 않게). | ok",
+  "부하 관리: 종류 · 수량을 바꾸면 스냅샷(모든 화면의 자료) · 가상 부하 배율 · 절감 가능 비율 · 저장 파일이 함께 바뀐다. 틀린 입력은 막는다. | ok",
+  "절감 공급 지령(LDS = 3): 가상 부하가 절감 비율만큼 줄고 차단기는 그대로다. 복구(1)하면 돌아온다. 화면 상태도 따라간다. | ok",
+  "가상 자료 가져오기 · 재생: CSV 의 값을 시간 순서대로 가상 장치에 넣고, 멈추면 가상 장치가 다시 스스로 값을 만든다. | ok",
   "test_calibration_keeps_scale_in_model_file_and_old_files_still_load | ok",
   "test_scale_grows_only_when_recent_errors_escape_the_interval | ok",
   "test_bad_or_short_data_is_not_learned | ok",
@@ -85,6 +88,7 @@
   "주둔지 자립 태세: 상전이 붙어 있어도 쓰지 않는다(수전 = 최소 수전), 상전으로 ESS 를 채우지 않는다. | ok",
   "주둔지에서도 이동형 태양광을 그대로 쓴다: 상전 연계 중에는 수전을 줄이고, 정전 중에는 발전기·ESS 부담을 줄인다. | ok",
   "test_shedder_order_hold_and_restore | ok",
+  "공급 능력 부족: 절감 공급을 먼저 하고, 그래도 모자라면 차단한다. 절감으로 풀리면 끊지 않는다. 태세 · 충전율 사유는 바로 끊는다. | ok",
   "test_garrison_generator_unavailable_falls_back_to_mobile_sources | ok",
   "주둔지 정전: ESS 가 먼저 버티고, 30초 뒤 기존 디젤발전기를 기동해 ESS·태양광과 함께 운전. 복전하면 발전기를 세운다. | ok",
   "test_garrison_peak_discharge_no_export_outage_and_restore | ok",
@@ -124,11 +128,13 @@
   "장치마다 순서가 다른 현장을 모의: 32비트 점 3종 + 장치 기본 DCBA(16비트 지령까지 바이트 뒤집힘). | ok",
   "test_known_vectors | ok",
   "test_pointmap_order_column_and_device_default | ok",
+  "지령을 받아들였지만 상태가 늦게 바뀌는 장비: 공통 완료 한도까지 기다리고(대체 전원을 켜지 않는다), 걸린 시간을 남긴다. | ok",
   "test_auto_off_and_shed_feeders_survive_restart | ok",
   "test_grid_state_held_while_meter_is_unreadable | ok",
   "test_history_write_failure_keeps_the_cycle | ok",
   "test_no_setpoint_to_a_unit_in_local_mode | ok",
   "test_one_bad_block_does_not_kill_the_device | ok",
+  "수전점을 못 읽는 동안: ESS 가 설정값보다 훨씬 많이 내보내는 상태가 이어지면 정전으로 미루어 보고 자립 논리로 넘어간다. | ok",
   "test_setpoints_rewritten_after_device_returns | ok",
   "test_slow_scan_does_not_mark_live_devices_lost | ok",
   "test_stale_soc_runs_a_generator | ok",
@@ -201,19 +207,19 @@
   "test_parse_json_and_csv | ok",
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 198,
+ "n_tests": 204,
  "tests_ok": true,
  "retried": [],
  "coverage_pct": 92.3,
  "stmt": {
-  "n": 6454,
-  "hit": 6142,
-  "pct": 95.2
+  "n": 6697,
+  "hit": 6380,
+  "pct": 95.3
  },
  "branch": {
-  "n": 2282,
-  "hit": 1918,
-  "pct": 84.0
+  "n": 2386,
+  "hit": 2008,
+  "pct": 84.2
  },
  "coverage_files": [
   [
@@ -250,17 +256,17 @@
   ],
   [
    "ifps_ems_rt/hmi/server.py",
-   77.1,
-   218,
-   68.1,
+   76.9,
+   221,
+   68.8,
    144,
-   "65-66, 80-82, 87-88, 105-106, 125-128, 130-138, 140, 154-156, 187-192, 194-198, 201-203, 213-214, 233-240"
+   "21, 71-72, 86-88, 93-94, 111-112, 131-134, 136-144, 146, 160-162, 193-198, 200-204, 207-209, 219-220, 239-246"
   ],
   [
    "ifps_ems_rt/hmi/archwatch.py",
    79.4,
    102,
-   59.1,
+   56.8,
    44,
    "29-30, 43, 56, 59-63, 67-68, 108-110, 114-116, 126-128, 131"
   ],
@@ -306,11 +312,11 @@
   ],
   [
    "ifps_ems_rt/hmi/eng_tools.py",
-   90.3,
-   113,
-   77.4,
-   62,
-   "69-74, 83-85, 114-115"
+   90.4,
+   115,
+   78.1,
+   64,
+   "70-75, 84-86, 116-117"
   ],
   [
    "ifps_ems_rt/hmi/eng_forecast.py",
@@ -361,6 +367,14 @@
    "116, 161-164, 169-172"
   ],
   [
+   "ifps_ems_rt/hmi/engine.py",
+   95.3,
+   150,
+   83.3,
+   36,
+   "75, 131-132, 136, 145, 184-185"
+  ],
+  [
    "ifps_ems_rt/archxfer.py",
    95.5,
    110,
@@ -385,20 +399,12 @@
    "29-30"
   ],
   [
-   "ifps_ems_rt/hmi/engine.py",
-   96.0,
-   150,
-   86.1,
-   36,
-   "75, 131-132, 145, 184-185"
-  ],
-  [
    "ifps_ems_rt/hal.py",
-   96.1,
-   103,
-   88.9,
-   36,
-   "102, 106-108"
+   96.2,
+   106,
+   89.5,
+   38,
+   "104, 108-110"
   ],
   [
    "ifps_ems/skycam.py",
@@ -419,10 +425,10 @@
   [
    "ifps_ems_rt/hmi/eng_command.py",
    96.6,
-   117,
+   118,
    88.0,
    50,
-   "25-26, 43, 147"
+   "25-26, 43, 148"
   ],
   [
    "ifps_ems_rt/hmi/pptx.py",
@@ -434,11 +440,19 @@
   ],
   [
    "ifps_ems_rt/hmi/simdriver.py",
-   97.1,
-   69,
+   97.2,
+   72,
    75.0,
    36,
-   "60-61"
+   "63-64"
+  ],
+  [
+   "ifps_ems_rt/hmi/simreplay.py",
+   97.5,
+   81,
+   87.5,
+   48,
+   "28, 68"
   ],
   [
    "ifps_ems/__main__.py",
@@ -489,12 +503,20 @@
    "93-94, 110"
   ],
   [
-   "ifps_ems_rt/runtime.py",
-   98.2,
-   391,
-   95.2,
-   124,
-   "113, 190, 271, 350, 510-512"
+   "ifps_ems_rt/hmi/loadctl.py",
+   98.3,
+   59,
+   95.0,
+   20,
+   "39"
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   98.3,
+   178,
+   92.4,
+   66,
+   "176, 188-189"
   ],
   [
    "ifps_ems_rt/modbus.py",
@@ -505,20 +527,20 @@
    "117-118"
   ],
   [
-   "ifps_ems_rt/hmi/report.py",
-   98.6,
-   146,
-   87.5,
-   40,
-   "133, 137"
+   "ifps_ems_rt/runtime.py",
+   98.5,
+   413,
+   94.8,
+   134,
+   "116, 275, 378, 538-540"
   ],
   [
-   "ifps_ems_rt/simplant.py",
-   98.8,
-   171,
-   93.8,
-   64,
-   "181-182"
+   "ifps_ems_rt/hmi/report.py",
+   98.7,
+   153,
+   85.7,
+   42,
+   "143, 147"
   ],
   [
    "ifps_ems_rt/fleet.py",
@@ -667,8 +689,8 @@
   [
    "ifps_ems_rt/hmi/eng_alarms.py",
    100.0,
-   79,
-   85.7,
+   80,
+   82.1,
    28,
    ""
   ],
@@ -707,7 +729,7 @@
   [
    "ifps_ems_rt/hmi/scenario_policy.py",
    100.0,
-   66,
+   67,
    100.0,
    12,
    ""
@@ -737,11 +759,19 @@
    ""
   ],
   [
+   "ifps_ems_rt/loads.py",
+   100.0,
+   42,
+   83.3,
+   12,
+   ""
+  ],
+  [
    "ifps_ems_rt/opsmode.py",
    100.0,
-   122,
+   133,
    100.0,
-   30,
+   36,
    ""
   ],
   [
@@ -963,7 +993,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/runtime.py",
-    98,
+    101,
     "Runtime._read_parallel",
     "Catching too general exception Exception"
    ],
@@ -971,7 +1001,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/runtime.py",
-    113,
+    116,
     "Runtime._probe_slot",
     "Catching too general exception Exception"
    ],
@@ -979,7 +1009,7 @@
     "W0201",
     "attribute-defined-outside-init",
     "ifps_ems_rt/simplant.py",
-    91,
+    98,
     "Plant._tick_power",
     "Attribute '_dt' defined outside __init__"
    ],
@@ -1035,7 +1065,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/simdriver.py",
-    60,
+    63,
     "SimDriver.loop",
     "Catching too general exception Exception"
    ],
@@ -1043,7 +1073,7 @@
     "W0012",
     "unknown-option-value",
     "ifps_ems_rt/hmi/report.py",
-    127,
+    137,
     "",
     "Unknown option value for 'disable', expected a valid pylint message and got 'scenarios'"
    ],
@@ -1051,7 +1081,7 @@
     "W0012",
     "unknown-option-value",
     "ifps_ems_rt/hmi/report.py",
-    127,
+    137,
     "",
     "Unknown option value for 'disable', expected a valid pylint message and got 'engine'"
    ],
@@ -1259,7 +1289,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/server.py",
-    105,
+    111,
     "make_handler.H.do_GET",
     "Catching too general exception Exception"
    ],
@@ -1267,14 +1297,14 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/server.py",
-    213,
+    219,
     "make_handler.H.do_POST",
     "Catching too general exception Exception"
    ]
   ]
  },
  "metrics": {
-  "n_func": 822,
+  "n_func": 855,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1286,7 +1316,7 @@
   "len_max": 199,
   "arg_max": 8,
   "depth_max": 5,
-  "file_max": 513,
+  "file_max": 541,
   "over": {
    "cc": [],
    "len": [],
@@ -1303,6 +1333,24 @@
     32,
     5,
     5
+   ],
+   [
+    "ifps_ems_rt/hal.py",
+    "send",
+    118,
+    20,
+    29,
+    5,
+    3
+   ],
+   [
+    "ifps_ems_rt/opsmode.py",
+    "step",
+    172,
+    20,
+    19,
+    7,
+    3
    ],
    [
     "ifps_ems_rt/pointmap.py",
@@ -1324,17 +1372,8 @@
    ],
    [
     "ifps_ems_rt/runtime.py",
-    "fast_control",
-    323,
-    20,
-    23,
-    0,
-    2
-   ],
-   [
-    "ifps_ems_rt/runtime.py",
     "decide",
-    370,
+    398,
     20,
     21,
     0,
@@ -1343,7 +1382,7 @@
    [
     "ifps_ems_rt/simplant.py",
     "_tick_bus",
-    147,
+    154,
     20,
     10,
     1,
@@ -1357,22 +1396,13 @@
     18,
     2,
     2
-   ],
-   [
-    "ifps_ems_rt/hmi/report.py",
-    "_current",
-    46,
-    20,
-    16,
-    2,
-    0
    ]
   ],
   "top_len": [
    [
     "ifps_ems_rt/hmi/server.py",
     "make_handler",
-    18,
+    24,
     1,
     199,
     1,
@@ -1381,7 +1411,7 @@
    [
     "ifps_ems_rt/hmi/server.py",
     "do_POST",
-    117,
+    123,
     1,
     98,
     0,
@@ -1408,7 +1438,7 @@
    [
     "ifps_ems_rt/hmi/server.py",
     "do_GET",
-    61,
+    67,
     1,
     46,
     0,
@@ -1435,7 +1465,7 @@
    [
     "ifps_ems_rt/runtime.py",
     "__init__",
-    36,
+    39,
     19,
     38,
     4,
@@ -1593,7 +1623,7 @@
   "files": [
    [
     "ifps_ems_rt/runtime.py",
-    513
+    541
    ],
    [
     "ifps_ems_rt/diag.py",
@@ -1612,12 +1642,12 @@
     315
    ],
    [
-    "ifps_ems/learner.py",
-    252
+    "ifps_ems_rt/hmi/server.py",
+    257
    ],
    [
-    "ifps_ems_rt/hmi/server.py",
-    251
+    "ifps_ems/learner.py",
+    252
    ],
    [
     "ifps_ems_rt/hmi/scenextra.py",
@@ -1633,15 +1663,19 @@
    ],
    [
     "ifps_ems_rt/hmi/report.py",
-    218
+    228
+   ],
+   [
+    "ifps_ems_rt/simplant.py",
+    223
    ],
    [
     "ifps_ems_rt/hmi/seqppt.py",
     217
    ],
    [
-    "ifps_ems_rt/simplant.py",
-    216
+    "ifps_ems_rt/opsmode.py",
+    205
    ],
    [
     "ifps_ems_rt/archive.py",
@@ -1658,10 +1692,6 @@
    [
     "ifps_ems_rt/hmi/engine.py",
     186
-   ],
-   [
-    "ifps_ems_rt/opsmode.py",
-    185
    ],
    [
     "ifps_ems_rt/hmi/pptx.py",
@@ -1685,7 +1715,7 @@
    ],
    [
     "ifps_ems_rt/hmi/eng_command.py",
-    152
+    153
    ],
    [
     "ifps_ems_rt/hmi/ringwatch.py",
@@ -1697,11 +1727,11 @@
    ],
    [
     "ifps_ems_rt/hal.py",
-    144
+    147
    ],
    [
     "ifps_ems_rt/hmi/eng_tools.py",
-    143
+    145
    ],
    [
     "ifps_ems/attn.py",
@@ -1728,12 +1758,16 @@
     119
    ],
    [
+    "ifps_ems_rt/hmi/simreplay.py",
+    116
+   ],
+   [
     "ifps_ems/dataio.py",
     115
    ],
    [
     "ifps_ems_rt/hmi/eng_view.py",
-    106
+    107
    ],
    [
     "ifps_ems/nowcast.py",
@@ -1745,23 +1779,31 @@
    ],
    [
     "ifps_ems_rt/hmi/eng_alarms.py",
-    98
+    99
    ],
    [
     "ifps_ems_rt/hmi/simdriver.py",
-    87
+    90
    ],
    [
     "ifps_ems_rt/planlink.py",
     86
    ],
    [
+    "ifps_ems_rt/hmi/loadctl.py",
+    85
+   ],
+   [
+    "ifps_ems_rt/hmi/scenario_policy.py",
+    84
+   ],
+   [
     "ifps_ems_rt/hmi/archapi.py",
     83
    ],
    [
-    "ifps_ems_rt/hmi/scenario_policy.py",
-    83
+    "ifps_ems_rt/loads.py",
+    80
    ],
    [
     "ifps_ems_rt/pointmap.py",
@@ -1880,7 +1922,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 8158,
+   "loc": 8457,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -2064,12 +2106,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.82,
- "cc_n": 843,
+ "cc_avg": 5.85,
+ "cc_n": 878,
  "cc_rank": {
-  "A": 503,
-  "B": 207,
-  "C": 133,
+  "A": 522,
+  "B": 217,
+  "C": 139,
   "D": 0,
   "E": 0,
   "F": 0
@@ -2089,19 +2131,25 @@
   ],
   [
    "ifps_ems_rt/runtime.py",
-   "fast_control",
+   "decide",
    20,
    "C"
   ],
   [
-   "ifps_ems_rt/runtime.py",
-   "decide",
+   "ifps_ems_rt/hal.py",
+   "send",
    20,
    "C"
   ],
   [
    "ifps_ems_rt/simplant.py",
    "_tick_bus",
+   20,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/opsmode.py",
+   "step",
    20,
    "C"
   ],
@@ -2128,12 +2176,6 @@
    "configure",
    20,
    "C"
-  ],
-  [
-   "ifps_ems_rt/hmi/archcfg.py",
-   "check",
-   20,
-   "C"
   ]
  ],
  "mi": [
@@ -2158,13 +2200,13 @@
    "C"
   ],
   [
-   "ifps_ems_rt/hmi/scenarios.py",
-   16.1,
+   "ifps_ems_rt/hmi/report.py",
+   15.2,
    "B"
   ],
   [
-   "ifps_ems_rt/hmi/report.py",
-   17.0,
+   "ifps_ems_rt/hmi/scenarios.py",
+   16.1,
    "B"
   ],
   [
@@ -2174,7 +2216,7 @@
   ],
   [
    "ifps_ems_rt/simplant.py",
-   24.8,
+   23.2,
    "A"
   ],
   [
@@ -2214,12 +2256,12 @@
   ],
   [
    "ifps_ems_rt/hmi/eng_tools.py",
-   32.4,
+   31.8,
    "A"
   ],
   [
    "ifps_ems_rt/hmi/eng_command.py",
-   33.4,
+   33.2,
    "A"
   ],
   [
@@ -2233,13 +2275,18 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/server.py",
+   36.9,
+   "A"
+  ],
+  [
    "ifps_ems_rt/modbus.py",
    37.2,
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/server.py",
-   37.3,
+   "ifps_ems_rt/opsmode.py",
+   37.4,
    "A"
   ],
   [
@@ -2258,12 +2305,12 @@
    "A"
   ],
   [
-   "ifps_ems_rt/fleet.py",
-   40.6,
+   "ifps_ems_rt/hmi/eng_view.py",
+   40.4,
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/eng_view.py",
+   "ifps_ems_rt/fleet.py",
    40.6,
    "A"
   ],
@@ -2275,11 +2322,6 @@
   [
    "ifps_ems/dispatch.py",
    41.1,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/opsmode.py",
-   41.2,
    "A"
   ],
   [
@@ -2303,13 +2345,23 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/loadctl.py",
+   42.9,
+   "A"
+  ],
+  [
    "ifps_ems/skycam.py",
    43.1,
    "A"
   ],
   [
    "ifps_ems_rt/hmi/eng_alarms.py",
-   43.5,
+   43.2,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/simreplay.py",
+   43.3,
    "A"
   ],
   [
@@ -2324,12 +2376,12 @@
   ],
   [
    "ifps_ems_rt/hal.py",
-   45.1,
+   45.4,
    "A"
   ],
   [
    "ifps_ems_rt/hmi/simdriver.py",
-   46.3,
+   46.8,
    "A"
   ],
   [
@@ -2353,13 +2405,18 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/scenario_policy.py",
-   52.9,
+   "ifps_ems_rt/hybrid.py",
+   53.0,
    "A"
   ],
   [
-   "ifps_ems_rt/hybrid.py",
-   53.0,
+   "ifps_ems_rt/loads.py",
+   53.1,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/scenario_policy.py",
+   54.4,
    "A"
   ],
   [
@@ -2484,14 +2541,14 @@
   ]
  ],
  "loc_py": {
-  "files": 69,
-  "sloc": 6721,
-  "comments": 949
+  "files": 72,
+  "sloc": 6975,
+  "comments": 998
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   579,
+   582,
    true
   ],
   [
@@ -2520,13 +2577,18 @@
    true
   ],
   [
+   "ifps_ems_rt/hmi/static/loads.js",
+   76,
+   true
+  ],
+  [
    "ifps_ems_rt/hmi/static/manual.js",
    34,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/ring.js",
-   106,
+   107,
    true
   ],
   [
@@ -2540,18 +2602,23 @@
    true
   ],
   [
+   "ifps_ems_rt/hmi/static/simreplay.js",
+   25,
+   true
+  ],
+  [
    "ifps_ems_rt/hmi/static/site.js",
-   290,
+   310,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/sld.js",
-   198,
+   200,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/train.js",
-   172,
+   173,
    true
   ],
   [
