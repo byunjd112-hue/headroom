@@ -4,21 +4,32 @@
 EMS 는 이 체계의 PCS 와만 통신한다. 발전기와 ESS 의 감시 · 제어는 모두 PCS 를 거친다(대응표의 장치 이름 DG = 복합전력 PCS).
   PCS 가 알려 주는 것  발전기 운전 · 출력 · 연료(DG.status · kw · fuel_l), ESS 충전율 · 충방전 전력(DG.ess_soc · ess_kw), 지금 모드(DG.pcs_mode)
   EMS 가 내리는 것     발전기 기동 · 정지(DG.cmd — 선택 · 실행 규약), 운전 모드(DG.mode_set)
-운전 모드
-  0 정지              발전기 정지, ESS 대기
-  1 발전기 단독       발전기만 공급(ESS 는 가득 차 있거나 쉬게 함)
-  2 발전기 + ESS 충전 발전기가 공급하면서 ESS 를 충전
-  3 ESS 방전          발전기 정지, ESS 가 공급(계통 형성 · 저소음)
-자동 제어의 모드 선택: 디젤이 필요하면 2(충전율이 soc_full 이상이면 1), 필요 없으면 3.
+운전 모드(열쇠 · 기본 값 · 뜻)
+  stop   0  정지              발전기 정지, ESS 대기
+  gen    1  발전기 단독       발전기만 공급(ESS 는 가득 차 있거나 쉬게 함)
+  charge 2  발전기 + ESS 충전 발전기가 공급하면서 ESS 를 충전
+  ess    3  ESS 방전          발전기 정지, ESS 가 공급(계통 형성 · 저소음)
+자동 제어의 모드 선택: 디젤이 필요하면 charge(충전율이 soc_full 이상이면 gen), 필요 없으면 ess.
 복합전력의 ESS 가 soc_low 아래로 내려가면 발전기를 돌려 충전하고(want.DG 를 켬) soc_ok 를 넘으면 그친다(저소음 태세에서는 디젤을 켜지 않는다).
-모드의 뜻 · 값과 한계값은 가정이다 — 제작사 PCS 사양을 받으면 맞춘다(runtime.json 의 hybrid).
+모드의 값 · 이름과 한계값은 제작사 PCS 사양에 맞춰 고친다 — runtime.json 의 hybrid(관리자 화면의 설정 편집 → '복합전력 PCS' 탭). 신호 주소는 대응표(pointmap.csv)의 DG.* 줄이다.
 """
-MODES = {0: "정지", 1: "발전기 단독", 2: "발전기 + ESS 충전", 3: "ESS 방전"}
+KEYS = ("stop", "gen", "charge", "ess")
 DEFAULT = {"soc_low": 20.0, "soc_ok": 50.0, "soc_full": 90.0}
+CODE = {"stop": 0, "gen": 1, "charge": 2, "ess": 3}
+LABEL = {"stop": "정지", "gen": "발전기 단독", "charge": "발전기 + ESS 충전", "ess": "ESS 방전"}
 
 
 def settings(cfg):
-    c = dict(DEFAULT); c.update({k: float(v) for k, v in (cfg or {}).items() if k in DEFAULT}); return c
+    """설정을 읽는다. 반환: {soc_low, soc_ok, soc_full, code: {열쇠: 값}, label: {열쇠: 이름}}"""
+    cfg = cfg or {}; c = dict(DEFAULT); c.update({k: float(v) for k, v in cfg.items() if k in DEFAULT})
+    c["code"] = dict(CODE, **{k: int(v) for k, v in (cfg.get("modes") or {}).items() if k in CODE})
+    c["label"] = dict(LABEL, **{k: str(v) for k, v in (cfg.get("labels") or {}).items() if k in LABEL})
+    return c
+
+
+def view(cfg):
+    """화면용: 모드 값과 이름."""
+    c = settings(cfg); return {"code": c["code"], "label": c["label"]}
 
 
 def check(cfg, bad):
@@ -26,8 +37,13 @@ def check(cfg, bad):
     if cfg is None: return
     if not isinstance(cfg, dict): bad.append("hybrid: 객체여야 함"); return
     try: c = settings(cfg)
-    except (TypeError, ValueError): bad.append("hybrid: 값은 숫자여야 함"); return
+    except (TypeError, ValueError, AttributeError): bad.append("hybrid: 한계값 · 모드 값은 숫자여야 함"); return
     if not 0 <= c["soc_low"] < c["soc_ok"] < c["soc_full"] <= 100: bad.append("hybrid: 0 ≤ soc_low < soc_ok < soc_full ≤ 100 이어야 함")
+    codes = list(c["code"].values())
+    if len(set(codes)) != len(codes) or not all(0 <= v <= 65535 for v in codes): bad.append("hybrid.modes: 모드 값 네 개는 서로 달라야 하고 0~65535 여야 함")
+    if not all(0 < len(v.strip()) <= 24 for v in c["label"].values()): bad.append("hybrid.labels: 모드 이름은 1~24자")
+    for k in list(cfg.get("modes") or {}) + list(cfg.get("labels") or {}):
+        if k not in CODE: bad.append(f"hybrid: 모르는 모드 열쇠 {k}(stop · gen · charge · ess)")
 
 
 def units(rt):
@@ -36,8 +52,8 @@ def units(rt):
 
 
 def mode_for(on, soc, c):
-    """그 장치에 내릴 모드: 발전기를 돌릴 때 2(충전율이 가득이면 1), 아니면 3."""
-    return (1 if soc is not None and soc >= c["soc_full"] else 2) if on else 3
+    """그 장치에 내릴 모드(열쇠): 발전기를 돌릴 때 charge(충전율이 가득이면 gen), 아니면 ess."""
+    return ("gen" if soc is not None and soc >= c["soc_full"] else "charge") if on else "ess"
 
 
 def need(rt, want):
@@ -49,11 +65,11 @@ def need(rt, want):
 
 
 def apply(rt, want, who="자동"):
-    """자동 제어의 결정대로 모드를 내린다. 현장 수동인 장치와 지령할 수 없는 장치는 건너뛴다. 반환: [(장치, 모드)] 이번에 바뀐 것"""
+    """자동 제어의 결정대로 모드를 내린다. 현장 수동인 장치와 지령할 수 없는 장치는 건너뛴다. 반환: [(장치, 모드 열쇠)] 이번에 바뀐 것"""
     c = settings(rt.cfg.get("hybrid")); last = rt.__dict__.setdefault("hy_last", {}); out = []
     for n in units(rt):
         if n in rt.dev and rt.dev[n].manual: continue
         m = mode_for(bool(want.get("DG")), rt.fleet.unit(n, "ess_soc", rt.val), c)
-        if rt._write1(n, f"{n}.mode_set", float(m), 0.0) and last.get(n) != m:      # pylint: disable=protected-access
-            last[n] = m; out.append((n, m)); rt.note("지령", f"{n} 복합전력 모드 {m} {MODES[m]}", actor=who)
+        if rt._write1(n, f"{n}.mode_set", float(c["code"][m]), 0.0) and last.get(n) != m:      # pylint: disable=protected-access
+            last[n] = m; out.append((n, m)); rt.note("지령", f"{n} 복합전력 모드 {c['code'][m]} {c['label'][m]}", actor=who)
     return out

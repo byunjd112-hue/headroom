@@ -29,6 +29,14 @@ class Plant:
             for suf, v in (("ess_soc", 70.0), ("mode_set", 3)):               # 복합전력 PCS: 처음에는 ESS 방전 모드(계통 형성), 충전율 70%
                 if fleet.kind(d) == "DG" and f"{d}.{suf}" in self.by_tag: self.set(f"{d}.{suf}", v)
 
+    hy = {"stop": 0, "gen": 1, "charge": 2, "ess": 3}                 # 복합전력 PCS 의 모드 값(hybrid.CODE 와 같다). 설정에서 바꾸면 set_hybrid 로 맞춘다
+
+    def set_hybrid(self, code):
+        """복합전력 PCS 의 모드 값을 설정대로 맞추고, 놓인 PCS 를 'ESS 방전' 모드로 둔다(가상 장치의 처음 상태)."""
+        self.hy = dict(code)
+        for d in self.units:
+            if fleet.kind(d) == "DG" and f"{d}.mode_set" in self.by_tag: self.set(f"{d}.mode_set", self.hy["ess"])
+
     def us(self, k):
         """그 종류의 놓인 장치 이름들."""
         return [d for d in self.units if fleet.kind(d) == k and d not in self.gone and f"{d}.status" in self.by_tag]
@@ -98,8 +106,9 @@ class Plant:
         """복합전력 PCS 한 대: 발전기 90 kW, ESS 200 kWh. 모드 2 는 발전기가 20 kW 로 ESS 를 충전한다. 모드 3(ESS 방전)의 방전 전력은 _hybrid_cover 가 정한다. 반환: 모선으로 나가는 전력(kW)"""
         g = self._g; on = g(f"{u}.status") > 0.5; gen = 90.0 * on * closed
         if f"{u}.mode_set" not in self.by_tag: self._put(((f"{u}.kw", gen),)); return gen
-        want = int(round(g(f"{u}.mode_set"))); soc = g(f"{u}.ess_soc"); mode = (2 if want == 2 else 1) if on else (3 if want == 3 else 0)      # 충전은 모드 2 지령을 받았을 때만(지령 없이 발전기만 돌면 발전기 단독)
-        ess = (-20.0 if soc < 100.0 else 0.0) if mode == 2 else 0.0
+        want = int(round(g(f"{u}.mode_set"))); soc = g(f"{u}.ess_soc"); c = self.hy
+        key = ("charge" if want == c["charge"] else "gen") if on else ("ess" if want == c["ess"] else "stop"); mode = c[key]      # 충전은 충전 모드 지령을 받았을 때만(지령 없이 발전기만 돌면 발전기 단독)
+        ess = (-20.0 if soc < 100.0 else 0.0) if key == "charge" else 0.0
         ess *= closed; dt = self._dt
         self._put(((f"{u}.kw", gen), (f"{u}.ess_kw", ess), (f"{u}.pcs_mode", mode), (f"{u}.ess_soc", min(100.0, max(0.0, soc - ess * dt / 3600.0 / 200.0 * 100.0)))))
         return gen + ess
@@ -107,7 +116,7 @@ class Plant:
     def _hybrid_cover(self, short, dt):
         """자립 운전에서 이동형 ESS(②)가 맡지 못한 부족분을 'ESS 방전' 모드의 복합전력 ESS 가 방전해 메운다(대마다 100 kW 까지, 충전율 5% 위에서).
         이동형 ESS 가 있으면 그쪽이 먼저 부담하는 것으로 단순화했다(실제 분담은 두 PCS 의 수하 특성에 따른다 — 가정)."""
-        g = self._g; us = [u for u in self.us("DG") if f"{u}.pcs_mode" in self.by_tag and int(round(g(f"{u}.pcs_mode"))) == 3 and g(f"{u}.ess_soc") > 5.0 and self._cb("G1")]
+        g = self._g; us = [u for u in self.us("DG") if f"{u}.pcs_mode" in self.by_tag and int(round(g(f"{u}.pcs_mode"))) == self.hy["ess"] and g(f"{u}.ess_soc") > 5.0 and self._cb("G1")]
         for u in us:
             x = min(100.0, max(0.0, short) / len(us)); self._put(((f"{u}.ess_kw", x), (f"{u}.ess_soc", max(0.0, g(f"{u}.ess_soc") - x * dt / 3600.0 / 200.0 * 100.0))))
 

@@ -233,7 +233,7 @@ class Engine:
         if sim:
             pts = pm.load(os.path.join(base, cfg["pointmap"]), cfg["devices"])
             units = {n: d["unit"] for n, d in cfg["devices"].items()}
-            self.plant = Plant(pts, units); self.plant.slow["GDG"] = 5.0; pa, pb = self.plant.start(self.hcfg.get("sim_ports", [0, 0]))
+            self.plant = Plant(pts, units); self.plant.slow["GDG"] = 5.0; self.plant.set_hybrid(hybrid.settings(cfg.get("hybrid"))["code"]); pa, pb = self.plant.start(self.hcfg.get("sim_ports", [0, 0]))
             c2 = copy.deepcopy(cfg); c2["allow"] = ["127.0.0.0/8"]
             for n in c2["devices"]: c2["devices"][n]["paths"] = [["127.0.0.1", pa], ["127.0.0.1", pb]]
             c2["pointmap"] = os.path.join(base, cfg["pointmap"]); c2["state_dir"] = os.path.join(base, cfg.get("state_dir", "state") + "_sim")
@@ -785,7 +785,7 @@ class Engine:
         return {"load": load, "pv": pv, "dg": dg, "fc": fc, "ess": ess, "soc": soc, "h2": h2, "fuel": fuel, "l1": g("LOAD.p1_kw"), "l2": g("LOAD.p2_kw"), "l3": g("LOAD.p3_kw"),
                 "gen": pv + dg + fc + max(ess, 0.0) + max(g("GRID.kw"), 0.0) + max(g("GDG.kw"), 0.0), "renew": (min(pv, load) / load * 100) if load > 1 else 0.0, "reserve_margin": margin, "reserve_need": margin < 0,
                 "online_kw": online, "ess_h": ess_h, "h2_h": h2 / (s.fc_kw * n("FC") * s.fc_nm3_per_kwh) if s.fc_kw else None, "fuel_h": fuel / (s.dg_kw * n("DG") * s.dg_l_per_kwh) if s.dg_kw else None,
-                "grid": g("GRID.kw"), "gdg": sum(g(f"{n}.kw") for n in rt.gdgs), "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "elz": elz, "g1_kw": rt.g1_kw(), "g1_n": rt.g1_n()}
+                "grid": g("GRID.kw"), "gdg": sum(g(f"{n}.kw") for n in rt.gdgs), "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "elz": elz, "g1_kw": rt.g1_kw(), "g1_n": rt.g1_n(), "hy": hybrid.view(rt.cfg.get("hybrid"))}
 
     def _snap_values(self, now):
         rt = self.rt

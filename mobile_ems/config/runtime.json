@@ -583,6 +583,18 @@
   "hybrid": {
     "soc_low": 20,
     "soc_ok": 50,
-    "soc_full": 90
+    "soc_full": 90,
+    "modes": {
+      "stop": 0,
+      "gen": 1,
+      "charge": 2,
+      "ess": 3
+    },
+    "labels": {
+      "stop": "정지",
+      "gen": "발전기 단독",
+      "charge": "발전기 + ESS 충전",
+      "ess": "ESS 방전"
+    }
   }
 }

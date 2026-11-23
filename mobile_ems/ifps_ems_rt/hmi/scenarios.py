@@ -7,7 +7,7 @@ import math
 import operator
 from pathlib import Path
 
-from .. import modbus, pointmap
+from .. import hybrid, modbus, pointmap
 from ..simplant import Plant
 from . import scenextra
 from .scenario_policy import METRICS, ScenarioPolicy, run_policy_case
@@ -168,6 +168,9 @@ def _snapshot(plant, watch):
 
 def run_case(case, pts, units, profile=None, directory=None, extra=None):
     plant = Plant(pts, units)
+    if profile:  # hybrid PCS mode codes follow the profile's settings
+        with open(profile, encoding="utf-8") as source:
+            plant.set_hybrid(hybrid.settings(json.load(source).get("hybrid"))["code"])
     model = scenextra.Model(extra, plant)
     plant.slow["GDG"] = 5.0
     elapsed = 0

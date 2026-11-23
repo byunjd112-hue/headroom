@@ -39,7 +39,7 @@ const CfgEdit = {
       <div class="ce-wrap">
         <div class="ce-cards" id="ceCards"></div>
         <div class="ce-side">
-          <div class="tabs" id="ceTabs"><button data-t="dev">장치 접속</button><button data-t="res">검사 · 변경 비교</button><button data-t="json">운전 설정</button><button data-t="bak">백업</button></div>
+          <div class="tabs" id="ceTabs"><button data-t="dev">장치 접속</button><button data-t="res">검사 · 변경 비교</button><button data-t="hy">복합전력 PCS</button><button data-t="json">운전 설정</button><button data-t="bak">백업</button></div>
           <div id="ceSide"></div>
         </div>
       </div>`;
@@ -87,6 +87,7 @@ const CfgEdit = {
         ${f("done_s", "지령 완료 한도(초)", dv.done_s, "기본 1.5")}${f("gap", "블록 읽기 틈", dv.gap, "기본 0")}</div>
         <p class="muted" style="font-size:11.5px;margin:10px 0 0">장치 제작사가 회신한 값으로 고친 뒤 [검사] → [저장] 하십시오. 저장한 값은 EMS 를 다시 기동해야 적용됩니다. 현장 확인은 현장 진단 도구(diag)로 합니다.</p></div>`;
       S2.querySelectorAll("[data-k]").forEach(el => el.onchange = () => this.devSet(n, el.dataset.k, el.value.trim()));
+    } else if (this.tab === "hy") { this.sideHy(S2);
     } else if (this.tab === "res") {
       const r = this.res; S2.innerHTML = !r ? `<div class="ce-box muted">[검사]를 누르면 오류·주의와 저장된 판과의 차이를 여기에 보여 줍니다.</div>` : r.map(x => `<div class="ce-box"><h4>${x.kind === "pointmap" ? "대응표" : "운전 설정"} — ${x.ok ? `<span class="okc">검사 통과</span>` : `<span class="badc">오류 ${x.errors.length}건</span>`} <span class="muted">· 변경 ${x.changed || 0}줄</span></h4>
         ${x.errors.map(e => `<div class="ce-err">✕ ${esc(e)}</div>`).join("")}${x.warnings.map(e => `<div class="ce-warn">! ${esc(e)}</div>`).join("")}
@@ -98,6 +99,25 @@ const CfgEdit = {
       const b = this.d.backups; S2.innerHTML = `<div class="ce-box"><h4>백업 <span class="muted">— 저장할 때마다 이전 판을 남깁니다(파일별 최근 20개)</span></h4>${b.length ? `<table class="t"><thead><tr><th>파일</th><th>저장 시각</th><th>크기</th><th></th></tr></thead><tbody>${b.map(x => `<tr><td>${x.kind === "pointmap" ? "대응표" : "운전 설정"}</td><td class="mono">${esc(x.time)}</td><td class="mono">${x.size}</td><td><button class="btn sm" data-bk="${esc(x.name)}">이 판으로 되돌리기</button></td></tr>`).join("")}</tbody></table>` : `<div class="muted">아직 백업이 없습니다.</div>`}</div>`;
       S2.querySelectorAll("[data-bk]").forEach(x => x.onclick = async () => { if (!confirm(`${x.dataset.bk} 판으로 되돌립니다. 지금 판은 백업으로 남습니다.`)) return; const r = await api("/api/config/restore", { name: x.dataset.bk }); if (r.ok) { toast("되돌렸습니다 — EMS 재기동 후 적용", "ok"); this.open(this.root); } else { this.res = [{ kind: x.dataset.bk.split(".")[0], ok: false, errors: r.errors || [r.why || "실패"], warnings: [], diff: [] }]; this.tab = "res"; this.side(); } });
     }
+  },
+  /* 복합전력 PCS: 모드 값 · 이름, 충전율 한계값(runtime.json 의 hybrid), 신호 주소(대응표의 DG.* 줄). 제작사 PCS 사양에 맞춰 고친다 */
+  sideHy(S2) {
+    const KEY = [["stop", "정지"], ["gen", "발전기 단독"], ["charge", "발전기 + ESS 충전"], ["ess", "ESS 방전"]], DEF = { stop: 0, gen: 1, charge: 2, ess: 3 };
+    const SIG = [["DG.pcs_mode", "지금 모드(읽기)"], ["DG.ess_soc", "ESS 충전율(읽기)"], ["DG.ess_kw", "ESS 충방전 전력(읽기)"], ["DG.mode_set", "모드 지령(쓰기)"]];
+    const h = this.rt.hybrid = this.rt.hybrid || {}; h.modes = h.modes || Object.assign({}, DEF); h.labels = h.labels || Object.fromEntries(KEY);
+    const row = t => this.rows.find(r => !r.del && r.v[0] === t), num = (k, lab, dv) => `<label>${lab}<input class="in" data-hk="${k}" type="number" min="0" max="100" value="${esc(h[k] ?? dv)}"></label>`;
+    S2.innerHTML = `<div class="ce-box"><h4>복합전력 PCS — 운전 모드 <span class="muted">(runtime.json → hybrid.modes · labels)</span></h4>
+      <table class="t"><thead><tr><th>모드</th><th>PCS 값</th><th>화면에 보이는 이름</th></tr></thead><tbody>${KEY.map(([k, d]) => `<tr><td class="mono">${k} <span class="muted">${d}</span></td><td><input class="in" data-hm="${k}" type="number" min="0" max="65535" style="width:90px" value="${esc(h.modes[k] ?? DEF[k])}"></td><td><input class="in" data-hl="${k}" maxlength="24" value="${esc(h.labels[k] ?? d)}"></td></tr>`).join("")}</tbody></table>
+      <h4 style="margin-top:14px">충전율 한계값 <span class="muted">(%, hybrid.soc_low · soc_ok · soc_full)</span></h4><div class="ce-form">${num("soc_low", "이 아래면 발전기로 충전", 20)}${num("soc_ok", "이 위면 충전 그침", 50)}${num("soc_full", "이 위면 발전기 단독", 90)}</div>
+      <h4 style="margin-top:14px">신호 주소 <span class="muted">(pointmap.csv 의 DG.* 줄 — 장치 카드에서도 고친다)</span></h4>
+      <table class="t"><thead><tr><th>신호</th><th>기능 코드</th><th>주소</th><th>배율</th></tr></thead><tbody>${SIG.map(([t, d]) => { const r = row(t); return `<tr><td class="mono">${t} <span class="muted">${d}</span></td>${r ? [2, 3, 5].map(c => `<td><input class="in" data-hs="${t}" data-c="${c}" style="width:80px" value="${esc(r.v[c])}"></td>`).join("") : `<td colspan="3" class="badc">대응표에 없음 — 디젤 카드에서 줄을 추가</td>`}</tr>`; }).join("")}</tbody></table>
+      <p class="muted" style="font-size:11.5px;margin:10px 0 0">제작사 PCS 사양으로 고친 뒤 [검사] → [저장] 하십시오. 모드 값을 고치면 DG.pcs_mode · DG.mode_set 의 허용 범위(최소 · 최대)도 함께 맞춥니다. 저장한 값은 EMS 를 다시 기동해야 적용됩니다.</p></div>`;
+    const done = () => { this.res = null; this.cards(); this.stat(); };
+    S2.querySelectorAll("[data-hk]").forEach(el => el.onchange = () => { h[el.dataset.hk] = Number(el.value); done(); });
+    S2.querySelectorAll("[data-hl]").forEach(el => el.onchange = () => { h.labels[el.dataset.hl] = el.value.trim(); done(); });
+    S2.querySelectorAll("[data-hm]").forEach(el => el.onchange = () => { h.modes[el.dataset.hm] = Math.round(Number(el.value)); const vs = Object.values(h.modes);
+      ["DG.pcs_mode", "DG.mode_set"].forEach(t => this.rows.filter(r => !r.del && r.v[0].replace(/^DG\d+/, "DG") === t).forEach(r => { r.v[7] = String(Math.min(...vs)); r.v[8] = String(Math.max(...vs)); })); done(); });      // 범위 밖 값은 읽기에서 버려지고 쓰기는 거부되므로 범위를 함께 맞춘다
+    S2.querySelectorAll("[data-hs]").forEach(el => el.onchange = () => { row(el.dataset.hs).v[+el.dataset.c] = el.value.trim(); done(); });
   },
   devSet(n, k, v) {
     const dv = this.rt.devices[n], num = x => x === "" ? null : Number(x); dv.paths = dv.paths || [[]];

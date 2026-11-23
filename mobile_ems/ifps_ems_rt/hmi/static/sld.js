@@ -133,7 +133,7 @@ function sldUpdate(s) {
   const code = f => Math.round(val("FLT." + f) || 0);
   const devLost = id => id === "G1" ? kLost("DG") : id === "PV" || id === "GRID" ? !gw : KF(id) ? kLost(id) : (D[id] ? D[id].link === "두절" : false);
   const ops = s.ops || {}, garr = ops.mode === "grid";
-  const running = { PV: k.pv > 0.5, DG: kOn("DG"), FC: kOn("FC"), ESS: val("ESS.status") > 0.5, G1: (val("DG.pcs_mode") ?? 3) > 0.5, GRID: garr && cbv("GRID") === 1, GDG: !!(D.GDG && D.GDG.on) };
+  const running = { PV: k.pv > 0.5, DG: kOn("DG"), FC: kOn("FC"), ESS: val("ESS.status") > 0.5, G1: hyOn(val("DG.pcs_mode")), GRID: garr && cbv("GRID") === 1, GDG: !!(D.GDG && D.GDG.on) };
   // 모선 통전: 실측 전압 우선
   const est = bus => SRC.some(n => n.bus === bus && n.id !== "PV" && running[n.id] && closed(n.id));
   let aLive = est("A"), bLive = est("B"); if (closed("TIE")) { const x = aLive || bLive; aLive = bLive = x; }
@@ -167,7 +167,7 @@ function sldUpdate(s) {
     else if (c === 0) st(n.id, ko ? "차단기 개방 · 분리" : "CB OPEN · ISOLATED", "var(--warn)");
     else if (n.id === "PV") st(n.id, k.pv > 0.5 ? (ko ? "발전 중" : "GENERATING") : (ko ? "발전 없음" : "IDLE"), k.pv > 0.5 ? "var(--pv)" : "var(--muted)");
     else if (n.id === "ESS") st(n.id, k.ess > 0.5 ? (ko ? "방전" : "DISCHARGING") : k.ess < -0.5 ? (ko ? "충전" : "CHARGING") : (ko ? "대기" : "STANDBY"), "var(--ess)");
-    else if (n.id === "G1") st(n.id, ko ? hyMode(val("DG.pcs_mode")) : ["STOP", "GEN ONLY", "GEN + CHARGE", "ESS DISCHARGE"][Math.round(val("DG.pcs_mode") ?? 3)], "var(--g1)");
+    else if (n.id === "G1") st(n.id, ko ? hyMode(val("DG.pcs_mode")) : ({ stop: "STOP", gen: "GEN ONLY", charge: "GEN + CHARGE", ess: "ESS DISCHARGE" })[hyKey(val("DG.pcs_mode")) || "ess"] || "?", "var(--g1)");
     else st(n.id, on ? (ko ? "운전" : "RUNNING") : (ko ? "정지" : "STOPPED"), on ? "var(--ok)" : "var(--muted)");
     const tg = $("#tg-" + n.id);
     if (tg && n.id === "ESS") { tg.textContent = `SOC ${F.n(k.soc, 1)}%${kCnt("ESS")}`; }

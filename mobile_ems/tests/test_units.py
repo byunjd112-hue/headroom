@@ -18,8 +18,11 @@ class FleetUnitTest(unittest.TestCase):
     def test_hybrid_pcs_modes(self):
         """복합전력 PCS 의 운전 모드 선택: 디젤이 필요하면 발전기 + ESS 충전(가득이면 발전기 단독), 필요 없으면 ESS 방전. 복합전력 ESS 가 낮으면 발전기로 충전(이력)."""
         from ifps_ems_rt import hybrid
-        c = hybrid.settings(None); self.assertEqual((hybrid.mode_for(True, 60.0, c), hybrid.mode_for(True, 95.0, c), hybrid.mode_for(True, None, c), hybrid.mode_for(False, 60.0, c)), (2, 1, 2, 3))
+        c = hybrid.settings(None); self.assertEqual((hybrid.mode_for(True, 60.0, c), hybrid.mode_for(True, 95.0, c), hybrid.mode_for(True, None, c), hybrid.mode_for(False, 60.0, c)), ("charge", "gen", "charge", "ess"))
         bad = []; hybrid.check({"soc_low": 60, "soc_ok": 50, "soc_full": 90}, bad); self.assertTrue(bad); bad = []; hybrid.check({"soc_low": 20, "soc_ok": 50, "soc_full": 90}, bad); hybrid.check(None, bad); self.assertEqual(bad, [])
+        for wrong in ({"modes": {"gen": 2}}, {"modes": {"idle": 9}}, {"labels": {"ess": ""}}, {"modes": {"ess": "x"}}):                       # 모드 값이 겹치거나, 모르는 열쇠, 빈 이름, 숫자가 아닌 값
+            bad = []; hybrid.check(wrong, bad); self.assertTrue(bad, wrong)
+        c2 = hybrid.settings({"soc_low": 30, "modes": {"ess": 30, "charge": 20}, "labels": {"ess": "배터리 운전"}}); self.assertEqual((c2["soc_low"], c2["code"], c2["label"]["ess"], c2["label"]["gen"]), (30.0, {"stop": 0, "gen": 1, "charge": 20, "ess": 30}, "배터리 운전", "발전기 단독"))
         class F:                                              # 실행기 흉내: 복합전력 PCS 두 대
             live = staticmethod(lambda k: ["DG", "DG2"]); soc = {"DG": 60.0, "DG2": 60.0}
             def unit(self, n, suf, val): return self.soc[n]
@@ -29,12 +32,13 @@ class FleetUnitTest(unittest.TestCase):
             def _write1(self, n, tag, v, tol): self.wrote.append((tag, v)); return True
             def note(self, kind, text, actor=""): self.notes.append(text)
         rt = RT(); w = {"DG": False}; hybrid.need(rt, w); self.assertEqual((w["DG"], rt.hy_charge), (False, False))
-        self.assertEqual(hybrid.apply(rt, w), [("DG", 3), ("DG2", 3)]); self.assertEqual(hybrid.apply(rt, w), [])                 # 같은 모드는 다시 알리지 않는다
-        F.soc["DG2"] = 15.0; w = {"DG": False}; hybrid.need(rt, w); self.assertEqual((w["DG"], w.get("_hybrid")), (True, True)); self.assertEqual(hybrid.apply(rt, w), [("DG", 2), ("DG2", 2)])   # 한 대라도 낮으면 발전기로 충전
+        self.assertEqual(hybrid.apply(rt, w), [("DG", "ess"), ("DG2", "ess")]); self.assertEqual(rt.wrote[-1], ("DG2.mode_set", 3.0)); self.assertEqual(hybrid.apply(rt, w), [])                 # 같은 모드는 다시 알리지 않는다
+        F.soc["DG2"] = 15.0; w = {"DG": False}; hybrid.need(rt, w); self.assertEqual((w["DG"], w.get("_hybrid")), (True, True)); self.assertEqual(hybrid.apply(rt, w), [("DG", "charge"), ("DG2", "charge")])   # 한 대라도 낮으면 발전기로 충전
         F.soc["DG2"] = 40.0; w = {"DG": False}; hybrid.need(rt, w); self.assertTrue(w["DG"])                                       # soc_ok 를 넘을 때까지 이어 간다
         F.soc["DG2"] = 55.0; w = {"DG": False}; hybrid.need(rt, w); self.assertFalse(w["DG"])
         F.soc["DG2"] = 15.0; w = {"DG": False, "_quiet": True}; hybrid.need(rt, w); self.assertFalse(w["DG"])                      # 저소음 태세에서는 켜지 않는다
-        F.soc["DG"] = 95.0; self.assertEqual(dict(hybrid.apply(rt, {"DG": True}))["DG"], 1)                                        # 가득 찬 장치는 발전기 단독
+        F.soc["DG"] = 95.0; self.assertEqual(dict(hybrid.apply(rt, {"DG": True}))["DG"], "gen")                                    # 가득 찬 장치는 발전기 단독
+        rt.cfg = {"hybrid": {"modes": {"gen": 11, "charge": 12, "ess": 13, "stop": 10}}}; rt.hy_last = {}; hybrid.apply(rt, {"DG": False}); self.assertEqual(rt.wrote[-1], ("DG2.mode_set", 13.0))   # 설정에서 바꾼 모드 값으로 내린다
 
     def test_merge_sum_any_mean_and_empty_slot(self):
         f = fleet.Fleet(["DG", "DG2", "ESS", "ESS2", "MTR"]); val = {}; seen = []; mark = lambda tag, ok: seen.append((tag, ok)); st = {"DG": "정상", "DG2": "정상", "ESS": "정상", "ESS2": "정상"}
@@ -85,7 +89,8 @@ class FleetLiveTest(unittest.TestCase):
         self.assertFalse([k for k in act() if k in ("link.PV3", "absent.PV3")], {"link": {n: (e.rt.lm.state.get(n), e.rt.links[n].err) for n in ("PV", "PV2", "PV3", "DG")}, "scan": (round(e.rt.max_scan_s, 2), e.rt.n_over, e.rt.n_scan), "events": [x["text"][:40] for x in e.rt.events[-14:]]})      # 일부러 뺀 장치는 두절 경보가 아니다(다른 장치의 경보는 여기서 보지 않는다 — 시험 장비가 느리면 흔들린다)
         time.sleep(7.0); self.assertEqual(unitctl.change(e, "PV", 1, "시험")["unit"], "PV3"); self.assertTrue(self._wait(lambda: pv()["n"] == 3)); time.sleep(3.0)      # 뺀 자리에 다시 놓을 수 있다
         self.assertFalse([x["text"] for x in e.rt.events if "PV3 생존 계수 정지" in x["text"]])                                       # 다시 놓을 때 묵은 생존 계수로 '정지' 경보가 뜨지 않는다
-        self.assertEqual(e.rt.fleet.span("PV.kw", "MTR"), 3); self.assertEqual((e.rt.fleet.span("PV.kw", "PV"), e.rt.fleet.span("LOAD.kw", "MTR")), (1, 1))      # 게이트웨이가 재는 합계의 범위는 대수만큼 넓어진다
+        self.assertEqual(e.rt.fleet.span("PV.kw", "MTR"), 4);      # 인식 3대 + 빈 자리가 있을 때의 한 대분 여유(막 연결한 장치가 인식되기 전에 합계가 먼저 커진다)
+        self.assertEqual((e.rt.fleet.span("PV.kw", "PV"), e.rt.fleet.span("LOAD.kw", "MTR")), (1, 1))      # 게이트웨이가 재는 합계의 범위는 대수만큼 넓어진다
         for _ in range(2): self.assertTrue(unitctl.change(e, "PV", 1, "시험")["ok"])
         self.assertTrue(self._wait(lambda: pv()["n"] == 5)); self.assertFalse(unitctl.change(e, "PV", 1, "시험")["ok"])                          # 자리가 다 차면 알려 준다
         self.assertRaises(ValueError, unitctl.change, e, "MTR", 1, "시험"); self.assertRaises(ValueError, unitctl.change, e, "PV", 2, "시험")
@@ -121,6 +126,21 @@ class FleetLiveTest(unittest.TestCase):
         unitctl.change(e, "DG", 1, "시험"); self.assertTrue(self._wait(lambda: ids("DG") == ["DG", "DG2"]))
         self.assertEqual((rt.g1_n(), rt.g1_kw(), e.kpi()["g1_kw"], e.kpi()["g1_n"]), (2, 200.0, 200.0, 2)); self.assertEqual(rt.online_kw(0, 0).count(100.0), 2)      # 형성 용량이 차량 대수만큼
         unitctl.change(e, "DG", -1, "시험"); self.assertTrue(self._wait(lambda: ids("DG") == ["DG"])); self.assertEqual(rt.g1_kw(), 100.0)
+
+    def test_hybrid_modes_follow_auto_control_live(self):
+        """운전 중인 EMS(가상 장치)에서 자동 제어가 복합전력 PCS 의 모드를 바꾼다: 디젤 필요 → 발전기 + ESS 충전, 가득 → 발전기 단독, 불필요 → ESS 방전, 복합전력 ESS 저충전 → 충전."""
+        e = self.eng; rt = e.rt; p = e.plant; mode = lambda: int(round(p.get("DG.pcs_mode")))
+        def run(**sets):
+            for t, v in sets.items(): e.sim_action({"action": "set", "tag": t.replace("_", ".", 1), "value": v, "hold": True}, "시험")
+            time.sleep(2.5)
+            with e.lock: rt.t_ctl = -1e9
+        self.assertTrue(self._wait(lambda: "DG.pcs_mode" in rt.val and mode() == 3)); self.assertEqual(e.kpi()["hy"]["label"]["ess"], "ESS 방전")       # 처음: ESS 방전(계통 형성)
+        run(ESS_soc=18.0); self.assertTrue(self._wait(lambda: p.get("DG.status") > 0.5 and mode() == 2, 45.0), "디젤 필요 → 발전기 + ESS 충전")
+        self.assertTrue(self._wait(lambda: p.get("DG.ess_kw") < -1.0)); self.assertTrue([x for x in rt.events if "복합전력 모드 2" in x["text"]])
+        e.plant.set("DG.ess_soc", 96.0); run(); self.assertTrue(self._wait(lambda: mode() == 1, 30.0), "복합전력 ESS 가득 → 발전기 단독")
+        e.plant.set("DG.ess_soc", 60.0); run(ESS_soc=85.0, PV_kw=260.0); self.assertTrue(self._wait(lambda: p.get("DG.status") < 0.5 and mode() == 3, 60.0), "디젤 불필요 → ESS 방전")
+        e.plant.set("DG.ess_soc", 12.0); run(); self.assertTrue(self._wait(lambda: p.get("DG.status") > 0.5 and mode() == 2, 45.0), "복합전력 ESS 저충전 → 발전기로 충전")
+        self.assertFalse([a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT" and a["key"].startswith("q5.DG")])                             # 새 신호가 범위 밖으로 걸리지 않는다
 
     def test_extra_units_are_recognized_summed_and_commanded(self):
         e = self.eng; rt = e.rt; fl = lambda: e.snapshot()["fleet"]; act = lambda: {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}

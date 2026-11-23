@@ -103,7 +103,9 @@ class Fleet:
     def span(self, tag, dev):
         """다른 장치(계측 게이트웨이)가 재는 종류 합계(PV.kw 등)의 범위 배율: 그 종류가 여러 대면 정격도 그만큼 는다."""
         k, _, suf = tag.partition(".")
-        return max(1, len(self.live_now.get(k, ()))) if k in self.slots and dev != k and AGG.get(suf) == "sum" else 1
+        if k not in self.slots or dev == k or AGG.get(suf) != "sum": return 1
+        spare = any(is_slot(n) and n not in self.ever for n in self.slots[k])      # 빈 자리가 있으면 한 대분의 여유: 막 연결한 장치가 인식되기 전(수 초)에 합계가 먼저 커져도 정상 값을 버리지 않는다
+        return max(1, len(self.live_now.get(k, ()))) + int(spare)
 
     def view(self, state, dev, val):
         """화면용: {종류: {n, seen, slots, on, units: [{id, link, seen, on, manual, kw, soc}]}}"""

@@ -163,8 +163,12 @@ const CTL_UNITS = [
   { id: "GRID", no: "주", nm: "주둔지 상전 수전점 · 22.9kV", en: "Utility incoming (no export)", col: "g1", dev: null, kw: "GRID.kw", need: "GRID.kw" },
 ];
 const CB_ROWS = [["PV", "③ PV 인입"], ["DG", "① 디젤 인입"], ["FC", "④ 연료전지 인입"], ["ESS", "② ESS 인입"], ["G1", "① 복합전력 인입"], ["TIE", "모선 A·B 연계"], ["L1", "1등급 부하 (지휘통제·의무)"], ["L2", "2등급 부하 (막사·정비)"], ["L3", "3등급 부하 (일반·탄약)"]];
-const HY_MODES = [[1, "발전기 단독"], [2, "발전기 + 충전"], [3, "ESS 방전"], [0, "정지"]];      // 복합전력 PCS 의 운전 모드(hybrid.py 의 MODES 와 같다)
-const hyMode = v => v == null ? "계통 형성" : ({ 0: "정지", 1: "발전기 단독", 2: "발전기 + ESS 충전", 3: "ESS 방전" })[Math.round(v)] || "?";
+/* 복합전력 PCS 의 운전 모드: 값과 이름은 설정(runtime.json 의 hybrid — 관리자 화면에서 고친다)에서 온다. 스냅샷 kpi.hy = {code: {stop, gen, charge, ess}, label: {...}} */
+const HY_KEYS = ["gen", "charge", "ess", "stop"], HY0 = { code: { stop: 0, gen: 1, charge: 2, ess: 3 }, label: { stop: "정지", gen: "발전기 단독", charge: "발전기 + ESS 충전", ess: "ESS 방전" } };
+const hyCfg = () => (S.snap && S.snap.kpi && S.snap.kpi.hy) || HY0;
+const hyKey = v => v == null ? null : HY_KEYS.find(k => hyCfg().code[k] === Math.round(v)) || "";
+const hyMode = v => v == null ? "계통 형성" : hyKey(v) ? hyCfg().label[hyKey(v)] : `모르는 모드 ${Math.round(v)}`;
+const hyOn = v => v == null || hyKey(v) !== "stop";                    // 정지 모드가 아니면 운전 중으로 본다
 const CTL_PHOTO = { ELZ: "FC", EMS: "EMS", G1: "G1", GDG: "GDG", GRID: "MTR" };
 const P_CTL = {
   mount(m) {
@@ -199,9 +203,9 @@ const P_CTL = {
       <div class="meta" id="mt-${u.id}"></div>
       ${u.ctl ? `<div class="acts"><button class="btn go" data-c="start" data-d="${u.dev}">▶ ${u.on || t("btn.start", "기동")}</button><button class="btn stop" data-c="stop" data-d="${u.dev}">■ ${u.off || t("btn.stop", "정지")}</button>
         ${u.sp ? `<div class="spacer"></div><input class="in" id="sp-${u.id}" type="number" min="0" max="${u.sp[2]}" step="${u.sp[3]}" style="width:80px" placeholder="kW"><button class="btn" data-sp="${u.id}">${u.sp[1]}</button>` : ""}</div><div class="interlock" id="il-${u.id}"></div>`
-        : `<div class="interlock muted" style="color:var(--muted)">${u.id === "EMS" ? "EMS 자체 상태 — 자동 제어는 오른쪽 패널에서 전환" : u.id === "G1" ? `<span class="hym">${HY_MODES.map(([v, t]) => `<button class="btn sm" data-hm="${v}">${t}</button>`).join("")}</span><span class="hyn">발전기 · ESS 모두 복합전력 PCS 를 거쳐 감시 · 제어 — 자동 제어 중에는 EMS 가 모드를 정한다</span>` : "감시 전용 — EMS는 지령하지 않음"}</div>`}</div></div>`).join("");
+        : `<div class="interlock muted" style="color:var(--muted)">${u.id === "EMS" ? "EMS 자체 상태 — 자동 제어는 오른쪽 패널에서 전환" : u.id === "G1" ? `<span class="hym">${HY_KEYS.map(k => `<button class="btn sm" data-hm="${k}">${esc(hyCfg().label[k])}</button>`).join("")}</span><span class="hyn">발전기 · ESS 모두 복합전력 PCS 를 거쳐 감시 · 제어 — 자동 제어 중에는 EMS 가 모드를 정한다</span>` : "감시 전용 — EMS는 지령하지 않음"}</div>`}</div></div>`).join("");
     $$("#devs [data-c]").forEach(b => b.onclick = () => { const u = CTL_UNITS.find(x => x.dev === b.dataset.d); sbo(b.dataset.d, b.dataset.c, { label: `${u.no} ${u.nm.split(" · ").pop()} ${b.dataset.c === "start" ? (u.on || "기동") : (u.off || "정지")}` }); });
-    $$("#devs [data-hm]").forEach(b => b.onclick = () => { const v = +b.dataset.hm; sbo("DG", "set", { tag: "DG.mode_set", value: v, label: `① 복합전력 모드 → ${HY_MODES.find(m => m[0] === v)[1]}` }); });      // 복합전력 운전 모드(PCS 로 보내는 지령)
+    $$("#devs [data-hm]").forEach(b => b.onclick = () => { const k = b.dataset.hm; sbo("DG", "set", { tag: "DG.mode_set", value: hyCfg().code[k], label: `① 복합전력 모드 → ${hyCfg().label[k]}` }); });      // 복합전력 운전 모드(PCS 로 보내는 지령)
     $$("#devs [data-uq]").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); const k = b.dataset.uq, dv = +b.dataset.dv, f = KF(k);
       if (dv < 0 && f && f.units.length <= 1 && !confirm("이 종류의 마지막 장치를 뺍니다. 계속합니까?")) return;
       const r = await api("/api/units", { kind: k, delta: dv }); toast(r.ok ? r.msg : r.why, r.ok ? "ok" : "bad"); poll(); });
@@ -219,7 +223,7 @@ const P_CTL = {
       const lp = $("#lp-" + u.id); if (!lp) continue;
       const d = u.dev ? D[u.dev] : null, kf = u.dev && KF(u.dev), lost = d ? (kf ? kLost(u.dev) : d.link === "두절") : u.id === "G1" ? kLost("DG") : (u.id === "GRID" && !gw), gone = !!(d && (kf ? kAbsent(u.dev) : d.absent));
       const o = s.ops || {}, garr = o.mode === "grid";
-      const on = u.id === "EMS" ? true : u.id === "G1" ? cb("G1") === 1 && (val("DG.pcs_mode") ?? 3) > 0.5 : u.id === "GRID" ? (garr && cb("GRID") === 1) : u.id === "MTR" ? !lost : kf ? kOn(u.dev) : !!(d && d.on);
+      const on = u.id === "EMS" ? true : u.id === "G1" ? cb("G1") === 1 && hyOn(val("DG.pcs_mode")) : u.id === "GRID" ? (garr && cb("GRID") === 1) : u.id === "MTR" ? !lost : kf ? kOn(u.dev) : !!(d && d.on);
       lp.className = "lamp " + (lost ? "lost" : on ? "on" : "");
       const lk = $("#lk-" + u.id), uq = $("#uq-" + u.id), qf = KF(u.uq || u.dev); if (uq && qf) uq.textContent = `${qf.units.length} / ${qf.slots}대`;
       if (d) { const best = kf && kf.units.find(x => x.live); lk.className = "pill " + (gone ? "" : LINK_CLS[best ? best.link : d.link]); lk.textContent = gone ? "미설치" : linkTxt(best ? best.link : d.link) + (kf ? kCnt(u.dev) : ""); lk.title = kf && kf.units.length > 1 ? kf.units.map(x => `${x.id}: ${x.live ? (x.on ? "운전" : "정지") : "두절"}${x.kw == null ? "" : " " + F.kw(x.kw) + " kW"}`).join(" / ") + " — 지령은 있는 장치 모두에게 간다" : ""; }
@@ -234,7 +238,7 @@ const P_CTL = {
         : u.id === "GRID" ? (!garr ? `<span class="muted">미연계(작전지)</span>` : o.outage ? `<span class="badc">정전</span>` : `<span class="okc">수전 중</span>`)
         : u.id === "GDG" ? (on ? `<span class="okc">운전 중</span>` : `<span class="muted">${garr ? "대기" : "미사용"}</span>`)
         : u.id === "MTR" ? `<span class="okc">계측 중</span>` : u.id === "EMS" ? `<span class="okc">${s.auto ? "자동 제어" : "수동 운전"}</span>`
-        : u.id === "G1" ? `<span class="${(val("DG.pcs_mode") ?? 3) > 0.5 ? "okc" : "muted"}">${hyMode(val("DG.pcs_mode"))}</span>`
+        : u.id === "G1" ? `<span class="${hyOn(val("DG.pcs_mode")) ? "okc" : "muted"}">${esc(hyMode(val("DG.pcs_mode")))}</span>`
         : u.id === "ESS" ? `<span class="okc">${k.ess < -.5 ? "충전" : k.ess > .5 ? "방전" : "대기"}</span>` : u.id === "PV" ? (on ? `<span class="okc">계통 연결</span>` : `<span class="muted">분리</span>`)
         : on ? `<span class="okc">운전 중</span>` : `<span class="muted">정지</span>`;
       const mode = d ? ["모드", d.manual ? "수동" : "자동"] : null, hb = d ? ["생존 HB", F.n(d.hb, 0)] : null;
