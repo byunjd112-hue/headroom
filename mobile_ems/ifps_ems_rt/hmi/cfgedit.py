@@ -9,7 +9,7 @@
   · 저장한 설정은 EMS 를 다시 기동해야 적용된다(운전 중인 값은 바꾸지 않는다).
 """
 import csv, difflib, hashlib, io, json, math, os, re, tempfile, time
-from .. import modbus as mb
+from .. import modbus as mb, fsio
 from .. import pointmap as pm
 from .. import opsmode as om
 from .. import archive, ring, weather, hybrid
@@ -277,13 +277,7 @@ class ConfigEditor:
             if not os.path.exists(bak): break
             n += 1
         with open(path, "rb") as f, open(bak, "wb") as g: g.write(f.read())
-        fd, tmp = tempfile.mkstemp(dir=self.dir, prefix=".cfg-", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f: f.write(text); f.flush(); os.fsync(f.fileno())
-            os.replace(tmp, path)
-        except OSError:
-            if os.path.exists(tmp): os.unlink(tmp)
-            raise
+        fsio.write_text(path, text, sync=True)
         old = [b["name"] for b in self.backups() if b["kind"] == kind][KEEP:]
         for b in old: os.unlink(os.path.join(self.bdir, b))
         return os.path.basename(bak)

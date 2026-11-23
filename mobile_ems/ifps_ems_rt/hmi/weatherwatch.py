@@ -7,7 +7,7 @@ import json, os, time, urllib.request
 from datetime import datetime, timedelta
 from threading import RLock
 from ifps_ems.solar import clear_pv_kw
-from .. import weather
+from .. import weather, fsio
 
 STEP = timedelta(minutes=15)
 
@@ -23,9 +23,7 @@ class WeatherWatch:
         self.t_fetch = 0.0; self.last = {"on": False}
 
     def _save(self):
-        tmp = self.path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f: json.dump({"rows": self.book.rows, "score": self.score.state(), "net": self.net}, f, ensure_ascii=False)
-        os.replace(tmp, self.path)
+        fsio.write_json(self.path, {"rows": self.book.rows, "score": self.score.state(), "net": self.net})
 
     def _slots(self, n):
         """앞으로 n 칸의 (시각, 맑은 하늘 발전량, 그 시각에 쓸 날씨 기록 또는 None)."""

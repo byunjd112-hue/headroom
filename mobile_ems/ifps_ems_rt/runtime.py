@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from ifps_ems import supervisor as sv, dispatch as dp, security
 from ifps_ems.config import Site, SUP
-from . import pointmap as pm, modbus as mb, fleet, hybrid
+from . import pointmap as pm, modbus as mb, fleet, hybrid, fsio
 from .hal import DeviceLink, RtCommander
 from . import opsmode as om
 from dataclasses import replace
@@ -231,10 +231,9 @@ class Runtime:
 
     def save_ops(self):
         """운용 상태를 적어 둔다: 운용 장소 · 태세, 자동 제어 켬/끔, EMS 가 스스로 끊은 급전선. 재기동해도 운용자가 끈 자동 제어가 켜지지 않고, 끊어 둔 부하를 되살릴 수 있다."""
-        tmp = self._ops_path() + ".tmp"; o = {"mode": self.mode, "posture": self.posture, "shed": sorted(self.shedder.mine)}
+        o = {"mode": self.mode, "posture": self.posture, "shed": sorted(self.shedder.mine)}
         if self.ops_auto is not None: o["auto"] = bool(self.ops_auto)
-        with open(tmp, "w", encoding="utf-8") as f: json.dump(o, f, ensure_ascii=False)
-        os.replace(tmp, self._ops_path())
+        fsio.write_json(self._ops_path(), o)
 
     def tied(self):
         """상전에 연계되어 있는가(주둔지이고 수전 차단기 투입, 복전 뒤 안정 시간 경과)."""
@@ -477,10 +476,7 @@ class Runtime:
         if all(x == x for x in row): self.acc.append(row); self.acc_sky.append(self.sky)
 
     def save(self):
-        tmp = os.path.join(self.state_dir, "last.json.tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump({"t": self.now(), "val": self.val, "link": self.lm.state, "on": {n: d.on for n, d in self.dev.items()}}, f, ensure_ascii=False)
-        os.replace(tmp, os.path.join(self.state_dir, "last.json"))          # 쓰는 도중 전원이 끊겨도 앞 파일이 남는다
+        fsio.write_json(os.path.join(self.state_dir, "last.json"), {"t": self.now(), "val": self.val, "link": self.lm.state, "on": {n: d.on for n, d in self.dev.items()}})
 
     # ── 주기 실행
     def run(self, n=None, sleep=time.sleep):

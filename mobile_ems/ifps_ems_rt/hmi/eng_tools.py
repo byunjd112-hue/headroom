@@ -3,7 +3,7 @@
 """
 import json, math, os, time
 from datetime import datetime
-from .. import fleet
+from .. import fleet, fsio
 from .. import modbus as mb
 from .engdefs import FEEDERS, wall_iso
 
@@ -130,9 +130,7 @@ class ToolsMixin:
             uids.add(uid); clean.append({"uid": uid, "kind": k, "bind": b, "name": str(it.get("name", ""))[:24], "x": round(x, 1), "y": round(y, 1)})
         old = self.layout(); rev = int(old.get("rev", 0)) + 1
         out = {"rev": rev, "items": clean, "by": who, "t": wall_iso()}
-        pth = os.path.join(self.rt.state_dir, "layout.json"); tmp = pth + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f: json.dump(out, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, pth)
+        fsio.write_json(os.path.join(self.rt.state_dir, "layout.json"), out, indent=1)
         cnt = {}
         for it in clean: cnt[it["kind"]] = cnt.get(it["kind"], 0) + 1
         self.rt.note("배치", f"작전지 배치 변경 rev{rev}: " + ", ".join(f"{k}×{v}" for k, v in sorted(cnt.items())), actor=who)

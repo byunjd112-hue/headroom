@@ -8,7 +8,8 @@
   · 분배: 기동·정지는 그 종류의 있는 장치 모두에게, 설정값(kW)은 똑같이 나누어 보낸다(대수별 순차 기동·정격 차이는 다루지 않는다).
 같은 종류 장치는 그 종류의 급전 차단기(CB.DG 등) 아래에 함께 물린 것으로 본다(가정).
 """
-import json, os, re
+import json, re
+from . import fsio
 
 KINDS = ("DG", "FC", "ESS", "PV", "ELZ")
 SLOT = re.compile(r"^([A-Z]+?)([2-9])$")
@@ -59,8 +60,7 @@ class Fleet:
         path = getattr(self, "path", None)
         if not path or not self.keep: return
         try:
-            with open(path + ".tmp", "w", encoding="utf-8") as f: json.dump(sorted(self.ever), f)
-            os.replace(path + ".tmp", path)
+            fsio.write_json(path, sorted(self.ever))
         except OSError: pass
 
     def forget(self, n):

@@ -14,7 +14,8 @@
 수급 반영(급전선의 ems): 켜 두면 그 급전선의 전력을 EMS 가 보는 부하 합계(LOAD.kw)에 더하거나(부하) 뺀다(전원) → 발전기 기동 같은 급전 판단이 달라진다.
 정정값은 시험용 가정값이다. 실제 값은 보호 협조 검토서로 정한다.
 """
-import json, os, re
+import json, os, re, shutil
+from .. import fsio
 
 from . import scenring, scenunit
 
@@ -149,10 +150,9 @@ def save(profile, extra, pts):
     """검사한 뒤 저장한다(임시 파일 후 교체, 직전 파일은 .bak). 반환: 오류 목록"""
     bad = check(extra, pts)
     if bad: return bad
-    clean = {k: extra.get(k, []) for k in MAX}; pth = path_for(profile); tmp = pth + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f: json.dump(clean, f, ensure_ascii=False, indent=1)
-    if os.path.exists(pth): os.replace(pth, pth + ".bak")
-    os.replace(tmp, pth)
+    clean = {k: extra.get(k, []) for k in MAX}; pth = path_for(profile)
+    if os.path.exists(pth): shutil.copyfile(pth, pth + ".bak")
+    fsio.write_json(pth, clean, indent=1)
     return []
 
 

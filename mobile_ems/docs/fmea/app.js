@@ -127,7 +127,7 @@ function head(title, sub, extra=""){ const M=compute(); return `<div class="topb
 function vDashboard(){
   const M=compute(), st=M.st, F=M.F;
   const pareto = M.rs.filter(r=>state.sel==="전체"||r.grp==="본체").sort((a,b)=>b.RPN-a.RPN);
-  const ss = ["ES-01","ES-02","ES-03","ES-04","ES-05","ES-06","ES-07","ES-08","ES-09","ES-10","IF"].map(c=>{ const g=M.rs.filter(r=>r.code===c); return {c, n:g.length, a:g.reduce((x,r)=>x+r.RPN,0), b:g.reduce((x,r)=>x+r.RPN2,0)}; });
+  const ss = ["ES-01","ES-02","ES-03","ES-04","ES-05","ES-06","ES-07","ES-08","ES-09","ES-10","ES-11","IF"].map(c=>{ const g=M.rs.filter(r=>r.code===c); return {c, n:g.length, a:g.reduce((x,r)=>x+r.RPN,0), b:g.reduce((x,r)=>x+r.RPN2,0)}; });
   const top3 = F.glist.filter(g=>["G1","G2","G3","G4","G5"].includes(g.id)).sort((a,b)=>b.q0-a.q0);
   const fvTop = [...F.imp].sort((a,b)=>b.fv0-a.fv0).slice(0,10);
   setMain(head("대시보드", "IFPS 이동형 전력체계 EMS 소프트웨어 FMEA(IEC 60812)·FTA(IEC 61025) 통합 분석 · "+DATA.meta.rev+" 기준 · 전 지표 실시간 재계산") + `
@@ -211,7 +211,7 @@ function vRpn(){
   const M=compute(), all=state.sel==="전체";
   const base=M.rs.filter(r=>all||r.grp==="본체");
   const pareto=[...base].sort((a,b)=>b.RPN-a.RPN); const tot=pareto.reduce((a,r)=>a+r.RPN,0); let cum=0;
-  const ss=["ES-01","ES-02","ES-03","ES-04","ES-05","ES-06","ES-07","ES-08","ES-09","ES-10","IF"].map(c=>{const g=M.rs.filter(r=>r.code===c);return {c,name:g[0]?g[0].ss:"",n:g.length,a:g.reduce((x,r)=>x+r.RPN,0),b:g.reduce((x,r)=>x+r.RPN2,0),hi:g.filter(r=>r.grade==="고").length,hi2:g.filter(r=>r.grade2==="고").length};});
+  const ss=["ES-01","ES-02","ES-03","ES-04","ES-05","ES-06","ES-07","ES-08","ES-09","ES-10","ES-11","IF"].map(c=>{const g=M.rs.filter(r=>r.code===c);return {c,name:g[0]?g[0].ss:"",n:g.length,a:g.reduce((x,r)=>x+r.RPN,0),b:g.reduce((x,r)=>x+r.RPN2,0),hi:g.filter(r=>r.grade==="고").length,hi2:g.filter(r=>r.grade2==="고").length};});
   const mat=(pre)=>{ const m=[]; for(let s=10;s>=1;s--){ const rw=[]; for(let o=1;o<=10;o++) rw.push(base.filter(r=>(pre?r.S:r.S2)===s&&(pre?r.O:r.O2)===o).length); m.push(rw);} return m; };
   const matHtml=(m)=>`<div class="matrix"><div class="h">S＼O</div>${[1,2,3,4,5,6,7,8,9,10].map(o=>`<div class="h">${o}</div>`).join("")}${m.map((rw,i)=>{const s=10-i;return `<div class="h">${s}</div>`+rw.map((v,j)=>{const so=s*(j+1);const c=so>=48?4:so>=30?3:so>=18?2:so>=10?1:0;return `<div class="c${v?c:0}" title="S${s}×O${j+1}">${v||""}</div>`;}).join("");}).join("")}</div>`;
   setMain(head("RPN 분석 · 위험 매트릭스", "파레토(자동 정렬) · 서브시스템 집계 · 위험등급 분포 · S×O 매트릭스", `<label class="pill">대상 <select id="sel2"><option ${!all?"selected":""}>본체</option><option ${all?"selected":""}>전체</option></select></label>`) + `

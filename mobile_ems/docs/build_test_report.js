@@ -105,7 +105,7 @@ b.push(H2("4.2 복잡도·유지보수성"));
 b.push(P(`함수·메서드 ${S.cc_n}개의 평균 순환 복잡도 ${S.cc_avg}. 등급 분포: ` + Object.entries(S.cc_rank).map(([k, v]) => `${k} ${v}`).join(", ") + `. Python 코드 ${S.loc_py.files}개 파일 ${S.loc_py.sloc}행(주석 ${S.loc_py.comments}행).`));
 b.push(TBL(["파일", "함수", "복잡도", "등급"], S.cc_top.map(x => [x[0], x[1], x[2], x[3]]), [44, 34, 11, 11], { mono: [0, 1], center: [2, 3] }));
 b.push(GAP()); b.push(TBL(["파일", "유지보수 지수", "등급"], S.mi.slice(0, 6).map(x => [x[0], x[1], x[2]]), [60, 22, 18], { mono: [0], center: [1, 2] }));
-b.push(GAP()); b.push(P("권고: 제어화면 엔진(engine.py)은 경보·지령·배치·가상 장치 기능이 한 파일에 모여 유지보수 지수가 낮다. 운용 전 기능별 모듈로 분리하고, 복잡도 D 등급 함수(가상 장치 동작, 상태 요약, 경보 판정)를 나누는 것을 권한다."));
+b.push(GAP()); b.push(P("조치(Rev54): 한 파일에 모여 있던 제어화면 엔진(engine.py)을 뼈대(기동·정지, 수집·감시 주기)와 기능별 묶음 — 경보 판정(eng_alarms), 지령·자동 제어(eng_command), 인증(eng_auth), 화면 자료(eng_view), 예측·학습(eng_forecast), 엔지니어 도구(eng_tools) — 그리고 공용 상수(engdefs), 경보 관리자(alarmmgr), 가상 장치 구동기(simdriver)로 나누었다. 동작은 바꾸지 않았다(정의 101개 동일, 전체 시험 통과). 파일을 안전하게 바꿔 쓰는 코드는 공용 모듈(fsio) 하나로 모았다."));
 
 b.push(H1("5. 시험 환경과 재현 방법"));
 ["pip install -r requirements.txt coverage bandit pyflakes radon", "python -m unittest discover -s tests", "python tools/measure.py docs/test_results.json --soak 300", "python tools/static_report.py", "node docs/build_test_report.js"].forEach(t => b.push(CODE(t)));

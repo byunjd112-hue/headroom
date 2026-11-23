@@ -75,7 +75,8 @@ b.push(H2("5.3 실행하지 못한 문장과 사유"));
 const WHYF = { "ifps_ems_rt/hmi/server.py": "① 내부 오류(500) 방어 처리기 ② 숫자 배열 형 변환 보조(넘파이 자료형) — 정상 경로에서 도달하지 않는 방어 코드",
   "ifps_ems_rt/hmi/__main__.py": "기동 실패 분기(보안 점검 거부, 웹 포트 사용 불가)와 프로그램 진입점. 보안 점검 거부는 test_hmi 가 함수 단위로 확인",
   "ifps_ems_rt/diag.py": "① Windows 콘솔 색 설정(시험 환경이 Linux) ② 차림표의 대화형 입력 분기 일부 ③ 프로그램 진입점 ④ 통신 중 끊김 방어",
-  "ifps_ems_rt/hmi/engine.py": "① systemd 알림 소켓(서비스로 기동할 때만) ② 주기 스레드의 최상위 예외 처리기(수집·감시·지령·가상 장치) ③ 상태 파일 쓰기 실패 무시 ④ 운용 모드 원격 바인드 거부 ⑤ 배치 파일 읽기 실패",
+  "ifps_ems_rt/hmi/engine.py": "주기 스레드의 최상위 예외 처리기(수집·감시), 상태 파일 쓰기 실패 무시", "ifps_ems_rt/hmi/engdefs.py": "systemd 알림 소켓(서비스로 기동할 때만)", "ifps_ems_rt/hmi/eng_command.py": "지령 스레드의 최상위 예외 처리기, 상태 저장 실패 무시",
+  "ifps_ems_rt/hmi/eng_auth.py": "운용 모드 원격 바인드 거부", "ifps_ems_rt/hmi/eng_tools.py": "배치 파일 읽기 실패", "ifps_ems_rt/hmi/simdriver.py": "가상 장치 주기의 최상위 예외 처리기", "ifps_ems_rt/fsio.py": "쓰기 실패 때 임시 파일 정리(저장 공간 가득·권한)",
   "ifps_ems/__main__.py": "프로그램 진입점", "ifps_ems/security.py": "감사 기록 복구 중 손상 줄 건너뛰기(끝줄 외 손상)", "ifps_ems_rt/runtime.py": "실행기 명령의 연속 운전 분기(무한 주기)", "ifps_ems_rt/simplant.py": "가상 장치 서버의 소켓 오류 종료(시험용 구성품)",
   "ifps_ems_rt/modbus.py": "코일 쓰기 함수(05) — 가상 장치가 코일을 지원하지 않음. 실장비 시험에서 확인", "ifps_ems_rt/hal.py": "지령 쓰기 실패 뒤 응답 대기 생략 분기", "ifps_ems_rt/mbtool.py": "프로그램 진입점", "ifps_ems/forecast.py": "입력 방어 분기", "ifps_ems/config.py": "설정 보조" };
 b.push(TBL(["파일", "미실행 줄", "사유"], S.coverage_files.filter(f => f[5]).map(f => [f[0], f[5], WHYF[f[0]] || "방어 코드"]), [26, 30, 44], { mono: [0, 1] }));

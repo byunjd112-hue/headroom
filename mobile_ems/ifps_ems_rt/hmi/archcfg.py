@@ -7,8 +7,8 @@
 저장하면 이전 판을 config/backup 에 남기고 바로 적용한다(재기동 불필요). 대응표 자체(주소·배율)는 디버그 화면의 설정 편집에서 고친다.
 항목이나 주기를 바꾼 뒤의 기록은 새 구성으로 쌓이고, 앞선 기록은 그때의 구성으로 읽힌다.
 """
-import csv, io, json, os, re, tempfile, time
-from .. import archive, archdev
+import csv, io, json, os, re, time
+from .. import archive, archdev, fsio
 from . import cfgedit
 
 MAX_ITEMS = 120
@@ -53,13 +53,7 @@ def _write(path, text, bdir):
     os.makedirs(bdir, exist_ok=True)
     if os.path.isfile(path):
         with open(path, "rb") as f, open(os.path.join(bdir, f"ess_safety.{time.strftime('%Y%m%d-%H%M%S')}.csv"), "wb") as g: g.write(f.read())
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".ess-", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f: f.write(text); f.flush(); os.fsync(f.fileno())
-        os.replace(tmp, path)
-    except OSError:
-        if os.path.exists(tmp): os.unlink(tmp)
-        raise
+    fsio.write_text(path, text, sync=True)
 
 
 def save(eng, b, who):
