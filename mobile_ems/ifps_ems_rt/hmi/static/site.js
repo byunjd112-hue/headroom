@@ -8,7 +8,7 @@ function siteState(s) {
   const gone = n => kAbsent(n) ? r("idle", "—", "미설치") : r("bad", "####", "통신 두절");          // 켠 뒤 한 번도 응답하지 않은 장치는 설치되지 않은 것으로 본다(자동 인식)
   const out = {
     G1: cb("G1") === 2 || cb("DG") === 2 ? r("bad", `DG ${F.kw(k.dg)} kW`, "차단기 트립") : lost("DG") ? gone("DG")
-      : r("ok", kOn("DG") ? `DG ${F.kw(k.dg)} kW` : "계통 형성 100 kW", kOn("DG") ? "디젤 운전" : "계통 형성"),
+      : r("ok", `DG ${F.kw(k.dg)} kW${val("DG.ess_soc") == null ? "" : ` · ESS ${F.n(val("DG.ess_soc"), 0)}%`}`, val("DG.pcs_mode") == null ? (kOn("DG") ? "디젤 운전" : "계통 형성") : hyMode(val("DG.pcs_mode"))),      // 복합전력: 발전기 출력 · ESS 충전율 · PCS 모드
     ESS: cb("ESS") === 2 ? r("bad", "0 kW", "트립") : lost("ESS") ? gone("ESS") : r(Math.abs(k.ess) > 0.5 ? "ok" : "idle", `${k.ess < 0 ? "▲" : "▼"} ${F.kw(Math.abs(k.ess))} kW · ${F.n(k.soc, 0)}%`, k.ess < -0.5 ? "충전" : k.ess > 0.5 ? "방전" : "대기"),
     PV: !gw ? r("bad", "####", "게이트웨이 두절") : cb("PV") === 2 ? r("bad", "0 kW", "트립") : r(k.pv > 0.5 ? "ok" : "idle", `${F.kw(k.pv)} kW`, k.pv > 0.5 ? "발전" : "발전 없음"),
     FC: cb("FC") === 2 ? r("bad", "0 kW", "트립") : lost("FC") ? gone("FC") : r(kOn("FC") ? "ok" : "idle", `${F.kw(k.fc)} kW · H₂ ${F.n(k.h2, 0)}`, kOn("FC") ? "운전" : "정지"),
@@ -171,19 +171,22 @@ function siteMapSvg(s) {
     <path d="M0 255 Q800 225 1600 255 L1600 900 L0 900Z" fill="url(#mGnd)"/><path d="M0 255 Q800 225 1600 255 L1600 900 L0 900Z" fill="url(#mGv)" opacity=".55"/>
     ${L.edit ? `<path d="M0 255 Q800 225 1600 255 L1600 900 L0 900Z" fill="url(#mGrid)"/>` : ""}`;
   const ems = items.find(i => i.kind === "EMS");
-  if (ems) items.filter(i => ["DG", "ESS", "PV", "FC", "DIST", "FSU"].includes(i.kind)).forEach(i => {      // 통신선: 발전 장비 · 배전 · 구간분전함 모두 EMS 와 이어진다
-    g += `<path d="${_cabPath([ems.x, ems.y - 20], [i.x, i.y + 20])}" class="mcom" fill="none"/>`; });
+  /* 통신선은 전력 케이블과 같은 경로로 간다(복합 케이블 · 같은 관로): 발전 장비 ↔ 배전 · 변압 ↔ EMS, 그리고 구간분전함을 도는 환형. 한 구간이 끊겨도 반대 방향으로 EMS 에 닿는다.
+     EMS 에서 장치마다 따로 끄는 방사형으로 그리지 않는다(구간 손실 때 통신이 함께 끊기는 구조로 보인다 — 사용자 지적) */
+  const rgc = !L.edit && s.ring ? s.ring : null;
+  cab.forEach(([a, b, f]) => { if (["L1", "L2", "L3", "RING"].includes(f)) return; const sec = /^RS\d+$/.test(f) && rgc ? rgc.sections[+f.slice(2)] : null, up = f === "EMSP" ? [9, 5] : [7];
+    up.forEach(o => { g += `<path d="${_cabPath([a[0], a[1] - o], [b[0], b[1] - o])}" class="mcom ${sec && sec.state === 2 ? "cut" : ""}" fill="none"/>`; }); });      // EMS ↔ 배전 · 변압 구간은 A · B 두 줄
   cab.forEach(([a, b, f], i) => { const d = _cabPath(a, b); g += `<path d="${d}" class="mcab" fill="none"/><path d="${d}" class="mflow" id="mf-${i}" fill="none"/>`; });
   items.slice().sort((a, b) => a.y - b.y).forEach(it => {
     const kind = it.kind === "BARRACK" ? "BARRACK" : it.kind, [Lx, Ly] = ISO_EXT[kind] || ISO_EXT.FSU, [wx, wy] = mapWorld(it.x, it.y), [px, py] = I.p(wx - Lx / 2, wy - Ly / 2, 0);
     const sel = L.edit && L.sel === it.uid;
     g += `<g class="meq ${L.edit ? "editable" : ""} ${sel ? "sel" : ""}" data-uid="${it.uid}">${sel ? `<ellipse cx="${it.x}" cy="${it.y}" rx="${(Lx + Ly) * ISO_C * MAP_S * .62}" ry="${(Lx + Ly) * ISO_S * MAP_S * .62}" class="msel"/>` : ""}${spriteSvg(kind, mapEqSt(s, it), it.x, it.y + (Lx + Ly) * ISO_S * MAP_S / 2 + 6, (Lx + Ly) * ISO_C * MAP_S * (kind === "FSU" ? 1.5 : kind === "PV" ? .78 : 1.12) * (it.sc || 1)) || isoPlace(kind, mapEqSt(s, it), px, py, MAP_S)}</g>`;
   });
-  if (ems && !L.edit) g += `<text x="${ems.x}" y="${ems.y + 58}" text-anchor="middle" class="mfsu sec">EMS 전원: 배전 모선(주) · 차량 28 V(예비) · 내장 무정전 전원</text>`;      // 하드웨어 설계의 전원 이중화
+  if (ems && !L.edit) g += `<text x="${ems.x}" y="${ems.y + 58}" text-anchor="middle" class="mfsu sec">EMS 전원: 배전 모선(주) · 차량 28 V(예비) · 내장 무정전 전원</text><text x="${ems.x}" y="${ems.y + 72}" text-anchor="middle" class="mfsu sec">통신: 전력 케이블과 같은 경로 · 구간분전함은 환형(한 구간이 끊겨도 반대 방향으로)</text>`;      // 하드웨어 설계의 전원 이중화
   const rg = !L.edit && s.ring ? s.ring : null;                                    // 구간분전함 이름표(환망 화면의 이름과 같다)
   const dst = rg && items.find(i => i.kind === "DIST");                            // 고리가 닫히는 곳: 첫 · 마지막 구간분전함은 배전 · 변압 안의 모선에서 만난다
   if (dst && rg.fsu.length > 1) g += `<text x="${dst.x}" y="${dst.y + 96}" text-anchor="middle" class="mfsu sec open">${esc(rg.fsu[0].name)} ↔ ${esc(rg.fsu[rg.fsu.length - 1].name)} 은 이 안의 모선 A · B 로 이어져 고리가 닫힘</text>`;
-  if (rg) items.filter(i => i.kind === "FSU").forEach(it => { const f = rg.fsu.find(x => x.id === _fsuNo(it)); if (f) g += `<text x="${it.x}" y="${it.y + 34}" text-anchor="middle" class="mfsu ${f.live === false ? "bad" : ""}">${esc(f.name)}</text>`; });
+  if (rg) items.filter(i => i.kind === "FSU").forEach(it => { const f = rg.fsu.find(x => x.id === _fsuNo(it)); if (f) g += `<text x="${it.x}" y="${it.y + 34}" text-anchor="middle" class="mfsu ${f.live === false || f.comm === false ? "bad" : ""}">${esc(f.name)}${f.comm === false ? " · 통신 고립" : ""}</text>`; });
   if (rg) cab.forEach(([a, b, f]) => { const sec = /^RS\d+$/.test(f) ? rg.sections[+f.slice(2)] : null; if (!sec) return; const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 + Math.abs(b[0] - a[0]) * .03;      // 구간 이름표
     const t = sec.state === 2 ? `구간 ${sec.i} 차단` : sec.open ? (sec.state === 1 ? "상시 개방점(닫힘 · 우회 중)" : "상시 개방점(열림)") : sec.i === 0 ? "환망 급전 A(모선 A)" : sec.i === rg.fsu.length ? "환망 급전 B(모선 B)" : "";      // 고리의 양 끝은 배전반의 두 모선에 물려 닫힌다
     if (t) g += `<text x="${mx}" y="${my - 16}" text-anchor="middle" class="mfsu sec ${sec.state === 2 ? "bad" : sec.open ? "open" : ""}">${t}</text>`; });
@@ -206,7 +209,7 @@ function siteMarkers() {
 function siteRebuild() { const box = $("#siteMap"); if (box && S.snap) { box.dataset.sig = ""; siteUpdate(S.snap, true); } siteMarkers(); layToolbar(); }
 function siteHtml() {
   return `<div class="site" id="siteBox"><div id="siteMap"></div><div class="site-shade"></div><div id="siteMk"></div>
-    <div class="site-leg"><span><i class="ok"></i>운전·급전</span><span><i class="idle"></i>정지·대기</span><span><i class="bad"></i>고장·두절</span><span><b class="lg on"></b>전력(AC)</span><span><b class="lg com"></b>통신(EMS)</span></div></div>
+    <div class="site-leg"><span><i class="ok"></i>운전·급전</span><span><i class="idle"></i>정지·대기</span><span><i class="bad"></i>고장·두절</span><span><b class="lg on"></b>전력(AC)</span><span><b class="lg com"></b>통신(전력선과 같은 경로 · 환형)</span></div></div>
     <div id="layBar"></div>`;
 }
 function siteUpdate(s, force) {

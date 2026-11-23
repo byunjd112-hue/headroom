@@ -162,7 +162,10 @@ def status(r, val, lost=False):
     g = (lambda t: None) if lost else val.get; r = layout(r, g); n = len(r["fsu"]); sw = sw_tags(r)
     secs = [{"i": i, "tag": t, "state": None if g(t) is None else int(round(g(t))), "open": i == r["open"]} for i, t in enumerate(sw)]
     fed = _fed([s["state"] == 1 for s in secs], n) if all(s["state"] is not None for s in secs) else [None] * n
-    fsu = [_unit(f, g, fed[k]) for k, f in enumerate(r["fsu"])]; auto = g("RING.auto"); ppdu = _ppdus(r, g, {f["id"]: f["live"] for f in fsu})
+    fsu = [_unit(f, g, fed[k]) for k, f in enumerate(r["fsu"])]; auto = g("RING.auto")
+    link = _fed([s["state"] != 2 for s in secs], n) if all(s["state"] is not None for s in secs) else [None] * n      # 통신선은 전력 케이블과 같은 경로의 고리다: 차단된(끊긴) 구간만 막히고 상시 개방점은 지나간다
+    for k, f in enumerate(fsu): f["comm"] = link[k]
+    ppdu = _ppdus(r, g, {f["id"]: f["live"] for f in fsu})
     return {"name": r["name"], "sections": secs, "fsu": fsu, "ppdu": ppdu, "open": r["open"], "auto": None if auto is None else auto > 0.5,
             "ok": n > 0 and all(f["live"] for f in fsu), "switched": bool(secs) and secs[r["open"]]["state"] == 1,
             "isolated": [f["id"] for f in fsu if f["live"] is False], "cut": [s["i"] for s in secs if s["state"] == 2], "missing": [t for t in tags(r) if val.get(t) is None], "eff": r, "recog": _recog(r, fsu + ppdu)}
@@ -220,6 +223,7 @@ def alarms(r, s):
     for f in s["fsu"]:
         vital = any(p["vital"] for p in s["ppdu"] if p["at"] == f["id"])
         out.append((f"ring.dead.{f['id']}", f["live"] is False, 1 if vital else 2, f["id"], f"{f['name']}({f['id']}) 무전압 — 이 마디의 부하 정전" + (" [중요 부하]" if vital else "")))
+        out.append((f"ring.comm.{f['id']}", f.get("comm") is False, 2, f["id"], f"{f['name']}({f['id']}) 통신 고립 — 양쪽 구간이 모두 끊겨 환형 통신으로도 닿지 않음(값은 마지막 값). 끊긴 구간 가운데 하나를 먼저 복구"))
         out.append((f"ring.id.{f['id']}", f["id_ok"] is False and f["id_read"] not in (None, 0), 3, f["id"], _id_text(f)))
     for p in s["ppdu"]:
         i = p["id"]; top = 1 if p["vital"] else 2

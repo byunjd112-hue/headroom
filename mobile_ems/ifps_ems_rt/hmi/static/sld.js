@@ -10,7 +10,7 @@ const SRC = [
   { id: "FC", name: "수소 연료전지", en: "FUEL CELL", x: 440, col: "fc", kw: "FC.kw", sub: "100kW", bus: "A" },
   { id: "GDG", name: "주둔지 발전기", en: "GARRISON GEN", x: 590, col: "dg", kw: "GDG.kw", sub: "1MW 디젤", bus: "B" },
   { id: "ESS", name: "ESS (PCS)", en: "ESS (PCS)", x: 730, col: "ess", kw: "ESS.kw", sub: "1MWh / 500kW", bus: "B" },
-  { id: "G1", name: "복합전력 G1", en: "HYBRID G1", x: 880, col: "g1", kw: null, sub: "100kW 계통 형성", bus: "B" },
+  { id: "G1", name: "복합전력 ESS", en: "HYBRID ESS", x: 880, col: "g1", kw: "DG.ess_kw", sub: "200kWh · PCS 경유", bus: "B" },
 ];
 const LOADS = [
   { id: "L1", name: "1등급 필수 부하", en: "CLASS 1 · CRITICAL", x: 220, kw: "LOAD.p1_kw", bus: "A", col: "#ff6b8a" },
@@ -131,9 +131,9 @@ function sldUpdate(s) {
   const cbv = f => { const v = val("CB." + f), ok = f === "GDG" ? !!(D.GDG && D.GDG.link !== "두절") : gw; return (!ok || v === null || v === undefined) ? null : Math.round(v); };   // 1 투입, 0 개방, 2 트립, null 미상
   const closed = f => cbv(f) === null ? true : cbv(f) === 1;
   const code = f => Math.round(val("FLT." + f) || 0);
-  const devLost = id => id === "PV" || id === "G1" || id === "GRID" ? !gw : KF(id) ? kLost(id) : (D[id] ? D[id].link === "두절" : false);
+  const devLost = id => id === "G1" ? kLost("DG") : id === "PV" || id === "GRID" ? !gw : KF(id) ? kLost(id) : (D[id] ? D[id].link === "두절" : false);
   const ops = s.ops || {}, garr = ops.mode === "grid";
-  const running = { PV: k.pv > 0.5, DG: kOn("DG"), FC: kOn("FC"), ESS: val("ESS.status") > 0.5, G1: true, GRID: garr && cbv("GRID") === 1, GDG: !!(D.GDG && D.GDG.on) };
+  const running = { PV: k.pv > 0.5, DG: kOn("DG"), FC: kOn("FC"), ESS: val("ESS.status") > 0.5, G1: (val("DG.pcs_mode") ?? 3) > 0.5, GRID: garr && cbv("GRID") === 1, GDG: !!(D.GDG && D.GDG.on) };
   // 모선 통전: 실측 전압 우선
   const est = bus => SRC.some(n => n.bus === bus && n.id !== "PV" && running[n.id] && closed(n.id));
   let aLive = est("A"), bLive = est("B"); if (closed("TIE")) { const x = aLive || bLive; aLive = bLive = x; }
@@ -146,7 +146,7 @@ function sldUpdate(s) {
     const fm = $("#fm-" + f); if (fm) { fm.style.display = c === 2 ? "" : "none"; $("#fmt-" + f).textContent = "⚡ " + (ANSI_TXT[code(f)] || (ko ? "보호 동작 " : "PROT ") + code(f)); }
   };
   const st = (id, txt, col) => { const e = $("#st-" + id); if (e) { e.textContent = txt; e.setAttribute("fill", col); } };
-  const pk = { PV: k.pv, DG: k.dg, FC: k.fc, ESS: k.ess, G1: 0, GRID: k.grid || 0, GDG: k.gdg || 0 };
+  const pk = { PV: k.pv, DG: k.dg, FC: k.fc, ESS: k.ess, G1: val("DG.ess_kw") || 0, GRID: k.grid || 0, GDG: k.gdg || 0 };
   SRC.forEach(n => {
     if (n.id === "GDG" && !D.GDG) { const e = $("#n-GDG"); if (e) e.style.opacity = .25; return; }      // 주둔지 발전기를 연동하지 않은 현장
     const lost = devLost(n.id), c = cbv(n.id), trip = c === 2, on = running[n.id] && !lost, g = $("#n-" + n.id); sldUnits(n.id);
@@ -167,7 +167,7 @@ function sldUpdate(s) {
     else if (c === 0) st(n.id, ko ? "차단기 개방 · 분리" : "CB OPEN · ISOLATED", "var(--warn)");
     else if (n.id === "PV") st(n.id, k.pv > 0.5 ? (ko ? "발전 중" : "GENERATING") : (ko ? "발전 없음" : "IDLE"), k.pv > 0.5 ? "var(--pv)" : "var(--muted)");
     else if (n.id === "ESS") st(n.id, k.ess > 0.5 ? (ko ? "방전" : "DISCHARGING") : k.ess < -0.5 ? (ko ? "충전" : "CHARGING") : (ko ? "대기" : "STANDBY"), "var(--ess)");
-    else if (n.id === "G1") st(n.id, ko ? "계통 형성" : "GRID-FORMING", "var(--g1)");
+    else if (n.id === "G1") st(n.id, ko ? hyMode(val("DG.pcs_mode")) : ["STOP", "GEN ONLY", "GEN + CHARGE", "ESS DISCHARGE"][Math.round(val("DG.pcs_mode") ?? 3)], "var(--g1)");
     else st(n.id, on ? (ko ? "운전" : "RUNNING") : (ko ? "정지" : "STOPPED"), on ? "var(--ok)" : "var(--muted)");
     const tg = $("#tg-" + n.id);
     if (tg && n.id === "ESS") { tg.textContent = `SOC ${F.n(k.soc, 1)}%${kCnt("ESS")}`; }
