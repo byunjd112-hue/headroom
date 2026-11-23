@@ -95,14 +95,21 @@ class Plant:
         return dg, fc, elz
 
     def _tick_hybrid(self, u, closed):
-        """복합전력 PCS 한 대: 발전기 90 kW, ESS 200 kWh. 모드 2 는 발전기가 20 kW 로 ESS 를 충전, 모드 3 은 ESS 가 10 kW 를 방전. 반환: 모선으로 나가는 전력(kW)"""
+        """복합전력 PCS 한 대: 발전기 90 kW, ESS 200 kWh. 모드 2 는 발전기가 20 kW 로 ESS 를 충전한다. 모드 3(ESS 방전)의 방전 전력은 _hybrid_cover 가 정한다. 반환: 모선으로 나가는 전력(kW)"""
         g = self._g; on = g(f"{u}.status") > 0.5; gen = 90.0 * on * closed
         if f"{u}.mode_set" not in self.by_tag: self._put(((f"{u}.kw", gen),)); return gen
-        want = int(round(g(f"{u}.mode_set"))); soc = g(f"{u}.ess_soc"); mode = (1 if want == 1 else 2) if on else (3 if want == 3 else 0)
-        ess = (-20.0 if soc < 100.0 else 0.0) if mode == 2 else (10.0 if soc > 5.0 else 0.0) if mode == 3 else 0.0
+        want = int(round(g(f"{u}.mode_set"))); soc = g(f"{u}.ess_soc"); mode = (2 if want == 2 else 1) if on else (3 if want == 3 else 0)      # 충전은 모드 2 지령을 받았을 때만(지령 없이 발전기만 돌면 발전기 단독)
+        ess = (-20.0 if soc < 100.0 else 0.0) if mode == 2 else 0.0
         ess *= closed; dt = self._dt
         self._put(((f"{u}.kw", gen), (f"{u}.ess_kw", ess), (f"{u}.pcs_mode", mode), (f"{u}.ess_soc", min(100.0, max(0.0, soc - ess * dt / 3600.0 / 200.0 * 100.0)))))
         return gen + ess
+
+    def _hybrid_cover(self, short, dt):
+        """자립 운전에서 이동형 ESS(②)가 맡지 못한 부족분을 'ESS 방전' 모드의 복합전력 ESS 가 방전해 메운다(대마다 100 kW 까지, 충전율 5% 위에서).
+        이동형 ESS 가 있으면 그쪽이 먼저 부담하는 것으로 단순화했다(실제 분담은 두 PCS 의 수하 특성에 따른다 — 가정)."""
+        g = self._g; us = [u for u in self.us("DG") if f"{u}.pcs_mode" in self.by_tag and int(round(g(f"{u}.pcs_mode"))) == 3 and g(f"{u}.ess_soc") > 5.0 and self._cb("G1")]
+        for u in us:
+            x = min(100.0, max(0.0, short) / len(us)); self._put(((f"{u}.ess_kw", x), (f"{u}.ess_soc", max(0.0, g(f"{u}.ess_soc") - x * dt / 3600.0 / 200.0 * 100.0))))
 
     def _tick_tied(self, now, dt, net, ess_u, ess_set, soc_avg):
         """상전·주둔지 발전기·ESS 가 나머지 전력을 나누어 맡는다."""
@@ -123,7 +130,7 @@ class Plant:
                 self.set("CB.GDG", 2 if int(round(g("CB.GDG"))) == 2 else int(on))
                 if on: gdg = min(1000.0, max(0.0, net - max(-500.0 * n_e, min(500.0 * n_e, ess_set))))
                 self.set("GDG.kw", gdg); self.set("GDG.fuel_pct", max(0.0, g("GDG.fuel_pct") - gdg * 0.26 / 5000.0 * 100.0 * dt / 3600.0))
-            ess = (net - gdg) * cb("ESS"); grid = 0.0; self._exp_t = now                        # 연계가 아닐 때는 역송 시간을 세지 않는다(재투입 직후 곧바로 트립하지 않게)
+            ess = (net - gdg) * cb("ESS"); grid = 0.0; self._hybrid_cover((net - gdg) - (ess if ess_u else 0.0), dt); self._exp_t = now                        # 연계가 아닐 때는 역송 시간을 세지 않는다(재투입 직후 곧바로 트립하지 않게)
         if "BUS.a_v" in self.by_tag: self._tick_bus(now)
         self._put((("GRID.kw", grid),))
         for u in ess_u: self._put(((f"{u}.kw", ess / n_e), (f"{u}.soc", min(90.0, max(10.0, g(f"{u}.soc") - ess / n_e * dt / 3600 / 1000.0 * 100)))))     # 여러 대면 똑같이 나누어 부담
