@@ -22,7 +22,7 @@ b.push(TBL(["구분", "항목", "적용 기준(제안)", "결과", "판정"], [
   ["정적", "메트릭 — 인자 수", `${LIM.arg}개 이하`, `최대 ${M.arg_max}개, 초과 ${M.over.arg.length}개`, ok(!M.over.arg.length)],
   ["정적", "메트릭 — 중첩 깊이", `${LIM.depth} 이하`, `최대 ${M.depth_max}, 초과 ${M.over.depth.length}개`, ok(!M.over.depth.length)],
   ["정적", "메트릭 — 파일 길이", `${LIM.file}줄 이하`, `최대 ${M.file_max}줄, 초과 ${M.over.file.length}개`, ok(!M.over.file.length)],
-  ["동적", "시험 수행", "전 건 통과", `${S.n_tests}건 ${S.tests_ok ? "전부 통과" : "실패 있음"} (${S.unittest_s}초)`, ok(S.tests_ok)],
+  ["동적", "시험 수행", "전 건 통과", `${S.n_tests}건 ${S.tests_ok ? "전부 통과" : "실패 있음"}${(S.retried || []).length ? ` · 그중 ${S.retried.length}건은 한 번 다시 돌려 통과` : ""} (${S.unittest_s}초)`, ok(S.tests_ok)],
   ["동적", "문장 실행률", "100% 또는 미달분 사유 소명", `${S.stmt.pct}% (${S.stmt.hit}/${S.stmt.n})`, S.stmt.pct >= 100 ? ok(true) : part],
   ["동적", "분기 실행률", "100% 또는 미달분 사유 소명", `${S.branch.pct}% (${S.branch.hit}/${S.branch.n})`, S.branch.pct >= 100 ? ok(true) : part]], [8, 28, 22, 30, 12], { center: [0, 4] }));
 b.push(GAP()); b.push(P(`정적 시험은 결함성 규칙·취약점·메트릭 모두 기준 안이다. 동적 시험은 ${S.n_tests}건이 모두 통과했고 문장 ${S.stmt.pct}%, 분기 ${S.branch.pct}%를 실행했다. 실행하지 못한 문장 ${S.stmt.n - S.stmt.hit}개는 5.3에 파일·줄 단위로 사유를 적었다. 분기 실행률은 목표(100%)에 못 미치며 6장의 보완 계획에 따라 올려야 한다.`));

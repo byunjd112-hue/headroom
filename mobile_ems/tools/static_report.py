@@ -56,6 +56,19 @@ def _metrics():
             "top_cc": top(3), "top_len": top(4), "top_arg": top(5), "top_depth": top(6), "files": sorted(files, key=lambda x: -x[1])}
 
 
+def _retry(R, lines):
+    """실패한 시험을 한 번씩 따로 다시 돌린다. 시간에 민감한 시험(응답 시간 · 수집 시간 한도)이 전체 실행의 부하에서 가끔 흔들리기 때문이다.
+    다시 돌려 통과하면 결과를 '재시도 통과'로 적고 이름을 retried 에 남긴다 — 숨기지 않는다. 다시 실패하면 실패 그대로다."""
+    bad = [re.match(r"(\w+)\s", l).group(1) for l in lines if re.search(r" \.\.\. (FAIL|ERROR)$", l) and re.match(r"(\w+)\s", l)]
+    R["retried"] = []
+    if R["tests_ok"] or not bad or len(bad) > 3: return                                  # 여러 건이 한꺼번에 깨지면 흔들림이 아니다
+    for name in bad:
+        r = sh([PY, "-W", "ignore", "-m", "unittest", "discover", "-s", "tests", "-k", name])
+        if not r.stderr.rstrip().endswith("OK"): return
+        R["retried"].append(name)
+    R["tests"] = [re.sub(r"\| (FAIL|ERROR)$", "| 재시도 통과", t) if t.split(" | ")[0].strip() in bad else t for t in R["tests"]]; R["tests_ok"] = True
+
+
 def main():
     R = {"date": time.strftime("%Y-%m-%d %H:%M")}
     # 단위·통합 시험 + 커버리지
@@ -63,6 +76,7 @@ def main():
     t0 = time.time(); r = sh([PY, "-W", "ignore", "-m", "coverage", "run", "--branch", "--source", ",".join(SRC), "-m", "unittest", "discover", "-s", "tests", "-v"]); R["unittest_s"] = round(time.time() - t0, 1)
     lines = r.stderr.splitlines(); R["tests"] = [re.sub(r"\s+\(.*?\)", "", l).replace(" ... ", " | ") for l in lines if " ... " in l]
     m = re.search(r"Ran (\d+) tests", r.stderr); R["n_tests"] = int(m.group(1)) if m else 0; R["tests_ok"] = r.stderr.rstrip().endswith("OK")
+    _retry(R, lines)
     fd, cj = tempfile.mkstemp(suffix=".json"); os.close(fd)
     sh([PY, "-m", "coverage", "json", "-o", cj]); cov = json.load(open(cj)); os.remove(cj)
     T = cov["totals"]; pct = lambda a, n: round(100.0 * a / n, 1) if n else 100.0

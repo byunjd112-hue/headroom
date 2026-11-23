@@ -41,7 +41,7 @@ b.push(TBL(["항목", "요구·기준", "측정", "판정"], sum, [30, 22, 34, 1
 b.push(GAP()); b.push(P(`시험 중 결함 ${5}건을 발견해 모두 수정하고 회귀 시험으로 확인했다(6장). 위 표는 수정 후 최종 측정값이다.`));
 
 b.push(H1("3. 동적 시험")); b.push(H2("3.1 단위·통합 시험"));
-b.push(P(`총 ${S.n_tests}건, 소요 ${S.unittest_s}초. 가상 장치는 Modbus TCP 서버로 동작하므로 모의 객체가 아니라 실제 프레임이 오간다.`));
+b.push(P(`총 ${S.n_tests}건, 소요 ${S.unittest_s}초. 가상 장치는 Modbus TCP 서버로 동작하므로 모의 객체가 아니라 실제 프레임이 오간다.${(S.retried || []).length ? ` 전체 실행에서 ${S.retried.length}건(${S.retried.join(", ")})이 시간 한도 확인에서 실패해 따로 한 번 다시 돌렸고 통과했다 — 응답 · 수집 시간을 재는 시험은 전체 실행의 부하에서 가끔 흔들린다.` : ""}`));
 b.push(TBL(["시험 항목", "결과"], S.tests.map(t => { const [n, r] = t.split(" | "); return [n.trim(), r === "ok" ? "통과" : r]; }), [80, 20], { mono: [0], center: [1] }));
 b.push(H2("3.2 코드 커버리지"));
 b.push(P(`문장 실행률 ${f(S.stmt.pct, 1)}%, 분기 실행률 ${f(S.branch.pct, 1)}%(상세와 미실행 사유는 HAES-IFPS-EMS-RL-001). 낮은 모듈은 명령줄 도구·기동 스크립트처럼 시험 대상 밖의 실행 경로가 많은 파일이다.`));

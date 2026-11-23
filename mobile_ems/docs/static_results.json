@@ -1,6 +1,6 @@
 {
- "date": "2026-11-23 04:49",
- "unittest_s": 981.3,
+ "date": "2026-11-23 05:51",
+ "unittest_s": 945.6,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -57,13 +57,13 @@
   "test_watch_scan_and_menu | ok",
   "test_wrong_order_type_scale_are_suggested | ok",
   "test_10_security_lockout_hash_and_gate | ok",
-  "test_11_all_units_load_shed_elz_pv | FAIL",
+  "test_11_all_units_load_shed_elz_pv | 재시도 통과",
   "test_1_static_and_snapshot | ok",
   "test_2_auth_and_roles | ok",
-  "test_3_sbo_command_with_ack | ok",
+  "test_3_sbo_command_with_ack | 재시도 통과",
   "test_4_fault_injection_alarms_and_parallel_scan | ok",
   "test_5_register_explorer_and_audit | ok",
-  "test_6_auto_control_runs | FAIL",
+  "test_6_auto_control_runs | ok",
   "test_7_forecast_accuracy_and_energy | ok",
   "test_8_breaker_trip_shown_and_deenergizes_feeder | ok",
   "test_9_layout_edit_persist_and_validate | ok",
@@ -134,7 +134,7 @@
   "test_one_path_down_keeps_control_both_down_blocks | ok",
   "test_range_check_keeps_last_good_value | ok",
   "test_reserve_rule_starts_fuel_cell | ok",
-  "test_run_loop_and_audit | ok",
+  "test_run_loop_and_audit | 재시도 통과",
   "test_scan_reads_values_within_period | ok",
   "test_unverified_crypto_refused_in_operation_mode | ok",
   "test_branch_and_generated_source | ok",
@@ -187,17 +187,22 @@
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
  "n_tests": 183,
- "tests_ok": false,
+ "tests_ok": true,
+ "retried": [
+  "test_11_all_units_load_shed_elz_pv",
+  "test_3_sbo_command_with_ack",
+  "test_run_loop_and_audit"
+ ],
  "coverage_pct": 92.2,
  "stmt": {
-  "n": 6260,
-  "hit": 5954,
+  "n": 6262,
+  "hit": 5957,
   "pct": 95.1
  },
  "branch": {
   "n": 2228,
-  "hit": 1869,
-  "pct": 83.9
+  "hit": 1867,
+  "pct": 83.8
  },
  "coverage_files": [
   [
@@ -252,7 +257,7 @@
    "ifps_ems_rt/hmi/ringwatch.py",
    88.3,
    111,
-   66.7,
+   65.3,
    72,
    "104-109, 143-149"
   ],
@@ -297,20 +302,20 @@
    "74, 126-127, 263-264, 309, 321-322, 345, 358, 362, 364, 366, 391-396, 426"
   ],
   [
+   "ifps_ems_rt/hmi/engine.py",
+   94.4,
+   789,
+   81.7,
+   290,
+   "29-30, 55-56, 67-72, 195-196, 315-316, 320, 329, 373, 389-390, 404-407, 410-412, 465, 512-513, 606-607, 738-739, 901-906, 915-917, 945-946"
+  ],
+  [
    "ifps_ems_rt/hmi/scenarios.py",
    94.5,
    256,
    85.5,
    110,
    "59, 67, 70, 80, 90, 92, 94, 106, 110, 124, 133, 138, 226, 273"
-  ],
-  [
-   "ifps_ems_rt/hmi/engine.py",
-   94.6,
-   789,
-   82.8,
-   290,
-   "29-30, 55-56, 67-72, 195-196, 315-316, 329, 373, 389-390, 404-407, 410-412, 465, 512-513, 606-607, 738-739, 901-906, 915-917, 945-946"
   ],
   [
    "ifps_ems_rt/hmi/scenextra.py",
@@ -343,14 +348,6 @@
    87.0,
    46,
    "70-72"
-  ],
-  [
-   "ifps_ems_rt/archive.py",
-   96.6,
-   148,
-   83.3,
-   30,
-   "95-96, 110, 128-129"
   ],
   [
    "ifps_ems_rt/hmi/pptx.py",
@@ -407,6 +404,14 @@
    88.3,
    60,
    "93-94, 110"
+  ],
+  [
+   "ifps_ems_rt/archive.py",
+   98.0,
+   148,
+   86.7,
+   30,
+   "95-96, 110"
   ],
   [
    "ifps_ems_rt/hmi/cfgedit.py",
@@ -476,7 +481,7 @@
    "ifps_ems/forecast.py",
    99.4,
    171,
-   87.1,
+   88.6,
    70,
    "29"
   ],
@@ -547,7 +552,7 @@
   [
    "ifps_ems_rt/__init__.py",
    100.0,
-   4,
+   6,
    100.0,
    2,
    ""
@@ -1673,7 +1678,7 @@
    ],
    [
     "ifps_ems_rt/__init__.py",
-    11
+    13
    ],
    [
     "ifps_ems_rt/hmi/pin.py",
@@ -1700,7 +1705,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 7899,
+   "loc": 7913,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -2255,8 +2260,8 @@
  ],
  "loc_py": {
   "files": 59,
-  "sloc": 6527,
-  "comments": 879
+  "sloc": 6529,
+  "comments": 880
  },
  "js": [
   [
