@@ -12,7 +12,7 @@ import re
 
 KINDS = ("DG", "FC", "ESS", "PV", "ELZ")
 SLOT = re.compile(r"^([A-Z]+?)([2-9])$")
-AGG = {"kw": "sum", "fuel_l": "sum", "lim": "sum", "h2_rate": "sum", "kw_set": "sum", "lim_set": "sum", "status": "any", "soc": "mean"}
+AGG = {"kw": "sum", "fuel_l": "sum", "lim": "sum", "h2_rate": "sum", "kw_set": "sum", "lim_set": "sum", "status": "any", "soc": "mean", "ess_kw": "sum", "ess_soc": "mean"}      # ess_* : 복합전력 PCS 의 ESS
 PROBE_S = 10.0                    # 응답한 적 없는 자리를 다시 불러 보는 간격(초)
 
 

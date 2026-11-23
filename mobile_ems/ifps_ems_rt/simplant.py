@@ -26,6 +26,8 @@ class Plant:
         for d in units:                                                   # 추가 자리의 장치도 첫 장치와 같은 처음 값
             for suf, v in (("soc", 60.0), ("status", 1 if fleet.kind(d) in ("ESS", "PV") else 0), ("fuel_l", 900.0)):
                 if fleet.is_slot(d) and f"{d}.{suf}" in self.by_tag: self.set(f"{d}.{suf}", v)
+            for suf, v in (("ess_soc", 70.0), ("mode_set", 3)):               # 복합전력 PCS: 처음에는 ESS 방전 모드(계통 형성), 충전율 70%
+                if fleet.kind(d) == "DG" and f"{d}.{suf}" in self.by_tag: self.set(f"{d}.{suf}", v)
 
     def us(self, k):
         """그 종류의 놓인 장치 이름들."""
@@ -78,7 +80,7 @@ class Plant:
 
     def _tick_power(self, now, dt):
         """전력 수지: 디젤·연료전지·수전해 출력과 ESS 충·방전(나머지), 모선 전압·주파수."""
-        g = self._g; ess_u = self.us("ESS"); n_e = max(1, len(ess_u)); dg, fc, elz = self._tick_units()
+        g = self._g; ess_u = self.us("ESS"); n_e = max(1, len(ess_u)); self._dt = dt; dg, fc, elz = self._tick_units()
         ess_set = sum(g(f"{u}.kw_set") for u in ess_u); soc_avg = sum(g(f"{u}.soc") for u in ess_u) / n_e
         net = g("LOAD.kw") + elz - g("PV.kw") - dg - fc
         self._tick_tied(now, dt, net, ess_u, ess_set, soc_avg)
@@ -86,11 +88,21 @@ class Plant:
     def _tick_units(self):
         """장치마다 출력을 낸다(같은 종류가 여러 대면 대마다). 반환: (디젤 합, 연료전지 합, 수전해 합) kW"""
         g, cb = self._g, self._cb; dg = fc = elz = 0.0
-        for u in self.us("DG"): x = 90.0 * g(f"{u}.status") * cb("DG"); self._put(((f"{u}.kw", x),)); dg += x
+        for u in self.us("DG"): dg += self._tick_hybrid(u, cb("DG"))
         for u in self.us("FC"): x = (100.0 * g(f"{u}.status") * 0.05 if g(f"{u}.kw_set") == 0 else g(f"{u}.kw_set") * g(f"{u}.status")) * cb("FC"); self._put(((f"{u}.kw", x),)); fc += x
         for u in self.us("ELZ"): x = 150.0 * g(f"{u}.status"); self._put(((f"{u}.kw", x), (f"{u}.h2_rate", 30.0 * g(f"{u}.status")))); elz += x      # 수전해 소비(150kW, 30Nm³/h)
         self._put([(f"{u}.lim", g(f"{u}.lim_set") or 400.0) for u in self.us("PV")])
         return dg, fc, elz
+
+    def _tick_hybrid(self, u, closed):
+        """복합전력 PCS 한 대: 발전기 90 kW, ESS 200 kWh. 모드 2 는 발전기가 20 kW 로 ESS 를 충전, 모드 3 은 ESS 가 10 kW 를 방전. 반환: 모선으로 나가는 전력(kW)"""
+        g = self._g; on = g(f"{u}.status") > 0.5; gen = 90.0 * on * closed
+        if f"{u}.mode_set" not in self.by_tag: self._put(((f"{u}.kw", gen),)); return gen
+        want = int(round(g(f"{u}.mode_set"))); soc = g(f"{u}.ess_soc"); mode = (1 if want == 1 else 2) if on else (3 if want == 3 else 0)
+        ess = (-20.0 if soc < 100.0 else 0.0) if mode == 2 else (10.0 if soc > 5.0 else 0.0) if mode == 3 else 0.0
+        ess *= closed; dt = self._dt
+        self._put(((f"{u}.kw", gen), (f"{u}.ess_kw", ess), (f"{u}.pcs_mode", mode), (f"{u}.ess_soc", min(100.0, max(0.0, soc - ess * dt / 3600.0 / 200.0 * 100.0)))))
+        return gen + ess
 
     def _tick_tied(self, now, dt, net, ess_u, ess_set, soc_avg):
         """상전·주둔지 발전기·ESS 가 나머지 전력을 나누어 맡는다."""

@@ -13,7 +13,7 @@ METRICS = ("executed", "writes", "tied", "outage", "DG", "FC", "GDG", "ELZ", "re
 
 class ScenarioPolicy:
     _auto_control = Engine._auto_control
-    _fc_setpoint = Engine._fc_setpoint
+    _fc_setpoint = Engine._fc_setpoint  # hybrid.apply is called from _auto_control through the engine module
 
     def __init__(self, profile, plant, sequences, clock, directory):
         source = Path(profile).resolve()

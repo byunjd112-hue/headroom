@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from ifps_ems import supervisor as sv, dispatch as dp, security
 from ifps_ems.config import Site, SUP
-from . import pointmap as pm, modbus as mb, fleet
+from . import pointmap as pm, modbus as mb, fleet, hybrid
 from .hal import DeviceLink, RtCommander
 from . import opsmode as om
 from dataclasses import replace
@@ -331,7 +331,7 @@ class Runtime:
             a = (0, 1 if h2_ok else int(a[1]), 0)
         want = {"DG": bool(a[0]), "FC": bool(a[1]), "_policy": tuple(int(x) for x in a)}
         if self.posture == "저소음": want["_quiet"] = True
-        self._swap_missing(want); gdg_on = self._decide_gdg(want)
+        self._swap_missing(want); hybrid.need(self, want); gdg_on = self._decide_gdg(want)      # 복합전력의 ESS 가 낮으면 발전기로 충전
         if self.mode in ("island", "grid"):                           # 자립 운전(작전지, 또는 주둔지 정전 중) N-1 순동 예비력
             online = self.online_kw(self._ready("DG") if want["DG"] else 0, self._ready("FC") if want["FC"] else 0) + [self.gar.gdg_kw] * int(gdg_on)
             if not gdg_on and dp.reserve_need(g("LOAD.p1_kw") + g("LOAD.p2_kw"), online): want["FC"] = True; want["_reserve"] = True
@@ -343,7 +343,7 @@ class Runtime:
         return [self.site.ess_kw] * ess + [float(self.cfg.get("g1_kw", 100.0))] * self.g1_n() + [self.site.dg_kw] * n_dg + [self.site.fc_kw] * n_fc
 
     def g1_n(self):
-        """복합전력 차량의 대수 = 인식한 디젤 대수(한 차량에 디젤과 계통 형성 ESS 가 함께 있다). 계통 형성 ESS(G1)는 통신 장치가 따로 없어 디젤 대수로 미루어 본다(가정)."""
+        """복합전력 차량의 대수 = 인식한 복합전력 PCS 의 수(한 PCS 가 발전기와 ESS 를 함께 맡는다 — 장치 이름 DG, DG2 …)."""
         return max(1, sum(1 for u in self.fleet.slots.get("DG", ()) if u in self.seen))
 
     def g1_kw(self):

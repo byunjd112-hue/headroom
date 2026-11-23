@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from ifps_ems import __version__ as CORE_VERSION
 from ifps_ems.solar import clear_pv_kw
 from ifps_ems.config import SUP
-from .. import fleet, __version__ as RT_VERSION
+from .. import fleet, hybrid, __version__ as RT_VERSION
 from .. import modbus as mb, pointmap as pm
 from ..runtime import Runtime
 from ..simplant import Plant
@@ -625,7 +625,7 @@ class Engine:
             w_n = want["GDG"] if n in rt.gdgs else want[k]
             if w_n != rt.dev[n].on:
                 ok, dt = self._send(n, "start" if w_n else "stop", who); done.append({"dev": n, "on": w_n, "ok": ok, "dt": round(dt, 2)})
-        self._fc_setpoint(want, who)
+        self._fc_setpoint(want, who); hybrid.apply(self.rt, want, who)
         self.last_decision = {"t": wall_iso(), "want": {k: bool(v) for k, v in want.items() if not k.startswith("_")}, "reserve": bool(want.get("_reserve")),
                               "policy": note or "규칙 운전", "action": list(want["_policy"]), "done": done, "ms": round((time.monotonic() - t0) * 1000)}
 
@@ -642,7 +642,7 @@ class Engine:
         if cmd == "set":
             tag, val = job["tag"], job["value"]
             us = [n for n in self.rt.fleet.live(dev) if self.rt.controllable(n)] if tag.startswith(dev + ".") else [dev] * int(self.rt.controllable(dev))      # 같은 종류가 여러 대면 있는 장치 모두에(선택 뒤 통신이 끊긴 장치에는 보내지 않는다)
-            each = val if tag == "FC.kw_set" else val / max(1, self.rt.fleet.share(dev) if len(us) > 1 else 1)        # 합으로 다루는 설정값(ESS·PV)은 똑같이 나누고, 연료전지 출력은 대마다
+            each = val if tag in ("FC.kw_set", "DG.mode_set") else val / max(1, self.rt.fleet.share(dev) if len(us) > 1 else 1)        # 합으로 다루는 설정값(ESS·PV)은 똑같이 나누고, 연료전지 출력은 대마다
             ok = bool(us) and all([self.rt.links[n].write(n + tag[len(dev):] if n != dev else tag, each) for n in us])
             self.rt.cmd.log.append({"t": 0, "dev": dev, "cmd": f"set {tag}={val}", "ok": ok, "text": f"{tag} 설정 {val} {'완료' if ok else '실패'}", "wall": wall_iso(), "who": who})
             self.rt.note("지령", f"{tag} 설정 {val} {'완료' if ok else '실패'}", actor=who)

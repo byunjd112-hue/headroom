@@ -579,5 +579,10 @@
         ]
       }
     ]
+  },
+  "hybrid": {
+    "soc_low": 20,
+    "soc_ok": 50,
+    "soc_full": 90
   }
 }
