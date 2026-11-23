@@ -1,6 +1,6 @@
 {
- "date": "2026-11-23 05:51",
- "unittest_s": 945.6,
+ "date": "2026-11-23 08:14",
+ "unittest_s": 630.6,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -57,10 +57,10 @@
   "test_watch_scan_and_menu | ok",
   "test_wrong_order_type_scale_are_suggested | ok",
   "test_10_security_lockout_hash_and_gate | ok",
-  "test_11_all_units_load_shed_elz_pv | 재시도 통과",
+  "test_11_all_units_load_shed_elz_pv | ok",
   "test_1_static_and_snapshot | ok",
   "test_2_auth_and_roles | ok",
-  "test_3_sbo_command_with_ack | 재시도 통과",
+  "test_3_sbo_command_with_ack | ok",
   "test_4_fault_injection_alarms_and_parallel_scan | ok",
   "test_5_register_explorer_and_audit | ok",
   "test_6_auto_control_runs | ok",
@@ -126,6 +126,7 @@
   "test_allowlist_rejects_outside_addresses | ok",
   "test_pointmap_validation | ok",
   "test_roundtrip_and_types | ok",
+  "운전계획을 뒤에서 계산하면(화면부의 설정) 계산 중에도 판단이 바로 나온다 — 지령 처리가 계획 계산을 기다리지 않는다. | ok",
   "test_plan_policy_decides_from_history_and_falls_back | ok",
   "test_command_ack | ok",
   "통신은 정상인데 장치 hb가 멈추면 지령을 막고, 다시 올라가면 풀린다. | ok",
@@ -134,7 +135,7 @@
   "test_one_path_down_keeps_control_both_down_blocks | ok",
   "test_range_check_keeps_last_good_value | ok",
   "test_reserve_rule_starts_fuel_cell | ok",
-  "test_run_loop_and_audit | 재시도 통과",
+  "test_run_loop_and_audit | ok",
   "test_scan_reads_values_within_period | ok",
   "test_unverified_crypto_refused_in_operation_mode | ok",
   "test_branch_and_generated_source | ok",
@@ -186,22 +187,18 @@
   "test_parse_json_and_csv | ok",
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 183,
+ "n_tests": 184,
  "tests_ok": true,
- "retried": [
-  "test_11_all_units_load_shed_elz_pv",
-  "test_3_sbo_command_with_ack",
-  "test_run_loop_and_audit"
- ],
- "coverage_pct": 92.2,
+ "retried": [],
+ "coverage_pct": 92.1,
  "stmt": {
-  "n": 6262,
-  "hit": 5957,
+  "n": 6285,
+  "hit": 5975,
   "pct": 95.1
  },
  "branch": {
-  "n": 2228,
-  "hit": 1867,
+  "n": 2234,
+  "hit": 1871,
   "pct": 83.8
  },
  "coverage_files": [
@@ -278,20 +275,20 @@
    "160, 198-210, 214-216"
   ],
   [
+   "ifps_ems_rt/hmi/weatherwatch.py",
+   91.1,
+   101,
+   50.0,
+   22,
+   "59-60, 68, 134-139"
+  ],
+  [
    "ifps_ems_rt/hmi/archapi.py",
    93.1,
    58,
    90.6,
    32,
    "62-63, 65-66"
-  ],
-  [
-   "ifps_ems_rt/hmi/weatherwatch.py",
-   93.1,
-   101,
-   50.0,
-   22,
-   "68, 134-139"
   ],
   [
    "ifps_ems_rt/diag.py",
@@ -302,20 +299,20 @@
    "74, 126-127, 263-264, 309, 321-322, 345, 358, 362, 364, 366, 391-396, 426"
   ],
   [
-   "ifps_ems_rt/hmi/engine.py",
-   94.4,
-   789,
-   81.7,
-   290,
-   "29-30, 55-56, 67-72, 195-196, 315-316, 320, 329, 373, 389-390, 404-407, 410-412, 465, 512-513, 606-607, 738-739, 901-906, 915-917, 945-946"
-  ],
-  [
    "ifps_ems_rt/hmi/scenarios.py",
    94.5,
    256,
    85.5,
    110,
    "59, 67, 70, 80, 90, 92, 94, 106, 110, 124, 133, 138, 226, 273"
+  ],
+  [
+   "ifps_ems_rt/hmi/engine.py",
+   94.6,
+   790,
+   82.8,
+   290,
+   "29-30, 55-56, 67-72, 195-196, 315-316, 329, 373, 389-390, 404-407, 410-412, 466, 513-514, 607-608, 739-740, 902-907, 916-918, 946-947"
   ],
   [
    "ifps_ems_rt/hmi/scenextra.py",
@@ -342,12 +339,28 @@
    "52, 72"
   ],
   [
+   "ifps_ems/nowcast.py",
+   96.4,
+   84,
+   81.2,
+   32,
+   "32, 57, 60"
+  ],
+  [
    "ifps_ems/skycam.py",
    96.4,
    84,
    87.0,
    46,
    "70-72"
+  ],
+  [
+   "ifps_ems_rt/archive.py",
+   96.6,
+   148,
+   83.3,
+   30,
+   "95-96, 110, 128-129"
   ],
   [
    "ifps_ems_rt/hmi/pptx.py",
@@ -364,14 +377,6 @@
    75.0,
    8,
    "53"
-  ],
-  [
-   "ifps_ems/nowcast.py",
-   97.6,
-   84,
-   84.4,
-   32,
-   "32, 57"
   ],
   [
    "ifps_ems_rt/hmi/docx.py",
@@ -399,19 +404,11 @@
   ],
   [
    "ifps_ems_rt/archdev.py",
-   97.8,
-   139,
+   97.9,
+   141,
    88.3,
    60,
    "93-94, 110"
-  ],
-  [
-   "ifps_ems_rt/archive.py",
-   98.0,
-   148,
-   86.7,
-   30,
-   "95-96, 110"
   ],
   [
    "ifps_ems_rt/hmi/cfgedit.py",
@@ -420,6 +417,14 @@
    93.6,
    94,
    "107, 274-276"
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   98.2,
+   171,
+   92.2,
+   64,
+   "169, 181-182"
   ],
   [
    "ifps_ems_rt/modbus.py",
@@ -436,14 +441,6 @@
    87.5,
    40,
    "133, 137"
-  ],
-  [
-   "ifps_ems_rt/simplant.py",
-   98.8,
-   171,
-   93.8,
-   64,
-   "181-182"
   ],
   [
    "ifps_ems_rt/hal.py",
@@ -481,7 +478,7 @@
    "ifps_ems/forecast.py",
    99.4,
    171,
-   88.6,
+   87.1,
    70,
    "29"
   ],
@@ -496,7 +493,7 @@
   [
    "ifps_ems/attn.py",
    100.0,
-   83,
+   90,
    80.8,
    26,
    ""
@@ -520,9 +517,9 @@
   [
    "ifps_ems/dispatch.py",
    100.0,
-   112,
-   93.8,
-   16,
+   114,
+   94.4,
+   18,
    ""
   ],
   [
@@ -552,7 +549,7 @@
   [
    "ifps_ems_rt/__init__.py",
    100.0,
-   6,
+   4,
    100.0,
    2,
    ""
@@ -592,9 +589,9 @@
   [
    "ifps_ems_rt/hmi/fcstats.py",
    100.0,
-   28,
-   100.0,
-   6,
+   29,
+   87.5,
+   8,
    ""
   ],
   [
@@ -656,9 +653,9 @@
   [
    "ifps_ems_rt/planlink.py",
    100.0,
-   51,
-   80.0,
-   10,
+   63,
+   83.3,
+   12,
    ""
   ],
   [
@@ -680,11 +677,11 @@
  ],
  "pylint": {
   "E": 1,
-  "W": 49,
+  "W": 52,
   "by_id": [
    [
     "W0718 broad-exception-caught",
-    16
+    17
    ],
    [
     "W0613 unused-argument",
@@ -711,6 +708,10 @@
     3
    ],
    [
+    "W0201 attribute-defined-outside-init",
+    2
+   ],
+   [
     "E1121 too-many-function-args",
     1
    ],
@@ -719,7 +720,7 @@
     1
    ],
    [
-    "W0201 attribute-defined-outside-init",
+    "W0621 redefined-outer-name",
     1
    ],
    [
@@ -748,7 +749,7 @@
     "W0613",
     "unused-argument",
     "ifps_ems/dispatch.py",
-    59,
+    61,
     "Planner.step",
     "Unused argument 'lclass'"
    ],
@@ -820,7 +821,15 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/planlink.py",
-    67,
+    70,
+    "PlanPolicy._refresh.run",
+    "Catching too general exception Exception"
+   ],
+   [
+    "W0718",
+    "broad-exception-caught",
+    "ifps_ems_rt/planlink.py",
+    83,
     "PlanPolicy.__call__",
     "Catching too general exception Exception"
    ],
@@ -895,6 +904,14 @@
     45,
     "Fleet.__init__.<lambda>",
     "Cell variable k defined in loop"
+   ],
+   [
+    "W0621",
+    "redefined-outer-name",
+    "ifps_ems_rt/archdev.py",
+    119,
+    "DevLog.seed",
+    "Redefining name 'groups' from outer scope (line 46)"
    ],
    [
     "W0108",
@@ -1060,7 +1077,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    442,
+    443,
     "Engine._compute_forecast",
     "Catching too general exception Exception"
    ],
@@ -1068,7 +1085,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    512,
+    513,
     "Engine._sup_loop",
     "Catching too general exception Exception"
    ],
@@ -1076,9 +1093,17 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/engine.py",
-    606,
+    607,
     "Engine._exec_loop",
     "Catching too general exception Exception"
+   ],
+   [
+    "W0201",
+    "attribute-defined-outside-init",
+    "ifps_ems_rt/hmi/engine.py",
+    301,
+    "Engine.stop",
+    "Attribute 'halted' defined outside __init__"
    ],
    [
     "W0212",
@@ -1139,7 +1164,7 @@
   ]
  },
  "metrics": {
-  "n_func": 790,
+  "n_func": 796,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1151,7 +1176,7 @@
   "len_max": 199,
   "arg_max": 8,
   "depth_max": 5,
-  "file_max": 997,
+  "file_max": 998,
   "over": {
    "cc": [],
    "len": [],
@@ -1320,7 +1345,7 @@
    [
     "ifps_ems/dispatch.py",
     "simulate",
-    141,
+    144,
     5,
     10,
     8,
@@ -1329,7 +1354,7 @@
    [
     "ifps_ems/dispatch.py",
     "stage_cost",
-    77,
+    79,
     5,
     7,
     8,
@@ -1338,7 +1363,7 @@
    [
     "ifps_ems/dispatch.py",
     "act",
-    124,
+    127,
     10,
     15,
     8,
@@ -1385,7 +1410,7 @@
    [
     "ifps_ems/attn.py",
     "fit",
-    106,
+    119,
     8,
     18,
     4,
@@ -1412,7 +1437,7 @@
    [
     "ifps_ems_rt/hmi/engine.py",
     "_sup_loop",
-    499,
+    500,
     6,
     15,
     0,
@@ -1458,7 +1483,7 @@
   "files": [
    [
     "ifps_ems_rt/hmi/engine.py",
-    997
+    998
    ],
    [
     "ifps_ems_rt/runtime.py",
@@ -1518,7 +1543,7 @@
    ],
    [
     "ifps_ems_rt/archdev.py",
-    190
+    194
    ],
    [
     "ifps_ems_rt/opsmode.py",
@@ -1533,6 +1558,10 @@
     157
    ],
    [
+    "ifps_ems/dispatch.py",
+    154
+   ],
+   [
     "ifps_ems/supervisor.py",
     154
    ],
@@ -1541,12 +1570,12 @@
     153
    ],
    [
-    "ifps_ems/dispatch.py",
-    151
-   ],
-   [
     "ifps_ems_rt/hmi/ringwatch.py",
     150
+   ],
+   [
+    "ifps_ems/attn.py",
+    141
    ],
    [
     "ifps_ems_rt/hmi/weatherwatch.py",
@@ -1563,10 +1592,6 @@
    [
     "ifps_ems_rt/hal.py",
     129
-   ],
-   [
-    "ifps_ems/attn.py",
-    128
    ],
    [
     "ifps_ems/security.py",
@@ -1587,6 +1612,10 @@
    [
     "ifps_ems/nowcast.py",
     99
+   ],
+   [
+    "ifps_ems_rt/planlink.py",
+    86
    ],
    [
     "ifps_ems_rt/hmi/archapi.py",
@@ -1621,10 +1650,6 @@
     72
    ],
    [
-    "ifps_ems_rt/planlink.py",
-    70
-   ],
-   [
     "ifps_ems_rt/archrecv.py",
     61
    ],
@@ -1650,7 +1675,7 @@
    ],
    [
     "ifps_ems_rt/hmi/fcstats.py",
-    41
+    42
    ],
    [
     "ifps_ems_rt/hmi/autodev.py",
@@ -1678,7 +1703,7 @@
    ],
    [
     "ifps_ems_rt/__init__.py",
-    13
+    11
    ],
    [
     "ifps_ems_rt/hmi/pin.py",
@@ -1705,7 +1730,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 7913,
+   "loc": 7940,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -1716,7 +1741,7 @@
    "B608",
    "MEDIUM",
    "ifps_ems_rt/archdev.py",
-   152,
+   156,
    "Possible SQL injection vector through string-based query construction.",
    "CWE-89"
   ],
@@ -1889,12 +1914,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.86,
- "cc_n": 805,
+ "cc_avg": 5.85,
+ "cc_n": 810,
  "cc_rank": {
-  "A": 479,
-  "B": 199,
-  "C": 127,
+  "A": 481,
+  "B": 201,
+  "C": 128,
   "D": 0,
   "E": 0,
   "F": 0
@@ -2013,13 +2038,13 @@
    "A"
   ],
   [
-   "ifps_ems_rt/archive.py",
-   26.5,
+   "ifps_ems_rt/archdev.py",
+   26.3,
    "A"
   ],
   [
-   "ifps_ems_rt/archdev.py",
-   27.2,
+   "ifps_ems_rt/archive.py",
+   26.5,
    "A"
   ],
   [
@@ -2073,13 +2098,13 @@
    "A"
   ],
   [
-   "ifps_ems/dispatch.py",
-   40.8,
+   "ifps_ems/dataio.py",
+   41.0,
    "A"
   ],
   [
-   "ifps_ems/dataio.py",
-   41.0,
+   "ifps_ems/dispatch.py",
+   41.1,
    "A"
   ],
   [
@@ -2108,13 +2133,13 @@
    "A"
   ],
   [
-   "ifps_ems_rt/mbtool.py",
-   45.0,
+   "ifps_ems/attn.py",
+   43.9,
    "A"
   ],
   [
-   "ifps_ems/attn.py",
-   45.6,
+   "ifps_ems_rt/mbtool.py",
+   45.0,
    "A"
   ],
   [
@@ -2138,23 +2163,23 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/fcstats.py",
-   52.2,
-   "A"
-  ],
-  [
    "ifps_ems_rt/hmi/scenario_policy.py",
    52.9,
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/archcfg.py",
-   56.4,
+   "ifps_ems_rt/planlink.py",
+   54.7,
    "A"
   ],
   [
-   "ifps_ems_rt/planlink.py",
-   59.3,
+   "ifps_ems_rt/hmi/fcstats.py",
+   55.2,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/archcfg.py",
+   56.4,
    "A"
   ],
   [
@@ -2260,8 +2285,8 @@
  ],
  "loc_py": {
   "files": 59,
-  "sloc": 6529,
-  "comments": 880
+  "sloc": 6552,
+  "comments": 888
  },
  "js": [
   [
