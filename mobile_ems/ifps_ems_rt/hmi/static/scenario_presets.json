@@ -3906,5 +3906,67 @@
   "cat": "고장 대응 (FMEA)",
   "ref": "FM-57",
   "fat": "응답 중인 장치에 − 를 눌러 거부되는지, 철수 처리 뒤 경보가 사라지는지 확인"
+ },
+ {
+  "name": "장치 구성 · 수소 차량 2대 인식 후 연료전지 동시 기동",
+  "note": "수소생성 · 발전 차량을 한 대 더 놓으면(연료전지 + 수전해) ESS 저충전에서 두 연료전지 모두에 기동 지령이 가는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "UNIT.FC2",
+    "value": 1
+   },
+   {
+    "type": "set",
+    "tag": "UNIT.ELZ2",
+    "value": 1
+   },
+   {
+    "type": "wait",
+    "ms": 300
+   },
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 20
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "평시",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "FC",
+    "value": 1,
+    "op": "eq"
+   },
+   {
+    "type": "expect",
+    "tag": "FC.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   },
+   {
+    "type": "expect",
+    "tag": "FC2.status",
+    "value": 1,
+    "op": "eq",
+    "ms": 1500,
+    "limit": 1500
+   }
+  ],
+  "cat": "고장 대응 (FMEA)",
+  "ref": "FM-59",
+  "fat": "수소 차량을 한 대 더 놓았을 때 연료전지와 수전해가 함께 인식되고 지령이 추가 차량까지 가는지 확인"
  }
 ]

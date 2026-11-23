@@ -88,6 +88,19 @@ class FleetLiveTest(unittest.TestCase):
         self.assertTrue([t for t in rt.events if "PV2 빼기" in t["text"]])
         self.assertEqual((archdev._name("DG2"), archdev._name("ESS3"), archdev._name("DG"), archdev._name("FSU2")), ("디젤발전기 2", "ESS 3", "디젤발전기", "FSU2"))      # 장치별 자료의 이름
 
+    def test_vehicle_pairs_and_hybrid_capacity(self):
+        """차량 단위 대수: ④ 수소 차량은 연료전지와 수전해가 함께 늘고 줄며, ① 복합전력의 계통 형성 용량은 인식한 디젤 대수를 따른다."""
+        from ifps_ems_rt.hmi import unitctl
+        e = self.eng; rt = e.rt; fl = lambda: e.snapshot()["fleet"]; ids = lambda k: [u["id"] for u in fl()[k]["units"]]
+        self.assertTrue(self._wait(lambda: fl()["FC"]["n"] == 1 and fl()["ELZ"]["n"] == 1)); self.assertEqual((fl()["ELZ"]["slots"], rt.g1_n(), rt.g1_kw()), (4, 1, 100.0))
+        r = unitctl.change(e, "FC", 1, "시험"); self.assertEqual(r["unit"], "FC2"); self.assertIn("ELZ2", r["msg"])
+        self.assertTrue(self._wait(lambda: ids("FC") == ["FC", "FC2"] and ids("ELZ") == ["ELZ", "ELZ2"]), "연료전지와 수전해가 함께 인식")
+        r = unitctl.change(e, "ELZ", -1, "시험"); self.assertEqual(r["unit"], "ELZ2"); self.assertIn("FC2", r["msg"])                              # 어느 쪽 카드에서 눌러도 한 차량이 빠진다
+        self.assertTrue(self._wait(lambda: ids("FC") == ["FC"] and ids("ELZ") == ["ELZ"]))
+        unitctl.change(e, "DG", 1, "시험"); self.assertTrue(self._wait(lambda: ids("DG") == ["DG", "DG2"]))
+        self.assertEqual((rt.g1_n(), rt.g1_kw(), e.kpi()["g1_kw"], e.kpi()["g1_n"]), (2, 200.0, 200.0, 2)); self.assertEqual(rt.online_kw(0, 0).count(100.0), 2)      # 형성 용량이 차량 대수만큼
+        unitctl.change(e, "DG", -1, "시험"); self.assertTrue(self._wait(lambda: ids("DG") == ["DG"])); self.assertEqual(rt.g1_kw(), 100.0)
+
     def test_extra_units_are_recognized_summed_and_commanded(self):
         e = self.eng; rt = e.rt; fl = lambda: e.snapshot()["fleet"]; act = lambda: {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}
         self.assertTrue(self._wait(lambda: fl()["DG"]["n"] == 1 and fl()["ESS"]["n"] == 1)); self.assertFalse([k for k in act() if k.startswith(("link.", "absent."))])      # 빈 자리는 경보가 아니다

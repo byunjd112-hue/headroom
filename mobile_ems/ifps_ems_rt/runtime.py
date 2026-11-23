@@ -258,7 +258,7 @@ class Runtime:
         """자립 운전 중 부하 차단 필요 여부. 공급 능력 = 지금 붙어 있는 전원의 합."""
         g = lambda k, d=0.0: self.val.get(k, d); s = self.site
         ess_ok = g("ESS.status", 1) > 0.5 and soc > s.soc_min + 0.02
-        avail = (s.ess_kw if ess_ok else 0.0) + float(self.cfg.get("g1_kw", 100.0)) * (g("CB.G1", 1) == 1) + s.dg_kw * (g("DG.status") > 0.5) + s.fc_kw * (g("FC.status") > 0.5) + max(0.0, g("PV.kw"))
+        avail = (s.ess_kw if ess_ok else 0.0) + self.g1_kw() * (g("CB.G1", 1) == 1) + s.dg_kw * (g("DG.status") > 0.5) + s.fc_kw * (g("FC.status") > 0.5) + max(0.0, g("PV.kw"))
         avail += sum(self.gar.gdg_kw for n in self.gdgs if g(f"{n}.status") > 0.5 and g(f"CB.{n}", 1) == 1)
         target = max(0.0, self.auto_target_h - (t - self.t_posture) / 3600.0) if self.posture == "자립" else self.auto_target_h
         return om.LoadShedder.want(s, self.posture, soc, avail, g("LOAD.p1_kw") + g("LOAD.p2_kw"), g("LOAD.kw"), self.auto_h, target)
@@ -340,7 +340,14 @@ class Runtime:
     def online_kw(self, n_dg, n_fc):
         """N-1 예비력 계산에 넣는 병렬 전원의 용량 목록: 운전 중인 ESS(대수만큼), 복합전력 G1, 디젤 n_dg 대, 연료전지 n_fc 대."""
         ess = self.fleet.running("ESS", self.val) if "ESS.status" in self.val else 1
-        return [self.site.ess_kw] * ess + [self.cfg.get("g1_kw", 100.0)] + [self.site.dg_kw] * n_dg + [self.site.fc_kw] * n_fc
+        return [self.site.ess_kw] * ess + [float(self.cfg.get("g1_kw", 100.0))] * self.g1_n() + [self.site.dg_kw] * n_dg + [self.site.fc_kw] * n_fc
+
+    def g1_n(self):
+        """복합전력 차량의 대수 = 인식한 디젤 대수(한 차량에 디젤과 계통 형성 ESS 가 함께 있다). 계통 형성 ESS(G1)는 통신 장치가 따로 없어 디젤 대수로 미루어 본다(가정)."""
+        return max(1, sum(1 for u in self.fleet.slots.get("DG", ()) if u in self.seen))
+
+    def g1_kw(self):
+        return float(self.cfg.get("g1_kw", 100.0)) * self.g1_n()
 
     def _ready(self, k):
         """기동 지령을 받을 수 있는 대수(있는 장치 가운데 현장 수동이 아닌 것). 아직 읽기 전이면 1."""

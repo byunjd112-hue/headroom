@@ -5,7 +5,7 @@
 """
 from .. import fleet
 
-KINDS = ("DG", "FC", "ESS", "PV")
+KINDS = ("DG", "FC", "ESS", "PV", "ELZ")
 
 
 def devices(pts):

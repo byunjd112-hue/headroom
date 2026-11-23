@@ -7,6 +7,7 @@
 """
 import time
 
+MATE = {"FC": "ELZ", "ELZ": "FC"}  # 한 차량에 함께 실린 장치(④ 수소생성 · 발전체계 = 연료전지 + 수전해): 대수를 같이 바꾼다. ① 복합전력의 계통 형성 ESS(G1)는 통신 장치가 따로 없어 디젤 대수를 따른다(runtime.g1_kw)
 HOLD_S = 30.0                     # 뺀 장치의 통신 상태가 '두절'로 정리되기를 기다리는 시간(초). 그동안 두절 경보를 내지 않는다
 
 
@@ -14,7 +15,32 @@ def _drop(eng):
     return eng.__dict__.setdefault("unit_drop", {})
 
 
+def _mate(eng, n):
+    """같은 차량의 짝 장치 이름(FC2 ↔ ELZ2). 없으면 None."""
+    from .. import fleet
+    k = fleet.kind(n); m = MATE.get(k) and MATE[k] + n[len(k):]
+    return m if m in eng.rt.links else None
+
+
 def change(eng, k, delta, who):
+    """한 차량 단위로 대수를 바꾼다: 그 종류의 장치와, 같은 차량의 짝 장치(있으면)."""
+    r = _change1(eng, k, delta, who); m = r.get("ok") and _mate(eng, r["unit"])
+    if m and (m in eng.rt.seen) != (delta > 0) and (delta > 0 or eng.sim or eng.rt.lm.state.get(m) == "두절"): _apply(eng, m, delta, who); r["msg"] += f" (같은 차량의 {m} 포함)"
+    return r
+
+
+def _apply(eng, n, delta, who):
+    """장치 하나를 놓거나(＋) 뺀다(−)."""
+    rt = eng.rt; drop = _drop(eng)
+    if delta > 0:
+        rt.fleet.park.pop(n, None); rt.hb_seen.pop(n, None); rt.hb_stop.pop(n, None); drop.pop(n, None); rt.hb_skip.discard(n)
+        if eng.sim: eng.plant.gone.discard(n)
+        return
+    if eng.sim: eng.plant.gone.add(n)
+    drop[n] = time.time() + HOLD_S; rt.hb_skip.add(n); rt.note("장치", f"{n} 빼기(대수 조정)", actor=who)
+
+
+def _change1(eng, k, delta, who):
     rt = eng.rt; names = rt.fleet.slots.get(k) or []; drop = _drop(eng)
     if not names or delta not in (1, -1): raise ValueError("대수를 바꿀 수 없는 종류")
     if delta > 0:
@@ -27,9 +53,8 @@ def change(eng, k, delta, who):
     have = [n for n in names if n in rt.seen and n not in drop]
     if not have: return {"ok": False, "why": f"뺄 {k} 장치가 없습니다"}
     n = have[-1]
-    if eng.sim: eng.plant.gone.add(n)
-    elif rt.lm.state.get(n) != "두절": return {"ok": False, "why": f"{n} 이 아직 응답합니다. 장치를 끄거나 통신선을 뺀 뒤 다시 누르십시오(응답하는 장치는 자동으로 다시 인식됩니다)"}
-    drop[n] = time.time() + HOLD_S; rt.hb_skip.add(n); rt.note("장치", f"{n} 빼기(대수 조정)", actor=who); cycle(eng)
+    if not eng.sim and rt.lm.state.get(n) != "두절": return {"ok": False, "why": f"{n} 이 아직 응답합니다. 장치를 끄거나 통신선을 뺀 뒤 다시 누르십시오(응답하는 장치는 자동으로 다시 인식됩니다)"}
+    _apply(eng, n, -1, who); cycle(eng)
     return {"ok": True, "unit": n, "msg": f"{n} 을 뺐습니다"}
 
 

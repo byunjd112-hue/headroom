@@ -152,7 +152,7 @@ const P_SLD = {
 /* 설비 목록: IFPS 체계 구성(①~⑥) 기준. dev = 통신 장치(runtime.json devices), 없으면 감시 전용 */
 const CTL_UNITS = [
   { id: "DG", no: "①", nm: "기동형 복합전력공급체계 · 디젤발전기", en: "Hybrid power unit · diesel generator", col: "dg", dev: "DG", kw: "DG.kw", ctl: true },
-  { id: "G1", no: "①", nm: "기동형 복합전력공급체계 · ESS 200kWh (계통 형성)", en: "Grid-forming hybrid ESS · 100kW", col: "g1", dev: null },
+  { id: "G1", no: "①", nm: "기동형 복합전력공급체계 · ESS 200kWh (계통 형성)", en: "Grid-forming hybrid ESS · 100kW", col: "g1", dev: null, uq: "DG" },      // 디젤과 같은 차량: 대수가 함께 바뀐다
   { id: "ESS", no: "②", nm: "이동형 ESS(GFM) · 1.0MWh / PCS 500kW", en: "Mobile grid-forming BESS", col: "ess", dev: "ESS", kw: "ESS.kw" },
   { id: "PV", no: "③", nm: "이동형 PV 발전체계 · 400kW급 (80kWp × 5식)", en: "Rollable thin-film PV · inverter", col: "pv", dev: "PV", kw: "PV.kw", ctl: true, on: "계통 연결", off: "분리", sp: ["PV.lim_set", "출력 제한", 400, 10] },
   { id: "FC", no: "④", nm: "수소생성·발전체계 · 연료전지 100kW", en: "PEM fuel cell", col: "fc", dev: "FC", kw: "FC.kw", ctl: true, sp: ["FC.kw_set", "출력 설정", 100, 5] },
@@ -193,7 +193,7 @@ const P_CTL = {
     const units = CTL_UNITS.filter(u => (!u.dev || s.devices[u.dev]) && (!u.need || s.values[u.need]));
     $("#devs").className = "devs devs4" + (units.length > 8 ? " devs5" : "");                       // 9~10장이면 5칸 × 2줄
     $("#devs").innerHTML = units.map(u => `<div class="panel dev" id="dv-${u.id}"><div class="hd"><span class="lamp" id="lp-${u.id}"></span><h3 style="color:var(--text)"><span class="dno">${u.no}</span>${u.nm}</h3><div class="spacer"></div><span class="pill" id="lk-${u.id}">—</span></div>
-      <div class="bd"><div class="toprow"><div style="flex:1;min-width:0"><div class="muted" style="font-size:12px;margin:-4px 0 8px">${u.en}${u.dev ? ` · <span class="mono">${u.dev}</span>` : ""}</div><div class="row"><div><div class="lab">${u.id === "EMS" ? "수집 주기" : u.id === "MTR" ? "총 부하" : u.id === "ELZ" ? "소비" : "출력"}</div><div class="big" id="kw2-${u.id}" style="color:var(--${u.col})">—</div></div><div class="spacer"></div><div style="text-align:right"><div class="lab">상태</div><div class="mid" id="sx-${u.id}">—</div></div></div></div><div class="eqimg" id="eq-${u.id}"></div>${u.dev && KF(u.dev) && KF(u.dev).slots > 1 ? `<span class="uq" title="장치 대수 — 가상 장치는 놓고 빼고, 실장비는 빈 자리를 다시 찾거나 철수한 장치를 지운다"><button class="btn sm" data-uq="${u.dev}" data-dv="-1">−</button><b id="uq-${u.id}">—</b><button class="btn sm" data-uq="${u.dev}" data-dv="1">＋</button></span>` : ""}</div>
+      <div class="bd"><div class="toprow"><div style="flex:1;min-width:0"><div class="muted" style="font-size:12px;margin:-4px 0 8px">${u.en}${u.dev ? ` · <span class="mono">${u.dev}</span>` : ""}</div><div class="row"><div><div class="lab">${u.id === "EMS" ? "수집 주기" : u.id === "MTR" ? "총 부하" : u.id === "ELZ" ? "소비" : "출력"}</div><div class="big" id="kw2-${u.id}" style="color:var(--${u.col})">—</div></div><div class="spacer"></div><div style="text-align:right"><div class="lab">상태</div><div class="mid" id="sx-${u.id}">—</div></div></div></div><div class="eqimg" id="eq-${u.id}"></div>${(u.uq || u.dev) && KF(u.uq || u.dev) && KF(u.uq || u.dev).slots > 1 ? `<span class="uq" title="차량(장치) 대수 — 가상 장치는 놓고 빼고, 실장비는 빈 자리를 다시 찾거나 철수한 장치를 지운다. ① 복합전력(디젤 + 계통 형성 ESS)과 ④ 수소(연료전지 + 수전해)는 한 차량이라 함께 바뀐다"><button class="btn sm" data-uq="${u.uq || u.dev}" data-dv="-1">−</button><b id="uq-${u.id}">—</b><button class="btn sm" data-uq="${u.uq || u.dev}" data-dv="1">＋</button></span>` : ""}</div>
       <div class="meta" id="mt-${u.id}"></div>
       ${u.ctl ? `<div class="acts"><button class="btn go" data-c="start" data-d="${u.dev}">▶ ${u.on || t("btn.start", "기동")}</button><button class="btn stop" data-c="stop" data-d="${u.dev}">■ ${u.off || t("btn.stop", "정지")}</button>
         ${u.sp ? `<div class="spacer"></div><input class="in" id="sp-${u.id}" type="number" min="0" max="${u.sp[2]}" step="${u.sp[3]}" style="width:80px" placeholder="kW"><button class="btn" data-sp="${u.id}">${u.sp[1]}</button>` : ""}</div><div class="interlock" id="il-${u.id}"></div>`
@@ -218,7 +218,7 @@ const P_CTL = {
       const o = s.ops || {}, garr = o.mode === "grid";
       const on = u.id === "EMS" ? true : u.id === "G1" ? cb("G1") === 1 : u.id === "GRID" ? (garr && cb("GRID") === 1) : u.id === "MTR" ? !lost : kf ? kOn(u.dev) : !!(d && d.on);
       lp.className = "lamp " + (lost ? "lost" : on ? "on" : "");
-      const lk = $("#lk-" + u.id), uq = $("#uq-" + u.id); if (uq && kf) uq.textContent = `${kf.units.length} / ${kf.slots}대`;
+      const lk = $("#lk-" + u.id), uq = $("#uq-" + u.id), qf = KF(u.uq || u.dev); if (uq && qf) uq.textContent = `${qf.units.length} / ${qf.slots}대`;
       if (d) { const best = kf && kf.units.find(x => x.live); lk.className = "pill " + (gone ? "" : LINK_CLS[best ? best.link : d.link]); lk.textContent = gone ? "미설치" : linkTxt(best ? best.link : d.link) + (kf ? kCnt(u.dev) : ""); lk.title = kf && kf.units.length > 1 ? kf.units.map(x => `${x.id}: ${x.live ? (x.on ? "운전" : "정지") : "두절"}${x.kw == null ? "" : " " + F.kw(x.kw) + " kW"}`).join(" / ") + " — 지령은 있는 장치 모두에게 간다" : ""; }
       else if (u.id === "EMS") { lk.className = "pill " + (s.alarm_cnt[1].act ? "bad" : "ok"); lk.textContent = s.alarm_cnt[1].act ? `긴급 ${s.alarm_cnt[1].act}` : "정상"; }
       else if (u.id === "GRID" && !lost) { const g2 = s.ops || {}, t2 = g2.mode !== "grid" ? "미연계" : g2.outage ? "정전" : "연계"; lk.className = "pill " + (t2 === "정전" ? "bad" : t2 === "연계" ? "ok" : "info"); lk.textContent = t2; }
@@ -234,7 +234,7 @@ const P_CTL = {
         : on ? `<span class="okc">운전 중</span>` : `<span class="muted">정지</span>`;
       const mode = d ? ["모드", d.manual ? "수동" : "자동"] : null, hb = d ? ["생존 HB", F.n(d.hb, 0)] : null;
       const meta = { DG: [mode, ["연료", F.n(val("DG.fuel_l"), 0) + " L"], ["순번 ACK", F.n(d && d.seq_ack, 0)], hb],
-        G1: [["CB-G1", c === 1 ? "투입" : c === 0 ? "개방" : c === 2 ? "트립" : "미상"], ["모선 B", F.n(val("BUS.b_v"), 0) + " V"], ["주파수", F.n(val("BUS.hz"), 2) + " Hz"], ["형성 용량", "100 kW"]],
+        G1: [["CB-G1", c === 1 ? "투입" : c === 0 ? "개방" : c === 2 ? "트립" : "미상"], ["모선 B", F.n(val("BUS.b_v"), 0) + " V"], ["주파수", F.n(val("BUS.hz"), 2) + " Hz"], ["형성 용량", `${F.n(k.g1_kw, 0)} kW${k.g1_n > 1 ? ` · ${k.g1_n}대` : ""}`]],
         ESS: [["SOC", F.n(k.soc) + " %"], ["가용", F.n(Math.max(0, (k.soc / 100 - .15) * 1000), 0) + " kWh"], ["자립", k.ess_h ? F.hrs(k.ess_h) + " h" : "—"], ["경로", d ? paths(d) : "—"]],
         PV: [mode, ["출력 제한", F.n(val("PV.lim"), 0) + " kW"], ["금일 발전", F.n(s.energy.pv, 1) + " kWh"], hb],
         FC: [mode, ["수소", F.n(val("H2.nm3"), 0) + " Nm³"], ["순번 ACK", F.n(d && d.seq_ack, 0)], hb],

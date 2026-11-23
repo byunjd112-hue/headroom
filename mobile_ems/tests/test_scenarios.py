@@ -80,7 +80,7 @@ class ScenarioTests(unittest.TestCase):
         self.assertEqual(len(presets), len(result["candidate"]))
         mode_cases = {case["name"] for case in presets if case["cat"] == "정상 운전 · 운전 모드"}
         self.assertEqual(mode_cases, {case["name"] for case in presets[:12]})                       # 운전 모드 12건은 맨 앞(결과 요약이 앞 12건을 운전 모드로 센다)
-        cats = [case["cat"] for case in presets]; self.assertEqual({c: cats.count(c) for c in dict.fromkeys(cats)}, {"정상 운전 · 운전 모드": 12, "정상 운전 · 장비 시퀀스": 6, "고장 대응 (FMEA)": 27, "보호 협조 (FAT 시험 항목)": 6})
+        cats = [case["cat"] for case in presets]; self.assertEqual({c: cats.count(c) for c in dict.fromkeys(cats)}, {"정상 운전 · 운전 모드": 12, "정상 운전 · 장비 시퀀스": 6, "고장 대응 (FMEA)": 28, "보호 협조 (FAT 시험 항목)": 6})
         self.assertEqual(4, sum(1 for case in presets if case["name"].startswith("환망 · ")))                    # 환망(고리 모양 배전) 단선 대응 4건
         self.assertTrue(all(case["ref"] and case["fat"] for case in presets if case["cat"] == "고장 대응 (FMEA)"))      # 고장 대응에는 FMEA 번호와 FAT 확인 항목이 있어야 한다
         self.assertEqual({f"{control} · {site} · {posture}" for control in ("AUTO", "MANUAL")

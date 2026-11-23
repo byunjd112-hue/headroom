@@ -1,6 +1,6 @@
 {
- "date": "2026-11-22 15:01",
- "unittest_s": 783.0,
+ "date": "2026-11-23 00:41",
+ "unittest_s": 889.4,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -175,6 +175,7 @@
   "test_extra_units_are_recognized_summed_and_commanded | ok",
   "test_kind_not_brought_is_marked_absent_and_replaced | ok",
   "설비 제어 화면의 − · ＋: 가상 장치를 놓으면 조작 없이 인식되고, 빼면 두절 경보 없이 빈 자리로 돌아간다. | ok",
+  "차량 단위 대수: ④ 수소 차량은 연료전지와 수전해가 함께 늘고 줄며, ① 복합전력의 계통 형성 용량은 인식한 디젤 대수를 따른다. | ok",
   "test_kind_slot_and_pointmap_expand | ok",
   "test_merge_sum_any_mean_and_empty_slot | ok",
   "test_blend_and_score_weight_follows_error | ok",
@@ -183,18 +184,18 @@
   "test_parse_json_and_csv | ok",
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 180,
+ "n_tests": 181,
  "tests_ok": true,
- "coverage_pct": 92.0,
+ "coverage_pct": 92.1,
  "stmt": {
-  "n": 6161,
-  "hit": 5851,
-  "pct": 95.0
+  "n": 6187,
+  "hit": 5881,
+  "pct": 95.1
  },
  "branch": {
-  "n": 2200,
-  "hit": 1838,
-  "pct": 83.5
+  "n": 2204,
+  "hit": 1846,
+  "pct": 83.8
  },
  "coverage_files": [
   [
@@ -225,7 +226,7 @@
    "ifps_ems_rt/hmi/archwatch.py",
    79.4,
    102,
-   56.8,
+   59.1,
    44,
    "29-30, 43, 56, 59-63, 67-68, 108-110, 114-116, 126-128, 131"
   ],
@@ -270,28 +271,20 @@
    "160, 198-210, 214-216"
   ],
   [
-   "ifps_ems_rt/hmi/unitctl.py",
-   89.7,
-   29,
-   72.2,
-   18,
-   "26, 31, 47"
-  ],
-  [
-   "ifps_ems_rt/hmi/weatherwatch.py",
-   91.1,
-   101,
-   50.0,
-   22,
-   "59-60, 68, 134-139"
-  ],
-  [
    "ifps_ems_rt/hmi/archapi.py",
    93.1,
    58,
    90.6,
    32,
    "62-63, 65-66"
+  ],
+  [
+   "ifps_ems_rt/hmi/weatherwatch.py",
+   93.1,
+   101,
+   50.0,
+   22,
+   "68, 134-139"
   ],
   [
    "ifps_ems_rt/diag.py",
@@ -313,7 +306,7 @@
    "ifps_ems_rt/hmi/engine.py",
    94.6,
    789,
-   82.1,
+   82.4,
    290,
    "29-30, 55-56, 67-72, 195-196, 315-316, 329, 373, 389-390, 404-407, 410-412, 465, 512-513, 606-607, 738-739, 901-906, 915-917, 945-946"
   ],
@@ -334,12 +327,12 @@
    "139-143"
   ],
   [
-   "ifps_ems/nowcast.py",
-   96.4,
-   84,
-   81.2,
-   32,
-   "32, 57, 60"
+   "ifps_ems_rt/hmi/unitctl.py",
+   95.6,
+   45,
+   83.3,
+   18,
+   "52, 72"
   ],
   [
    "ifps_ems/skycam.py",
@@ -372,6 +365,14 @@
    75.0,
    8,
    "53"
+  ],
+  [
+   "ifps_ems/nowcast.py",
+   97.6,
+   84,
+   84.4,
+   32,
+   "32, 57"
   ],
   [
    "ifps_ems_rt/hmi/docx.py",
@@ -433,7 +434,7 @@
    "ifps_ems_rt/simplant.py",
    98.7,
    151,
-   94.6,
+   92.9,
    56,
    "153-154"
   ],
@@ -448,10 +449,10 @@
   [
    "ifps_ems_rt/runtime.py",
    98.9,
-   349,
+   353,
    93.5,
    108,
-   "112, 443-445"
+   "112, 450-452"
   ],
   [
    "ifps_ems_rt/mbtool.py",
@@ -480,9 +481,9 @@
   [
    "ifps_ems/__init__.py",
    100.0,
-   1,
+   4,
    100.0,
-   0,
+   2,
    ""
   ],
   [
@@ -544,9 +545,9 @@
   [
    "ifps_ems_rt/__init__.py",
    100.0,
-   1,
+   4,
    100.0,
-   0,
+   2,
    ""
   ],
   [
@@ -1111,7 +1112,7 @@
   ]
  },
  "metrics": {
-  "n_func": 773,
+  "n_func": 778,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1434,7 +1435,7 @@
    ],
    [
     "ifps_ems_rt/runtime.py",
-    446
+    453
    ],
    [
     "ifps_ems_rt/diag.py",
@@ -1581,6 +1582,10 @@
     76
    ],
    [
+    "ifps_ems_rt/hmi/unitctl.py",
+    73
+   ],
+   [
     "ifps_ems_rt/hmi/docx.py",
     72
    ],
@@ -1607,10 +1612,6 @@
    [
     "ifps_ems_rt/hmi/skywatch.py",
     51
-   ],
-   [
-    "ifps_ems_rt/hmi/unitctl.py",
-    48
    ],
    [
     "ifps_ems_rt/hmi/scenunit.py",
@@ -1641,16 +1642,16 @@
     26
    ],
    [
-    "ifps_ems_rt/hmi/pin.py",
-    10
-   ],
-   [
     "ifps_ems/__init__.py",
-    9
+    13
    ],
    [
     "ifps_ems_rt/__init__.py",
-    7
+    11
+   ],
+   [
+    "ifps_ems_rt/hmi/pin.py",
+    10
    ],
    [
     "ifps_ems_rt/__main__.py",
@@ -1673,7 +1674,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 7770,
+   "loc": 7800,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -1857,11 +1858,11 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.86,
- "cc_n": 788,
+ "cc_avg": 5.84,
+ "cc_n": 793,
  "cc_rank": {
-  "A": 470,
-  "B": 192,
+  "A": 474,
+  "B": 193,
   "C": 126,
   "D": 0,
   "E": 0,
@@ -2126,6 +2127,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/unitctl.py",
+   59.4,
+   "A"
+  ],
+  [
    "ifps_ems/__main__.py",
    60.8,
    "A"
@@ -2168,11 +2174,6 @@
   [
    "ifps_ems_rt/hmi/__main__.py",
    68.7,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/hmi/unitctl.py",
-   69.1,
    "A"
   ],
   [
@@ -2223,8 +2224,8 @@
  ],
  "loc_py": {
   "files": 58,
-  "sloc": 6428,
-  "comments": 852
+  "sloc": 6454,
+  "comments": 855
  },
  "js": [
   [
@@ -2274,7 +2275,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/scentopo.js",
-   187,
+   188,
    true
   ],
   [

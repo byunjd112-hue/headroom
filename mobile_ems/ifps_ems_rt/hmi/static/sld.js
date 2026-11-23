@@ -83,7 +83,7 @@ function setFlow(id, kw, cap, on = true) {
 
 /* 같은 종류 장치가 여러 대면 그림 위에 장치 칩을 대수만큼 그린다(자동 인식 — 놓거나 빼면 스스로 바뀐다). 초록 운전 · 회색 정지 · 빨강 두절 */
 function sldUnits(id) {
-  const g = document.getElementById("un-" + id); if (!g) return; const f = KF(id), us = f && f.units.length > 1 ? f.units : [], sig = JSON.stringify(us.map(u => [u.id, u.live, u.on])); if (g.dataset.sig === sig) return; g.dataset.sig = sig;
+  const g = document.getElementById("un-" + id); if (!g) return; const f = KF(id === "G1" ? "DG" : id),      /* 복합전력 G1 은 디젤과 같은 차량이라 디젤 대수를 따른다 */ us = f && f.units.length > 1 ? f.units : [], sig = JSON.stringify(us.map(u => [u.id, u.live, u.on])); if (g.dataset.sig === sig) return; g.dataset.sig = sig;
   const x0 = +g.dataset.x - us.length * 17 + 1, y = +g.dataset.y;
   g.innerHTML = us.map((u, i) => `<g class="uchip ${u.live ? (u.on ? "on" : "off") : "lost"}"><title>${u.id} · ${u.live ? (u.on ? "운전" : "정지") : "통신 두절"}</title><rect x="${x0 + i * 34}" y="${y - 8}" width="32" height="15" rx="4"/><text x="${x0 + i * 34 + 16}" y="${y + 3.5}" text-anchor="middle">${u.id}</text></g>`).join("");
 }

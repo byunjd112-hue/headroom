@@ -3,7 +3,7 @@
 인터넷 되는 PC에서 한 번 실행한 뒤 photos 폴더째 폐쇄망 노트북으로 옮긴다.  사용: python tools/fetch_ai_photos.py"""
 import os, urllib.request
 BASE = "https://d8j0ntlcm91z4.cloudfront.net/user_3G1lrqe7HpJoxxp7X4ZEBNoNiBf/"
-FILES = {"ess": "hf_20261115_010141_57f8b3f8-dae6-416e-b40a-338600edeb1d", "pv": "hf_20261115_010141_55e95de4-2785-488e-96dc-7673fa1b1471",
+FILES = {"ess": "hf_20261115_010141_57f8b3f8-dae6-416e-b40a-338600edeb1d", "pv": "hf_20261123_000834_d8ca91fb-ca15-45c0-b7b2-558601f14577",
          "fc": "hf_20261115_010241_b7143caf-9d32-46b1-9b17-9ab254ecf3fa", "dg": "hf_20261115_010141_8ddbd6bb-4bd7-4f1f-8bac-8eb35b5e7775",
          "dist": "hf_20261115_010140_ce0a7fa6-4aba-40bf-bf8e-636cb8a06a87", "ems": "hf_20261115_010141_6ec591ae-4afc-46b4-bd1b-9fc5c8af09f5",
          "l1": "hf_20261115_010243_b2849db0-96f1-46b4-8815-4a43343b2289", "l2": "hf_20261115_010141_910d7576-104e-499e-af71-78e81ddfcf28",
