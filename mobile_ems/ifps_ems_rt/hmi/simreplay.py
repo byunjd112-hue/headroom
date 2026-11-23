@@ -42,6 +42,20 @@ def _columns(head, by_tag):
     return cols, bad, [s for s in skipped if s]
 
 
+def _values(r, cols, by_tag, n, bad):
+    """한 줄의 값 → {신호: 값}. 빈 칸은 뺀다(앞 값 유지). 숫자가 아니거나 범위 밖이면 bad 에 적는다."""
+    vals = {}
+    for i, tag in cols:
+        c = r[i].strip() if i < len(r) else ""
+        if not c: continue
+        p = by_tag[tag]
+        try: v = float(c)
+        except ValueError: bad.append(f"{n}줄 {tag}: 숫자가 아님 ({c[:20]})"); continue
+        if not math.isfinite(v) or (p["lo"] is not None and v < p["lo"]) or (p["hi"] is not None and v > p["hi"]): bad.append(f"{n}줄 {tag}: 범위 {p['lo']}~{p['hi']} 밖 ({c[:20]})"); continue
+        vals[tag] = v
+    return vals
+
+
 def parse(text, by_tag):
     """CSV 글 → {"tags", "rows": [(초, {신호: 값})], "skipped"}. 형식 · 범위 오류는 ValueError(여러 건이면 앞의 5건)."""
     rd = list(csv.reader(io.StringIO(text.lstrip("﻿")))); rd = [r for r in rd if any(c.strip() for c in r)]
@@ -53,16 +67,7 @@ def parse(text, by_tag):
         try: t, t0 = _time(r[0], t0)
         except ValueError as e: bad.append(f"{n}줄: {e}"); continue
         if t < 0 or t <= last: bad.append(f"{n}줄: 시각이 앞 줄보다 뒤가 아님"); continue
-        last = t; vals = {}
-        for i, tag in cols:
-            c = r[i].strip() if i < len(r) else ""
-            if not c: continue
-            p = by_tag[tag]
-            try: v = float(c)
-            except ValueError: bad.append(f"{n}줄 {tag}: 숫자가 아님 ({c[:20]})"); continue
-            if not math.isfinite(v) or (p["lo"] is not None and v < p["lo"]) or (p["hi"] is not None and v > p["hi"]): bad.append(f"{n}줄 {tag}: 범위 {p['lo']}~{p['hi']} 밖 ({c[:20]})"); continue
-            vals[tag] = v
-        rows.append((t, vals))
+        last = t; rows.append((t, _values(r, cols, by_tag, n, bad)))
     if bad: raise ValueError(" / ".join(bad[:5]))
     return {"tags": [t for _, t in cols], "rows": rows, "skipped": skipped}
 
