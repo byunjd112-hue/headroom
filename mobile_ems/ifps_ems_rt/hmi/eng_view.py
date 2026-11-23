@@ -62,7 +62,7 @@ class ViewMixin:
 
     def sim_state(self):
         p = self.plant
-        return {"muted": sorted(p.muted), "noack": sorted(p.no_ack), "down": sorted(p.down), "gone": sorted(p.gone), "hold": dict(self.simdrv.hold), "scenario": self.simdrv.scn,
+        return {"muted": sorted(p.muted), "noack": sorted(p.no_ack), "down": sorted(p.down), "gone": sorted(p.gone), "hold": dict(self.simdrv.hold), "scenario": self.simdrv.scn, "replay": self.simdrv.replay.state(),
                 "clock": (datetime.now() + timedelta(hours=self.simdrv.off_h)).strftime("%H:%M") if self.simdrv.off_h else "",
                 "ports": list(self.sim_ports), "manual": [d for d in ("DG", "FC", "ELZ", "PV") if f"{d}.mode" in p.by_tag and p.get(f"{d}.mode") > 0.5]}
 
@@ -102,4 +102,5 @@ class ViewMixin:
         c = copy.deepcopy(self.cfg); c.pop("hmi", None)
         return {"config": c, "site": self.rt.site.to_dict(), "cfg_path": self.cfg_path, "state_dir": self.rt.state_dir, "sim": self.sim,
                 "version": {"rt": RT_VERSION, "core": CORE_VERSION, "pkg": PKG_REV}, "crypto": {"module": self.rt.audit.c.module, "verified": self.rt.audit.c.verified},
-                "sup": SUP, "policy": self.plan_note}
+                "sup": SUP, "policy": self.plan_note,
+                "cmd": {"took": {n: round(t, 2) for n, t in self.rt.cmd.took.items()}, "done_default": self.rt.cmd.done_default, "done_s": dict(self.rt.cmd.done_s)}}

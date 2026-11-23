@@ -6,6 +6,7 @@ from datetime import datetime
 from .. import fleet, fsio
 from .. import modbus as mb
 from .engdefs import FEEDERS, wall_iso
+from . import simreplay
 
 
 class ToolsMixin:
@@ -94,11 +95,12 @@ class ToolsMixin:
         elif a == "set": self._sim_set(q)
         elif a == "release": self.simdrv.hold.pop(q["tag"], None)
         elif a == "clock": self._sim_clock(q.get("hour"))
+        elif a == "replay": simreplay.action(self, q, who)
         elif a == "scenario" and q["name"] in ("grid_outage", "grid_restore"): self._sim_grid(q["name"] == "grid_outage")
         elif a == "scenario": self.simdrv.scenario(q["name"])
         elif a in ("fault", "cb"): self._sim_feeder(q)
         else: raise ValueError(f"동작 없음: {a}")
-        self.rt.note("시뮬레이터", f"고장 주입 {a} {tgt or q.get('tag') or q.get('name') or ''} {q.get('on', '')}".strip(), actor=who)
+        self.rt.note("시뮬레이터", f"고장 주입 {a} {tgt or q.get('tag') or q.get('name') or q.get('op') or ''} {q.get('on', '')}".strip(), actor=who)
         return {"ok": True, "sim": self.sim_state()}
 
     # ── 작전지 배치(운용자 편집): state/layout.json. 장비 대수·막사 수량·위치·연결 급전선

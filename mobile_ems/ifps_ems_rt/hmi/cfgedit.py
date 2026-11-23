@@ -19,7 +19,7 @@ MASK = "********"; SECRET = re.compile(r"^(pin_|audit_key)"); KEEP = 20
 COLS = ["tag", "device", "fc", "addr", "type", "scale", "unit", "lo", "hi", "rw", "order"]
 BAK = re.compile(r"^(runtime|pointmap)\.\d{8}-\d{6}(-\d+)?\.bak$")
 # 운전 설정 값 범위(없는 키는 검사하지 않는다)
-RANGE = {"scan_s": (0.2, 1.5), "ctrl_s": (1, 3600), "timeout_s": (0.05, 1.0), "sup_s": (0.1, 2), "autonomy_target_h": (1, 720), "g1_kw": (0, 10000)}      # 수집 주기 · 응답 한도는 통신 두절 판정 시간(2초)보다 짧아야 한다
+RANGE = {"scan_s": (0.2, 1.5), "ctrl_s": (1, 3600), "timeout_s": (0.05, 1.0), "sup_s": (0.1, 2), "done_s": (0, 600), "autonomy_target_h": (1, 720), "g1_kw": (0, 10000)}      # 수집 주기 · 응답 한도는 통신 두절 판정 시간(2초)보다 짧아야 한다
 AI_RANGE = {"retrain_h": (0.5, 720), "sim_retrain_h": (0.1, 720), "first_min": (0, 1440), "holdout_days": (1, 14), "min_gain": (0, 50), "keep": (2, 100), "max_days": (20, 720),
             "max_gap": (0, 1), "bias_slots": (3, 96), "bias_tau": (1, 96), "nmae_limit": (1, 100)}
 SKY_RANGE = {"max_age_s": (10, 3600), "period_s": (2, 600)}
@@ -162,7 +162,7 @@ def check_runtime(cfg):
 
 def _check_slow(devs, warn):
     slow = [n for n, d in devs.items() if isinstance(d, dict) and re.fullmatch(r"(DG|FC|GDG)\d*", n) and "done_s" not in d]
-    if slow: warn.append(f"{', '.join(slow)}: 완료 한도(done_s) 없음 — 지령을 받은 뒤 상태가 바뀌기까지 1.5초 넘게 걸리는 장비면 devices.<장치>.done_s 를 넣어야 함(없으면 기동 실패로 보고 대체 전원을 기동)")
+    if slow: warn.append(f"{', '.join(slow)}: 장치별 완료 한도(devices.<장치>.done_s) 없음 — 공통 한도(done_s, 기본 20초)를 쓴다. 실장비의 기동 시간을 잰 뒤 장치별로 넣는 것을 권함(시스템 정보의 '지령 완료 시간' 참고)")
 
 
 def _check_hmi(h, bad, warn):

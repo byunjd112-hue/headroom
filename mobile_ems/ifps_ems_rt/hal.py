@@ -83,7 +83,9 @@ class RtCommander(sv.Commander):
         super().__init__(devices, fallback); self.links = links; self.clock = clock; self.poll_s = poll_s
         self.gate = None       # gate(장치) → 지령 가능 여부. 실행기가 통신 상태·생존 계수 판정을 연결한다
         self.tick = None       # 응답 대기 중 주기적으로 부르는 함수(프로세스 감시 갱신)
-        self.done_s = {}       # 장치별 상태 변화 완료 한도(초). 없으면 ack_s. 기동에 시간이 걸리는 장비용
+        self.done_s = {}       # 장치별 상태 변화 완료 한도(초). 없으면 done_default. 기동에 시간이 걸리는 장비용
+        self.done_default = 0.0   # 장치별 값이 없을 때의 완료 한도(초). 실행기가 설정(done_s, 기본 20초)에서 넣는다
+        self.took = {}         # 장치별 지령 완료에 걸린 가장 긴 시간(초) — 완료 한도를 정하는 근거로 화면에 보인다
 
     def refresh(self, did):
         """장치의 현재 상태를 읽어 판단 자료를 갱신한다."""
@@ -127,14 +129,15 @@ class RtCommander(sv.Commander):
                 if self.tick: self.tick()
                 v = self.links[did].read_all()
                 if v is not None and not acked and int(round(v.get(f"{did}.seq_ack", -1))) == self.seq:
-                    acked = True; t_end = max(t_end, self.clock() + self.done_s.get(did, 0.0))        # 수용 확인 → 상태 변화는 장치별 한도까지 기다린다
+                    acked = True; t_end = max(t_end, self.clock() + self.done_s.get(did, self.done_default))        # 수용 확인 → 상태 변화는 완료 한도까지 기다린다
                 if v is not None and acked and (int(round(v.get(f"{did}.status", 0))) == 1) == want:
-                    d.on = want; d.last_seq = self.seq
+                    d.on = want; d.last_seq = self.seq; self.took[did] = max(self.took.get(did, 0.0), self.clock() - t_try)
                     self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": True, "text": f"{did} {cmd} 응답 확인(순번 {self.seq}" + (f", 재지령 {n}회" if n else "") + ")"})
                     return True, self.clock() - t0
                 time.sleep(self.poll_s)
             if not sent: self._idle(t_end)
             self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} {cmd} " + (f"수용했으나 상태 미변화({self.clock() - t_try:.1f}초)" if acked else f"무응답({SUP['ack_s']:.1f}초)")})
+            if acked: break                                          # 받아들인 장치에는 같은 지령을 다시 보내지 않는다(완료 한도까지 기다렸다)
         self._cancel(did, cmd, t0)
         for alt in self.fallback.get(did, []) if _depth == 0 and cmd == "start" else []:      # 대체는 기동 실패 때만(정지 실패를 다른 전원의 정지로 바꾸지 않는다)
             self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} 지령 실패 → 대체 전원 {alt} 지령, 경보"})

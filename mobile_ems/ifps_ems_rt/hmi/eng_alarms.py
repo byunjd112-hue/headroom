@@ -44,7 +44,7 @@ class AlarmsMixin:
         A.set("soc.lo", s.soc_min * 100 + 4 <= soc < 25, 2, "ESS", f"ESS 충전율 낮음 {soc:.1f}%")
         A.set("soc.hi", soc > s.soc_max * 100 - 1, 4, "ESS", f"ESS 충전율 상한 근접 {soc:.1f}% — PV 출력 제한 가능")
         A.set("soc.blind", rt.soc_blind(), 1, "ESS", "ESS 충전율을 읽지 못함(통신 두절 · 값 이상) — 자립 운전 중이면 안전 쪽으로 발전기를 돌림. ESS 통신과 표시창의 충전율을 확인")
-        A.set("grid.blind", rt.grid_blind(), 1, "GRID", "수전 차단기 상태를 읽지 못함(계측 두절) — 상전 판정을 직전 그대로 두고 발전기 자동 기동 · 정지를 보류. ESS 가 낮아지면 자립 운전 논리로 기동. 현장에서 상전 상태를 확인")
+        A.set("grid.blind", rt.grid_blind(), 1, "GRID", "수전 차단기 상태를 읽지 못함(계측 두절) — 상전 판정을 직전 그대로 두고 발전기 자동 기동 · 정지를 보류. ESS 가 설정값보다 많이 내보내는 상태가 이어지거나 충전율이 낮아지면 정전으로 보고 자립 운전 논리로 기동. 현장에서 상전 상태를 확인")
         h2 = g("H2.nm3", s.h2_nm3)
         A.set("h2.lo", h2 < s.h2_nm3 * s.h2_min * 1.5, 2, "FC", f"수소 잔량 낮음 {h2:.0f}Nm³")
         fuelwatch.alarms(self)

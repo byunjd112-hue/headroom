@@ -20,6 +20,7 @@ from . import opsmode as om
 from dataclasses import replace
 from ifps_ems.solar import clear_pv_kw
 
+BLIND_S = 20.0                    # 수전점 계측 두절 중 ESS 출력으로 정전을 미루어 보는 지속 시간(초)
 HIST_COLS = ["ts", "load_kw", "load_p1", "load_p2", "load_p3", "pv_kw", "temp", "press", "rh", "plan", "mode", "sky"]
 
 
@@ -50,7 +51,7 @@ class Runtime:
         fb = {"DG": ["FC"], "FC": ["DG"]}; fb.update({n: ["DG", "FC"] for n in self.gdgs})      # 주둔지 발전기 기동 실패 → 이동형 디젤·연료전지
         self.cmd = RtCommander({n: self.links[n] for n in self.ctl}, self.dev, fallback=fb, clock=clock)
         self.cmd.gate = self.controllable; self.cmd.tick = lambda: self.wd.kick("제어", self.now())
-        self.cmd.done_s = {n: float(d["done_s"]) for n, d in self.cfg["devices"].items() if "done_s" in d}
+        self.cmd.done_s = {n: float(d["done_s"]) for n, d in self.cfg["devices"].items() if "done_s" in d}; self.cmd.done_default = float(self.cfg.get("done_s", 20.0))      # 지령을 받아들인 장치의 상태가 바뀌기까지 기다리는 한도
         self._probe = {}; self.seen = set()                                                 # 켠 뒤 한 번이라도 응답한 장치
         self.fleet = fleet.Fleet(list(self.links), self.seen)                        # 같은 종류 여러 대 자동 인식·합산
         self.lm = sv.LinkMonitor(list(self.links)); self.wd = sv.Watchdog(["수집", "제어"])
@@ -68,7 +69,7 @@ class Runtime:
         self.gar = om.Garrison.from_cfg(self.cfg.get("garrison")); self.posture = "평시"; self.auto_enabled = True; self.shedder = om.LoadShedder()
         self.auto_h = None; self.auto_target_h = float(self.cfg.get("autonomy_target_h", 72.0)); self.t_posture = self.now(); self.pv_day_kwh = None
         self.grid_lost = False; self.t_grid_ok = None; self.t_outage = None; self._grid_reset_pending = False; self.gdg_last = None; self.gar_last = None; self._gdg_t0 = None; self._w = {}; self._pvday = (None, 0.0)
-        self._tags = {p["tag"] for p in self.pts}; self.rewrite = set(); self._grid_was = True; self.hist_err = ""; self.ops_auto = None; self._load_ops(); self._shed_saved = set(self.shedder.mine)
+        self._t_blind = None; self._tags = {p["tag"] for p in self.pts}; self.rewrite = set(); self._grid_was = True; self.hist_err = ""; self.ops_auto = None; self._load_ops(); self._shed_saved = set(self.shedder.mine)
         ok, why = security.crypto_gate(self.audit.c, self.cfg.get("run_mode", "개발"))
         if not ok: raise RuntimeError(why)
 
@@ -327,7 +328,7 @@ class Runtime:
         self._grid_watch(t); tied = self.tied(); soc = g("ESS.soc", 60.0) / 100
         self._autonomy_update(soc)
         phys = self.mode == "grid" and self._grid_closed()         # 수전 차단기가 실제로 투입되어 있는가(복전 확인 시간 중 포함)
-        if self.grid_blind(): self.gar_last = None                   # 수전점 계측을 못 읽는다: 묵은 부하 값으로 ESS · 태양광 설정을 바꾸지 않는다
+        if self.grid_blind(): self.gar_last = None; self._blind_outage(t)      # 수전점 계측을 못 읽는다: 묵은 부하 값으로 ESS · 태양광 설정을 바꾸지 않는다. ESS 출력으로 정전을 미루어 본다
         elif tied or phys: done += self._garrison_control(tied, hr, soc)
         else:
             self.gar_last = None
@@ -343,6 +344,17 @@ class Runtime:
                 self.note("지령", f"부하 자동 {'차단' if act == 'shed' else '복구'}: {nm}({f}) — {why}{'' if ok else ' (쓰기 실패)'}"); done.append((f, act))
             if self.shedder.mine != self._shed_saved: self._save_shed()
         return done
+
+    def _blind_outage(self, t):
+        """수전점을 못 읽는 동안 정전을 미루어 본다. 상전 연계 중 ESS 는 EMS 설정값대로 충 · 방전한다. ESS 가 설정값보다 훨씬 많이 내보내는 상태가 BLIND_S 이어지면
+        상전이 끊겨 ESS 가 부하를 떠안은 것(계통 형성)으로 보고 자립 운전 논리로 넘긴다. ESS 의 출력 · 설정값을 모르면 미루어 보지 않는다(ESS 충전율이 낮아질 때까지 보류)."""
+        us = self.fleet.live("ESS"); sp = [self._w.get(f"{n}.kw_set") for n in us]
+        if self.grid_lost or not us or None in sp or not self.fresh("ESS.kw"): self._t_blind = None; return
+        over = self.val["ESS.kw"] - sum(sp) > max(10.0, 0.10 * self.site.ess_kw * len(us))
+        self._t_blind = (t if self._t_blind is None else self._t_blind) if over else None
+        if over and t - self._t_blind >= BLIND_S:
+            self.grid_lost = True; self.t_outage = t; self.t_grid_ok = None; self._grid_was = False; self._t_blind = None; self.t_ctl = -1e9
+            self.note("운용", f"상전 정전 추정 — 수전점 계측을 못 읽는 중 ESS 가 설정값보다 {self.val['ESS.kw'] - sum(sp):.0f}kW 더 내보냄({BLIND_S:.0f}초). 자립 운전으로 전환")
 
     def _save_shed(self):
         self._shed_saved = set(self.shedder.mine)
@@ -392,7 +404,7 @@ class Runtime:
     def _decide_hold(self):
         """수전 차단기 상태를 못 읽는 동안(주둔지): 발전기 기동 · 정지를 보류한다(상전이 살아 있는지 모른다). 반환: 보류 결정 또는 None.
         다만 ESS 가 낮거나 충전율도 못 읽으면 보류하지 않고 자립 운전 논리로 넘어간다 — 상전이 실제로 끊긴 것일 수 있다."""
-        if not self.grid_blind(): return None
+        if not self.grid_blind() or self.grid_lost: return None      # 이미 정전으로 판정(또는 추정)했으면 자립 운전 논리
         if self.soc_blind() or self.val.get("ESS.soc", 60.0) / 100 < self.site.soc_min + 0.06: return None
         dg = self.fleet.running("DG", self.val) > 0; fc = self.fleet.running("FC", self.val) > 0
         return {"DG": dg, "FC": fc, "_policy": (int(dg), int(fc), 0), "_hold": True}

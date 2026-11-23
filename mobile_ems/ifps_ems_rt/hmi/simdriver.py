@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from ifps_ems.solar import clear_pv_kw
 from ifps_ems.dataio import sky_from_clearness as dataio_sky
 from .engdefs import FEEDERS
+from .simreplay import Replay
 
 
 # ───────────────────────────────── 가상 장치 구동(현장 부하·PV 변화 모사)
@@ -15,7 +16,7 @@ class SimDriver:
     def __init__(self, plant, site):
         self.p = plant; self.site = site; self.hold = {}; self.cloud = 0.9; self.run = True; self.t_last = time.time()
         self.ahead = collections.deque([0.9] * self.LEAD); self.sky = None        # 앞으로 올 구름(25분치)과 하늘 카메라가 보는 구름량(밤에는 None)
-        self.scn = ""; self.extra_load = 0.0; self.err = ""; self.off_h = 0.0
+        self.scn = ""; self.extra_load = 0.0; self.err = ""; self.off_h = 0.0; self.replay = Replay()      # replay: 가져온 자료 재생
 
     def _cloud_step(self, clear):
         """구름을 한 걸음 진행한다. 카메라가 보는 구름량은 15~25분 뒤 태양을 가릴 구름이다(밤에는 None)."""
@@ -23,7 +24,7 @@ class SimDriver:
         far = list(self.ahead)[900:]; self.sky = dataio_sky(sum(far) / len(far)) if clear > 0.02 * self.site.pv_kwp else None
 
     def step(self):
-        now = datetime.now() + timedelta(hours=self.off_h); hr = now.hour + now.minute / 60 + now.second / 3600; doy = now.timetuple().tm_yday
+        self.replay.step(self); now = datetime.now() + timedelta(hours=self.off_h); hr = now.hour + now.minute / 60 + now.second / 3600; doy = now.timetuple().tm_yday
         day = 1 / (1 + math.exp(-(hr - 7.5) * 2)) * 1 / (1 + math.exp((hr - 18.5) * 2))
         p1 = 28 + random.gauss(0, 0.4)
         p2 = 22 + 18 * day + random.gauss(0, 0.8)
@@ -77,7 +78,7 @@ class SimDriver:
             f, code = {"fault_l3": ("L3", 51), "fault_dg": ("DG", 87), "fault_ess": ("ESS", 64)}[name]; self.trip(f, code)
         elif name == "tie_open": self.p.set("CB.TIE", 0)
         elif name == "normal":
-            self.hold.clear(); self.extra_load = 0.0; self.scn = ""
+            self.replay.stop(self); self.hold.clear(); self.extra_load = 0.0; self.scn = ""
             for f in FEEDERS:
                 if f"CB.{f}" in self.p.by_tag: self.p.set(f"CB.{f}", 1); self.p.set(f"FLT.{f}", 0)
             self.p.muted.clear(); self.p.no_ack.clear(); self.p.down.clear()

@@ -491,7 +491,7 @@ const P_ENG = {
     $$("#simScn [data-s]").forEach(b => b.onclick = () => act({ action: "scenario", name: b.dataset.s }));
     $$("#simScn [data-clk]").forEach(b => b.onclick = () => act({ action: "clock", hour: b.dataset.clk === "" ? null : +b.dataset.clk }));
     $("#svGo").onclick = () => { const x = parseFloat($("#svVal").value); if (!Number.isFinite(x)) return toast("값을 숫자로 입력하십시오", "bad"); act({ action: "set", tag: $("#svTag").value, value: x, hold: $("#svHold").checked }); };
-    this.simUpdate();
+    this.simUpdate(); SimReplay.mount(act);
   },
   simUpdate() {
     const s = S.snap; if (!s || !s.sim || !$("#simDev")) return; const ss = s.sim_state; const tog = (on, a, tgt) => `<button class="btn sm ${on ? "stop" : ""}" data-a="${a}" data-t="${tgt}" data-on="${on ? 0 : 1}">${on ? "● 적용 중 — 해제" : "적용"}</button>`;
@@ -516,13 +516,14 @@ const P_ENG = {
     $("#engBody").innerHTML = `<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div class="panel"><div class="hd"><h3>실행 정보</h3></div><div class="bd"><div class="kv band">
       <span class="k">패키지 리비전</span><span class="v">${esc(r.version.pkg || "")}</span><span class="k">EMS 연동 계층</span><span class="v">v${r.version.rt}</span><span class="k">핵심 프로그램</span><span class="v">v${r.version.core}</span><span class="k">운전 정책</span><span class="v" style="font-family:var(--sans)">${esc(r.policy)}</span>
       <span class="k">설정 파일</span><span class="v">${esc(r.cfg_path)}</span><span class="k">상태 폴더</span><span class="v">${esc(r.state_dir)}</span><span class="k">모드</span><span class="v">${r.sim ? "가상 장치" : "실장치"}</span>
+      <span class="k">지령 완료 시간</span><span class="v">${Object.keys((r.cmd || {}).took || {}).length ? Object.entries(r.cmd.took).map(([n, t]) => `${esc(n)} ${t.toFixed(1)}초`).join(" · ") : "아직 잰 것 없음"} <span class="muted">(잰 최대값 / 완료 한도 공통 ${(r.cmd || {}).done_default ?? "—"}초${Object.keys((r.cmd || {}).done_s || {}).length ? " · 장치별 " + Object.entries(r.cmd.done_s).map(([n, t]) => `${esc(n)} ${t}초`).join(", ") : ""})</span></span>
       <span class="k">암호 모듈</span><span class="v">${esc(r.crypto.module)} ${r.crypto.verified ? `<span class="okc">검증필</span>` : `<span class="warnc">미검증(개발 모드 한정)</span>`}</span>
       <span class="k">감사 기록</span><span class="v ${v.ok ? "okc" : "badc"}">${v.ok ? "✔" : "✖"} ${esc(v.msg)}</span></div></div>
       <div class="hd" style="border-top:1px solid var(--line)"><h3>운영 감시 한도 (SUP)</h3></div><div class="bd"><div class="kv band">${Object.entries(r.sup).map(([k, x]) => `<span class="k mono">${k}</span><span class="v">${x}</span>`).join("")}</div></div></div>
       <div class="grid" style="align-content:start"><div class="panel"><div class="hd"><h3>설비 정격 (Site)</h3></div><div class="bd"><div class="kv band">${Object.entries(r.site).map(([k, x]) => `<span class="k mono">${k}</span><span class="v">${esc(x)}</span>`).join("")}</div></div></div>
       <div class="panel"><div class="hd"><h3>runtime.json</h3></div><div class="bd"><pre class="code">${esc(JSON.stringify(r.config, null, 2))}</pre></div></div></div></div>`;
   },
-  update(s) { if (this.tab === "sim") this.simUpdate(); },
+  update(s) { if (this.tab === "sim") { this.simUpdate(); SimReplay.update(); } },
 };
 
 /* ════════════════ 라우팅·주기 갱신 */

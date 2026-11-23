@@ -87,6 +87,36 @@ class TestFieldGuards(Base):
         for _ in range(3): clk[0] += 1.0; rt2.scan(); rt2.fast_control()
         self.assertFalse(rt2.grid_blind()); self.assertTrue(rt2.grid_lost)                                 # 읽히면 실제 상태로 판정한다
 
+    def test_outage_inferred_from_ess_while_meter_is_unreadable(self):
+        """수전점을 못 읽는 동안: ESS 가 설정값보다 훨씬 많이 내보내는 상태가 이어지면 정전으로 미루어 보고 자립 논리로 넘어간다."""
+        rt, clk = self.fake(); rt.set_ops(mode="grid"); self.plant.set("CB.GRID", 1); rt.scan(); rt.fast_control(); self.assertTrue(rt.tied())
+        self.plant.muted.add("MTR"); clk[0] += 3.0; rt.scan(); clk[0] += 3.0; rt.scan(); self.assertTrue(rt.grid_blind())
+        rt._w["ESS.kw_set"] = 0.0; rt.val["ESS.kw"] = 5.0; rt.flag["ESS.kw"] = 0
+        for _ in range(30): clk[0] += 1.0; rt.fast_control()
+        self.assertFalse(rt.grid_lost); self.assertTrue(rt.decide().get("_hold"))                          # 설정값대로면 보류를 이어 간다
+        rt.val["ESS.kw"] = 70.0
+        for _ in range(10): clk[0] += 1.0; rt.fast_control()
+        self.assertFalse(rt.grid_lost)                                                                     # 잠깐의 차이로는 바꾸지 않는다
+        for _ in range(15): clk[0] += 1.0; rt.fast_control()
+        self.assertTrue(rt.grid_lost); self.assertFalse(rt.tied()); self.assertFalse(rt.decide().get("_hold"))
+        self.assertTrue(any("정전 추정" in e["text"] for e in rt.events))
+        rt2, clk2 = self.fake(); rt2.scan(); rt2.fast_control(); rt2.val["ESS.kw"] = 70.0; rt2.flag["ESS.kw"] = 0; self.assertTrue(rt2.grid_blind())
+        for _ in range(40): clk2[0] += 1.0; rt2.fast_control()
+        self.assertFalse(rt2.grid_lost)                                                                    # 설정값을 모르면(쓴 적 없음) 미루어 보지 않는다
+
+    def test_accepted_command_waits_for_completion_limit(self):
+        """지령을 받아들였지만 상태가 늦게 바뀌는 장비: 공통 완료 한도까지 기다리고(대체 전원을 켜지 않는다), 걸린 시간을 남긴다."""
+        self.assertEqual(self.rt.cmd.done_default, 20.0); self.rt.scan(); self.plant.ack_delay = 0.2; real = self.plant._tick_cmd
+        hold = {"until": time.monotonic() + 3.0, "seq": None}
+        def slow(dev, now):                                                                                # 순번은 곧바로 되돌려 쓰고(수용) 상태는 3초 뒤에 바꾼다
+            if dev == "DG" and time.monotonic() < hold["until"]:
+                if int(round(self.plant.get("DG.cmd"))): self.plant.set("DG.seq_ack", self.plant.get("DG.seq"))
+                return
+            real(dev, now)
+        self.plant._tick_cmd = slow; ok, dt = self.rt.cmd.send("DG", "start")
+        self.assertTrue(ok); self.assertGreater(dt, 2.5); self.assertEqual(int(self.plant.get("FC.status")), 0); self.assertGreater(self.rt.cmd.took["DG"], 2.5)
+        self.assertFalse([e for e in self.rt.cmd.log if "대체 전원" in e["text"]])
+
     def test_history_write_failure_keeps_the_cycle(self):
         self.rt.scan(); os.mkdir(os.path.join(self.rt.state_dir, "history.csv"))                           # 쓸 수 없는 이력 파일
         self.rt.slot = self.rt.slot.replace(year=self.rt.slot.year - 1); self.rt.acc = [[1.0] * 8]; self.rt.acc_sky = [float("nan")]

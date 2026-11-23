@@ -44,6 +44,20 @@ class TestHmi(unittest.TestCase):
             time.sleep(0.2)
         self.fail("조건 미충족")
 
+    def test_replay_feeds_imported_values_to_the_plant(self):
+        """가상 자료 가져오기 · 재생: CSV 의 값을 시간 순서대로 가상 장치에 넣고, 멈추면 가상 장치가 다시 스스로 값을 만든다."""
+        from ifps_ems_rt.hmi import simreplay
+        e = self.eng; by = e.plant.by_tag
+        d = simreplay.parse("t,LOAD.p1_kw,pv_kw,plan\n0,31,77,1\n60,33,,1\n120,35,12,1\n", by); self.assertEqual(d["tags"], ["LOAD.p1_kw", "PV.kw"]); self.assertEqual(d["skipped"], ["plan"]); self.assertEqual(d["rows"][1], (60.0, {"LOAD.p1_kw": 33.0}))
+        d2 = simreplay.parse("ts,load_kw\n2026-05-01 13:00,80\n2026-05-01 13:15,90\n", by); self.assertEqual([r[0] for r in d2["rows"]], [0.0, 900.0])
+        for bad in ("t,NOPE.x\n0,1\n", "t,DG.status\n0,1\n", "t,PV.kw\n0,abc\n", "t,PV.kw\n0,99999\n", "t,PV.kw\n10,1\n5,2\n", "t,PV.kw\n", "t,ESS.kw_set\n0,1\n"):
+            with self.assertRaises(ValueError, msg=bad): simreplay.parse(bad, by)
+        r = e.sim_action({"action": "replay", "op": "start", "text": "t,LOAD.p1_kw,PV.kw\n0,31,77\n60,33,66\n120,35,12\n", "name": "시험.csv", "speed": 60, "loop": False}, "시험")
+        self.assertTrue(r["sim"]["replay"]["on"]); e.simdrv.step(); self.assertAlmostEqual(e.plant.get("LOAD.p1_kw"), 31.0, places=1); self.assertAlmostEqual(e.plant.get("PV.kw"), 77.0, places=1)
+        time.sleep(2.4); e.simdrv.step(); st = e.sim_state()["replay"]; self.assertTrue(st["done"]); self.assertAlmostEqual(e.plant.get("LOAD.p1_kw"), 35.0, places=1); self.assertAlmostEqual(e.plant.get("PV.kw"), 12.0, places=1)
+        with self.assertRaises(ValueError): e.sim_action({"action": "replay", "op": "start", "text": "t,PV.kw\n0,1\n", "speed": 7}, "시험")
+        e.sim_action({"action": "replay", "op": "stop"}, "시험"); self.assertFalse(e.sim_state()["replay"]["on"]); self.assertNotIn("LOAD.p1_kw", e.simdrv.hold); self.assertNotIn("PV.kw", e.simdrv.hold)
+
     def test_late_operator_command_is_dropped(self):
         """앞선 지령에 밀려 늦어진 운용자 지령은 버린다(잊은 지령이 뒤늦게 나가지 않게)."""
         e = self.eng; n0 = len(e.rt.cmd.log); on = e.rt.dev["FC"].on
