@@ -153,12 +153,19 @@ def check_runtime(cfg):
     units = {}
     al = cfg.get("allow"); al = al if isinstance(al, list) and all(isinstance(a, str) for a in al) else None
     for n, d in devs.items(): _check_device(n, d, bad, units, al)
-    slow = [n for n, d in devs.items() if isinstance(d, dict) and re.fullmatch(r"(DG|FC|GDG)\d*", n) and "done_s" not in d]
-    if slow: warn.append(f"{', '.join(slow)}: 완료 한도(done_s) 없음 — 지령을 받은 뒤 상태가 바뀌기까지 1.5초 넘게 걸리는 장비면 devices.<장치>.done_s 를 넣어야 함(없으면 기동 실패로 보고 대체 전원을 기동)")
+    _check_slow(devs, warn)
     if "MTR" not in devs: warn.append("MTR(계측 게이트웨이) 장치가 없음 — 부하 계측·부하 자동 차단 불가")
     _check_garrison(cfg.get("garrison") or {}, bad)
-    _check_sections(cfg, bad)
-    h = cfg.get("hmi") or {}
+    _check_sections(cfg, bad); _check_hmi(cfg.get("hmi") or {}, bad, warn)
+    return bad, warn
+
+
+def _check_slow(devs, warn):
+    slow = [n for n, d in devs.items() if isinstance(d, dict) and re.fullmatch(r"(DG|FC|GDG)\d*", n) and "done_s" not in d]
+    if slow: warn.append(f"{', '.join(slow)}: 완료 한도(done_s) 없음 — 지령을 받은 뒤 상태가 바뀌기까지 1.5초 넘게 걸리는 장비면 devices.<장치>.done_s 를 넣어야 함(없으면 기동 실패로 보고 대체 전원을 기동)")
+
+
+def _check_hmi(h, bad, warn):
     for k, (lo, hi) in HMI_RANGE.items():
         if isinstance(h, dict) and k in h and not _in(h[k], lo, hi): bad.append(f"hmi.{k}: {lo}~{hi} 범위의 숫자")
     if isinstance(h, dict) and str(h.get("bind", "127.0.0.1")) not in ("127.0.0.1", "localhost", "::1"): warn.append(f"제어화면이 {h.get('bind')} 에 열림 — 폐쇄망 내부 단말에서만 사용")

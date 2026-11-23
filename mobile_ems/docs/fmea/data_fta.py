@@ -121,6 +121,13 @@ B_DESIGN = [  # FM, 보완설계 반영 내용, 반영 대상, 검증 방법, �
  ["C-07", "제어망 스위치 A·B 전원·설치 위치 분리", "망 구성도, 연동 방안서", "전원 한 계통 차단 시험", "SAT", "체계통합(SI)"],
  ["C-08", "ESS 설정값 응답 시간·변화율·운전 방식별 동작 회신과 제어 반영", "안내서 03, opsmode.py", "계단 지령 응답 시험", "FAT", "장비 제작사"],
  ["C-09", "보호 정정표 입수와 EMS 임계 협조 검토서", "보호 협조 검토서", "저주파·역전력 모의 시험", "SAT", "체계통합(SI)"],
+ ["FM-63", "지령 대체를 기동 실패 때만으로 한정(Rev54 반영), 장치별 완료 한도(done_s) 확정", "hal.py(send), runtime.json(devices.done_s)", "test_stop_failure_never_stops_the_other_source, 실장비 기동 완료 시간 측정", "FAT", "체계통합(SI)"],
+ ["FM-64", "충전율을 못 읽으면 발전기 기동 · 1등급 경보(Rev54 반영)", "runtime.py(soc_blind·decide), eng_alarms.py", "test_stale_soc_runs_a_generator, ESS 통신선 분리 시험", "FAT", "EMS 개발"],
+ ["FM-65", "수전 차단기 상태를 못 읽으면 판정 유지 · 기동 정지 보류 · 1등급 경보(Rev54 반영)", "runtime.py(grid_blind·_decide_hold)", "test_grid_state_held_while_meter_is_unreadable, 계측 게이트웨이 분리 시험", "SAT", "EMS 개발"],
+ ["FM-66", "돌아온 장치에 설정값 다시 쓰기, 현장 수동 장치에는 쓰지 않음(Rev54 반영)", "runtime.py(_forget_writes·can_write), hybrid.py(alarms)", "test_setpoints_rewritten_after_device_returns, test_no_setpoint_to_a_unit_in_local_mode, 장치 전원 재투입 시험", "FAT", "EMS 개발"],
+ ["FM-67", "자동 제어 켬/끔 · 인식한 장치 · 자동 차단 급전선을 재기동 뒤에도 유지(Rev54 반영)", "runtime.py(save_ops), fleet.py(restore·store)", "test_auto_off_and_shed_feeders_survive_restart, test_seen_units_survive_restart, EMS 재기동 시험", "FAT", "EMS 개발"],
+ ["FM-68", "수집 주기의 단계별 실패 처리, 이력 쓰기 실패 경보, 응답 시각 = 읽기 완료 때(Rev54 반영)", "hmi/engine.py(_scan_loop), runtime.py(scan·_accumulate), modbus.py", "test_history_write_failure_keeps_the_cycle, test_slow_scan_does_not_mark_live_devices_lost", "FAT", "EMS 개발"],
+ ["FM-69", "'없는 주소' 응답은 그 블록만 빼고 읽음 · 일부 신호 경보(Rev54 반영)", "hal.py(read_blocks), eng_alarms.py", "test_one_bad_block_does_not_kill_the_device, 실장비 주소표 대조", "FAT", "체계통합(SI)"],
 ]
 B_DESIGN_NOTE = "※ [신규] 표기는 현 리비전 소프트웨어에 없는 기능으로, 다음 리비전 설계 반영이 필요한 제안 사항이다. 구현·검증 전에는 해당 고장모드의 개선 후 RPN 을 인정하지 않는다."
 B_AFTER = ["RPN 상위 항목과 단일 고장점은 FAT·SAT 시험 절차서의 필수 시험 항목으로 넣는다.", "실장비 연동 후 실제 고장·경보 이력으로 발생도(O)를 다시 평가한다(시운전 종료 시, 이후 연 1회).",

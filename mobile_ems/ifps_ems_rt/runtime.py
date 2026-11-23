@@ -115,10 +115,7 @@ class Runtime:
     def scan(self):
         got = self._read_parallel(); t = self.now(); bad = set()      # 응답 시각은 읽기를 마친 때다(읽기가 길어져도 살아 있는 장치를 두절로 보지 않는다)
         for n, lk in self.links.items():
-            was = self.lm.state[n]; v = got[n]
-            for k, a in lk.alive.items():
-                if a: self.lm.heartbeat(n, t, k)
-            if len(lk.cl) == 1 and lk.alive.get("A"): self.lm.heartbeat(n, t, "B")      # 경로가 하나뿐인 장치: '경로 저하'로 보지 않는다
+            was = self.lm.state[n]; v = got[n]; self._beat(n, lk, t)
             if v is None: continue
             if n not in self.seen: self.seen.add(n); self.fleet.store()            # 처음 응답한 장치: 인식 목록에 넣고 적어 둔다(재기동 뒤에도 기억)
             if was == "재조회 대기":                                 # 복구 뒤 첫 수집: 달라진 값을 반영한 뒤 제어 재개
@@ -134,6 +131,12 @@ class Runtime:
         self.wd.kick("수집", t); self.n_scan += 1
         self._accumulate()
         return {"t": t, "bad": {k: f for k, f in self.flag.items() if f}, "link": {n: s for n, s in self.lm.state.items() if s != "정상"}}
+
+    def _beat(self, n, lk, t):
+        """응답한 경로의 시각을 적는다. 경로가 하나뿐인 장치는 '경로 저하'로 보지 않게 두 경로 모두 적는다."""
+        for k, a in lk.alive.items():
+            if a: self.lm.heartbeat(n, t, k)
+        if len(lk.cl) == 1 and lk.alive.get("A"): self.lm.heartbeat(n, t, "B")
 
     def _merge_fleet(self, got, t, bad):
         """같은 종류 여러 대: 있는 장치를 가리고 종류 이름의 값을 합산한다. 대수가 바뀌면 기록에 남긴다."""

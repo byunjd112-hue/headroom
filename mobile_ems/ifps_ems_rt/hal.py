@@ -101,6 +101,18 @@ class RtCommander(sv.Commander):
             o = pc.get("order", "ABCD"); return lk.write_regs(pc["addr"], mb.encode(code, "u16", 1, o) + mb.encode(self.seq, "u16", 1, ps.get("order", o)))
         return lk.write(f"{did}.seq", self.seq) and lk.write(f"{did}.cmd", code)
 
+    def _idle(self, t_end):
+        """쓰기 실패: 응답 대기와 같은 시간만큼 기다렸다 다시 보낸다(기다리는 동안에도 프로세스 감시를 갱신)."""
+        while self.clock() < t_end:
+            if self.tick: self.tick()
+            time.sleep(self.poll_s)
+
+    def _cancel(self, did, cmd, t0):
+        """응답 없이 끝난 지령은 취소(cmd=0)해 둔다. 남겨 두면 장치가 늦게 회복될 때 잔류 지령이 뒤늦게 실행된다."""
+        if self.tick: self.tick()
+        cancelled = self.links[did].write(f"{did}.cmd", 0)
+        self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} {cmd} 지령 취소(cmd=0) {'완료' if cancelled else '실패 — 현장 확인 필요'}"})
+
     def send(self, did, cmd, t=None, ttl=None, _depth=0):
         t0 = self.clock(); self.refresh(did)
         why = self.check(did, cmd)
@@ -121,14 +133,9 @@ class RtCommander(sv.Commander):
                     self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": True, "text": f"{did} {cmd} 응답 확인(순번 {self.seq}" + (f", 재지령 {n}회" if n else "") + ")"})
                     return True, self.clock() - t0
                 time.sleep(self.poll_s)
-            while not sent and self.clock() < t_end:                 # 쓰기 실패: 같은 시간만큼 기다렸다 다시 보낸다(기다리는 동안에도 프로세스 감시를 갱신)
-                if self.tick: self.tick()
-                time.sleep(self.poll_s)
+            if not sent: self._idle(t_end)
             self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} {cmd} " + (f"수용했으나 상태 미변화({self.clock() - t_try:.1f}초)" if acked else f"무응답({SUP['ack_s']:.1f}초)")})
-        # 응답 없이 끝난 지령은 취소(cmd=0)해 둔다. 남겨 두면 장치가 늦게 회복될 때 잔류 지령이 뒤늦게 실행된다
-        if self.tick: self.tick()
-        cancelled = self.links[did].write(f"{did}.cmd", 0)
-        self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} {cmd} 지령 취소(cmd=0) {'완료' if cancelled else '실패 — 현장 확인 필요'}"})
+        self._cancel(did, cmd, t0)
         for alt in self.fallback.get(did, []) if _depth == 0 and cmd == "start" else []:      # 대체는 기동 실패 때만(정지 실패를 다른 전원의 정지로 바꾸지 않는다)
             self.log.append({"t": self.clock() - t0, "dev": did, "cmd": cmd, "ok": False, "text": f"{did} 지령 실패 → 대체 전원 {alt} 지령, 경보"})
             ok, _ = self.send(alt, cmd, _depth=1)
