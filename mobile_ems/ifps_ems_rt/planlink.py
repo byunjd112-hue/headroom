@@ -25,7 +25,7 @@ class PlanPolicy:
         self.V = None; self.k = 0; self.rows = 0; self.fc = None; self.note = ""; self.t_plan = None; self.src = ""; self.sh = None
         self.pv_adjust = None                # (태양광 예측, 하한) → (고친 예측, 하한). 화면부가 날씨 입력 반영을 여기에 건다
         self.background = False              # 참이면 운전계획을 뒤에서 따로 계산한다(화면부가 켠다): 계산하는 동안 지령 처리(선택 · 실행, 자동 제어)가 기다리지 않게
-        self._bg = None; self.bg_err = ""
+        self._bg = None; self.bg_err = ""; self.stopped = False; self.pl.cancel = lambda: self.stopped
 
     def reload(self):
         """적용 중인 예측 모델을 다시 읽는다(지속 학습이 새 모델을 적용했을 때)."""
@@ -33,6 +33,10 @@ class PlanPolicy:
             self.fl, self.fp = LoadForecaster(self.site), PVForecaster(self.site)
             dataio.load_model(os.path.join(self.md, "model_load.npz"), self.fl); dataio.load_model(os.path.join(self.md, "model_pv.npz"), self.fp)
             self.meta = learner.active(self.md); self.t_plan = None
+
+    def cancel(self):
+        """뒤에서 돌던 계획 계산을 그만두게 한다(EMS 종료 때)."""
+        self.stopped = True
 
     def _history(self):
         """쓸 이력을 고른다: 실측이 8일 이상이면 실측, 아니면 시연용 합성 자료(있을 때만)."""
@@ -59,7 +63,7 @@ class PlanPolicy:
 
     def _refresh(self, hr):
         """계획이 없거나 1시간이 지났으면 다시 세운다. background 면 뒤에서 계산을 시작하고 바로 돌아온다 — 그동안은 직전 계획을 쓰고, 계획이 아직 없으면 규칙 운전이다."""
-        if not self.background: self.replan(hr); return
+        if not getattr(self, "background", False): self.replan(hr); return
         if self._bg is None or not self._bg.is_alive():
             def run():
                 try: self.replan(hr); self.bg_err = ""

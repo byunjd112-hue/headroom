@@ -192,13 +192,14 @@ class TestPlanLink(Base):
         self.assertLess(dt, 0.5); self.assertEqual(pol.note, "운전계획 계산 중 → 규칙 운전"); self.assertEqual(len(a), 3)      # 기다리지 않고 규칙 운전으로 답한다
         pol(dict(self.rt.val), 14.0); self.assertEqual(threading.active_count(), threading.active_count())                  # 계산 중에 또 불러도 가닥을 더 만들지 않는다
         self.assertEqual(sum(1 for t in threading.enumerate() if t.name == "plan"), 1)
-        gate.set(); pol._bg.join(20.0); a2 = pol(dict(self.rt.val), 14.0); self.assertEqual(pol.note, "계획 운전(실측 이력)"); self.assertEqual(len(a2), 3)
+        gate.set(); pol._bg.join(120.0); self.assertFalse(pol._bg.is_alive()); self.assertEqual(pol.bg_err, ""); a2 = pol(dict(self.rt.val), 14.0); self.assertEqual(pol.note, "계획 운전(실측 이력)"); self.assertEqual(len(a2), 3)
         v_old = pol.V; clk[0] = 3700.0; gate.clear(); t0 = time.monotonic(); pol(dict(self.rt.val), 15.0); self.assertLess(time.monotonic() - t0, 0.5)
         self.assertIs(pol.V, v_old); self.assertEqual(pol.note, "계획 운전(실측 이력)")                                      # 다시 세우는 동안에는 직전 계획을 쓴다
-        gate.set(); pol._bg.join(20.0); self.assertIsNot(pol.V, v_old)
+        gate.set(); pol._bg.join(120.0); self.assertIsNot(pol.V, v_old)
+        pol.cancel(); clk[0] = 7400.0; pol(dict(self.rt.val), 16.0); pol._bg.join(30.0); self.assertIn("중단", pol.bg_err)                 # 멈추라고 하면 계산을 그만둔다(EMS 종료)
         short = os.path.join(self.td, "short_bg.csv")
         with open(os.path.join(res, "sample_site_data.csv"), encoding="utf-8") as f, open(short, "w", encoding="utf-8") as g: g.writelines(f.readlines()[:200])
-        pol2 = PlanPolicy(self.rt.site, short, res); pol2.background = True; pol2(dict(self.rt.val), 14.0); pol2._bg.join(20.0); pol2(dict(self.rt.val), 14.0)
+        pol2 = PlanPolicy(self.rt.site, short, res); pol2.background = True; pol2(dict(self.rt.val), 14.0); pol2._bg.join(60.0); pol2(dict(self.rt.val), 14.0)
         self.assertIn("이력", pol2.note); self.assertIn("규칙 운전", pol2.note)                                              # 뒤에서 난 실패(이력 부족)도 사유가 남는다
 
 

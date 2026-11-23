@@ -21,11 +21,12 @@ def _daily(d):
     return out
 
 
-def backtest(d, fl, fp, site, meta):
+def backtest(d, fl, fp, site, meta, stop=None):
     """반환: (정밀도 사전, 일별 발전·부하 목록)"""
     n = d["n"]; el = {b: [] for b in range(len(BUCKET))}; ep = {b: [] for b in range(len(BUCKET))}; cl = []; cp = []; mean_l = max(float(np.mean(d["load"][-7 * 96:])), 1e-6)
     day_l, day_p, pts = [], [], []
     for oo in range(n - 7 * 96 - 1, n - 97, 24):
+        if stop is not None and stop(): raise InterruptedError("예측 계산 중단")      # EMS 가 멈추면 그만둔다
         a = learner.predict(fl, d, oo, "load", site, meta)[:3]; b = learner.predict(fp, d, oo, "pv", site, meta)[:3]; sl = slice(oo + 1, oo + 97)
         yl = d["load"][sl]; yp = d["pv"][sl]; valid_l = d["load_observed"][sl]; valid_p = d["pv_observed"][sl] & (d["clear"][sl] > 0.05 * site.pv_kwp)
         _score(a, yl, valid_l, mean_l, el, cl); _score(b, yp, valid_p, site.pv_kwp, ep, cp)

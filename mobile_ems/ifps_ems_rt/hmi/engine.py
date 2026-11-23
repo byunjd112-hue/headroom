@@ -298,7 +298,7 @@ class Engine:
     def stop(self):
         self.running = False
         if self.simdrv: self.simdrv.run = False
-        time.sleep(0.3)
+        getattr(self.rt.policy, "cancel", lambda: None)(); time.sleep(0.3)      # 뒤에서 돌던 운전계획 계산을 멈춘다(예측 계산은 running 을 보고 멈춘다)
         try: self.rt.save()
         finally:
             self.archw.close(); self.rt.close()
@@ -421,15 +421,15 @@ class Engine:
     def _compute_forecast(self):
         try:
             import numpy as np
-            from ifps_ems import dataio
+            from ifps_ems import dataio, attn
             from ifps_ems.forecast import LoadForecaster, PVForecaster
-            site = self.rt.site; hist, md, src = self._forecast_source(site)
-            d = dataio.load_csv(hist, site); n = d["n"]
+            attn.set_cancel(lambda: not self.running); site = self.rt.site; hist, md, src = self._forecast_source(site)      # EMS 가 멈추면 이 계산도 그만둔다
+            d = dataio.load_csv(hist, site); n = d["n"]; attn._check()      # pylint: disable=protected-access
             fl, fp = LoadForecaster(site), PVForecaster(site); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp) and fp.trained
             from ifps_ems import learner
             meta = learner.active(md); o = n - 1                                # 적용 중인 모델 정보(최근 오차 보정을 켤지 포함)
             l50, llo, lhi, bl = learner.predict(fl, d, o, "load", site, meta); p50, plo, phi, bp = learner.predict(fp, d, o, "pv", site, meta); p50, plo, phi, wx = self.wxw.apply(d, p50, plo, phi)      # 날씨 입력을 섞는다
-            acc, daily = fcstats.backtest(d, fl, fp, site, meta)
+            acc, daily = fcstats.backtest(d, fl, fp, site, meta, lambda: not self.running)
             r = lambda a: [round(float(x), 2) for x in a]; ts = d["ts"]
             out = {"ok": True, "source": src, "trained": {"load": tl, "pv": tp}, "issued": ts[-1], "hist_ts": ts[-96:], "load_act": r(d["load"][-96:]), "pv_act": r(d["pv"][-96:]),
                    "clear_hist": r(d["clear"][-96:]), "load": r(l50), "load_lo": r(llo), "load_hi": r(lhi), "pv": r(p50), "pv_lo": r(plo), "pv_hi": r(phi),

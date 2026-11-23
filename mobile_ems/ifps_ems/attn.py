@@ -10,7 +10,20 @@
 인과성: 예측 시점보다 뒤에 끝난 기억은 쓰지 않는다(미래를 보지 않는다).
 """
 import math
+import threading
 import numpy as np
+
+_local = threading.local()
+
+
+def set_cancel(fn):
+    """이 가닥에서 도는 예측 계산을 그만둘지 묻는 함수를 정한다(없으면 None). EMS 가 멈출 때 뒤에서 돌던 계산을 끝내는 데 쓴다."""
+    _local.cancel = fn
+
+
+def _check():
+    fn = getattr(_local, "cancel", None)
+    if fn is not None and fn(): raise InterruptedError("예측 계산 중단")
 
 NF = 13                     # 특징 수
 NEAR = 8                    # 가까운 예측의 경계(구간) = 2시간
@@ -75,7 +88,7 @@ class Attention:
 
     def _apply(self, D, V, ok):
         """질의마다 기억의 가중 평균. D: 거리(특징×질의×기억), ok(질의×기억): 쓸 수 있는 기억(예측 시점 전에 끝난 것). 반환: 질의×horizon"""
-        out = np.full((D.shape[1], self.h), np.nan); fin = np.isfinite(V).astype(float); V0 = np.where(np.isfinite(V), V, 0.0)
+        _check(); out = np.full((D.shape[1], self.h), np.nan); fin = np.isfinite(V).astype(float); V0 = np.where(np.isfinite(V), V, 0.0)
         for part, sl in ((0, slice(0, NEAR)), (1, slice(NEAR, self.h))):
             w = self._weights(D, ok, part); den = w @ fin[:, sl]; num = w @ V0[:, sl]
             out[:, sl] = np.where(den > 1e-9, num / np.maximum(den, 1e-9), np.nan)

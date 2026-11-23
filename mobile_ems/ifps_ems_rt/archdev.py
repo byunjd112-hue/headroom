@@ -112,10 +112,11 @@ class DevLog:
     def seed(self, rows, ess_days=3):
         """시연용 과거 자료. rows 는 Archive.seed 와 같은 [(ts, {…})]. 장치별 자료는 전 기간, ESS 1분 자료는 최근 며칠만 넣는다."""
         pick = {"DG.kw": "dg", "FC.kw": "fc", "PV.kw": "pv", "ESS.soc": "soc", "LOAD.kw": "load", "BUS.a_v": "va", "BUS.b_v": "vb", "BUS.hz": "hz", "ENV.temp": "temp"}; out = []; ess = []
-        last = rows[-1][0] if rows else 0
+        last = rows[-1][0] if rows else 0; have = set(pick) | {"ESS.kw", "ESS.status", "ENV.rh"}
+        groups = {dev: sig for dev, sig in self.groups.items() if any(s["tag"] in have for s in sig)}      # 시연 자료가 있는 장치만 돈다(장치 수가 늘어도 넣는 시간이 늘지 않게)
         for ts, v in rows:
             val = {t: v.get(k) for t, k in pick.items()}; val["ESS.kw"] = (v.get("ess_dis") or 0.0) - (v.get("ess_chg") or 0.0); val["ESS.status"] = 1.0; val["ENV.rh"] = 45.0
-            for dev, sig in self.groups.items():
+            for dev, sig in groups.items():
                 d = [x for s in sig for x in ([val[s["tag"]]] * 3 if val.get(s["tag"]) is not None else [NAN] * 3)]
                 if any(x == x for x in d): out.append((int(ts // self.dstep) * self.dstep, self.cid[dev], 1, struct.pack(f"<{len(d)}f", *d)))          # pylint: disable=protected-access
             if self.ess_cid is not None and ts > last - ess_days * 86400:
