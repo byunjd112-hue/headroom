@@ -166,11 +166,17 @@ def _snapshot(plant, watch):
     return {tag: round(plant.get(tag), 2) for tag in watch}
 
 
-def run_case(case, pts, units, profile=None, directory=None, extra=None):
+def _plant(pts, units, profile):
+    """Create the virtual plant; hybrid PCS mode codes follow the profile's settings."""
     plant = Plant(pts, units)
-    if profile:  # hybrid PCS mode codes follow the profile's settings
+    if profile:
         with open(profile, encoding="utf-8") as source:
             plant.set_hybrid(hybrid.settings(json.load(source).get("hybrid"))["code"])
+    return plant
+
+
+def run_case(case, pts, units, profile=None, directory=None, extra=None):
+    plant = _plant(pts, units, profile)
     model = scenextra.Model(extra, plant)
     plant.slow["GDG"] = 5.0
     elapsed = 0

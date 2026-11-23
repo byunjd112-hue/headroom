@@ -1,6 +1,6 @@
 {
- "date": "2026-11-23 02:38",
- "unittest_s": 845.4,
+ "date": "2026-11-23 04:49",
+ "unittest_s": 981.3,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -57,13 +57,13 @@
   "test_watch_scan_and_menu | ok",
   "test_wrong_order_type_scale_are_suggested | ok",
   "test_10_security_lockout_hash_and_gate | ok",
-  "test_11_all_units_load_shed_elz_pv | ok",
+  "test_11_all_units_load_shed_elz_pv | FAIL",
   "test_1_static_and_snapshot | ok",
   "test_2_auth_and_roles | ok",
   "test_3_sbo_command_with_ack | ok",
   "test_4_fault_injection_alarms_and_parallel_scan | ok",
   "test_5_register_explorer_and_audit | ok",
-  "test_6_auto_control_runs | ok",
+  "test_6_auto_control_runs | FAIL",
   "test_7_forecast_accuracy_and_energy | ok",
   "test_8_breaker_trip_shown_and_deenergizes_feeder | ok",
   "test_9_layout_edit_persist_and_validate | ok",
@@ -173,6 +173,7 @@
   "test_check_scans_and_module_entry | ok",
   "장치를 놓고 빼도 기록 · 보고가 사실대로 남는다: 있는 장치의 값만 저장하고, 보고서에 장치 구성 표가 들어간다. | ok",
   "test_extra_units_are_recognized_summed_and_commanded | ok",
+  "운전 중인 EMS(가상 장치)에서 자동 제어가 복합전력 PCS 의 모드를 바꾼다: 디젤 필요 → 발전기 + ESS 충전, 가득 → 발전기 단독, 불필요 → ESS 방전, 복합전력 ESS 저충전 → 충전. | ok",
   "test_kind_not_brought_is_marked_absent_and_replaced | ok",
   "설비 제어 화면의 − · ＋: 가상 장치를 놓으면 조작 없이 인식되고, 빼면 두절 경보 없이 빈 자리로 돌아간다. | ok",
   "차량 단위 대수: ④ 수소 차량은 연료전지와 수전해가 함께 늘고 줄며, ① 복합전력의 계통 형성 용량은 인식한 디젤 대수를 따른다. | ok",
@@ -185,18 +186,18 @@
   "test_parse_json_and_csv | ok",
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 182,
- "tests_ok": true,
- "coverage_pct": 92.1,
+ "n_tests": 183,
+ "tests_ok": false,
+ "coverage_pct": 92.2,
  "stmt": {
-  "n": 6234,
-  "hit": 5925,
-  "pct": 95.0
+  "n": 6260,
+  "hit": 5954,
+  "pct": 95.1
  },
  "branch": {
-  "n": 2220,
-  "hit": 1860,
-  "pct": 83.8
+  "n": 2228,
+  "hit": 1869,
+  "pct": 83.9
  },
  "coverage_files": [
   [
@@ -272,20 +273,20 @@
    "160, 198-210, 214-216"
   ],
   [
-   "ifps_ems_rt/hmi/weatherwatch.py",
-   91.1,
-   101,
-   50.0,
-   22,
-   "59-60, 68, 134-139"
-  ],
-  [
    "ifps_ems_rt/hmi/archapi.py",
    93.1,
    58,
    90.6,
    32,
    "62-63, 65-66"
+  ],
+  [
+   "ifps_ems_rt/hmi/weatherwatch.py",
+   93.1,
+   101,
+   50.0,
+   22,
+   "68, 134-139"
   ],
   [
    "ifps_ems_rt/diag.py",
@@ -297,17 +298,17 @@
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
-   94.4,
-   250,
-   85.2,
-   108,
-   "59, 67, 70, 80, 90, 92, 94, 106, 110, 124, 133, 138, 217, 264"
+   94.5,
+   256,
+   85.5,
+   110,
+   "59, 67, 70, 80, 90, 92, 94, 106, 110, 124, 133, 138, 226, 273"
   ],
   [
    "ifps_ems_rt/hmi/engine.py",
    94.6,
    789,
-   82.4,
+   82.8,
    290,
    "29-30, 55-56, 67-72, 195-196, 315-316, 329, 373, 389-390, 404-407, 410-412, 465, 512-513, 606-607, 738-739, 901-906, 915-917, 945-946"
   ],
@@ -334,14 +335,6 @@
    83.3,
    18,
    "52, 72"
-  ],
-  [
-   "ifps_ems_rt/hybrid.py",
-   96.3,
-   27,
-   90.0,
-   10,
-   "29"
   ],
   [
    "ifps_ems/skycam.py",
@@ -442,10 +435,10 @@
   [
    "ifps_ems_rt/simplant.py",
    98.8,
-   165,
-   93.5,
-   62,
-   "172-173"
+   171,
+   93.8,
+   64,
+   "181-182"
   ],
   [
    "ifps_ems_rt/hal.py",
@@ -570,9 +563,9 @@
   [
    "ifps_ems_rt/fleet.py",
    100.0,
-   67,
-   96.2,
-   26,
+   69,
+   96.4,
+   28,
    ""
   ],
   [
@@ -637,6 +630,14 @@
    21,
    100.0,
    6,
+   ""
+  ],
+  [
+   "ifps_ems_rt/hybrid.py",
+   100.0,
+   39,
+   91.7,
+   12,
    ""
   ],
   [
@@ -870,7 +871,7 @@
     "W0201",
     "attribute-defined-outside-init",
     "ifps_ems_rt/simplant.py",
-    83,
+    91,
     "Plant._tick_power",
     "Attribute '_dt' defined outside __init__"
    ],
@@ -1133,7 +1134,7 @@
   ]
  },
  "metrics": {
-  "n_func": 787,
+  "n_func": 790,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1193,7 +1194,7 @@
    [
     "ifps_ems_rt/simplant.py",
     "_tick_bus",
-    138,
+    147,
     20,
     10,
     1,
@@ -1249,7 +1250,7 @@
    [
     "ifps_ems_rt/hmi/scenarios.py",
     "run_case",
-    169,
+    178,
     20,
     61,
     6,
@@ -1468,7 +1469,7 @@
    ],
    [
     "ifps_ems_rt/hmi/scenarios.py",
-    325
+    334
    ],
    [
     "ifps_ems_rt/hmi/cfgedit.py",
@@ -1504,7 +1505,7 @@
    ],
    [
     "ifps_ems_rt/simplant.py",
-    207
+    216
    ],
    [
     "ifps_ems_rt/archive.py",
@@ -1572,7 +1573,7 @@
    ],
    [
     "ifps_ems_rt/fleet.py",
-    116
+    118
    ],
    [
     "ifps_ems/dataio.py",
@@ -1603,6 +1604,10 @@
     76
    ],
    [
+    "ifps_ems_rt/hybrid.py",
+    76
+   ],
+   [
     "ifps_ems_rt/hmi/unitctl.py",
     73
    ],
@@ -1617,10 +1622,6 @@
    [
     "ifps_ems_rt/archrecv.py",
     61
-   ],
-   [
-    "ifps_ems_rt/hybrid.py",
-    60
    ],
    [
     "ifps_ems/config.py",
@@ -1699,7 +1700,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 7869,
+   "loc": 7899,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -1883,12 +1884,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.85,
- "cc_n": 802,
+ "cc_avg": 5.86,
+ "cc_n": 805,
  "cc_rank": {
   "A": 479,
-  "B": 197,
-  "C": 126,
+  "B": 199,
+  "C": 127,
   "D": 0,
   "E": 0,
   "F": 0
@@ -1983,7 +1984,7 @@
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
-   16.5,
+   16.1,
    "B"
   ],
   [
@@ -1997,13 +1998,13 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/scenextra.py",
+   "ifps_ems_rt/simplant.py",
    24.8,
    "A"
   ],
   [
-   "ifps_ems_rt/simplant.py",
-   25.8,
+   "ifps_ems_rt/hmi/scenextra.py",
+   24.8,
    "A"
   ],
   [
@@ -2113,7 +2114,7 @@
   ],
   [
    "ifps_ems_rt/fleet.py",
-   46.2,
+   45.8,
    "A"
   ],
   [
@@ -2167,6 +2168,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hybrid.py",
+   61.1,
+   "A"
+  ],
+  [
    "ifps_ems_rt/pointmap.py",
    61.5,
    "A"
@@ -2199,11 +2205,6 @@
   [
    "ifps_ems_rt/hmi/__main__.py",
    68.7,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/hybrid.py",
-   69.2,
    "A"
   ],
   [
@@ -2254,13 +2255,13 @@
  ],
  "loc_py": {
   "files": 59,
-  "sloc": 6501,
-  "comments": 877
+  "sloc": 6527,
+  "comments": 879
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   575,
+   579,
    true
   ],
   [
@@ -2270,7 +2271,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/cfgedit.js",
-   129,
+   149,
    true
   ],
   [
