@@ -127,6 +127,11 @@ def tags(r):
     return out
 
 
+def meter_tags(r):
+    """분기 전력계 신호(구간분전함의 전력 · 전력량, 배전체계와 회로의 전력량). 없어도 감시는 되지만 분기별 전력량과 예측의 정밀도가 떨어진다."""
+    return [f"{f['id']}.{k}" for f in r["fsu"] for k in ("kw", "kwh")] + [f"{p['id']}.kwh" for p in r["ppdu"]] + [f"{p['id']}.ch{n}_kwh" for p in r["ppdu"] for n in range(1, 7)]
+
+
 def _fed(ok, n):
     """구간이 이어졌는지(ok)로 마디마다 전원까지 닿는지: 왼쪽으로든 오른쪽으로든 닿으면 참."""
     return [all(ok[:k + 1]) or all(ok[k + 1:]) for k in range(n)]
@@ -144,9 +149,9 @@ def _ppdus(r, g, fsu_live):
     out = []
     for p in r["ppdu"]:
         st = lambda t, i=p["id"]: None if g(f"{i}.{t}") is None else int(round(g(f"{i}.{t}")))
-        ch = [{"n": n + 1, "name": c["name"], "cls": c["cls"], "type": CH_SPEC[n][0], "limit": CH_SPEC[n][1], "cb": st(f"ch{n + 1}"), "kw": g(f"{p['id']}.ch{n + 1}_kw")} for n, c in enumerate(p["ch"])]
+        ch = [{"n": n + 1, "name": c["name"], "cls": c["cls"], "type": CH_SPEC[n][0], "limit": CH_SPEC[n][1], "cb": st(f"ch{n + 1}"), "kw": g(f"{p['id']}.ch{n + 1}_kw"), "kwh": g(f"{p['id']}.ch{n + 1}_kwh")} for n, c in enumerate(p["ch"])]
         kw = g(f"{p['id']}.kw"); gnd = g(f"{p['id']}.gnd")
-        out.append(dict(_unit(p, g), at=p["at"], at_auto=bool(p.get("at_auto")), kw=kw, mccb=st("mccb"), gnd=gnd, lamp=st("lamp"), ch=ch, vital=any(c["cls"] == 1 for c in p["ch"]), at_live=fsu_live.get(p["at"]),
+        out.append(dict(_unit(p, g), at=p["at"], at_auto=bool(p.get("at_auto")), kw=kw, kwh=g(f"{p['id']}.kwh"), mccb=st("mccb"), gnd=gnd, lamp=st("lamp"), ch=ch, vital=any(c["cls"] == 1 for c in p["ch"]), at_live=fsu_live.get(p["at"]),
                         over=None if kw is None else kw > RATED_KW, gnd_bad=None if gnd is None else gnd > GND_LIMIT))
     return out
 
@@ -168,12 +173,12 @@ def status(r, val, lost=False):
     g = (lambda t: None) if lost else val.get; r = layout(r, g); n = len(r["fsu"]); sw = sw_tags(r)
     secs = [{"i": i, "tag": t, "state": None if g(t) is None else int(round(g(t))), "open": i == r["open"]} for i, t in enumerate(sw)]
     fed = _fed([s["state"] == 1 for s in secs], n) if all(s["state"] is not None for s in secs) else [None] * n
-    fsu = [_unit(f, g, fed[k]) for k, f in enumerate(r["fsu"])]; auto = g("RING.auto")
+    fsu = [dict(_unit(f, g, fed[k]), kw=g(f"{f['id']}.kw"), kwh=g(f"{f['id']}.kwh")) for k, f in enumerate(r["fsu"])]; auto = g("RING.auto")      # kw · kwh: 그 구간분전함 분기 전력계
     _comm(secs, fsu)
     ppdu = _ppdus(r, g, {f["id"]: f["live"] for f in fsu})
     return {"name": r["name"], "sections": secs, "fsu": fsu, "ppdu": ppdu, "open": r["open"], "auto": None if auto is None else auto > 0.5,
             "ok": n > 0 and all(f["live"] for f in fsu), "switched": bool(secs) and secs[r["open"]]["state"] == 1,
-            "isolated": [f["id"] for f in fsu if f["live"] is False], "cut": [s["i"] for s in secs if s["state"] == 2], "missing": [t for t in tags(r) if val.get(t) is None], "eff": r, "recog": _recog(r, fsu + ppdu)}
+            "isolated": [f["id"] for f in fsu if f["live"] is False], "cut": [s["i"] for s in secs if s["state"] == 2], "missing": [t for t in tags(r) if val.get(t) is None], "meters_missing": [t for t in meter_tags(r) if val.get(t) is None], "eff": r, "recog": _recog(r, fsu + ppdu)}
 
 
 def _found(s):
@@ -248,6 +253,7 @@ class Model:
     place 가 '어느 자리에 어떤 장치가 놓였는지'다 — 장치를 빼고 넣고 섞어서 자동 인식을 연습한다."""
     def __init__(self, r, plant, kw=None):
         self.r = r if r and "RING.sw0" in plant.by_tag else None; self.p = plant; self.kw = kw or {"L1": "LOAD.p1_kw", "L2": "LOAD.p2_kw", "L3": "LOAD.p3_kw"}
+        self.e = {}; self.dt = 0.0; self.t_last = None                 # 분기 전력량계의 누적값 · 걸음 길이
         self.brk = set(); self.t_brk = {}; self.t_trip = None; self.init = set(); self.armed = False; self.swap = None; self.place = {}; self.zero = set(); self.t_fix = {}
         if self.r is None: return
         self._place0(); self._ids(); e = self.eff()
@@ -303,8 +309,20 @@ class Model:
         for n, c in enumerate(p["ch"]):
             tag = self.kw.get(f"L{c['cls']}"); closed = int(round(P.get(f"{i}.ch{n + 1}"))) == 1; bad = bad or int(round(P.get(f"{i}.ch{n + 1}"))) == 2
             kw = CH_SPEC[n][1] * 0.9 * min(1.2, P.get(tag) / LOAD_REF) if on and closed and c["cls"] and tag in P.by_tag else 0.0      # 그 등급 부하의 크기에 비례(기준 부하에서 회로 정격의 90%)
-            P.set(f"{i}.ch{n + 1}_kw", round(kw, 1)); tot += kw
-        P.set(f"{i}.kw", round(tot, 1)); P.set(f"{i}.lamp", 2 if bad else 1 if tot > RATED_KW or P.get(f"{i}.gnd") > GND_LIMIT or not fed else 0)
+            P.set(f"{i}.ch{n + 1}_kw", round(kw, 1)); tot += kw; self._meter(f"{i}.ch{n + 1}_kwh", kw)
+        self._meter(f"{i}.kwh", tot); P.set(f"{i}.kw", round(tot, 1)); P.set(f"{i}.lamp", 2 if bad else 1 if tot > RATED_KW or P.get(f"{i}.gnd") > GND_LIMIT or not fed else 0)
+
+    def _meter(self, tag, kw):
+        """분기 전력량계(누적 kWh)를 한 걸음 올린다."""
+        if tag not in self.p.by_tag: return
+        self.e[tag] = self.e.get(tag, self.p.get(tag)) + max(0.0, kw) * self.dt / 3600.0; self.p.set(tag, self.e[tag])
+
+    def _fsu_meters(self, e):
+        """구간분전함의 분기 전력계: 그 구간분전함에 물린 배전체계 전력의 합."""
+        for f in e["fsu"]:
+            if f"{f['id']}.kw" not in self.p.by_tag: continue
+            kw = sum(self.p.get(f"{p['id']}.kw") for p in e["ppdu"] if p["at"] == f["id"] and f"{p['id']}.kw" in self.p.by_tag)
+            self.p.set(f"{f['id']}.kw", round(kw, 1)); self._meter(f"{f['id']}.kwh", kw)
 
     def _update(self, e):
         """구간분전함 전압 → 배전체계(PPDU) 전압·주 차단기·회로별 전력. 회로 전력은 그 등급 부하(LOAD.pN_kw)의 크기에 비례하는 것으로 본다(가상 장치의 가정)."""
@@ -314,9 +332,11 @@ class Model:
             if f"{i}.mccb" not in self.p.by_tag: continue
             if i in here: self._one(here[i], bool(live.get(here[i]["at"], False)))
             else: self._clear(i)
+        self._fsu_meters(e)
 
     def tick(self, now):
         if self.r is None: return
+        self.dt = 0.0 if self.t_last is None else min(60.0, max(0.0, now - self.t_last)); self.t_last = now
         self._ids(); e = self.eff(); sw = sw_tags(e); auto = self.p.get("RING.auto") > 0.5
         for i, t in enumerate(sw):
             if not self._broken(i) or int(round(self.p.get(t))) != 1: self.t_brk.pop(i, None); continue

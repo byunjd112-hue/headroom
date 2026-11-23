@@ -2,7 +2,7 @@
 """환망 감시: 구간분전함(FSU)·휴대용 배전체계(PPDU) 상태 판단, 자리마다 읽은 ID 로 배치 자동 인식, 경보, 설정 검사, 화면부 연결."""
 import copy, json, os, shutil, sys, tempfile, time, unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, ROOT)
-from ifps_ems_rt import ring                            # noqa: E402
+from ifps_ems_rt import ring, branchfc                  # noqa: E402
 from ifps_ems_rt.hmi.engine import Engine                # noqa: E402
 
 R = ring.settings(copy.deepcopy(ring.DEFAULT))
@@ -17,6 +17,34 @@ def values(open_at=4, cut=(), dead=(), ids=None):
         v.update({p["id"] + ".kw": 10.0, p["id"] + ".mccb": 1.0, p["id"] + ".gnd": 35.0, p["id"] + ".lamp": 0.0})
         for n in range(1, 7): v[f"{p['id']}.ch{n}"] = 1.0; v[f"{p['id']}.ch{n}_kw"] = 1.5
     return v
+
+
+class BranchForecastTest(unittest.TestCase):
+    """분기별 부하 예측(ifps_ems_rt/branchfc.py)."""
+    def run_days(self, book, days, kw, kwh0=None, n=900):
+        e = kwh0
+        for d in range(days):
+            for slot in range(branchfc.SLOTS):
+                x = kw(slot)
+                for k in range(n):
+                    if e is not None: e += x / 3600.0
+                    if k in (0, n - 1) or n < 20: book.feed(f"2026-05-{d + 1:02d}", slot, {"P": (x, e)})
+                    elif k == 1: book.acc["P"][0] += x * (n - 2); book.acc["P"][1] += n - 2      # 같은 값의 표본을 한 번에 넣는다(시험 시간 단축)
+        return e
+
+    def test_profile_level_and_error(self):
+        kw = lambda s: 10.0 + (8.0 if 32 <= s < 72 else 0.0); b = branchfc.Book(); self.assertEqual(b.forecast("P", 0, 4), [None] * 4)
+        e = self.run_days(b, 3, kw, 100.0); f = b.forecast("P", 0); self.assertAlmostEqual(f[10], 10.0, delta=0.3); self.assertAlmostEqual(f[40], 18.0, delta=0.4)        # 시간대 평균(전력량계 차이로 구한 값)
+        r = b.row("P", 95, 10.0, e); self.assertAlmostEqual(r["next24_kwh"], sum(kw(s) for s in range(96)) / 4, delta=6); self.assertEqual(r["peak_kw"] > 17, True); self.assertLess(r["err_pct"], 3.0); self.assertGreater(r["err_n"], 100)
+        self.assertAlmostEqual(r["today_kwh"], sum(kw(s) for s in range(96)) / 4, delta=1.0)
+        b2 = branchfc.Book(json.loads(json.dumps(b.state()))); self.assertEqual(b2.forecast("P", 0)[40], f[40])                                                             # 저장했다 되살려도 같다
+        for slot in range(4): b2.feed("2026-05-04", slot, {"P": (15.0, None)}); b2.acc["P"][0] += 15.0 * 898; b2.acc["P"][1] += 898
+        b2.feed("2026-05-04", 4, {"P": (15.0, None)}); g = b2.forecast("P", 4); self.assertGreater(g[0], 13.0); self.assertLess(g[60], 19.5); self.assertGreater(b2.level("P"), 1.2)   # 최근 실측이 크면 가까운 시각을 올리고 먼 시각은 덜 올린다
+
+    def test_meter_reset_falls_back_to_power_samples(self):
+        b = branchfc.Book(); b.feed("d", 0, {"P": (10.0, 500.0)}); b.acc["P"][0] += 10.0 * 898; b.acc["P"][1] += 898; b.feed("d", 0, {"P": (10.0, 2.0)}); b.feed("d", 1, {"P": (10.0, 2.1)})      # 전력량계가 초기화됐다
+        self.assertAlmostEqual(b.b["P"]["prof"][0], 10.0, places=3)
+        b = branchfc.Book(); b.seed("X", 6.0, [1.0] * 96); self.assertTrue(b.demo); self.assertEqual(b.forecast("X", 0, 2), [6.0, 6.0])
 
 
 class RingTest(unittest.TestCase):
@@ -88,6 +116,22 @@ class RingWatchTest(unittest.TestCase):
             if test(): return True
             time.sleep(0.2)
         return False
+
+    def test_branch_meters_and_forecast_view(self):
+        """분기 전력계: 구간분전함 전력 = 아래 배전체계의 합, 전력량이 쌓이고, 환망 화면에 분기별 전력 · 전력량 · 예측이 나온다. 전력계가 어긋나면 알린다."""
+        e = self.eng; w = e.ringw; self.assertTrue(self._wait(lambda: (e.snapshot()["ring"] or {}).get("ok")))
+        self.assertTrue(self._wait(lambda: all(f.get("kwh") for f in w.status()["fsu"] if any(p["at"] == f["id"] for p in w.status()["ppdu"])), 12.0)); s = w.status(); self.assertEqual(s["meters_missing"], [])
+        for f in s["fsu"]: self.assertAlmostEqual(f["kw"], sum(p["kw"] for p in s["ppdu"] if p["at"] == f["id"]), delta=0.35, msg=f["id"])
+        p0 = s["ppdu"][0]; self.assertGreater(p0["kwh"], 0); self.assertAlmostEqual(sum(c["kwh"] for c in p0["ch"]), p0["kwh"], delta=0.3)
+        b = w.view(e)["branch"]; self.assertEqual(len(b["rows"]), len(s["fsu"]) + len(s["ppdu"])); self.assertTrue(b["demo"])                 # 가상 장치: 실측이 쌓이기 전에는 시연용 초기값
+        r = next(x for x in b["rows"] if x["id"] == p0["id"]); self.assertIsNotNone(r["next1h"]); self.assertIsNotNone(r["next24_kwh"]); self.assertEqual(len(r["spark"]), 48); self.assertIsNotNone(b["total"]["next24_kwh"])
+        f = next(x for x in s["fsu"] if any(p["at"] == x["id"] for p in s["ppdu"])); rt = e.rt; t = [1000.0]; now = rt.now; rt.now = lambda: t[0]
+        try:
+            with e.lock:
+                w.last = copy.deepcopy(w.status()); next(x for x in w.last["fsu"] if x["id"] == f["id"])["kw"] = f["kw"] + 30.0
+                w._meters(e); t[0] += 31.0; w._meters(e); self.assertIn(f"ring.meter.{f['id']}", {k for k, a in e.alarms.items.items() if a["state"] == "ACT"})
+        finally: rt.now = now
+        self.assertTrue(self._wait(lambda: f"ring.meter.{f['id']}" not in {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}))      # 다시 맞으면 사라진다
 
     def test_monitor_break_discover_and_configure(self):
         e = self.eng; w = e.ringw; self.assertTrue(self._wait(lambda: (e.snapshot()["ring"] or {}).get("ok")))

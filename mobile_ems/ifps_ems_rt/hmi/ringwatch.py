@@ -3,8 +3,8 @@
 자리마다 읽은 ID 로 배치를 스스로 알아내 화면을 구성(조작 없음), 현장에서 고르는 배전체계 구성(회로별 시설·부하 등급, 중요 부하) 저장, 가상 장치 모드의 환망 모형.
 계산은 ifps_ems_rt/ring.py 가 한다. 여기서는 값을 넘기고 결과를 화면·경보·설정 파일로 옮긴다.
 """
-import json, time
-from .. import ring
+import json, math, os, time
+from .. import ring, branchfc, fsio
 from . import cfgedit
 
 EDIT = ("at", "name")                           # 운용자가 현장에서 고칠 수 있는 배전체계(PPDU) 항목 — 회로별 이름·등급은 따로 다룬다
@@ -14,6 +14,10 @@ class RingWatch:
     def __init__(self, eng):
         self.r = ring.settings(eng.cfg.get("ring")); self.model = None; self.last = None; self.keys = set(); self.sig = None; self.hold = 0; self.on = set()
         if self.r and eng.sim and eng.plant is not None: self.model = ring.Model(self.r, eng.plant)
+        self.bpath = os.path.join(eng.rt.state_dir, "branch.json"); self.t_meter = {}
+        try:
+            with open(self.bpath, encoding="utf-8") as f: self.book = branchfc.Book(json.load(f))
+        except (OSError, ValueError): self.book = branchfc.Book()
 
     def _lost(self, eng):
         return eng.rt.lm.state.get("MTR") in ("두절", "재조회 대기")
@@ -28,8 +32,38 @@ class RingWatch:
             if not (quiet and on and key not in self.on): eng.alarms.set(key, bool(on), prio, src, text)      # 배치가 막 바뀐 동안에는 새 경보를 올리지 않는다(값이 한 주기 엇갈려 읽힐 수 있다)
             if not on: self.on.discard(key)
             elif not quiet: self.on.add(key)
+        keys |= self._meters(eng)
         for key in self.keys - keys: eng.alarms.set(key, False, 3, "환망", ""); self.on.discard(key)     # 빠진 장치의 경보는 내린다
-        self.keys = keys
+        self.keys = keys; self._branch(eng)
+
+    def _branch(self, eng):
+        """분기 전력계의 값을 모은다(15분 구간이 끝나면 예측 자료를 고치고 저장한다)."""
+        s = self.last; day, slot = branchfc.slot_of(eng.rt.wall()); units = s["fsu"] + s["ppdu"]
+        if self.book.feed(day, slot, {u["id"]: (u.get("kw"), u.get("kwh")) for u in units}):
+            try: fsio.write_json(self.bpath, self.book.state())
+            except OSError: pass                                     # 저장 실패는 감시를 막지 않는다
+        if eng.sim and not self.book.b and all(u.get("kw") is not None for u in units):      # 시연: 실측이 쌓이기 전에 하루 모양을 채워 둔다(화면에 '시연용'으로 표시)
+            day_shape = [0.55 + 0.45 / (1 + math.exp(-(k / 4 - 7.5) * 2)) / (1 + math.exp((k / 4 - 18.5) * 2)) for k in range(branchfc.SLOTS)]
+            for u in units: self.book.seed(u["id"], u["kw"], day_shape)
+
+    def _meters(self, eng):
+        """전력계 대조: 구간분전함 분기 전력계와 그 아래 배전체계 전력의 합이 30초 넘게 크게 다르면 알린다(전력계 고장 · 배선 · 구성 불일치)."""
+        s = self.last; keys = set(); now = eng.rt.now()
+        for f in s["fsu"]:
+            below = [p["kw"] for p in s["ppdu"] if p["at"] == f["id"]]; key = f"ring.meter.{f['id']}"; keys.add(key)
+            bad = f.get("kw") is not None and below and all(x is not None for x in below) and abs(f["kw"] - sum(below)) > max(2.0, 0.2 * max(abs(f["kw"]), sum(below)))
+            if not bad: self.t_meter.pop(f["id"], None)
+            late = bool(bad) and now - self.t_meter.setdefault(f["id"], now) >= 30.0
+            eng.alarms.set(key, late, 3, f["id"], f"{f['name']} 분기 전력계 {f['kw'] or 0:.1f} kW 와 아래 배전체계 합 {sum(x or 0 for x in below):.1f} kW 가 다름 — 전력계 · 배선 · 배전체계 연결 구성을 확인")
+        return keys
+
+    def branch_view(self, eng):
+        """환망 화면의 분기별 전력 · 전력량 · 예측 표."""
+        s = self.last or ring.status(self.r, eng.rt.val, self._lost(eng)); _, slot = branchfc.slot_of(eng.rt.wall()); rows = []
+        for kind, us in (("FSU", s["fsu"]), ("PPDU", s["ppdu"])):
+            for u in us: rows.append(dict(self.book.row(u["id"], slot, u.get("kw"), u.get("kwh")), id=u["id"], name=u["name"], kind=kind, at=u.get("at", "")))
+        pp = [r for r in rows if r["kind"] == "PPDU"]; tot = lambda k: round(sum(r[k] for r in pp), 1) if pp and all(r[k] is not None for r in pp) else None
+        return {"rows": rows, "demo": self.book.demo, "slot_min": 15, "total": {"kw": tot("kw"), "next1h": tot("next1h"), "next24_kwh": tot("next24_kwh"), "today_kwh": tot("today_kwh")}}
 
     def _recognized(self, eng):
         """자동 인식한 배치가 달라지면 기록에 남긴다(화면은 조작 없이 따라 바뀐다)."""
@@ -45,7 +79,7 @@ class RingWatch:
         """환망 화면이 받는 것: 상태 + 초기 기동 점검 결과 + 구성."""
         if self.r is None: return {"ok": False, "why": "환망을 쓰지 않습니다(runtime.json 의 ring)"}
         st = ring.status(self.r, eng.rt.val, self._lost(eng))
-        return {"ok": True, "status": st, "discover": ring.discover(self.r, eng.rt.val, self._lost(eng)), "config": {k: v for k, v in st["eff"].items() if k != "empty"}, "spec": {"rated_kw": ring.RATED_KW, "gnd_limit": ring.GND_LIMIT, "ch": [{"type": t, "kw": k} for t, k in ring.CH_SPEC]}, "sim": bool(self.model),
+        return {"ok": True, "branch": self.branch_view(eng), "status": st, "discover": ring.discover(self.r, eng.rt.val, self._lost(eng)), "config": {k: v for k, v in st["eff"].items() if k != "empty"}, "spec": {"rated_kw": ring.RATED_KW, "gnd_limit": ring.GND_LIMIT, "ch": [{"type": t, "kw": k} for t, k in ring.CH_SPEC]}, "sim": bool(self.model),
                 "sim_break": sorted(self.model.brk) if self.model else [], "sim_swap": self.model.swap if self.model else None, "sim_place": {k: sorted(v) for k, v in self.model.place.items()} if self.model else None}
 
     def _save(self, eng, new, who, what):
