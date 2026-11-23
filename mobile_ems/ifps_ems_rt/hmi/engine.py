@@ -298,7 +298,7 @@ class Engine:
     def stop(self):
         self.running = False
         if self.simdrv: self.simdrv.run = False
-        getattr(self.rt.policy, "cancel", lambda: None)(); time.sleep(0.3)      # 뒤에서 돌던 운전계획 계산을 멈춘다(예측 계산은 running 을 보고 멈춘다)
+        self.halted = True; getattr(self.rt.policy, "cancel", lambda: None)(); time.sleep(0.3)      # 뒤에서 돌던 운전계획 계산을 멈춘다(예측 계산은 running 을 보고 멈춘다)
         try: self.rt.save()
         finally:
             self.archw.close(); self.rt.close()
@@ -419,17 +419,18 @@ class Engine:
         n = datetime.now(); return n.replace(minute=n.minute // 15 * 15, second=0, microsecond=0) - timedelta(minutes=15)
 
     def _compute_forecast(self):
+        from ifps_ems import attn
         try:
             import numpy as np
-            from ifps_ems import dataio, attn
+            from ifps_ems import dataio
             from ifps_ems.forecast import LoadForecaster, PVForecaster
-            attn.set_cancel(lambda: not self.running); site = self.rt.site; hist, md, src = self._forecast_source(site)      # EMS 가 멈추면 이 계산도 그만둔다
+            attn.set_cancel(lambda: getattr(self, "halted", False)); site = self.rt.site; hist, md, src = self._forecast_source(site)      # EMS 가 멈추면 이 계산도 그만둔다
             d = dataio.load_csv(hist, site); n = d["n"]; attn._check()      # pylint: disable=protected-access
             fl, fp = LoadForecaster(site), PVForecaster(site); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp) and fp.trained
             from ifps_ems import learner
             meta = learner.active(md); o = n - 1                                # 적용 중인 모델 정보(최근 오차 보정을 켤지 포함)
             l50, llo, lhi, bl = learner.predict(fl, d, o, "load", site, meta); p50, plo, phi, bp = learner.predict(fp, d, o, "pv", site, meta); p50, plo, phi, wx = self.wxw.apply(d, p50, plo, phi)      # 날씨 입력을 섞는다
-            acc, daily = fcstats.backtest(d, fl, fp, site, meta, lambda: not self.running)
+            acc, daily = fcstats.backtest(d, fl, fp, site, meta, lambda: getattr(self, "halted", False))
             r = lambda a: [round(float(x), 2) for x in a]; ts = d["ts"]
             out = {"ok": True, "source": src, "trained": {"load": tl, "pv": tp}, "issued": ts[-1], "hist_ts": ts[-96:], "load_act": r(d["load"][-96:]), "pv_act": r(d["pv"][-96:]),
                    "clear_hist": r(d["clear"][-96:]), "load": r(l50), "load_lo": r(llo), "load_hi": r(lhi), "pv": r(p50), "pv_lo": r(plo), "pv_hi": r(phi),
@@ -442,7 +443,7 @@ class Engine:
         except Exception as e:
             with self.fc_lock: self.fc_cache = {"ok": False, "why": str(e) if isinstance(e, ValueError) else f"예측 계산 실패: {type(e).__name__}: {e}", "_t": time.time()}
         finally:
-            self._fc_busy = False
+            self._fc_busy = False; attn.set_cancel(None)      # 이 가닥에 건 중단 조건을 지운다 — 남으면 EMS 가 멈춘 뒤 같은 가닥의 다른 예측 계산까지 중단된다
 
     def _forecast_source(self, site, training=False):
         """예측에 쓸 이력 파일을 고른다. 반환: (이력 경로, 모델 폴더, 출처 설명)"""
