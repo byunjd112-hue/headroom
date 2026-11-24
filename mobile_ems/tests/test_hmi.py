@@ -76,9 +76,9 @@ class TestHmi(unittest.TestCase):
             at = {i["id"]: (i["fsu"], i["need"], i["fsu_auto"]) for i in snap["items"]}; ff = [f["id"] for f in snap["fsus"]]
             self.assertEqual((at["c2"], at["med"], at["ammo"]), (("FSU2", 2, True), ("FSU4", 1, True), ("FSU6", 1, True)))                                     # 종류에 따른 구간분전함(자동), 부하 앞 배전체계: 30 kW 는 20 kW 2대 병렬
             self.assertEqual(at["brk"][1], 3); self.assertNotEqual(at[nid][0], "FSU4")                                                                         # 막사 3동은 동마다 1대. 출력 4회로가 다 찬 구간분전함 대신 가까운 곳으로
-            self.assertEqual((snap["ppdu_kw"], snap["fsu_a"], snap["fsu_out"]), (20.0, 630.0, 4)); full = lambda: all(len(i["ppdus"]) == i["need"] for i in e.snapshot()["loads"]["items"]) or len(e.snapshot()["ring"]["ppdu"]) == 8; t0 = time.time()
+            self.assertEqual((snap["ppdu_kw"], snap["fsu_a"], snap["fsu_out"]), (20.0, 630.0, 4)); full = lambda: all(len(i["ppdus"]) == i["need"] for i in e.snapshot()["loads"]["items"]) or len(e.snapshot()["ring"]["ppdu"]) == 18; t0 = time.time()
             while not full() and time.time() - t0 < 12.0: time.sleep(0.3)
-            self.assertTrue(full())   # 가상 장치가 목록대로 배전체계를 놓는다(자리 8개까지)
+            self.assertTrue(full())   # 가상 장치가 목록대로 배전체계를 놓는다(자리 18개까지)
             free = next(f for f in ff if f not in {i["fsu"] for i in snap["items"]})
             r = self.req("/api/loads", {"op": "set", "id": "ammo", "grade": 1, "save_pct": 0, "fsu": free}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "ammo")
             self.assertEqual((it["feeder"], it["fsu"], it["fsu_auto"]), ("L1", free, False))                                                       # 등급 · 자리를 바꾸면 급전선과 구간분전함이 따라간다(배전체계 없는 구간분전함에도 물린다)

@@ -439,7 +439,7 @@
     "enabled": true,
     "auto": true,
     "fsu_slots": 7,
-    "ppdu_slots": 8,
+    "ppdu_slots": 18,
     "name": "부하 환망",
     "open": 4,
     "trip_ms": 1500,

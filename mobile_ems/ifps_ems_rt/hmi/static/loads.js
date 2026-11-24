@@ -31,7 +31,7 @@ const P_LOADS = {
         절감 공급은 그 급전선의 '절감 비율'만큼만 줄인다(냉난방 완화 · 조명 감광 · 비필수 회로). 태세(저소음 · 자립)나 ESS 충전율 때문에 끊을 때는 절감을 거치지 않고 바로 끊는다.</div>
       <div class="panel"><div class="hd"><h3>부하 목록</h3><div class="spacer"></div><select class="in" id="ldKind"></select><button class="btn go" id="ldAdd">＋ 부하 추가</button></div>
         <div class="bd np"><table class="t"><thead><tr><th>이름</th><th>종류</th><th>등급</th><th>공급 경로</th><th class="n">대당 정격</th><th style="text-align:center">수량</th><th class="n">정격 합</th><th class="n">지금(추정)</th><th class="n">절감 비율</th><th>상태</th><th></th></tr></thead><tbody id="ldRows"></tbody></table></div>
-        <div class="bd muted" style="font-size:12px;border-top:1px solid var(--line)">EMS 가 재는 것은 급전선(등급)별 합계다. 부하 하나하나의 '지금' 값은 급전선 계측값을 정격 비율로 나눈 추정값이다. 등급별 정격 합은 그 급전선의 계측 범위를 넘을 수 없다(<span id="ldLim"></span>).</div></div>
+        <div class="bd muted" style="font-size:12px;border-top:1px solid var(--line)">EMS 가 재는 것은 급전선(등급)별 합계다. 부하 하나하나의 '지금' 값은 급전선 계측값을 정격 비율로 나눈 추정값이다. 등급별 정격 합은 그 급전선의 계측 범위를 넘을 수 없다(<span id="ldLim"></span>). <b>배전체계(PPDU-20)</b>는 부하를 늘리면 필요한 대수가 자동으로 늘어 부하 앞에 짝지어진다: <span id="ldPp"></span>.</div></div>
       <div class="panel" style="margin-top:14px;display:none" id="ldEdit"></div>`;
     $("#ldReset").onclick = () => { if (confirm("부하 목록을 기본으로 되돌립니다. 계속합니까?")) this.post({ op: "reset" }); };
     $("#ldAdd").onclick = () => this.post({ op: "add", kind: $("#ldKind").value });
@@ -68,6 +68,7 @@ const P_LOADS = {
     const d = LD.s(); if (!$("#ldRows")) return;
     if (!$("#ldKind").options.length) $("#ldKind").innerHTML = d.kinds.map(k => `<option value="${k.id}">${esc(k.name)} (${k.grade}등급 · ${k.kw} kW)</option>`).join("");
     const lim = d.limit || {}; $("#ldLim").textContent = `1등급 ${lim[1] ?? "—"} · 2등급 ${lim[2] ?? "—"} · 3등급 ${lim[3] ?? "—"} · 합계 ${lim[0] ?? "—"} kW`;
+    const short = d.ppdu_need > d.ppdu_have; $("#ldPp").innerHTML = `필요 ${d.ppdu_need}대 · 인식 ${d.ppdu_have}대 · 자리 ${d.ppdu_slots}개${d.ppdu_need > d.ppdu_slots ? ' <span class="warnc">— 자리보다 많다(부하를 줄이거나 나눠 물린다)</span>' : short ? ' <span class="warnc">— 놓는 중이거나 모자란다</span>' : ""}`;
     this.grades(d); this.rows(d);
     const it = d.items.find(x => x.id === this.sel), E = $("#ldEdit"), sig = it ? JSON.stringify([it.id, d.rev]) : "";
     if (!it) { E.style.display = "none"; this.sig = ""; return; }

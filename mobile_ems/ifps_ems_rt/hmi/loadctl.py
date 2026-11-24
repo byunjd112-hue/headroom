@@ -71,7 +71,7 @@ class LoadBook:
                       **{k: at[i["id"]][k] for k in ("fsu", "fsu_name", "ppdu", "ppdu_name", "ppdus", "need")}, fsu_auto=at[i["id"]]["auto"], fsu_over=at[i["id"]]["over"], out_over=at[i["id"]]["out_over"]) for i in self.items]
         grades = [{"grade": g, "feeder": f, "rated": round(r[g], 1), "kw": kw[f], "stage": st[f], "n": sum(i["n"] for i in self.items if i["grade"] == g), "save_frac": round(fr.get(f, 0.0), 3),
                    "auto": "save" if f in rt.shedder.saved else "shed" if f in rt.shedder.mine else "", "why": rt.shedder.why.get(f, "")} for g, f in loads.FEEDER.items()]
-        return {"rev": self.rev, "by": self.by, "t": self.t, "items": items, "grades": grades, "limit": self.limit(), "ppdus": pp, "fsus": ff, "ppdu_kw": ring.RATED_KW, "fsu_kw": ring.FSU_KW, "fsu_a": ring.FSU_A, "fsu_out": ring.FSU_OUT,
+        return {"rev": self.rev, "by": self.by, "t": self.t, "items": items, "grades": grades, "limit": self.limit(), "ppdus": pp, "fsus": ff, "ppdu_need": sum(i["need"] for i in items), "ppdu_have": len(pp), "ppdu_slots": int((self.eng.cfg.get("ring") or {}).get("ppdu_slots", ring.DEFAULT["ppdu_slots"])), "ppdu_kw": ring.RATED_KW, "fsu_kw": ring.FSU_KW, "fsu_a": ring.FSU_A, "fsu_out": ring.FSU_OUT,
                 "kinds": [{"id": k, "name": v[0], "grade": v[1], "kw": v[2], "save_pct": v[3]} for k, v in loads.KINDS.items()], "max_n": loads.MAX_N, "max_items": loads.MAX_ITEMS}
 
 

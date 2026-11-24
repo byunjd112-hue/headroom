@@ -21,7 +21,7 @@ import re
 
 ID = re.compile(r"^(FSU|PPDU)[1-9][0-9]?$")
 V_LIVE = 300.0                   # 이 전압(V) 이상이면 그 마디에 전기가 들어온 것으로 본다
-MAX_FSU, MAX_PPDU = 12, 12
+MAX_FSU, MAX_PPDU = 12, 18       # 배전체계 18대는 제안 발표 자료의 PPDU-20 수량
 KIND = {0x46: "FSU", 0x50: "PPDU"}       # 장치 ID 의 윗자리로 종류를 가린다(가정)
 KNAME = {"FSU": "구간분전함", "PPDU": "배전체계"}
 PLAIN = re.compile(r"^배전체계( \d+| \(ID \d+\))$")      # 따로 이름을 붙이지 않은 배전체계 — 부하 앞에 붙으면 그 부하의 이름으로 부른다
@@ -39,7 +39,7 @@ def _ch(names):
     return [{"name": n or d[1], "cls": d[0]} for n, d in zip(names, CH_DEFAULT)]
 
 
-DEFAULT = {"enabled": True, "auto": True, "fsu_slots": 7, "ppdu_slots": 8, "name": "부하 환망", "open": 4, "trip_ms": 1500, "close_ms": 2500,
+DEFAULT = {"enabled": True, "auto": True, "fsu_slots": 7, "ppdu_slots": 18, "name": "부하 환망", "open": 4, "trip_ms": 1500, "close_ms": 2500,
            "fsu": [{"id": f"FSU{k}", "code": 0x4600 + k, "name": f"구간분전함 {k}"} for k in range(1, 8)],
            "ppdu": [{"id": "PPDU1", "code": 0x5001, "at": "FSU2", "name": "배전체계 1", "ch": _ch(("예비 동력", "", "지휘소", "통신소", "상황실 조명", "생활 전열"))},
                     {"id": "PPDU2", "code": 0x5002, "at": "FSU4", "name": "배전체계 2", "ch": _ch(("의무 장비", "", "수술·처치", "의무 통신", "경계 조명", "생활 전열"))},
