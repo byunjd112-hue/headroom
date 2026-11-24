@@ -17,6 +17,8 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
     const need = (scr, txt, want) => { n++; if (!txt.includes(want)) miss.push(`${scr}: '${want}' 없음`); };
     const lp = await text("loads", "#ldRows tr"); on.forEach(i => { need("부하 관리", lp, i.name); need("부하 관리", lp, i.fsu_name); });
     const ov = await text("overview", "#siteMk .spt:not(.ppdu)", 4500); on.forEach(i => { need("개요", ov, i.name); need("개요", ov, `${i.grade}등급 · ${i.fsu_name}`); });
+    const spare = await p.evaluate(() => [...document.querySelectorAll("#siteMk .spt:not(.ppdu)")].filter(e => /예비 자리/.test(e.querySelector(".sh").textContent)).map(e => e.querySelector(".ss").textContent));
+    n++; if (spare.some(t => /급전 중|kW/.test(t))) miss.push(`개요: 예비 자리에 '${spare.find(t => /급전 중|kW/.test(t))}'`);      // 부하가 없는 예비 자리는 급전 중이라고 나오면 안 된다
     const cnt = await p.evaluate(() => document.querySelector("#layCnt").textContent); need("개요", cnt, pill.replace("개", "").trim());
     const sl = await text("sld", "#main svg text, #sldCb", 3500); on.forEach(i => need("결선도", sl, lab(i).slice(0, 10)));
     const rg = await text("ring", "#rgBody", 3500); on.forEach(i => need("환망", rg, lab(i)));
