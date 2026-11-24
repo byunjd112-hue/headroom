@@ -58,7 +58,7 @@ def _current(doc, s):
     act = [a for a in s["alarms"] if a["state"] == "ACT"]
     doc.h2(f"1.3 발생 중인 경보 ({len(act)}건)")
     doc.table(["등급", "대상", "내용", "발생 시각", "확인"], [[a["prio"], a["src"], a["text"], datetime.fromtimestamp(a["t_on"]).strftime("%m-%d %H:%M:%S"), "확인" if a["acked"] else "미확인"] for a in act[:60]], [8, 12, 52, 18, 10])
-    _ring(doc, s.get("ring")); _fleet(doc, s.get("fleet")); _loads(doc, s.get("loads"))
+    _ring(doc, s.get("ring"), s.get("loads")); _fleet(doc, s.get("fleet")); _loads(doc, s.get("loads"))
 
 
 def _fleet(doc, fl):
@@ -80,7 +80,13 @@ def _loads(doc, ld):
     doc.table(["등급", "부하 수", "정격 합", "지금 전력", "공급 상태"], [[f"{x['grade']}등급", x["n"], f"{_n(x['rated'], 0)} kW", "—" if x["kw"] is None else f"{_n(x['kw'], 1)} kW", st.get(x["stage"], "값 없음")] for x in g.values()])
 
 
-def _ring(doc, r):
+def _attached(ld):
+    """물린 부하의 이름을 주는 함수: 부하 관리의 목록(개요 · 결선도 · 환망 화면과 같은 자리). at("fsu" | "ppdu", 장치 이름)"""
+    on = [i for i in (ld or {}).get("items", []) if i["n"] > 0]; lab = lambda i: i["name"] + (f" ×{i['n']}" if i["n"] > 1 else "")
+    return lambda k, v: ", ".join(lab(i) for i in on if i.get(k) == v) or "—"
+
+
+def _ring(doc, r, ld=None):
     """1.4 환망(구간분전함 · 휴대용 배전체계) — 환망 화면과 같은 이름 · 상태."""
     if not r: return
     st = {None: "값 없음", 0: "개방", 1: "투입", 2: "차단"}; live = {None: "값 없음", True: "공급", False: "정전"}; end = lambda i: "전원" if i in (0, len(r["fsu"]) + 1) else r["fsu"][i - 1]["name"]
@@ -88,9 +94,10 @@ def _ring(doc, r):
     doc.p(("전 마디 공급" if r["ok"] else "정전 마디 있음: " + ", ".join(r["isolated"]) if r["isolated"] else "확인 필요") + (" · 차단된 구간 " + ", ".join(str(i) for i in r["cut"]) if r["cut"] else "")
           + (" · 상시 개방점이 닫혀 반대쪽에서 공급 중(여유 없음)" if r["switched"] else "") + f" · 자동 인식: 구간분전함 {len(r['fsu'])}대, 배전체계 {len(r['ppdu'])}대")
     doc.table(["구간", "잇는 곳", "개폐기", "비고"], [[s["i"], f"{end(s['i'])} ↔ {end(s['i'] + 1)}", st.get(s["state"], "?"), "상시 개방점" if s["open"] else ""] for s in r["sections"]], [10, 50, 16, 24])
-    doc.table(["구간분전함", "이름", "장치 ID", "전압", "공급"], [[f["id"], f["name"], f["id_read"] if f["id_read"] is not None else "—", _n(f["v"], 0, " V"), live.get(f["live"], "?")] for f in r["fsu"]], [16, 34, 16, 16, 18])
-    doc.table(["배전체계", "이름", "연결", "전력", "주 차단기", "접지", "트립한 회로", "중요 부하"],
-              [[p["id"], p["name"], p["at"] or "미확인", _n(p["kw"], 1, " kW"), st.get(p["mccb"], "?"), _n(p["gnd"], 0, " Ω"), ", ".join(f"CH{c['n']} {c['name']}" for c in p["ch"] if c["cb"] == 2) or "없음", "예" if p["vital"] else ""] for p in r["ppdu"]], [10, 18, 10, 10, 10, 8, 24, 10])
+    at = _attached(ld)
+    doc.table(["구간분전함", "이름", "장치 ID", "전압", "공급", "물린 부하"], [[f["id"], f["name"], f["id_read"] if f["id_read"] is not None else "—", _n(f["v"], 0, " V"), live.get(f["live"], "?"), at("fsu", f["id"])] for f in r["fsu"]], [12, 22, 10, 10, 10, 36])
+    doc.table(["배전체계", "이름", "연결", "물린 부하", "전력", "주 차단기", "접지", "트립한 회로", "중요 부하"],
+              [[p["id"], p["name"], p["at"] or "미확인", at("ppdu", p["id"]), _n(p["kw"], 1, " kW"), st.get(p["mccb"], "?"), _n(p["gnd"], 0, " Ω"), ", ".join(f"CH{c['n']} {c['name']}" for c in p["ch"] if c["cb"] == 2) or "없음", "예" if p["vital"] else ""] for p in r["ppdu"]], [9, 15, 8, 18, 9, 9, 7, 17, 8])
 
 
 def _recent(doc, arch, a, b):

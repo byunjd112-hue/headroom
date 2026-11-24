@@ -228,6 +228,11 @@ def _id_text(u):
     return f"{u['id']} 자리의 장치 ID {u['id_read']} — {u['bad']}" if u["bad"] else f"{u['id']} 장치 ID 불일치(기대 {u['code']}, 읽음 {u['id_read']}) — 설치 위치 확인"
 
 
+def _vital(s, f):
+    """그 구간분전함에 중요 부하(1등급)가 물렸는지: 부하 목록의 표시(vital)나 물린 배전체계의 표시."""
+    return bool(f.get("vital")) or any(p["vital"] for p in s["ppdu"] if p["at"] == f["id"])
+
+
 def alarms(r, s):
     """경보 목록: [(열쇠, 발생 여부, 등급, 대상, 글)]. 값이 없는 신호는 따지지 않는다(통신 경보가 따로 난다)."""
     out = []; r = s.get("eff", r)
@@ -236,7 +241,7 @@ def alarms(r, s):
         out.append((f"ring.cut.{sec['i']}", sec["state"] == 2, 2, "환망", f"환망 구간 {sec['i']}({a} ↔ {b}) 차단 — 그 구간의 케이블·접속부 점검"))
     out.append(("ring.switched", bool(s["switched"]), 3, "환망", "환망 상시 개방점이 닫혀 있음 — 반대쪽 공급 중(다음 고장에 여유 없음). 고장 구간 복구 뒤 원래대로 되돌리십시오"))
     for f in s["fsu"]:
-        vital = any(p["vital"] for p in s["ppdu"] if p["at"] == f["id"])
+        vital = _vital(s, f)
         out.append((f"ring.dead.{f['id']}", f["live"] is False, 1 if vital else 2, f["id"], f"{f['name']}({f['id']}) 무전압 — 이 마디의 부하 정전" + (" [중요 부하]" if vital else "")))
         out.append((f"ring.comm.{f['id']}", f.get("comm") is False, 2, f["id"], f"{f['name']}({f['id']}) 통신 고립 — 양쪽 구간이 모두 끊겨 환형 통신으로도 닿지 않음(값은 마지막 값). 끊긴 구간 가운데 하나를 먼저 복구"))
         out.append((f"ring.id.{f['id']}", f["id_ok"] is False and f["id_read"] not in (None, 0), 3, f["id"], _id_text(f)))
@@ -259,6 +264,7 @@ class Model:
     def __init__(self, r, plant, kw=None):
         self.r = r if r and "RING.sw0" in plant.by_tag else None; self.p = plant; self.kw = kw or {"L1": "LOAD.p1_kw", "L2": "LOAD.p2_kw", "L3": "LOAD.p3_kw"}
         self.e = {}; self.dt = 0.0; self.t_last = None                 # 분기 전력량계의 누적값 · 걸음 길이
+        self.branch = None; self.w = None; self.live = {}              # 부하 목록의 분기별 몫(화면부가 넣는다) — 있으면 분기 전력계가 '그 자리에 물린 부하'를 따른다
         self.brk = set(); self.t_brk = {}; self.t_trip = None; self.init = set(); self.armed = False; self.swap = None; self.place = {}; self.zero = set(); self.t_fix = {}
         if self.r is None: return
         self._place0(); self._ids(); e = self.eff()
@@ -311,11 +317,27 @@ class Model:
         if i not in self.init: self.init.add(i); self.zero.discard(i); P.set(f"{i}.mccb", 1); P.set(f"{i}.gnd", 35.0); [P.set(f"{i}.ch{n}", 1) for n in range(1, 7)]
         on = fed and int(round(P.get(f"{i}.mccb"))) == 1; tot = 0.0; bad = int(round(P.get(f"{i}.mccb"))) == 2
         if f"{i}.v" in P.by_tag: P.set(f"{i}.v", 380.0 if fed else 0.0)
+        mine = None if self.w is None else self._split(p)
         for n, c in enumerate(p["ch"]):
             tag = self.kw.get(f"L{c['cls']}"); closed = int(round(P.get(f"{i}.ch{n + 1}"))) == 1; bad = bad or int(round(P.get(f"{i}.ch{n + 1}"))) == 2
-            kw = CH_SPEC[n][1] * 0.9 * min(1.2, P.get(tag) / LOAD_REF) if on and closed and c["cls"] and tag in P.by_tag else 0.0      # 그 등급 부하의 크기에 비례(기준 부하에서 회로 정격의 90%)
+            if mine is not None: kw = mine[n] if on and closed else 0.0                                                                 # 부하 목록에서 이 배전체계에 물린 부하의 몫
+            else: kw = CH_SPEC[n][1] * 0.9 * min(1.2, P.get(tag) / LOAD_REF) if on and closed and c["cls"] and tag in P.by_tag else 0.0      # 부하 목록이 없을 때(시나리오 검증): 그 등급 부하의 크기에 비례
             P.set(f"{i}.ch{n + 1}_kw", round(kw, 1)); tot += kw; self._meter(f"{i}.ch{n + 1}_kwh", kw)
         self._meter(f"{i}.kwh", tot); P.set(f"{i}.kw", round(tot, 1)); P.set(f"{i}.lamp", 2 if bad else 1 if tot > RATED_KW or P.get(f"{i}.gnd") > GND_LIMIT or not fed else 0)
+
+    def _feeder(self, g):
+        t = self.kw.get(f"L{g}"); return self.p.get(t) if t in self.p.by_tag else 0.0
+
+    def _split(self, p):
+        """이 배전체계에 물린 부하의 전력을 회로 6개에 나눈다: 등급이 같은 회로에 회로 정격 비율로 싣고, 그 회로들의 정격을 넘는 몫은 쓰는 회로 전체에 정격 비율로 싣는다(가상 장치의 가정)."""
+        out = [0.0] * len(p["ch"]); used = [n for n, c in enumerate(p["ch"]) if c["cls"] > 0] or [0]; cap = lambda ns: sum(CH_SPEC[n][1] for n in ns)
+        for g in (1, 2, 3):
+            kw = sum(self._feeder(g) * w["frac"] for w in self.w if w["ppdu"] == p["id"] and w["grade"] == g)
+            if kw <= 0: continue
+            tg = [n for n, c in enumerate(p["ch"]) if c["cls"] == g] or used; a = min(kw, cap(tg))
+            for n in tg: out[n] += a * CH_SPEC[n][1] / cap(tg)
+            for n in used: out[n] += (kw - a) * CH_SPEC[n][1] / cap(used)
+        return out
 
     def _meter(self, tag, kw):
         """분기 전력량계(누적 kWh)를 한 걸음 올린다."""
@@ -323,15 +345,16 @@ class Model:
         self.e[tag] = self.e.get(tag, self.p.get(tag)) + max(0.0, kw) * self.dt / 3600.0; self.p.set(tag, self.e[tag])
 
     def _fsu_meters(self, e):
-        """구간분전함의 분기 전력계: 그 구간분전함에 물린 배전체계 전력의 합."""
+        """구간분전함의 분기 전력계: 그 구간분전함에 물린 배전체계 전력의 합 + 배전체계 없이 직결한 부하."""
         for f in e["fsu"]:
             if f"{f['id']}.kw" not in self.p.by_tag: continue
             kw = sum(self.p.get(f"{p['id']}.kw") for p in e["ppdu"] if p["at"] == f["id"] and f"{p['id']}.kw" in self.p.by_tag)
+            if self.w is not None and self.live.get(f["id"]): kw += sum(self._feeder(w["grade"]) * w["frac"] for w in self.w if w["fsu"] == f["id"] and not w["ppdu"])
             self.p.set(f"{f['id']}.kw", round(kw, 1)); self._meter(f"{f['id']}.kwh", kw)
 
     def _update(self, e):
         """구간분전함 전압 → 배전체계(PPDU) 전압·주 차단기·회로별 전력. 회로 전력은 그 등급 부하(LOAD.pN_kw)의 크기에 비례하는 것으로 본다(가상 장치의 가정)."""
-        live = self._fsu_live(e); here = {p["id"]: p for p in e["ppdu"]}
+        live = self._fsu_live(e); here = {p["id"]: p for p in e["ppdu"]}; self.live = live; self.w = self.branch() if self.branch else None
         for k in range(1, self._n("ppdu") + 1):
             i = f"PPDU{k}"
             if f"{i}.mccb" not in self.p.by_tag: continue

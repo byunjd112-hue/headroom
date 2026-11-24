@@ -22,6 +22,12 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
     const cnt = await p.evaluate(() => document.querySelector("#layCnt").textContent); need("개요", cnt, pill.replace("개", "").trim());
     const sl = await text("sld", "#main svg text, #sldCb", 3500); on.forEach(i => need("결선도", sl, lab(i).slice(0, 10)));
     const rg = await text("ring", "#rgBody", 3500); on.forEach(i => need("환망", rg, lab(i)));
+    // 환망 구성도: 부하가 개요 · 결선도와 같은 구간분전함 아래에 그려지는지, 분기 전력계(구간분전함 · 배전체계)가 그 자리에 물린 부하의 추정 전력과 맞는지
+    const dg = await p.evaluate(() => ({ at: Object.fromEntries([...document.querySelectorAll("#rgBody .rv-load")].map(e => [e.dataset.load, e.dataset.fsu])), ring: S.snap.ring, items: S.snap.loads.items }));
+    on.forEach(i => { n++; if (dg.at[i.id] !== i.fsu) miss.push(`환망 구성도: ${i.name} 이 ${dg.at[i.id] || "없음"} 아래(목록은 ${i.fsu})`); });
+    const est = f => dg.items.filter(f).reduce((a, i) => a + (i.n > 0 ? i.est_kw || 0 : 0), 0), near = (a, b) => Math.abs(a - b) <= Math.max(2.5, 0.12 * Math.max(a, b));
+    dg.ring.fsu.forEach(f => { n++; const e = est(i => i.fsu === f.id); if (f.kw != null && !near(f.kw, e)) miss.push(`분기 전력계 ${f.id} ${f.kw.toFixed(1)} kW ≠ 물린 부하 ${e.toFixed(1)} kW`); });
+    dg.ring.ppdu.forEach(q => { n++; const e = est(i => i.ppdu === q.id); if (q.kw != null && !near(q.kw, e)) miss.push(`배전체계 ${q.id} ${q.kw.toFixed(1)} kW ≠ 물린 부하 ${e.toFixed(1)} kW`); n++; const v = dg.items.some(i => i.ppdu === q.id && i.grade === 1 && i.n > 0); if (!!q.vital !== v) miss.push(`배전체계 ${q.id} 중요 부하 표시(★) ${q.vital} — 1등급 부하 ${v ? "있음" : "없음"}`); });
     for (const [pg, nm] of [["control", "설비 제어"], ["energy", "발전·예측"], ["trends", "추세"], ["scenarios", "운영 시나리오"]]) need(nm, await text(pg, "#main .pagehd .ld-note", 2200), pill);
     await p.goto(B + "#control"); await p.waitForTimeout(2000); const ct = await p.evaluate(() => [...document.querySelectorAll("#cbRows tr")].map(e => e.title).join(" | "));      // 차단기 줄의 이름(풍선 도움말) d.grades.filter(g => g.n > 0).forEach(g => need("설비 제어", ct, d.items.find(i => i.feeder === g.feeder && i.n > 0).name));
     bad += miss.length; console.log(`${miss.length ? "✕" : "○"} ${what} | ${on.map(i => `${lab(i)}@${i.fsu}`).join(", ")}` + (miss.length ? "\n    " + miss.slice(0, 8).join("\n    ") : ""));

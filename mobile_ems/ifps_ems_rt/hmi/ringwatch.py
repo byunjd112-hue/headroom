@@ -14,7 +14,7 @@ class RingWatch:
     def __init__(self, eng):
         self.r = ring.settings(eng.cfg.get("ring")); self.model = None; self.last = None; self.keys = set(); self.sig = None; self.hold = 0; self.on = set()
         if self.r and eng.sim and eng.plant is not None: self.model = ring.Model(self.r, eng.plant)
-        self.bpath = os.path.join(eng.rt.state_dir, "branch.json"); self.t_meter = {}
+        self.bpath = os.path.join(eng.rt.state_dir, "branch.json"); self.t_meter = {}; self.bsig = None; self.bwait = 0
         try:
             with open(self.bpath, encoding="utf-8") as f: self.book = branchfc.Book(json.load(f))
         except (OSError, ValueError): self.book = branchfc.Book()
@@ -26,7 +26,7 @@ class RingWatch:
         """감시 주기마다: (가상 장치면 환망을 한 걸음 움직이고) 상태를 판단해 경보를 올리고 내린다."""
         if self.r is None: return
         if self.model is not None: self.model.tick(time.monotonic())
-        self.last = ring.status(self.r, eng.rt.val, self._lost(eng)); keys = set(); self._recognized(eng); quiet = self.hold > 0; self.hold = max(0, self.hold - 1)
+        self.last = self._mark(eng, ring.status(self.r, eng.rt.val, self._lost(eng)), self.last); keys = set(); self._recognized(eng); quiet = self.hold > 0; self.hold = max(0, self.hold - 1)
         for key, on, prio, src, text in ring.alarms(self.r, self.last):
             keys.add(key)
             if not (quiet and on and key not in self.on): eng.alarms.set(key, bool(on), prio, src, text)      # 배치가 막 바뀐 동안에는 새 경보를 올리지 않는다(값이 한 주기 엇갈려 읽힐 수 있다)
@@ -36,25 +36,51 @@ class RingWatch:
         for key in self.keys - keys: eng.alarms.set(key, False, 3, "환망", ""); self.on.discard(key)     # 빠진 장치의 경보는 내린다
         self.keys = keys; self._branch(eng)
 
+    def _mark(self, eng, st, prev=None):
+        """중요 부하 표시를 부하 목록에 맞춘다: 1등급 부하가 물린 구간분전함 · 배전체계가 중요 부하다(부하 목록이 비어 있으면 회로 등급 설정을 그대로 쓴다)."""
+        lw = getattr(eng, "loadw", None)
+        if lw is None or st is None: return st
+        if self.last is None: self.last = prev or st                 # 자리 계산은 직전 배치를 본다
+        w = lw.branch(); st["w"] = w
+        if w:
+            v1 = {x["ppdu"] for x in w if x["grade"] == 1 and x["ppdu"]}; f1 = {x["fsu"] for x in w if x["grade"] == 1}
+            for p in st["ppdu"]: p["vital"] = p["id"] in v1
+            for f in st["fsu"]: f["vital"] = f["id"] in f1
+        return st
+
+    def _direct(self, eng, fsu):
+        """그 구간분전함에 배전체계 없이 직결한 부하의 추정 전력 합(모르면 None)."""
+        tot = 0.0
+        for w in (self.last or {}).get("w", []):
+            if w["fsu"] != fsu or w["ppdu"]: continue
+            v = eng.rt.val.get(f"LOAD.p{w['grade']}_kw")
+            if v is None: return None
+            tot += v * w["frac"]
+        return tot
+
     def _branch(self, eng):
         """분기 전력계의 값을 모은다(15분 구간이 끝나면 예측 자료를 고치고 저장한다)."""
         s = self.last; day, slot = branchfc.slot_of(eng.rt.wall()); units = s["fsu"] + s["ppdu"]
         if self.book.feed(day, slot, {u["id"]: (u.get("kw"), u.get("kwh")) for u in units}):
             try: fsio.write_json(self.bpath, self.book.state())
             except OSError: pass                                     # 저장 실패는 감시를 막지 않는다
-        if eng.sim and not self.book.b and all(u.get("kw") is not None for u in units):      # 시연: 실측이 쌓이기 전에 하루 모양을 채워 둔다(화면에 '시연용'으로 표시)
+        sig = tuple((w["id"], w["fsu"], w["ppdu"]) for w in s.get("w", []))
+        if sig != self.bsig: self.bsig = sig; self.bwait = 4               # 부하의 자리가 바뀌면 전력계 값이 자리 잡은 뒤 시연용 초기값을 다시 채운다
+        self.bwait = max(0, self.bwait - 1); stale = self.book.demo and self.bwait == 1
+        if eng.sim and (not self.book.b or stale) and self.bwait <= 1 and all(u.get("kw") is not None for u in units) and any(u["kw"] > 0 for u in units):      # 시연: 실측이 쌓이기 전에 하루 모양을 채워 둔다(화면에 '시연용'으로 표시)
             day_shape = [0.55 + 0.45 / (1 + math.exp(-(k / 4 - 7.5) * 2)) / (1 + math.exp((k / 4 - 18.5) * 2)) for k in range(branchfc.SLOTS)]
             for u in units: self.book.seed(u["id"], u["kw"], day_shape)
 
     def _meters(self, eng):
-        """전력계 대조: 구간분전함 분기 전력계와 그 아래 배전체계 전력의 합이 30초 넘게 크게 다르면 알린다(전력계 고장 · 배선 · 구성 불일치)."""
+        """전력계 대조: 구간분전함 분기 전력계와 그 아래(배전체계 전력 + 직결 부하 추정)의 합이 30초 넘게 크게 다르면 알린다(전력계 고장 · 배선 · 구성 불일치)."""
         s = self.last; keys = set(); now = eng.rt.now()
         for f in s["fsu"]:
-            below = [p["kw"] for p in s["ppdu"] if p["at"] == f["id"]]; key = f"ring.meter.{f['id']}"; keys.add(key)
-            bad = f.get("kw") is not None and below and all(x is not None for x in below) and abs(f["kw"] - sum(below)) > max(2.0, 0.2 * max(abs(f["kw"]), sum(below)))
+            below = [p["kw"] for p in s["ppdu"] if p["at"] == f["id"]]; key = f"ring.meter.{f['id']}"; keys.add(key); d = self._direct(eng, f["id"])
+            if d: below = below + [d]
+            bad = f.get("kw") is not None and d is not None and below and all(x is not None for x in below) and abs(f["kw"] - sum(below)) > max(2.0, 0.2 * max(abs(f["kw"]), sum(below)))
             if not bad: self.t_meter.pop(f["id"], None)
             late = bool(bad) and now - self.t_meter.setdefault(f["id"], now) >= 30.0
-            eng.alarms.set(key, late, 3, f["id"], f"{f['name']} 분기 전력계 {f['kw'] or 0:.1f} kW 와 아래 배전체계 합 {sum(x or 0 for x in below):.1f} kW 가 다름 — 전력계 · 배선 · 배전체계 연결 구성을 확인")
+            eng.alarms.set(key, late, 3, f["id"], f"{f['name']} 분기 전력계 {f['kw'] or 0:.1f} kW 와 아래(배전체계 · 직결 부하) 합 {sum(x or 0 for x in below):.1f} kW 가 다름 — 전력계 · 배선 · 배전체계 연결 구성을 확인")
         return keys
 
     def branch_view(self, eng):
@@ -62,7 +88,7 @@ class RingWatch:
         s = self.last or ring.status(self.r, eng.rt.val, self._lost(eng)); _, slot = branchfc.slot_of(eng.rt.wall()); rows = []
         for kind, us in (("FSU", s["fsu"]), ("PPDU", s["ppdu"])):
             for u in us: rows.append(dict(self.book.row(u["id"], slot, u.get("kw"), u.get("kwh")), id=u["id"], name=u["name"], kind=kind, at=u.get("at", "")))
-        pp = [r for r in rows if r["kind"] == "PPDU"]; tot = lambda k: round(sum(r[k] for r in pp), 1) if pp and all(r[k] is not None for r in pp) else None
+        pp = [r for r in rows if r["kind"] == "FSU"]; tot = lambda k: round(sum(r[k] for r in pp), 1) if pp and all(r[k] is not None for r in pp) else None
         return {"rows": rows, "demo": self.book.demo, "slot_min": 15, "total": {"kw": tot("kw"), "next1h": tot("next1h"), "next24_kwh": tot("next24_kwh"), "today_kwh": tot("today_kwh")}}
 
     def _recognized(self, eng):
@@ -78,7 +104,7 @@ class RingWatch:
     def view(self, eng):
         """환망 화면이 받는 것: 상태 + 초기 기동 점검 결과 + 구성."""
         if self.r is None: return {"ok": False, "why": "환망을 쓰지 않습니다(runtime.json 의 ring)"}
-        st = ring.status(self.r, eng.rt.val, self._lost(eng))
+        st = self._mark(eng, ring.status(self.r, eng.rt.val, self._lost(eng)))
         return {"ok": True, "branch": self.branch_view(eng), "status": st, "discover": ring.discover(self.r, eng.rt.val, self._lost(eng)), "config": {k: v for k, v in st["eff"].items() if k != "empty"}, "spec": {"rated_kw": ring.RATED_KW, "gnd_limit": ring.GND_LIMIT, "ch": [{"type": t, "kw": k} for t, k in ring.CH_SPEC]}, "sim": bool(self.model),
                 "sim_break": sorted(self.model.brk) if self.model else [], "sim_swap": self.model.swap if self.model else None, "sim_place": {k: sorted(v) for k, v in self.model.place.items()} if self.model else None}
 

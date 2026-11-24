@@ -2,7 +2,7 @@
 """부하 관리 — 화면부 연결. 부하 목록을 상태 폴더(loads.json)에 두고, 바뀔 때마다 실행기(절감 가능 비율)와 가상 장치(부하 배율)에 알린다.
 목록은 스냅샷의 loads 로 나가 부하 관리 · 개요 · 결선도 · 환망 · 운영 시나리오 화면이 같이 따라간다. 계산은 ifps_ems_rt/loads.py."""
 import json, os, secrets
-from .. import loads, fsio
+from .. import loads, fsio, ring
 from .engdefs import wall_iso
 
 
@@ -16,6 +16,18 @@ class LoadBook:
         except (OSError, ValueError, TypeError, AttributeError): pass
         if loads.check(self.items): self.items = [dict(i) for i in loads.DEFAULT]      # 설정의 목록이 틀렸으면 기본 목록으로
         self.apply()
+        rw = getattr(eng, "ringw", None)
+        if rw is not None and rw.model is not None: rw.model.branch = self.branch      # 가상 장치의 분기 전력계가 부하 목록을 따른다
+
+    def where(self):
+        """부하마다 물린 자리(지금 인식한 환망 배치 기준). 반환: (자리, 배전체계 목록, 구간분전함 목록)"""
+        rg = self.eng.ringw.status() if getattr(self.eng, "ringw", None) is not None else None
+        pp = [{"id": p["id"], "name": p["name"], "at": p["at"]} for p in (rg or {}).get("ppdu", [])]; ff = [{"id": f["id"], "name": f["name"]} for f in (rg or {}).get("fsu", [])]
+        return loads.attach(self.items, pp, ff, ring.RATED_KW), pp, ff
+
+    def branch(self):
+        """분기별 몫(loads.weights) — 환망의 분기 전력계 · 중요 부하 표시가 쓴다."""
+        return loads.weights(self.items, self.where()[0], self.stage())
 
     def limit(self):
         """급전선 계측 범위의 상한(대응표): {등급: kW, 0: 합계}"""
@@ -49,12 +61,12 @@ class LoadBook:
     def view(self):
         rt = self.eng.rt; st = self.stage(); kw = {"L1": rt.val.get("LOAD.p1_kw"), "L2": rt.val.get("LOAD.p2_kw"), "L3": rt.val.get("LOAD.p3_kw")}
         est = loads.share(self.items, kw, st); r = loads.rated(self.items); fr = loads.save_frac(self.items)
-        rg = self.eng.ringw.status() if getattr(self.eng, "ringw", None) is not None else None; pp = [{"id": p["id"], "name": p["name"], "at": p["at"]} for p in (rg or {}).get("ppdu", [])]; ff = [{"id": f["id"], "name": f["name"]} for f in (rg or {}).get("fsu", [])]; at = loads.attach(self.items, pp, ff)
+        at, pp, ff = self.where()
         items = [dict(i, feeder=loads.FEEDER[i["grade"]], rated=round(i["kw"] * i["n"], 1), est_kw=None if est[i["id"]] is None else round(est[i["id"]], 1), spr=loads.KINDS[i["kind"]][4],
-                      **{k: at[i["id"]][k] for k in ("fsu", "fsu_name", "ppdu", "ppdu_name")}, fsu_auto=at[i["id"]]["auto"]) for i in self.items]
+                      **{k: at[i["id"]][k] for k in ("fsu", "fsu_name", "ppdu", "ppdu_name")}, fsu_auto=at[i["id"]]["auto"], ppdu_over=at[i["id"]]["over"]) for i in self.items]
         grades = [{"grade": g, "feeder": f, "rated": round(r[g], 1), "kw": kw[f], "stage": st[f], "n": sum(i["n"] for i in self.items if i["grade"] == g), "save_frac": round(fr.get(f, 0.0), 3),
                    "auto": "save" if f in rt.shedder.saved else "shed" if f in rt.shedder.mine else "", "why": rt.shedder.why.get(f, "")} for g, f in loads.FEEDER.items()]
-        return {"rev": self.rev, "by": self.by, "t": self.t, "items": items, "grades": grades, "limit": self.limit(), "ppdus": pp, "fsus": ff,
+        return {"rev": self.rev, "by": self.by, "t": self.t, "items": items, "grades": grades, "limit": self.limit(), "ppdus": pp, "fsus": ff, "ppdu_kw": ring.RATED_KW,
                 "kinds": [{"id": k, "name": v[0], "grade": v[1], "kw": v[2], "save_pct": v[3]} for k, v in loads.KINDS.items()], "max_n": loads.MAX_N, "max_items": loads.MAX_ITEMS}
 
 

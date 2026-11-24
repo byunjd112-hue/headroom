@@ -118,14 +118,20 @@ class RingWatchTest(unittest.TestCase):
         return False
 
     def test_branch_meters_and_forecast_view(self):
-        """분기 전력계: 구간분전함 전력 = 아래 배전체계의 합, 전력량이 쌓이고, 환망 화면에 분기별 전력 · 전력량 · 예측이 나온다. 전력계가 어긋나면 알린다."""
+        """분기 전력계: 구간분전함 전력 = 아래 배전체계 + 직결 부하(부하 목록의 자리 그대로), 전력량이 쌓이고, 환망 화면에 분기별 전력 · 전력량 · 예측이 나온다. 전력계가 어긋나면 알린다."""
         e = self.eng; w = e.ringw; self.assertTrue(self._wait(lambda: (e.snapshot()["ring"] or {}).get("ok")))
-        self.assertTrue(self._wait(lambda: all(f.get("kwh") for f in w.status()["fsu"] if any(p["at"] == f["id"] for p in w.status()["ppdu"])), 12.0)); s = w.status(); self.assertEqual(s["meters_missing"], [])
-        for f in s["fsu"]: self.assertAlmostEqual(f["kw"], sum(p["kw"] for p in s["ppdu"] if p["at"] == f["id"]), delta=0.35, msg=f["id"])
-        p0 = s["ppdu"][0]; self.assertGreater(p0["kwh"], 0); self.assertAlmostEqual(sum(c["kwh"] for c in p0["ch"]), p0["kwh"], delta=0.3)
+        used = lambda: {x["fsu"] for x in w.status().get("w", [])}
+        self.assertTrue(self._wait(lambda: used() and all(f.get("kwh") for f in w.status()["fsu"] if f["id"] in used()), 12.0)); s = w.status(); self.assertEqual(s["meters_missing"], [])
+        items = e.snapshot()["loads"]["items"]; self.assertEqual({i["id"]: (i["fsu"], i["ppdu"]) for i in items}, {"c2": ("FSU1", ""), "med": ("FSU4", "PPDU2"), "brk": ("FSU3", ""), "ammo": ("FSU5", "")})      # 배전체계 정격(20 kW)을 넘는 부하는 직결
+        for f in s["fsu"]:                                                # 구간분전함 전력계 = 그 자리에 물린 부하의 추정 전력 합(개요 · 결선도 · 환망이 같은 값)
+            self.assertAlmostEqual(f["kw"], sum(i["est_kw"] for i in items if i["fsu"] == f["id"]), delta=1.5, msg=f["id"])
+            self.assertAlmostEqual(f["kw"], sum(p["kw"] for p in s["ppdu"] if p["at"] == f["id"]) + (w._direct(e, f["id"]) or 0), delta=0.6, msg=f["id"])
+        for p in s["ppdu"]: self.assertAlmostEqual(p["kw"], sum(i["est_kw"] for i in items if i["ppdu"] == p["id"]), delta=1.0, msg=p["id"])
+        self.assertEqual([f["id"] for f in s["fsu"] if f.get("vital")], ["FSU1"]); self.assertFalse(any(p["vital"] for p in s["ppdu"]))      # ★ = 1등급 부하가 물린 자리
+        p0 = next(p for p in s["ppdu"] if p["id"] == "PPDU2"); self.assertGreater(p0["kwh"], 0); self.assertAlmostEqual(sum(c["kwh"] for c in p0["ch"]), p0["kwh"], delta=0.3)
         b = w.view(e)["branch"]; self.assertEqual(len(b["rows"]), len(s["fsu"]) + len(s["ppdu"])); self.assertTrue(b["demo"])                 # 가상 장치: 실측이 쌓이기 전에는 시연용 초기값
         r = next(x for x in b["rows"] if x["id"] == p0["id"]); self.assertIsNotNone(r["next1h"]); self.assertIsNotNone(r["next24_kwh"]); self.assertEqual(len(r["spark"]), 48); self.assertIsNotNone(b["total"]["next24_kwh"])
-        f = next(x for x in s["fsu"] if any(p["at"] == x["id"] for p in s["ppdu"])); rt = e.rt; t = [1000.0]; now = rt.now; rt.now = lambda: t[0]
+        f = next(x for x in s["fsu"] if x["id"] == "FSU4"); rt = e.rt; t = [1000.0]; now = rt.now; rt.now = lambda: t[0]
         try:
             with e.lock:
                 w.last = copy.deepcopy(w.status()); next(x for x in w.last["fsu"] if x["id"] == f["id"])["kw"] = f["kw"] + 30.0
@@ -148,7 +154,8 @@ class RingWatchTest(unittest.TestCase):
         w.sim({"action": "break", "section": 2}); self.assertTrue(self._wait(lambda: w.status()["cut"] == [2] and w.status()["switched"] and w.status()["ok"])); w.sim({"action": "break", "section": 3}); self.assertTrue(self._wait(lambda: w.status()["isolated"] == ["FSU3"]))
         w.sim({"action": "restore"}); w.sim({"action": "swap", "a": "FSU2", "b": "FSU5"}); self.assertTrue(self._wait(lambda: w.status()["fsu"][1]["name"] == "구간분전함 5"))      # 자리를 바꿔 놓아도 조작 없이 따라간다
         self.assertTrue(w.view(e)["discover"]["ok"]); self.assertEqual(w.status()["ppdu"][0]["at"], "FSU2"); self.assertFalse(w.accept(e, "시험")["ok"]); w.sim({"action": "swap"})
-        self.assertTrue(w.status()["ppdu"][2]["vital"]); ch = [{"name": "통신 중계", "cls": 3}] + [{"name": c["name"], "cls": min(3, c["cls"] + 1) if c["cls"] else 0} for c in w.r["ppdu"][2]["ch"][1:]]      # 1등급 회로를 모두 낮춘다
+        self.assertFalse(w.status()["ppdu"][2]["vital"]); self.assertTrue(e.loadw.change({"op": "set", "id": "c2", "fsu": "FSU6"}, "시험")["ok"])                          # ★(중요 부하)는 1등급 부하가 물린 자리를 따른다
+        self.assertTrue(self._wait(lambda: w.status()["ppdu"][2]["vital"])); self.assertTrue(e.loadw.change({"op": "set", "id": "c2", "fsu": ""}, "시험")["ok"]); ch = [{"name": "통신 중계", "cls": 3}] + [{"name": c["name"], "cls": min(3, c["cls"] + 1) if c["cls"] else 0} for c in w.r["ppdu"][2]["ch"][1:]]      # 1등급 회로를 모두 낮춘다
         r = w.configure(e, {"ppdu": [{"id": "PPDU3", "at": "FSU1", "name": "통신소", "ch": ch}], "open": 3}, "시험"); self.assertTrue(r["ok"])
         with open(self.cfg, encoding="utf-8") as f: saved = json.load(f)["ring"]
         self.assertEqual((saved["ppdu"][2]["at"], saved["ppdu"][2]["name"], saved["ppdu"][2]["ch"][0], saved["open"]), ("FSU6", "통신소", {"name": "통신 중계", "cls": 3}, 3))      # 붙은 곳은 자동으로 알므로 화면에서 고치지 않는다

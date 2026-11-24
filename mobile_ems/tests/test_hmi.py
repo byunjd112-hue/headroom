@@ -74,7 +74,8 @@ class TestHmi(unittest.TestCase):
             snap = e.snapshot()["loads"]; self.assertEqual(len(snap["items"]), 5); self.assertTrue(all(i["est_kw"] is not None for i in snap["items"])); self.assertIn(snap["grades"][2]["stage"], ("on", "save", "off"))
             self.assertAlmostEqual(sum(i["est_kw"] for i in snap["items"] if i["feeder"] == "L2"), e.rt.val["LOAD.p2_kw"], delta=0.2)   # 추정 전력의 합 = 급전선 계측값
             at = {i["id"]: (i["fsu"], i["ppdu"], i["fsu_auto"]) for i in snap["items"]}; pp = snap["ppdus"]; ff = [f["id"] for f in snap["fsus"]]; self.assertGreaterEqual(len(pp), 3)
-            self.assertEqual(at["c2"], (pp[0]["at"], pp[0]["id"], True)); self.assertEqual(at["brk"][0], pp[1]["at"]); self.assertEqual(at["ammo"][0], pp[2]["at"])          # 종류에 따라 배전체계가 붙은 구간분전함에 물린다(자동)
+            self.assertEqual(at["med"], (pp[1]["at"], pp[1]["id"], True)); self.assertEqual(at["c2"], ("FSU1", "", True)); self.assertEqual((at["brk"][1], at["ammo"][1]), ("", ""))   # 종류에 맞는 배전체계에 물린다(자동). 배전체계 정격 20 kW 를 넘는 부하는 가까운 구간분전함에 직결
+            self.assertEqual(snap["ppdu_kw"], 20.0)
             free = next(f for f in ff if f not in {p["at"] for p in pp})
             r = self.req("/api/loads", {"op": "set", "id": "ammo", "grade": 1, "save_pct": 0, "fsu": free}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "ammo")
             self.assertEqual((it["feeder"], it["fsu"], it["ppdu"], it["fsu_auto"]), ("L1", free, "", False))                                                       # 등급 · 자리를 바꾸면 급전선과 구간분전함이 따라간다(배전체계 없는 구간분전함에도 물린다)

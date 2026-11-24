@@ -75,19 +75,46 @@ def scale(items):
     r = rated(items); return {g: r[g] / BASE[g] for g in BASE}
 
 
-def attach(items, ppdus, fsus=()):
-    """부하마다 물린 자리를 정한다 — 구간분전함(fsu)이 기준이고, 그 구간분전함에 배전체계가 있으면 그것이 물린 배전체계다.
-    ppdus: 지금 있는 배전체계 [{id, name, at}], fsus: 지금 있는 구간분전함 [{id, name}] (환망 순서).
-    부하에 정해 둔 구간분전함(개요 배치도에서 옮기거나 부하 관리에서 고른 것)이 지금 있으면 그것, 아니면 종류에 따른 차례의 배전체계가 붙은 구간분전함으로('자동').
-    반환: {부하 id: {"fsu", "fsu_name", "ppdu", "ppdu_name", "auto"}} — 환망이 없으면 빈 값."""
-    out = {}; fn = {f["id"]: f["name"] for f in fsus}; at = {}
-    for p in ppdus: at.setdefault(p["at"], p)
+def _near(order, home, free, taken):
+    """home 구간분전함에서 가까운 차례로, 배전체계가 없는 구간분전함을 고른다(다른 직결 부하가 아직 잡지 않은 곳 먼저)."""
+    if home not in order: return ""
+    k = order.index(home); cand = sorted((f for f in free), key=lambda f: (f in taken, abs(order.index(f) - k), order.index(f)))
+    return cand[0] if cand else ""
+
+
+def _auto(items, ppdus, cap, where, used, spot):
+    """자리를 정하지 않은 부하의 자리: 종류에 따른 차례의 배전체계, 정격을 넘게 되면 가까운 직결 자리."""
+    order, free, taken = where
     for it in items:
-        f = it.get("fsu") or ""; auto = f not in fn
-        if auto: p = ppdus[min(KIND_AT.get(it["kind"], 0), len(ppdus) - 1)] if ppdus else None; f = p["at"] if p else ""
-        p = at.get(f)
-        out[it["id"]] = {"fsu": f, "fsu_name": fn.get(f, f), "ppdu": p["id"] if p else "", "ppdu_name": p["name"] if p else "", "auto": auto}
+        if it["id"] in spot: continue
+        p = ppdus[min(KIND_AT.get(it["kind"], 0), len(ppdus) - 1)] if ppdus else None; f = p["at"] if p else ""; r = it["kw"] * it["n"]
+        if p and cap is not None and used.get(f, 0.0) + r > cap + 1e-9: f = _near(order, p["at"], free, taken) or f
+        spot[it["id"]] = (f, True); used[f] = used.get(f, 0.0) + r; taken.add(f)
+
+
+def attach(items, ppdus, fsus=(), cap=None):
+    """부하마다 물린 자리를 정한다 — 구간분전함(fsu)이 기준이고, 그 구간분전함에 배전체계가 있으면 그것이 물린 배전체계다(없으면 구간분전함 직결).
+    ppdus: 지금 있는 배전체계 [{id, name, at}], fsus: 지금 있는 구간분전함 [{id, name}] (환망 순서), cap: 배전체계 한 대의 정격(kW).
+    부하에 정해 둔 구간분전함(개요 배치도에서 옮기거나 부하 관리에서 고른 것)이 지금 있으면 그것, 아니면 '자동' — 종류에 따른 차례의 배전체계로 보내되,
+    그 배전체계의 정격(cap)을 넘게 되면 가까운 '배전체계 없는 구간분전함'에 직결한다(정격 20 kW 배전체계에 30 kW 시설을 물리는 그림이 되지 않게).
+    반환: {부하 id: {"fsu", "fsu_name", "ppdu", "ppdu_name", "auto", "over"}} — over: 그 배전체계에 물린 정격 합이 cap 을 넘음. 환망이 없으면 빈 값."""
+    out = {}; fn = {f["id"]: f["name"] for f in fsus}; at = {}; order = [f["id"] for f in fsus]; used = {}; taken = set(); spot = {}
+    for p in ppdus: at.setdefault(p["at"], p)
+    free = [f for f in order if f not in at]
+    for it in items:                                                   # 자리를 정해 둔 부하 먼저
+        f = it.get("fsu") or ""
+        if f in fn: spot[it["id"]] = (f, False); used[f] = used.get(f, 0.0) + it["kw"] * it["n"]; taken.add(f)
+    _auto(items, ppdus, cap, (order, free, taken), used, spot)
+    for it in items:
+        f, auto = spot[it["id"]]; p = at.get(f)
+        out[it["id"]] = {"fsu": f, "fsu_name": fn.get(f, f), "ppdu": p["id"] if p else "", "ppdu_name": p["name"] if p else "", "auto": auto, "over": bool(p and cap is not None and used.get(f, 0.0) > cap + 1e-9)}
     return out
+
+
+def weights(items, at, stage):
+    """분기별 몫: 부하마다 (물린 구간분전함 · 배전체계 · 등급 · 그 급전선 전력에서 차지하는 비율). 가상 장치의 분기 전력계와 전력계 대조가 쓴다."""
+    fr = share(items, {f: 1.0 for f in FEEDER.values()}, stage)
+    return [{"id": it["id"], "fsu": at[it["id"]]["fsu"], "ppdu": at[it["id"]]["ppdu"], "grade": it["grade"], "frac": fr[it["id"]] or 0.0} for it in items if it["n"] > 0 and at.get(it["id"], {}).get("fsu")]
 
 
 def share(items, feeder_kw, stage):
