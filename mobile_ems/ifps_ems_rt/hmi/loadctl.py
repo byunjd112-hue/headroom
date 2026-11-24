@@ -49,10 +49,12 @@ class LoadBook:
     def view(self):
         rt = self.eng.rt; st = self.stage(); kw = {"L1": rt.val.get("LOAD.p1_kw"), "L2": rt.val.get("LOAD.p2_kw"), "L3": rt.val.get("LOAD.p3_kw")}
         est = loads.share(self.items, kw, st); r = loads.rated(self.items); fr = loads.save_frac(self.items)
-        items = [dict(i, feeder=loads.FEEDER[i["grade"]], rated=round(i["kw"] * i["n"], 1), est_kw=None if est[i["id"]] is None else round(est[i["id"]], 1), spr=loads.KINDS[i["kind"]][4]) for i in self.items]
+        rg = self.eng.ringw.status() if getattr(self.eng, "ringw", None) is not None else None; pp = [{"id": p["id"], "name": p["name"], "at": p["at"]} for p in (rg or {}).get("ppdu", [])]; at = loads.attach(self.items, pp)
+        items = [dict(i, feeder=loads.FEEDER[i["grade"]], rated=round(i["kw"] * i["n"], 1), est_kw=None if est[i["id"]] is None else round(est[i["id"]], 1), spr=loads.KINDS[i["kind"]][4],
+                      ppdu=at[i["id"]]["ppdu"], ppdu_name=at[i["id"]]["ppdu_name"], fsu=at[i["id"]]["fsu"], ppdu_auto=at[i["id"]]["auto"]) for i in self.items]
         grades = [{"grade": g, "feeder": f, "rated": round(r[g], 1), "kw": kw[f], "stage": st[f], "n": sum(i["n"] for i in self.items if i["grade"] == g), "save_frac": round(fr.get(f, 0.0), 3),
                    "auto": "save" if f in rt.shedder.saved else "shed" if f in rt.shedder.mine else "", "why": rt.shedder.why.get(f, "")} for g, f in loads.FEEDER.items()]
-        return {"rev": self.rev, "by": self.by, "t": self.t, "items": items, "grades": grades, "limit": self.limit(),
+        return {"rev": self.rev, "by": self.by, "t": self.t, "items": items, "grades": grades, "limit": self.limit(), "ppdus": pp,
                 "kinds": [{"id": k, "name": v[0], "grade": v[1], "kw": v[2], "save_pct": v[3]} for k, v in loads.KINDS.items()], "max_n": loads.MAX_N, "max_items": loads.MAX_ITEMS}
 
 
@@ -73,10 +75,10 @@ def _edit(items, b):
     if op == "count": it["n"] = it["n"] + int(b.get("delta", 0)); return items, f"{it['name']} 수량 {it['n']}"
     if op == "del": items.remove(it); return items, f"부하 삭제: {it['name']}"
     if op != "set": raise ValueError(f"동작 없음: {op}")
-    for k in ("name", "grade", "kw", "save_pct"):
+    for k in ("name", "grade", "kw", "save_pct", "ppdu"):
         if k in b: it[k] = b[k].strip() if k == "name" and isinstance(b[k], str) else b[k]
     if it["grade"] == 1 and "grade" in b and "save_pct" not in b: it["save_pct"] = 0
-    return items, f"{it['name']} 변경: {it['grade']}등급 · 대당 {it['kw']:g} kW · 절감 {it['save_pct']:g}%"
+    return items, f"{it['name']} 변경: {it['grade']}등급 · 대당 {it['kw']:g} kW · 절감 {it['save_pct']:g}%" + (f" · 배전체계 {it['ppdu'] or '자동'}" if "ppdu" in b else "")
 
 
 def http_post(eng, b, sess):

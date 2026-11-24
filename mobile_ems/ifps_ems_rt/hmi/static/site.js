@@ -111,7 +111,8 @@ function layCables(items) {
   if (!ring) dist.forEach(d => fsu.slice().sort((a, b) => _d2(a, d) - _d2(b, d)).slice(0, 2).forEach(f => cab.push([pt(d), pt(f), "RING"])));
   items.filter(i => i.kind !== "FSU" && i.kind !== "DIST").forEach(i => {
     if (!hubs.length) return; const src = ring && dist.length && ["DG", "ESS", "PV", "FC", "EMS"].includes(i.kind);      // 환망을 감시 중이면 결선도와 같게: 발전 장비 · EMS 는 배전 · 변압(모선)으로, 부하 시설은 가까운 구간분전함으로
-    const h = (src ? dist : hubs).slice().sort((a, b) => _d2(a, i) - _d2(b, i))[0];
+    const own = i.fsu && fsu.find(f => _fsuNo(f) === i.fsu);                   // 부하 목록이 정한 구간분전함(그 부하가 물린 배전체계가 붙은 곳) — 결선도와 같은 자리
+    const h = own || (src ? dist : hubs).slice().sort((a, b) => _d2(a, i) - _d2(b, i))[0];
     cab.push([pt(i), pt(h), i.kind === "EMS" ? "EMSP" : (i.bind || "RING")]);
   });
   return cab;
@@ -134,13 +135,14 @@ const LOAD_SPR = ["L1", "L2", "L3", "BARRACK"], LOAD_AT = { L1: [230, 740], L2: 
 function layLoads(items) {
   const d = S.snap && S.snap.loads; if (L.edit || !d || !d.items) return items;
   const out = items.filter(i => !LOAD_SPR.includes(i.kind)), pool = {}, made = {};
-  items.filter(i => LOAD_SPR.includes(i.kind)).forEach(i => (pool[i.kind + "/" + i.bind] = pool[i.kind + "/" + i.bind] || []).push(i));
-  d.items.forEach(ld => { const have = pool[ld.spr + "/" + ld.feeder] || []; let anchor = null, k = 0; const grp = [];
-    for (let j = 0; j < ld.n; j++) { const it = have.shift(), name = ld.n > 1 ? `${ld.name} #${j + 1}` : ld.name;
-      if (it) { anchor = it; k = 0; grp.push(Object.assign({}, it, { name, load: ld.id })); continue; }
+  items.filter(i => LOAD_SPR.includes(i.kind)).forEach(i => (pool[i.kind] = pool[i.kind] || []).push(i));
+  const take = ld => { const have = pool[ld.spr] || [], k = have.findIndex(i => i.bind === ld.feeder); return have.length ? have.splice(k < 0 ? 0 : k, 1)[0] : null; };      // 같은 급전선에 묶여 있던 그림을 먼저, 없으면 같은 종류의 아무 그림
+  d.items.forEach(ld => { let anchor = null, k = 0; const grp = [], tie = { load: ld.id, bind: ld.feeder, fsu: ld.fsu };
+    for (let j = 0; j < ld.n; j++) { const it = take(ld), name = ld.n > 1 ? `${ld.name} #${j + 1}` : ld.name;
+      if (it) { anchor = it; k = 0; grp.push(Object.assign({}, it, tie, { name })); continue; }
       const m = made[ld.feeder] = (made[ld.feeder] || 0) + (anchor ? 0 : 1), b = anchor || { x: LOAD_AT[ld.feeder][0] + 150 * (m - 1) * (ld.feeder === "L3" ? -1 : 1), y: LOAD_AT[ld.feeder][1] - 70 };
-      if (!anchor) { anchor = { x: Math.max(60, Math.min(1540, b.x)), y: b.y }; grp.push({ uid: `auto-ld-${ld.id}-${j}`, kind: ld.spr, bind: ld.feeder, name, x: anchor.x, y: anchor.y, load: ld.id }); continue; }
-      k++; grp.push({ uid: `auto-ld-${ld.id}-${j}`, kind: ld.spr, bind: ld.feeder, name, x: Math.min(1540, anchor.x + 46 * k), y: Math.max(215, anchor.y - 24 * k), load: ld.id, stack: true }); }
+      if (!anchor) { anchor = { x: Math.max(60, Math.min(1540, b.x)), y: b.y }; grp.push(Object.assign({ uid: `auto-ld-${ld.id}-${j}`, kind: ld.spr, name, x: anchor.x, y: anchor.y }, tie)); continue; }
+      k++; grp.push(Object.assign({ uid: `auto-ld-${ld.id}-${j}`, kind: ld.spr, name, x: Math.min(1540, anchor.x + 46 * k), y: Math.max(215, anchor.y - 24 * k), stack: true }, tie)); }
     const st = grp.filter(g => g.stack).length; if (st) grp.forEach(g => { g.sc = layScale(st + 1); });      // 겹쳐 세운 무리는 같은 비율로 줄인다
     out.push(...grp); });
   Object.values(pool).forEach(rest => rest.forEach(it => out.push(Object.assign({}, it, { absent: true, spare: true }))));      // 목록에서 빠진 그림: 흐리게 둔다(다시 늘리면 켜진다)
@@ -220,7 +222,7 @@ function siteMarkers() {
   const rg = S.snap && S.snap.ring, pp = !rg ? "" : rg.ppdu.map((p, j) => { const it = (L.view || L.items).find(i => i.kind === "FSU" && _fsuNo(i) === p.at); if (!it) return "";
     return `<div class="spt mini ppdu" data-pp="${esc(p.id)}" style="left:${it.x / MAP_W * 100}%;top:${(it.y + 50) / MAP_H * 100}%"><i class="core"></i><div class="scard"><div class="sh">${esc(p.name)}${p.vital ? " ★" : ""}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`; }).join("");
   box.dataset.n = (L.view || L.items).length + (rg ? rg.ppdu.length * 100 : 0); box.innerHTML = pp + (L.view || L.items).filter(i => i.kind !== "FSU").map(it => {
-    const [x, y] = _mkPos(it), mini = it.kind === "BARRACK" || seen[it.bind]; seen[it.bind] = 1;
+    const key = it.load ? "ld:" + it.load : it.bind, [x, y] = _mkPos(it), mini = it.load ? !!seen[key] : it.kind === "BARRACK" || seen[key]; seen[key] = 1;      // 부하는 목록의 한 줄마다 첫 그림에 표지를 단다
     return `<div class="spt ${mini ? "mini" : ""}" data-act="goctl" data-uid="${it.uid}" style="left:${x}%;top:${y}%"><i class="pulse"></i><i class="core"></i>
       <div class="scard"><div class="sh">${esc(it.name || LAY_KINDS[it.kind].nm)}${it.spare ? " · 예비 자리" : ""}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`;
   }).join("");
@@ -254,6 +256,8 @@ function siteUpdate(s, force) {
     e.className = `spt mini ppdu ${bad ? "bad" : tr || p.over || p.gnd_bad ? "idle" : "ok"}`; e.querySelector(".sv .mono").textContent = p.kw == null ? "—" : F.kw(p.kw) + " kW"; e.querySelector(".ss").textContent = bad ? (p.mccb === 2 ? "주 차단기 트립" : "정전") : tr ? `회로 트립 ${tr}` : p.over ? "과부하" : "공급"; });
   $$("#siteMk .spt:not(.ppdu)").forEach(e => { const it = L.view.find(i => i.uid === e.dataset.uid); if (!it) return; let x = st[it.bind] || { st: "ok", v: "", t: "" };
     const kf = KF(LAY_FLEET[it.kind]), u = kf && kf.units.length > 1 && kf.units.find(q => q.id === it.unit);
+    const ld = it.load && LD.s().items.find(q => q.id === it.load);
+    if (ld && !it.spare && /kW$/.test(x.v) && x.v !== "0 kW") x = Object.assign({}, x, { v: `${F.kw(ld.est_kw)} kW`, t: `${x.t} · ${ld.grade}등급${ld.ppdu ? " · " + ld.ppdu_name : ""}` });      // 그 부하의 추정 전력(부하 관리 화면과 같은 값) · 등급 · 물린 배전체계
     if (u) x = { st: !u.live ? "bad" : u.on || it.kind === "ESS" || it.kind === "PV" ? "ok" : "idle", v: `${u.id}${u.kw == null ? "" : " · " + F.kw(u.kw) + " kW"}${it.kind === "ESS" && u.soc != null ? " · " + F.n(u.soc, 0) + "%" : ""}`, t: !u.live ? "통신 두절" : it.kind === "ESS" || it.kind === "PV" ? "연결" : u.on ? "운전" : "정지" };
     e.className = `spt ${e.classList.contains("mini") ? "mini" : ""} ${x.st}`; e.querySelector(".sv .mono").textContent = x.v; e.querySelector(".ss").textContent = x.t; });
   const sum = $("#layCnt"); if (sum) { const A = L.edit ? L.items : layAuto(L.items).filter(i => !i.spare), c = k => A.filter(i => i.kind === k).length, ld = LD.s().grades.reduce((a, g) => a + g.n, 0);      // 화면에 놓인 것(자동으로 놓인 장치 · 부하 포함)

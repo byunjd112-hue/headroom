@@ -5,6 +5,8 @@
 EMS 가 재는 것은 급전선별 합계(LOAD.p1_kw · p2_kw · p3_kw)뿐이다 — 부하 하나하나의 전력은 정격 비율로 나눈 추정값이다.
 절감 비율: 그 부하가 '절감 공급'(LDS = 3) 때 줄일 수 있는 몫(냉난방 설정 완화 · 조명 감광 · 비필수 회로 차단). 0 이면 줄일 수 없는 부하다."""
 
+import re
+
 MAX_ITEMS = 24; MAX_N = 20
 # 부하 종류: (이름, 기본 등급, 대당 정격 kW, 절감 비율 %, 배치도 그림)
 KINDS = {"c2": ("지휘통제소", 1, 30.0, 0, "L1"), "comm": ("통신 · 레이더", 1, 15.0, 0, "L1"), "medical": ("의무시설", 2, 16.0, 10, "L2"), "barrack": ("막사", 2, 12.0, 30, "BARRACK"),
@@ -13,6 +15,8 @@ DEFAULT = [{"id": "c2", "kind": "c2", "name": "지휘통제(C2)", "grade": 1, "k
            {"id": "med", "kind": "medical", "name": "의무시설", "grade": 2, "kw": 16.0, "n": 1, "save_pct": 10},
            {"id": "brk", "kind": "barrack", "name": "막사", "grade": 2, "kw": 12.0, "n": 2, "save_pct": 30},
            {"id": "ammo", "kind": "ammo", "name": "탄약저장", "grade": 3, "kw": 25.0, "n": 1, "save_pct": 20}]
+# 부하 종류가 보통 물리는 배전체계의 차례(0 = 첫째 배전체계). 부하에 배전체계를 따로 정하지 않으면('자동') 이 차례로 붙인다
+KIND_AT = {"c2": 0, "comm": 0, "medical": 1, "barrack": 1, "kitchen": 1, "maint": 2, "hvac": 2, "ammo": 2}
 BASE = {1: 30.0, 2: 40.0, 3: 25.0}                 # 기본 목록의 등급별 정격 합(kW) — 가상 장치의 부하 곡선이 이 값을 기준으로 만들어져 있다
 FEEDER = {1: "L1", 2: "L2", 3: "L3"}
 
@@ -39,6 +43,7 @@ def _check1(i, it, ids, bad):
              (isinstance(nm, str) and 1 <= len(nm.strip()) <= 24, "이름은 1~24자"), (it.get("grade") in (1, 2, 3), "등급은 1 · 2 · 3"), (_num(it.get("kw"), 0.1, 500), "대당 정격은 0.1~500 kW"),
              (isinstance(n, int) and not isinstance(n, bool) and 0 <= n <= MAX_N, f"수량은 0~{MAX_N}"), (_num(it.get("save_pct"), 0, 80), "절감 비율은 0~80 %"))
     bad.extend(f"{tag}: {why}" for ok, why in rules if not ok)
+    if not (isinstance(it.get("ppdu", ""), str) and re.fullmatch(r"(PPDU[1-9][0-9]?)?", it.get("ppdu", ""))): bad.append(f"{tag}: 배전체계 이름 오류")
     if _num(it.get("save_pct"), 0, 80) and it.get("grade") == 1 and it["save_pct"] > 0: bad.append(f"{tag}: 1등급 부하는 절감하지 않는다(절감 비율 0)")
 
 
@@ -68,6 +73,17 @@ def save_frac(items):
 def scale(items):
     """가상 장치의 급전선별 부하 배율: 기본 목록의 정격 합을 1 로 본다."""
     r = rated(items); return {g: r[g] / BASE[g] for g in BASE}
+
+
+def attach(items, ppdus):
+    """부하마다 물린 배전체계를 정한다. ppdus: 지금 있는 배전체계 [{id, name, at}] (환망 순서). 부하에 정해 둔 배전체계가 있으면 그것, 없거나 그 배전체계가 지금 없으면 종류에 따른 차례로.
+    반환: {부하 id: {"ppdu", "ppdu_name", "fsu", "auto"}} — 배전체계가 하나도 없으면 빈 값."""
+    out = {}; by = {p["id"]: p for p in ppdus}
+    for it in items:
+        p = by.get(it.get("ppdu") or ""); auto = p is None
+        if auto and ppdus: p = ppdus[min(KIND_AT.get(it["kind"], 0), len(ppdus) - 1)]
+        out[it["id"]] = {"ppdu": p["id"] if p else "", "ppdu_name": p["name"] if p else "", "fsu": p["at"] if p else "", "auto": auto}
+    return out
 
 
 def share(items, feeder_kw, stage):
