@@ -33,7 +33,7 @@ class RingWatch:
             if not on: self.on.discard(key)
             elif not quiet: self.on.add(key)
         keys |= self._meters(eng); keys.add("ring.over.total"); tot = [f.get("kw") for f in self.last["fsu"]]; amp = None if any(x is None for x in tot) else sum(tot)
-        eng.alarms.set("ring.over.total", amp is not None and amp > ring.FSU_KW, 2, "환망", f"환망 전체 부하 {amp or 0:.0f} kW — 한 구간이 끊겨 한쪽에서만 받으면 환망 간선 정격 {ring.FSU_A:.0f} A(약 {ring.FSU_KW:.0f} kW)를 넘는다. 부하를 줄이거나 낮은 등급부터 끊으십시오")
+        sp = ring.spec(self.r); eng.alarms.set("ring.over.total", amp is not None and amp > sp["fsu_kw"], 2, "환망", f"환망 전체 부하 {amp or 0:.0f} kW — 한 구간이 끊겨 한쪽에서만 받으면 환망 간선 정격 {sp['fsu_a']:.0f} A(약 {sp['fsu_kw']:.0f} kW)를 넘는다. 부하를 줄이거나 낮은 등급부터 끊으십시오")
         for key in self.keys - keys: eng.alarms.set(key, False, 3, "환망", ""); self.on.discard(key)     # 빠진 장치의 경보는 내린다
         self.keys = keys; self._branch(eng)
 
@@ -108,7 +108,7 @@ class RingWatch:
         """환망 화면이 받는 것: 상태 + 초기 기동 점검 결과 + 구성."""
         if self.r is None: return {"ok": False, "why": "환망을 쓰지 않습니다(runtime.json 의 ring)"}
         st = self._mark(eng, ring.status(self.r, eng.rt.val, self._lost(eng)))
-        return {"ok": True, "branch": self.branch_view(eng), "status": st, "discover": ring.discover(self.r, eng.rt.val, self._lost(eng)), "config": {k: v for k, v in st["eff"].items() if k != "empty"}, "spec": {"rated_kw": ring.RATED_KW, "fsu_kw": ring.FSU_KW, "fsu_a": ring.FSU_A, "fsu_kva": ring.FSU_KVA, "fsu_out": ring.FSU_OUT, "gnd_limit": ring.GND_LIMIT, "ch": [{"type": t, "kw": k} for t, k in ring.CH_SPEC]}, "sim": bool(self.model),
+        return {"ok": True, "branch": self.branch_view(eng), "status": st, "discover": ring.discover(self.r, eng.rt.val, self._lost(eng)), "config": {k: v for k, v in st["eff"].items() if k != "empty"}, "spec": {"rated_kw": ring.spec(self.r)["ppdu_kw"], **ring.spec(self.r), "items": [{"k": k, "v": ring.spec(self.r)[k], "lo": v[1], "hi": v[2], "src": v[3], "text": v[4], "set": k in (self.r.get("spec") or {})} for k, v in ring.SPEC.items()], "gnd_limit": ring.GND_LIMIT, "ch": [{"type": t, "kw": k} for t, k in ring.CH_SPEC]}, "sim": bool(self.model),
                 "sim_break": sorted(self.model.brk) if self.model else [], "sim_swap": self.model.swap if self.model else None, "sim_place": {k: sorted(v) for k, v in self.model.place.items()} if self.model else None}
 
     def _save(self, eng, new, who, what):
@@ -145,6 +145,14 @@ class RingWatch:
         if not eff.get("eff"): return i
         if not 0 <= i < len(ring.sw_tags(eff)): raise ValueError("상시 개방점 구간 번호 오류")
         t = ring.sw_tags(eff)[i]; return 0 if t == "RING.sw0" else int(t[3:-3])
+
+    def set_spec(self, eng, b, who):
+        """환망의 정격 · 가정값을 고친다(엔지니어). 사양이 확정되면 여기에 넣는다 — 배전체계 대수 계산, 용량 점검, 경보, 가상 장치가 바로 따라간다. reset 이면 기본값으로."""
+        if self.r is None: raise ValueError("환망을 쓰지 않습니다")
+        new = json.loads(json.dumps({k: v for k, v in self.r.items() if k not in ("eff", "empty")})); cur = dict(new.get("spec") or {})
+        sp = {} if b.get("reset") else dict(cur, **{k: v for k, v in (b.get("spec") or {}).items() if k in ring.SPEC})
+        if sp == cur: return {"ok": True, "same": True}
+        new["spec"] = sp; return self._save(eng, new, who, "환망 정격 · 가정값: " + (", ".join(f"{k} = {v:g}" for k, v in sp.items()) or "기본값으로"))
 
     def configure(self, eng, b, who):
         """배전체계(PPDU) 구성(운용자): 이름 · 회로별 시설 이름과 부하 등급(1등급이 있으면 중요 부하) · (자동으로 알 수 없을 때만) 붙는 FSU. 구성은 장치 ID 를 따라간다."""
@@ -205,6 +213,7 @@ def http_post(eng, b, sess):
     """POST /api/ring — 배전체계 구성은 운용자, 고정 배치의 ID 확정과 가상 장치 조작은 엔지니어."""
     w = eng.ringw; kind = b.get("do"); who = sess["name"]
     if kind == "config": return w.configure(eng, b, who)
+    if kind == "spec": return w.set_spec(eng, b, who) if sess["role"] == "engineer" else {"ok": False, "why": "권한 필요: engineer"}
     if sess["role"] != "engineer": return {"ok": False, "why": "권한 필요: engineer"}
     if kind == "accept": return w.accept(eng, who)
     if kind == "sim":

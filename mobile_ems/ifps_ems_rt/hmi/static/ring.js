@@ -54,8 +54,8 @@ const P_RING = {
   d: null, t: 0, open: "",
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>환망 · 구간분전함</h2><span class="sub">공급 경로: ⑥ 배전 · 변압 → 구간분전함(FSU, 환상 간선 · 630 A · 출력 4회로) → 휴대용 배전체계(PPDU-20, 부하 앞 · 병렬) → 시설 부하</span>
-      <div class="spacer"></div><button class="btn" id="rgDisc">초기 기동 점검</button><button class="btn" id="rgCfg">배전체계 구성 · 중요 부하</button></div><div id="rgBody"><p class="muted">불러오는 중…</p></div>`;
-    $("#rgDisc").onclick = () => this.discover(); $("#rgCfg").onclick = () => this.config(); this.load();
+      <div class="spacer"></div><button class="btn" id="rgSpec">정격 · 가정값</button><button class="btn" id="rgDisc">초기 기동 점검</button><button class="btn" id="rgCfg">배전체계 구성 · 중요 부하</button></div><div id="rgBody"><p class="muted">불러오는 중…</p></div>`;
+    $("#rgSpec").onclick = () => this.spec(); $("#rgDisc").onclick = () => this.discover(); $("#rgCfg").onclick = () => this.config(); this.load();
   },
   async load() { this.d = await api("/api/archive/ring"); this.t = Date.now(); this.paint(); },
   update() { if (Date.now() - this.t > 1500 && !$("#modal").classList.contains("on")) this.load(); },
@@ -101,6 +101,19 @@ const P_RING = {
       <div class="bd np scroll arc-table"><table class="t"><thead><tr><th>분기</th><th>이름</th><th>종류 · 연결</th><th class="n">지금 kW</th><th class="n">오늘 kWh</th><th class="n">누적 kWh</th><th class="n">다음 1시간 kW</th><th class="n">24시간 kWh</th><th class="n">최대 예상 kW(시각)</th><th>24시간 예측</th><th class="n">1시간 앞 오차</th></tr></thead>
         <tbody>${b.rows.map(row).join("")}<tr><td colspan="3"><b>구간분전함 합계</b></td><td class="n"><b>${n(t.kw)}</b></td><td class="n">${n(t.today_kwh)}</td><td></td><td class="n"><b>${n(t.next1h)}</b></td><td class="n"><b>${n(t.next24_kwh, 0)}</b></td><td colspan="3" class="muted">구간분전함 전력계 = 그 아래 배전체계의 합(전체 부하 예측은 발전 · 예측 화면)</td></tr></tbody></table></div>
       <div class="bd muted" style="font-size:12px;border-top:1px solid var(--line)">예측 = 분기의 시간대 평균(최근 며칠, 15분 구간) × 최근 1시간 실측의 수준 보정. 오차는 1시간 전에 한 예측과 실측의 평균 차이다. 전력량은 분기 전력량계의 누적값이다${miss ? ` — <span class="warnc">전력계 신호 ${miss}개가 들어오지 않는다(그 분기는 전력 표본의 평균으로 대신한다)</span>` : ""}.</div></div>`;
+  },
+  /* 정격 · 가정값: 문서에서 온 정격과 아직 가정인 값을 한 표로 보이고, 엔지니어가 확정된 값으로 고친다 */
+  spec() {
+    const sp = this.d && this.d.spec; if (!sp) return; const eng = can("engineer");
+    modal(`<h3>환망의 정격 · 가정값</h3><p class="sub">배전체계 대수 계산, 용량 · 출력 회로 점검, 과부하 경보, 1등급 부하의 무정전(STS) 모형이 이 값을 쓴다. <b>문서</b> = 제안 발표 자료 · PPDU-20 상세기술자료의 값, <b>가정</b> = 아직 정해지지 않아 넣어 둔 값 — 실장비 사양이 정해지면 고친다. 저장하면 바로 적용된다.</p>
+      <table class="t"><thead><tr><th>항목</th><th class="n">값</th><th>범위</th><th>근거</th></tr></thead><tbody>${sp.items.map(i => `<tr><td>${esc(i.text)}</td><td class="n"><input class="in sm" data-spec="${i.k}" type="number" step="any" min="${i.lo}" max="${i.hi}" value="${i.v}" style="width:90px" ${eng ? "" : "disabled"}></td><td class="sub">${i.lo}~${i.hi}</td>
+        <td><span class="pill ${i.src === "가정" ? "warn" : "ok"}">${i.src}</span>${i.set ? ' <span class="sub">고친 값</span>' : ""}</td></tr>`).join("")}</tbody></table>
+      <p class="sub" style="margin-top:8px">여기서 나오는 값: 환망 간선 한계 = √3 × ${sp.fsu_v} V × ${sp.fsu_a} A ≈ <b>${sp.fsu_kva} kVA</b>, 역률 ${sp.pf} 로 <b>약 ${sp.fsu_kw} kW</b>(한 구간이 끊겨 한쪽에서만 받을 때 환망 전체 부하가 이 값을 넘으면 안 된다) · 배전체계 한 대에 싣는 한계 <b>${sp.ppdu_ok} kW</b>(부하가 이보다 크면 여러 대).</p>
+      <div class="row" style="justify-content:flex-end;gap:8px;margin-top:10px">${eng ? '<button class="btn" id="spReset">기본값으로</button>' : ""}<button class="btn" id="spNo">닫기</button>${eng ? '<button class="btn pri" id="spOk">저장 · 적용</button>' : ""}</div>`, box => {
+      box.classList.add("wide"); const close = () => { box.classList.remove("wide"); closeModal(); this.load(); }; box.querySelector("#spNo").onclick = close;
+      const send = async body => { const r = await api("/api/ring", { do: "spec", ...body }); toast(r.ok ? (r.same ? "바뀐 내용이 없습니다" : "저장하고 적용했습니다") : (r.why || "저장하지 못했습니다"), r.ok ? "ok" : "bad"); if (r.ok) close(); };
+      if (eng) { box.querySelector("#spOk").onclick = () => send({ spec: Object.fromEntries([...box.querySelectorAll("[data-spec]")].map(x => [x.dataset.spec, +x.value]).filter(([k, v]) => v !== sp.items.find(i => i.k === k).v || sp.items.find(i => i.k === k).set)) }); box.querySelector("#spReset").onclick = () => send({ reset: true }); }
+    });
   },
   /* 초기 기동 점검: 전원에서 가까운 순서로 한 대씩 ID 를 확인해 보여 준다 */
   async discover() {

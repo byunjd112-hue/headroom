@@ -82,7 +82,7 @@ const P_LOADS = {
       <label>대당 정격(kW)<input class="in" id="leKw" type="number" min="0.1" max="500" step="0.1" value="${it.kw}" style="width:100px"></label>
       <label>절감 비율(%)<input class="in" id="leSave" type="number" min="0" max="80" step="5" value="${it.save_pct}" style="width:90px"></label>
       <button class="btn go" id="leOk">저장</button><button class="btn" id="leNo">닫기</button></div>
-      <div class="muted" style="margin-top:8px;font-size:12px">등급이 급전선을 정한다(1등급 L1 · 2등급 L2 · 3등급 L3). 1등급은 절감하지 않는다. 물린 구간분전함은 개요 배치도의 케이블과 결선도 · 환망의 부하 자리를 정한다 — 개요의 [배치 편집]에서 부하 그림을 옮겨 저장해도 가장 가까운 구간분전함으로 바뀐다. 공급 경로는 구간분전함(정격 ${d.fsu_a} A · 약 ${d.fsu_kw} kW · 출력 ${d.fsu_out}회로) → 배전체계(PPDU-20, ${d.ppdu_kw} kW, 부하 바로 앞) → 부하다. 부하 하나의 정격이 ${d.ppdu_kw} kW 보다 크면 배전체계를 병렬로 여러 대 붙여 정격을 맞춘다. 자리가 '자동'인 부하는 그 구간분전함의 출력 회로가 모자라면 가까운 구간분전함으로 간다. 절감 비율은 그 부하가 절감 공급 때 줄일 수 있는 몫이다.</div></div>`;
+      <div class="muted" style="margin-top:8px;font-size:12px">등급이 급전선을 정한다(1등급 L1 · 2등급 L2 · 3등급 L3). 1등급은 절감하지 않는다. 물린 구간분전함은 개요 배치도의 케이블과 결선도 · 환망의 부하 자리를 정한다 — 개요의 [배치 편집]에서 부하 그림을 옮겨 저장해도 가장 가까운 구간분전함으로 바뀐다. 공급 경로는 구간분전함(정격 ${d.fsu_a} A · 약 ${d.fsu_kw} kW · 출력 ${d.fsu_out}회로) → 배전체계(PPDU-20, ${d.ppdu_kw} kW, 부하 바로 앞) → 부하다. 부하 하나의 정격이 ${d.ppdu_ok} kW 보다 크면 배전체계를 병렬로 여러 대 붙여 정격을 맞춘다. 자리가 '자동'인 부하는 그 구간분전함의 출력 회로가 모자라면 가까운 구간분전함으로 간다. 절감 비율은 그 부하가 절감 공급 때 줄일 수 있는 몫이다.</div></div>`;
     $("#leNo").onclick = () => { this.sel = null; this.paint(); };
     $("#leOk").onclick = async () => {
       const g = +$("#leGrade").value, r = await this.post({ op: "set", id: it.id, name: $("#leName").value, grade: g, kw: parseFloat($("#leKw").value), save_pct: g === 1 ? 0 : parseFloat($("#leSave").value), fsu: $("#lePp").value });

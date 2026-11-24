@@ -4,6 +4,7 @@ import copy, json, os, shutil, sys, tempfile, time, unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, ROOT)
 from ifps_ems_rt import ring, branchfc                  # noqa: E402
 from ifps_ems_rt.hmi.engine import Engine                # noqa: E402
+from ifps_ems_rt.hmi.ringwatch import http_post          # noqa: E402
 
 R = ring.settings(copy.deepcopy(ring.DEFAULT))
 
@@ -160,6 +161,18 @@ class RingWatchTest(unittest.TestCase):
         with e.lock:                                                                                                                         # 환망 전체 부하가 간선 정격(630 A)을 넘으면 경보
             w.last = copy.deepcopy(w.status()); [f.update(kw=80.0) for f in w.last["fsu"]]; tot = sum(f["kw"] for f in w.last["fsu"])
             e.alarms.set("ring.over.total", tot > ring.FSU_KW, 2, "환망", "시험"); self.assertGreater(tot, ring.FSU_KW); self.assertEqual((ring.FSU_A, ring.FSU_OUT, ring.FSU_KVA), (630.0, 4, 415))
+
+    def test_ratings_and_assumptions_are_settings(self):
+        """정격 · 가정값(ring.spec)은 엔지니어가 고친다: 고치면 배전체계 대수 · 용량 점검이 따라가고, 틀린 값은 막는다. 기본값은 문서의 값이다."""
+        e = self.eng; w = e.ringw; sp = ring.spec(w.r); self.assertEqual((sp["fsu_a"], sp["fsu_out"], sp["ppdu_kw"], sp["fsu_kva"], sp["ppdu_ok"], sp["sts"]), (630.0, 4, 20.0, 415, 20.0, 1))
+        need = lambda: {i["id"]: i["need"] for i in e.snapshot()["loads"]["items"]}; self.assertEqual(need(), {"c2": 2, "med": 1, "brk": 2, "ammo": 1})
+        self.assertFalse(http_post(e, {"do": "spec", "spec": {"ppdu_use": 0.8}}, {"role": "operator", "name": "운용"})["ok"])                        # 엔지니어만
+        r = http_post(e, {"do": "spec", "spec": {"ppdu_use": 0.8, "pf": 0.85}}, {"role": "engineer", "name": "시험"}); self.assertTrue(r["ok"], r)
+        self.assertEqual(need(), {"c2": 2, "med": 1, "brk": 2, "ammo": 2}); self.assertEqual(ring.spec(w.r)["fsu_kw"], round(415 * 0.85)); self.assertEqual(e.snapshot()["loads"]["ppdu_ok"], 16.0)   # 한 대에 16 kW 까지만 싣는다 → 20 kW 부하는 2대
+        with open(self.cfg, encoding="utf-8") as f: self.assertEqual(json.load(f)["ring"]["spec"], {"ppdu_use": 0.8, "pf": 0.85})
+        for bad in ({"pf": 1.4}, {"fsu_a": 5}, {"nope": 1}): self.assertFalse(http_post(e, {"do": "spec", "spec": bad}, {"role": "engineer", "name": "시험"}).get("ok") and ring.spec(w.r).get("pf") == 1.4)
+        self.assertEqual(ring.spec({"spec": {"pf": 1.4, "fsu_a": 800}})["fsu_a"], 800); self.assertEqual(ring.spec({"spec": {"pf": 1.4}})["pf"], 0.9)        # 범위를 벗어난 값은 기본값
+        self.assertTrue(http_post(e, {"do": "spec", "reset": True}, {"role": "engineer", "name": "시험"})["ok"]); self.assertEqual(need()["ammo"], 1)
 
     def test_monitor_break_discover_and_configure(self):
         e = self.eng; w = e.ringw; self.assertTrue(self._wait(lambda: (e.snapshot()["ring"] or {}).get("ok")))

@@ -29,6 +29,19 @@ RATED_KW = 20.0                  # PPDU-20 정격
 FSU_A, FSU_V, FSU_PF, FSU_OUT = 630.0, 380.0, 0.9, 4      # 구간분전함 정격: AC 380 V 3상 4선식 · 630 A · 출력 4회로(제안 발표 원본의 FSU 사양). 역률 0.9 는 kW 로 견주려는 가정
 FSU_KVA = round(3 ** 0.5 * FSU_V * FSU_A / 1000.0)        # 약 415 kVA
 FSU_KW = round(FSU_KVA * FSU_PF)                          # 약 373 kW — 아래 배전체계 · 부하의 합이 넘으면 과부하
+# 정격과 가정값(runtime.json 의 ring.spec 으로 고친다). (기본값, 아래 한계, 위 한계, 근거, 설명) — 근거가 '가정'인 값은 실장비 사양이 정해지면 고친다
+SPEC = {"fsu_a": (FSU_A, 50.0, 2000.0, "문서", "구간분전함 · 환망 간선의 정격 전류(A)"), "fsu_v": (FSU_V, 200.0, 480.0, "문서", "정격 전압(V, 3상)"), "fsu_out": (FSU_OUT, 1, 12, "문서", "구간분전함의 출력 회로 수(배전체계 한 대가 하나를 쓴다)"),
+        "ppdu_kw": (RATED_KW, 5.0, 100.0, "문서", "배전체계 한 대의 정격(kW)"), "pf": (FSU_PF, 0.7, 1.0, "가정", "전류 정격을 kW 로 견줄 때의 역률"),
+        "ppdu_use": (1.0, 0.5, 1.0, "가정", "배전체계를 여러 대 나란히 쓸 때 한 대에 싣는 몫(1 = 정격까지, 0.8 = 정격의 80%까지 — 전류 분담이 고르지 않을 것에 대비한 여유)"),
+        "sts": (1, 0, 1, "가정", "1등급 부하의 배전체계가 반대쪽 급전을 STS 로 바로 넘겨받는가(1 = 받는다, 0 = 다른 부하처럼 절체를 기다린다)")}
+
+
+def spec(r):
+    """환망의 정격 · 가정값(설정의 spec 으로 덮어쓴 것)과 거기서 나온 값: fsu_kva · fsu_kw(환망 간선의 한계), ppdu_ok(배전체계 한 대에 싣는 한계 kW)."""
+    o = (r or {}).get("spec") if isinstance((r or {}).get("spec"), dict) else {}
+    s = {k: (o[k] if _int_in(o.get(k), v[1], v[2]) else v[0]) for k, v in SPEC.items()}
+    s["fsu_out"] = int(s["fsu_out"]); s["sts"] = int(s["sts"]); s["fsu_kva"] = round(3 ** 0.5 * s["fsu_v"] * s["fsu_a"] / 1000.0); s["fsu_kw"] = round(s["fsu_kva"] * s["pf"]); s["ppdu_ok"] = round(s["ppdu_kw"] * s["ppdu_use"], 2)
+    return s
 LOAD_REF = 60.0                  # 가상 장치: 등급별 부하가 이 값(kW)일 때 회로가 정격의 90% 를 쓴다고 본다
 GND_LIMIT = 100.0                # 접지저항이 이 값(Ω)을 넘으면 주회로 투입 금지(인터록 IL-1)
 CH_SPEC = (("3상 16 A", 10.5), ("3상 16 A", 10.5), ("단상 20 A", 4.4), ("단상 20 A", 4.4), ("단상 20 A", 4.4), ("단상 20 A", 4.4))      # CH1~CH6 정격(형식, kW)
@@ -73,6 +86,11 @@ def _int_in(v, lo, hi):
     return not isinstance(v, bool) and isinstance(v, (int, float)) and lo <= v <= hi
 
 
+def _check_spec(sp, bad):
+    """정격 · 가정값(ring.spec)의 범위 검사."""
+    if not isinstance(sp, dict) or any(k not in SPEC or not _int_in(v, SPEC[k][1], SPEC[k][2]) for k, v in sp.items()): bad.append("ring.spec: " + ", ".join(f"{k} {v[1]:g}~{v[2]:g}" for k, v in SPEC.items()))
+
+
 def check(cfg, bad):
     """runtime.json 의 ring 검사."""
     if cfg is None: return
@@ -81,6 +99,7 @@ def check(cfg, bad):
     if not isinstance(fsu, list) or not isinstance(ppdu, list) or len(fsu) > MAX_FSU or len(ppdu) > MAX_PPDU or not all(isinstance(x, dict) for x in fsu + ppdu): bad.append(f"ring: fsu 는 {MAX_FSU}개, ppdu 는 {MAX_PPDU}개까지의 목록"); return
     _check_units(fsu, ppdu, bad)
     if fsu and not (isinstance(cfg.get("open", 0), int) and _int_in(cfg.get("open", 0), 0, len(fsu))): bad.append("ring.open: 상시 개방점은 0 ~ FSU 개수 사이의 구간 번호")
+    _check_spec(cfg.get("spec", {}), bad)
     for k, hi in (("trip_ms", 5000), ("close_ms", 10000)):
         if not _int_in(cfg.get(k, 0), 0, hi): bad.append(f"ring.{k}: 0~{hi} ms")
     if not isinstance(cfg.get("auto", True), bool) or not _int_in(cfg.get("fsu_slots", 1), 1, MAX_FSU) or not _int_in(cfg.get("ppdu_slots", 1), 1, MAX_PPDU): bad.append(f"ring: auto 는 참·거짓, 자리 수(fsu_slots·ppdu_slots)는 1~{MAX_FSU}")
@@ -156,13 +175,13 @@ def _ppdus(r, g, fsu_live):
         ch = [{"n": n + 1, "name": c["name"], "cls": c["cls"], "type": CH_SPEC[n][0], "limit": CH_SPEC[n][1], "cb": st(f"ch{n + 1}"), "kw": g(f"{p['id']}.ch{n + 1}_kw"), "kwh": g(f"{p['id']}.ch{n + 1}_kwh")} for n, c in enumerate(p["ch"])]
         kw = g(f"{p['id']}.kw"); gnd = g(f"{p['id']}.gnd")
         out.append(dict(_unit(p, g), at=p["at"], at_auto=bool(p.get("at_auto")), kw=kw, kwh=g(f"{p['id']}.kwh"), mccb=st("mccb"), gnd=gnd, lamp=st("lamp"), ch=ch, vital=any(c["cls"] == 1 for c in p["ch"]), at_live=fsu_live.get(p["at"]),
-                        over=None if kw is None else kw > RATED_KW, gnd_bad=None if gnd is None else gnd > GND_LIMIT))
+                        over=None if kw is None else kw > spec(r)["ppdu_kw"], gnd_bad=None if gnd is None else gnd > GND_LIMIT))
     return out
 
 
 def _fsus(r, g, fed):
     """구간분전함들의 읽은 값. kw · kwh 는 그 구간분전함의 분기 전력계다."""
-    return [dict(_unit(f, g, fed[k]), kw=g(f"{f['id']}.kw"), kwh=g(f"{f['id']}.kwh"), over=None if g(f"{f['id']}.kw") is None else g(f"{f['id']}.kw") > FSU_KW) for k, f in enumerate(r["fsu"])]
+    return [dict(_unit(f, g, fed[k]), kw=g(f"{f['id']}.kw"), kwh=g(f"{f['id']}.kwh"), over=None if g(f"{f['id']}.kw") is None else g(f"{f['id']}.kw") > spec(r)["fsu_kw"]) for k, f in enumerate(r["fsu"])]
 
 
 def _recog(r, units):
@@ -244,7 +263,7 @@ def _fsu_alarms(s, f):
     out.append((f"ring.dead.{f['id']}", f["live"] is False, 1 if vital else 2, f["id"], f"{f['name']}({f['id']}) 무전압 — 이 마디의 부하 정전" + (" [중요 부하]" if vital else "") + (" — 1등급 부하는 STS 절체로 공급 중" if sts else "")))
     out.append((f"ring.comm.{f['id']}", f.get("comm") is False, 2, f["id"], f"{f['name']}({f['id']}) 통신 고립 — 양쪽 구간이 모두 끊겨 환형 통신으로도 닿지 않음(값은 마지막 값). 끊긴 구간 가운데 하나를 먼저 복구"))
     out.append((f"ring.id.{f['id']}", f["id_ok"] is False and f["id_read"] not in (None, 0), 3, f["id"], _id_text(f)))
-    out.append((f"ring.over.{f['id']}", bool(f.get("over")), 2, f["id"], f"{f['name']}({f['id']}) 과부하 {f.get('kw') or 0:.1f} kW — 정격 {FSU_A:.0f} A(약 {FSU_KW:.0f} kW) 초과. 부하 일부를 다른 구간분전함으로 옮기십시오"))
+    out.append((f"ring.over.{f['id']}", bool(f.get("over")), 2, f["id"], f"{f['name']}({f['id']}) 과부하 {f.get('kw') or 0:.1f} kW — 정격 {spec(s.get('eff'))['fsu_a']:.0f} A(약 {spec(s.get('eff'))['fsu_kw']:.0f} kW) 초과. 부하 일부를 다른 구간분전함으로 옮기십시오"))
     return out
 
 
@@ -262,7 +281,7 @@ def alarms(r, s):
         out.append((f"ring.id.{i}", p["id_ok"] is False and p["id_read"] not in (None, 0), 3, i, _id_text(p)))
         out.append((f"ring.at.{i}", p["at_auto"] and not p["at"], 3, i, f"{p['name']}({i}) 가 어느 구간분전함에 물렸는지 알 수 없음 — 입력 케이블·통신 확인"))
         out.append((f"ring.mccb.{i}", p["mccb"] == 2, top, i, f"{p['name']}({i}) 주 차단기 트립 — 6회로 모두 정전. 단락·과부하 원인 확인"))
-        out.append((f"ring.over.{i}", bool(p["over"]), 2, i, f"{p['name']}({i}) 과부하 {p['kw'] or 0:.1f} kW — 정격 {RATED_KW:.0f} kW 초과. 낮은 등급 회로부터 줄이십시오"))
+        out.append((f"ring.over.{i}", bool(p["over"]), 2, i, f"{p['name']}({i}) 과부하 {p['kw'] or 0:.1f} kW — 정격 {spec(r)['ppdu_kw']:.0f} kW 초과. 낮은 등급 회로부터 줄이십시오"))
         out.append((f"ring.gnd.{i}", bool(p["gnd_bad"]), 2, i, f"{p['name']}({i}) 접지저항 {p['gnd'] or 0:.0f} Ω — {GND_LIMIT:.0f} Ω 초과(주회로 투입 금지 조건). 접지봉·접지선 보강"))
         for c in p["ch"]:
             out.append((f"ring.ch.{i}.{c['n']}", c["cb"] == 2 and c["cls"] > 0, c["cls"] or 3, i, f"{p['name']}({i}) CH{c['n']} {c['name']} 회로 트립 — {c['cls']}등급 부하 정전"))
@@ -341,7 +360,7 @@ class Model:
             if mine is not None: kw = mine[n] if on and closed else 0.0                                                                 # 부하 목록에서 이 배전체계에 물린 부하의 몫
             else: kw = CH_SPEC[n][1] * 0.9 * min(1.2, P.get(tag) / LOAD_REF) if on and closed and c["cls"] and tag in P.by_tag else 0.0      # 부하 목록이 없을 때(시나리오 검증): 그 등급 부하의 크기에 비례
             P.set(f"{i}.ch{n + 1}_kw", round(kw, 1)); tot += kw; self._meter(f"{i}.ch{n + 1}_kwh", kw)
-        self._meter(f"{i}.kwh", tot); P.set(f"{i}.kw", round(tot, 1)); P.set(f"{i}.lamp", 2 if bad else 1 if tot > RATED_KW or P.get(f"{i}.gnd") > GND_LIMIT or not fed else 0)
+        self._meter(f"{i}.kwh", tot); P.set(f"{i}.kw", round(tot, 1)); P.set(f"{i}.lamp", 2 if bad else 1 if tot > spec(self.r)["ppdu_kw"] or P.get(f"{i}.gnd") > GND_LIMIT or not fed else 0)
 
     def _feeder(self, g):
         t = self.kw.get(f"L{g}"); return self.p.get(t) if t in self.p.by_tag else 0.0
@@ -373,7 +392,7 @@ class Model:
     def _update(self, e):
         """구간분전함 전압 → 배전체계(PPDU) 전압·주 차단기·회로별 전력. 회로 전력은 그 등급 부하(LOAD.pN_kw)의 크기에 비례하는 것으로 본다(가상 장치의 가정)."""
         live = self._fsu_live(e); here = {p["id"]: p for p in e["ppdu"]}; self.live = live; self.w = self.branch() if self.branch else None
-        sts = {x for w in (self.w or []) if w["grade"] == 1 for x in w["ppdus"]}; alt = self._alt(e) if sts else {}      # 1등급 부하 앞의 배전체계: STS 로 반대쪽 급전을 바로 받는다
+        sts = {x for w in (self.w or []) if w["grade"] == 1 for x in w["ppdus"]} if spec(self.r)["sts"] else set(); alt = self._alt(e) if sts else {}      # 1등급 부하 앞의 배전체계: STS 로 반대쪽 급전을 바로 받는다
         for k in range(1, self._n("ppdu") + 1):
             i = f"PPDU{k}"
             if f"{i}.mccb" not in self.p.by_tag: continue
