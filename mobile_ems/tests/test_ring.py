@@ -125,14 +125,14 @@ class RingWatchTest(unittest.TestCase):
         full = lambda: all(len(i["ppdus"]) == i["need"] for i in e.snapshot()["loads"]["items"])
         self.assertTrue(self._wait(lambda: used() and full() and all(f.get("kwh") for f in w.status()["fsu"] if f["id"] in used()), 15.0)); s = w.status(); self.assertEqual(s["meters_missing"], [])
         with e.lock: snap = e.snapshot()
-        s = snap["ring"]; items = snap["loads"]["items"]; self.assertEqual({i["id"]: (i["fsu"], i["ppdus"]) for i in items}, {"c2": ("FSU2", ["PPDU1", "PPDU2"]), "med": ("FSU4", ["PPDU3"]), "brk": ("FSU4", ["PPDU4", "PPDU5"]), "ammo": ("FSU6", ["PPDU6"])})      # 30 kW 는 20 kW 배전체계 2대 병렬, 막사는 동마다 1대
-        self.assertEqual([p["name"] for p in s["ppdu"]][:3], ["지휘통제(C2) 배전 1", "지휘통제(C2) 배전 2", "의무시설 배전"]); self.assertFalse(any(p["over"] for p in s["ppdu"])); self.assertFalse(any(f["over"] for f in s["fsu"]))
+        s = snap["ring"]; items = snap["loads"]["items"]; self.assertEqual({i["id"]: (i["fsu"], i["ppdus"]) for i in items}, {"c2": ("FSU2", ["PPDU1", "PPDU2", "PPDU3"]), "med": ("FSU4", ["PPDU4"]), "brk": ("FSU4", ["PPDU5", "PPDU6"]), "ammo": ("FSU6", ["PPDU7"])})      # 30 kW 는 20 kW 배전체계 2대 병렬 + 1등급이라 한 대 더(N+1), 막사는 동마다 1대
+        self.assertEqual([p["name"] for p in s["ppdu"]][:3], ["지휘통제(C2) 배전 1", "지휘통제(C2) 배전 2", "지휘통제(C2) 배전 3"]); self.assertFalse(any(p["over"] for p in s["ppdu"])); self.assertFalse(any(f["over"] for f in s["fsu"]))
         for f in s["fsu"]:                                                # 구간분전함 전력계 = 그 자리에 물린 부하의 추정 전력 합(개요 · 결선도 · 환망이 같은 값)
             self.assertAlmostEqual(f["kw"], sum(i["est_kw"] for i in items if i["fsu"] == f["id"]), delta=3.0, msg=f["id"])
             self.assertAlmostEqual(f["kw"], sum(p["kw"] for p in s["ppdu"] if p["at"] == f["id"]) + (w._direct(e, f["id"]) or 0), delta=0.6, msg=f["id"])
         for p in s["ppdu"]: self.assertAlmostEqual(p["kw"], sum(i["est_kw"] / len(i["ppdus"]) for i in items if p["id"] in i["ppdus"]), delta=2.0, msg=p["id"])
-        self.assertEqual([f["id"] for f in s["fsu"] if f.get("vital")], ["FSU2"]); self.assertEqual([p["id"] for p in s["ppdu"] if p["vital"]], ["PPDU1", "PPDU2"])      # ★ = 1등급 부하가 물린 자리
-        p0 = next(p for p in s["ppdu"] if p["id"] == "PPDU3"); self.assertGreater(p0["kwh"], 0); self.assertAlmostEqual(sum(c["kwh"] for c in p0["ch"]), p0["kwh"], delta=0.3)
+        self.assertEqual([f["id"] for f in s["fsu"] if f.get("vital")], ["FSU2"]); self.assertEqual([p["id"] for p in s["ppdu"] if p["vital"]], ["PPDU1", "PPDU2", "PPDU3"])      # ★ = 1등급 부하가 물린 자리
+        p0 = next(p for p in s["ppdu"] if p["id"] == "PPDU4"); self.assertGreater(p0["kwh"], 0); self.assertAlmostEqual(sum(c["kwh"] for c in p0["ch"]), p0["kwh"], delta=0.3)
         b = w.view(e)["branch"]; self.assertEqual(len(b["rows"]), len(s["fsu"]) + len(s["ppdu"])); self.assertTrue(b["demo"])                 # 가상 장치: 실측이 쌓이기 전에는 시연용 초기값
         r = next(x for x in b["rows"] if x["id"] == p0["id"]); self.assertIsNotNone(r["next1h"]); self.assertIsNotNone(r["next24_kwh"]); self.assertEqual(len(r["spark"]), 48); self.assertIsNotNone(b["total"]["next24_kwh"])
         f = next(x for x in s["fsu"] if x["id"] == "FSU4"); rt = e.rt; t = [1000.0]; now = rt.now; rt.now = lambda: t[0]
@@ -154,29 +154,36 @@ class RingWatchTest(unittest.TestCase):
         self.assertTrue(self._wait(lambda: (e.snapshot()["ring"] or {}).get("ok") and full(), 15.0)); self.assertLessEqual(w.r["trip_ms"] + w.r["close_ms"], 3000)
         pp = lambda i: next(p for p in w.status()["ppdu"] if p["id"] == i); seen = {"c2": [], "med": [], "fsu": []}; w.sim({"action": "break", "section": 1}); t0 = time.monotonic()      # 지휘통제(FSU2) · 의무(FSU4)가 물린 쪽의 급전 구간을 끊는다
         while time.monotonic() - t0 < 6.0:
-            s = w.status(); seen["c2"].append(pp("PPDU1")["live"] and pp("PPDU2")["live"]); seen["med"].append((time.monotonic() - t0, pp("PPDU3")["live"])); seen["fsu"].append(next(f for f in s["fsu"] if f["id"] == "FSU2")["live"]); time.sleep(0.1)
+            s = w.status(); seen["c2"].append(pp("PPDU1")["live"] and pp("PPDU2")["live"] and pp("PPDU3")["live"]); seen["med"].append((time.monotonic() - t0, pp("PPDU4")["live"])); seen["fsu"].append(next(f for f in s["fsu"] if f["id"] == "FSU2")["live"]); time.sleep(0.1)
         self.assertTrue(all(seen["c2"]), "1등급 부하의 배전체계가 끊겼다"); self.assertIn(False, seen["fsu"])                                   # 구간분전함은 잠깐 무전압이 됐지만 1등급은 STS 로 이어 받았다
         dead = [t for t, v in seen["med"] if v is False]; self.assertTrue(dead); self.assertLess(max(dead) - min(dead), 5.0)                  # 2등급은 끊겼다가 복구(설정은 2.6초 — 가상 장치의 걸음과 수집 주기 때문에 화면에는 1~2초 늦게 보인다)
         s = w.status(); self.assertTrue(s["ok"] and s["switched"] and s["cut"] == [1]); w.sim({"action": "restore"})
+        self.assertTrue(self._wait(lambda: w.status()["ok"] and not w.status()["cut"], 12.0))
+        w.sim({"action": "ppdu", "id": "PPDU1", "what": "mccb", "value": 2})                                                                 # 1등급 부하 앞의 배전체계 한 대가 트립해도 남은 두 대가 떠안는다(N+1) — 과부하 없이
+        self.assertTrue(self._wait(lambda: pp("PPDU1")["kw"] == 0 and pp("PPDU2")["kw"] > 10 and not pp("PPDU2")["over"] and abs(pp("PPDU2")["kw"] + pp("PPDU3")["kw"] - e.rt.val["LOAD.p1_kw"]) < 2.0, 10.0))
+        n1 = w.status()["n1"]; self.assertTrue(n1["ok"]); self.assertEqual({x["level"] for x in n1["items"]} - {"info", "warn"}, set()); w.sim({"action": "ppdu", "id": "PPDU1", "what": "mccb", "value": 1})
         with e.lock:                                                                                                                         # 환망 전체 부하가 간선 정격(630 A)을 넘으면 경보
             w.last = copy.deepcopy(w.status()); [f.update(kw=80.0) for f in w.last["fsu"]]; tot = sum(f["kw"] for f in w.last["fsu"])
             e.alarms.set("ring.over.total", tot > ring.FSU_KW, 2, "환망", "시험"); self.assertGreater(tot, ring.FSU_KW); self.assertEqual((ring.FSU_A, ring.FSU_OUT, ring.FSU_KVA), (630.0, 4, 415))
 
     def test_ratings_and_assumptions_are_settings(self):
         """정격 · 가정값(ring.spec)은 엔지니어가 고친다: 고치면 배전체계 대수 · 용량 점검이 따라가고, 틀린 값은 막는다. 기본값은 문서의 값이다."""
-        e = self.eng; w = e.ringw; sp = ring.spec(w.r); self.assertEqual((sp["fsu_a"], sp["fsu_out"], sp["ppdu_kw"], sp["fsu_kva"], sp["ppdu_ok"], sp["sts"]), (630.0, 4, 20.0, 415, 20.0, 1))
-        need = lambda: {i["id"]: i["need"] for i in e.snapshot()["loads"]["items"]}; self.assertEqual(need(), {"c2": 2, "med": 1, "brk": 2, "ammo": 1})
+        e = self.eng; w = e.ringw; sp = ring.spec(w.r); self.assertEqual((sp["fsu_a"], sp["fsu_out"], sp["ppdu_kw"], sp["fsu_kva"], sp["ppdu_ok"], sp["sts"], sp["n1"]), (630.0, 4, 20.0, 415, 20.0, 1, 1))
+        need = lambda: {i["id"]: i["need"] for i in e.snapshot()["loads"]["items"]}; self.assertEqual(need(), {"c2": 3, "med": 1, "brk": 2, "ammo": 1})
         self.assertFalse(http_post(e, {"do": "spec", "spec": {"ppdu_use": 0.8}}, {"role": "operator", "name": "운용"})["ok"])                        # 엔지니어만
         r = http_post(e, {"do": "spec", "spec": {"ppdu_use": 0.8, "pf": 0.85}}, {"role": "engineer", "name": "시험"}); self.assertTrue(r["ok"], r)
-        self.assertEqual(need(), {"c2": 2, "med": 1, "brk": 2, "ammo": 2}); self.assertEqual(ring.spec(w.r)["fsu_kw"], round(415 * 0.85)); self.assertEqual(e.snapshot()["loads"]["ppdu_ok"], 16.0)   # 한 대에 16 kW 까지만 싣는다 → 20 kW 부하는 2대
+        self.assertEqual(need(), {"c2": 3, "med": 1, "brk": 2, "ammo": 2}); self.assertEqual(ring.spec(w.r)["fsu_kw"], round(415 * 0.85)); self.assertEqual(e.snapshot()["loads"]["ppdu_ok"], 16.0)   # 한 대에 16 kW 까지만 싣는다 → 20 kW 부하는 2대
         with open(self.cfg, encoding="utf-8") as f: self.assertEqual(json.load(f)["ring"]["spec"], {"ppdu_use": 0.8, "pf": 0.85})
         for bad in ({"pf": 1.4}, {"fsu_a": 5}, {"nope": 1}): self.assertFalse(http_post(e, {"do": "spec", "spec": bad}, {"role": "engineer", "name": "시험"}).get("ok") and ring.spec(w.r).get("pf") == 1.4)
         self.assertEqual(ring.spec({"spec": {"pf": 1.4, "fsu_a": 800}})["fsu_a"], 800); self.assertEqual(ring.spec({"spec": {"pf": 1.4}})["pf"], 0.9)        # 범위를 벗어난 값은 기본값
-        self.assertTrue(http_post(e, {"do": "spec", "reset": True}, {"role": "engineer", "name": "시험"})["ok"]); self.assertEqual(need()["ammo"], 1)
+        self.assertTrue(http_post(e, {"do": "spec", "spec": {"n1": 0}}, {"role": "engineer", "name": "시험"})["ok"]); self.assertEqual(need()["c2"], 2)                         # N+1 을 끄면 정격에 딱 맞는 대수 — 무정전 점검이 주의를 낸다
+        with e.lock: w.step(e)
+        self.assertTrue(any("N+1" in x["fix"] for x in w.status()["n1"]["items"]))
+        self.assertTrue(http_post(e, {"do": "spec", "reset": True}, {"role": "engineer", "name": "시험"})["ok"]); self.assertEqual((need()["ammo"], need()["c2"]), (1, 3))
 
     def test_monitor_break_discover_and_configure(self):
         e = self.eng; w = e.ringw; self.assertTrue(self._wait(lambda: (e.snapshot()["ring"] or {}).get("ok")))
-        v = w.view(e); self.assertEqual(v["status"]["missing"], []); self.assertTrue(self._wait(lambda: w.view(e)["discover"]["n"] == 13 and w.view(e)["discover"]["ok"]))      # 구간분전함 7 + 부하 앞 배전체계 6
+        v = w.view(e); self.assertEqual(v["status"]["missing"], []); self.assertTrue(self._wait(lambda: w.view(e)["discover"]["n"] == 14 and w.view(e)["discover"]["ok"], 12.0))      # 구간분전함 7 + 부하 앞 배전체계 7
         w.sim({"action": "break", "section": 2}); self.assertTrue(self._wait(lambda: w.status()["cut"] == [2] and w.status()["switched"] and w.status()["ok"]))                  # 구간 차단 뒤 반대쪽 공급
         keys = {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}; self.assertIn("ring.cut.2", keys); self.assertIn("ring.switched", keys)
         w.sim({"action": "break", "section": 3}); self.assertTrue(self._wait(lambda: w.status()["isolated"] == ["FSU3"]))
@@ -190,8 +197,8 @@ class RingWatchTest(unittest.TestCase):
         w.sim({"action": "restore"}); w.sim({"action": "swap", "a": "FSU2", "b": "FSU5"}); self.assertTrue(self._wait(lambda: w.status()["fsu"][1]["name"] == "구간분전함 5"))      # 자리를 바꿔 놓아도 조작 없이 따라간다
         self.assertTrue(w.view(e)["discover"]["ok"]); self.assertEqual(w.status()["ppdu"][0]["at"], "FSU2"); self.assertFalse(w.accept(e, "시험")["ok"]); w.sim({"action": "swap"})
         vit = lambda: [(p["id"], p["at"]) for p in w.status()["ppdu"] if p["vital"]]
-        self.assertTrue(self._wait(lambda: vit() == [("PPDU1", "FSU2"), ("PPDU2", "FSU2")], 12.0), vit()); self.assertTrue(e.loadw.change({"op": "set", "id": "c2", "fsu": "FSU6"}, "시험")["ok"])            # ★(중요 부하)와 배전체계의 자리는 1등급 부하가 물린 자리를 따른다
-        self.assertTrue(self._wait(lambda: vit() == [("PPDU1", "FSU6"), ("PPDU2", "FSU6")], 12.0)); self.assertTrue(e.loadw.change({"op": "set", "id": "c2", "fsu": ""}, "시험")["ok"])
+        self.assertTrue(self._wait(lambda: vit() == [("PPDU1", "FSU2"), ("PPDU2", "FSU2"), ("PPDU3", "FSU2")], 12.0), vit()); self.assertTrue(e.loadw.change({"op": "set", "id": "c2", "fsu": "FSU6"}, "시험")["ok"])            # ★(중요 부하)와 배전체계의 자리는 1등급 부하가 물린 자리를 따른다
+        self.assertTrue(self._wait(lambda: vit() == [("PPDU1", "FSU6"), ("PPDU2", "FSU6"), ("PPDU3", "FSU6")], 12.0)); self.assertTrue(e.loadw.change({"op": "set", "id": "c2", "fsu": ""}, "시험")["ok"])
         self._plain(); self.assertTrue(self._wait(lambda: len(w.status()["ppdu"]) == 3 and w.status()["ppdu"][2]["vital"], 12.0))                                             # 부하 목록이 비어 있으면 설정에 적힌 배전체계 · 회로 등급을 쓴다
         ch = [{"name": "통신 중계", "cls": 3}] + [{"name": c["name"], "cls": min(3, c["cls"] + 1) if c["cls"] else 0} for c in w.r["ppdu"][2]["ch"][1:]]      # 1등급 회로를 모두 낮춘다
         r = w.configure(e, {"ppdu": [{"id": "PPDU3", "at": "FSU1", "name": "통신소", "ch": ch}], "open": 3}, "시험"); self.assertTrue(r["ok"])
@@ -211,7 +218,7 @@ class RingWatchTest(unittest.TestCase):
 
     def test_units_removed_added_and_shuffled_without_any_setting(self):
         e = self.eng; w = e.ringw; n = lambda: (len(w.status()["fsu"]), len(w.status()["ppdu"])); act = lambda: {a["key"] for a in e.snapshot()["alarms"] if a["state"] == "ACT"}
-        self.assertTrue(self._wait(lambda: w.status() and w.status()["ok"] and n() == (7, 6)))      # 부하 목록대로 배전체계 6대
+        self.assertTrue(self._wait(lambda: w.status() and w.status()["ok"] and n() == (7, 7), 12.0))      # 부하 목록대로 배전체계 7대
         self._plain(); self.assertTrue(self._wait(lambda: w.status()["ok"] and n() == (7, 3), 12.0))     # 아래는 장치 인식 자체의 시험 — 부하 목록을 비우고 설정의 배치로
         w.sim({"action": "ppdu", "id": "PPDU2", "what": "mccb", "value": 2}); self.assertTrue(self._wait(lambda: "ring.mccb.PPDU2" in act()))
         w.sim({"action": "remove", "id": "PPDU2"}); w.sim({"action": "remove", "id": "FSU4"}); self.assertTrue(self._wait(lambda: n() == (6, 2) and w.status()["ok"]))            # 대수가 줄어도 화면이 따라가고

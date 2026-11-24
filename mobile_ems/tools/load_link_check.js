@@ -49,7 +49,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   const after = (await loads()).items.find(i => i.id === "ammo"); n++; if (after.fsu !== moved || after.name !== "탄약고 A") { bad++; console.log(`✕ 배치 편집 반영: 기대 ${moved} · 탄약고 A / 실제 ${after.fsu} · ${after.name}`); }
   await compare(`개요 배치 편집: 탄약저장 → ${moved} 옆 · 이름 '탄약고 A'`);
   // 모선 구성: 자동 보완으로 복합전력 ESS 를 모선 A 로 옮기면 결선도의 자리 · 스냅샷 · 모선 전압이 따라가는지
-  await post("/api/bus", { op: "reset" }); const fix = await post("/api/bus", { op: "auto" }); await p.goto(B + "#sld"); await p.waitForTimeout(4000);
+  await post("/api/bus", { op: "reset" }); await post("/api/bus", { op: "set", node: "G1", bus: "B" }); const fix = await post("/api/bus", { op: "auto" }); await p.goto(B + "#sld"); await p.waitForTimeout(4000);
   const sb = await p.evaluate(() => ({ g1: SRC.find(n => n.id === "G1"), snap: S.snap.bus.assign.G1, issues: S.snap.bus.issues.length, ov: [...document.querySelectorAll("#main svg .node")].length, va: val("BUS.a_v"), vb: val("BUS.b_v") }));
   n += 4; const bm = []; if (!fix.ok || sb.snap !== "A") bm.push("스냅샷의 G1 모선"); if (sb.g1.bus !== "A" || sb.g1.x > 480) bm.push(`결선도의 G1 자리 ${sb.g1.bus}@${Math.round(sb.g1.x)}`); if (sb.issues) bm.push("보완 뒤에도 약점 남음"); if (!(sb.va > 300 && sb.vb > 300)) bm.push("모선 전압");
   bad += bm.length; console.log(`${bm.length ? "✕" : "○"} 모선 구성 자동 보완: ${fix.msg || fix.why}` + (bm.length ? "\n    " + bm.join("\n    ") : "")); await post("/api/bus", { op: "reset" });

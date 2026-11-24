@@ -55,8 +55,9 @@ class FleetUnitTest(unittest.TestCase):
         from ifps_ems_rt import busplan as bp
         P = {"PV", "DG", "FC", "ESS", "G1", "L1", "L2", "L3"}; R = {"DG": 100, "FC": 100, "PV": 400, "ESS": 500, "G1": 100, "L1": 30, "L2": 40, "L3": 25}
         d = bp.settings(None); self.assertEqual(d, bp.DEFAULT); self.assertEqual(bp.settings({"PV": "B", "X": "A", "DG": "C"})["PV"], "B")
-        i0 = bp.check(d, P, R); self.assertEqual([(i["level"], i["bus"], i["fix"]) for i in i0], [("warn", "A", {"G1": "A"})])                  # 기본: 모선 A 는 디젤이 돌 때만 전압이 선다(주의) — 복합전력 ESS 를 옮기면 풀린다
-        a, done = bp.auto(d, P, R); self.assertEqual(a["G1"], "A"); self.assertEqual(done, ["복합전력 ESS → 모선 A"]); self.assertEqual(bp.check(a, P, R), [])
+        self.assertEqual(bp.check(d, P, R), []); self.assertEqual(bp.live(d, {"G1", "ESS"}, False), (True, True)); a0 = dict(d); d = dict(d, G1="B")      # 기본 구성: 계통 형성 전원이 모선마다 하나 — 약점 없음, 연계 차단기가 열려도 두 모선이 선다
+        i0 = bp.check(d, P, R); self.assertEqual([(i["level"], i["bus"], i["fix"]) for i in i0], [("warn", "A", {"G1": "A"})])                  # 복합전력 ESS 를 모선 B 로 옮겨 놓으면: 모선 A 는 디젤이 돌 때만 전압이 선다(주의) — 되돌리면 풀린다
+        a, done = bp.auto(d, P, R); self.assertEqual(a, a0); self.assertEqual(a["G1"], "A"); self.assertEqual(done, ["복합전력 ESS → 모선 A"]); self.assertEqual(bp.check(a, P, R), [])
         b = dict(d, DG="B"); i1 = bp.check(b, P, R); self.assertEqual(i1[0]["level"], "bad"); self.assertIn("정전", i1[0]["text"])                  # 모선 A 에 1등급 부하와 연료전지 · 태양광뿐: 정전 위험
         c = dict(d, ESS="A", G1="A", DG="A", FC="A"); t = " ".join(i["text"] for i in bp.check(c, P, R)); self.assertIn("전원이 모두 모선 A", t); self.assertIn("모선 B 에 늘 전압을 세우는 전원", t)
         self.assertEqual(bp.check(c, P, R)[0]["fix"], {"G1": "B"}); one = P - {"G1", "DG"}; self.assertIsNone(bp.check(dict(d, ESS="B"), one, R)[0]["fix"])  # 계통 형성 전원이 하나뿐이면 옮길 수 없다

@@ -74,7 +74,7 @@ class TestHmi(unittest.TestCase):
             snap = e.snapshot()["loads"]; self.assertEqual(len(snap["items"]), 5); self.assertTrue(all(i["est_kw"] is not None for i in snap["items"])); self.assertIn(snap["grades"][2]["stage"], ("on", "save", "off"))
             self.assertAlmostEqual(sum(i["est_kw"] for i in snap["items"] if i["feeder"] == "L2"), e.rt.val["LOAD.p2_kw"], delta=0.2)   # 추정 전력의 합 = 급전선 계측값
             at = {i["id"]: (i["fsu"], i["need"], i["fsu_auto"]) for i in snap["items"]}; ff = [f["id"] for f in snap["fsus"]]
-            self.assertEqual((at["c2"], at["med"], at["ammo"]), (("FSU2", 2, True), ("FSU4", 1, True), ("FSU6", 1, True)))                                     # 종류에 따른 구간분전함(자동), 부하 앞 배전체계: 30 kW 는 20 kW 2대 병렬
+            self.assertEqual((at["c2"], at["med"], at["ammo"]), (("FSU2", 3, True), ("FSU4", 1, True), ("FSU6", 1, True)))                                     # 종류에 따른 구간분전함(자동), 부하 앞 배전체계: 30 kW 는 20 kW 2대 병렬 + 1등급이라 한 대 더
             self.assertEqual(at["brk"][1], 3); self.assertNotEqual(at[nid][0], "FSU4")                                                                         # 막사 3동은 동마다 1대. 출력 4회로가 다 찬 구간분전함 대신 가까운 곳으로
             self.assertEqual((snap["ppdu_kw"], snap["fsu_a"], snap["fsu_out"]), (20.0, 630.0, 4)); full = lambda: all(len(i["ppdus"]) == i["need"] for i in e.snapshot()["loads"]["items"]) or len(e.snapshot()["ring"]["ppdu"]) == 18; t0 = time.time()
             while not full() and time.time() - t0 < 12.0: time.sleep(0.3)
@@ -96,9 +96,10 @@ class TestHmi(unittest.TestCase):
 
     def test_bus_plan_and_layout_scale(self):
         """모선 구성을 바꾸면 스냅샷 · 가상 장치의 모선 전압 계산이 따라가고(엔지니어만), 배치의 크기 값이 저장된다."""
-        e = self.eng; op = self.login("4321"); en = self.login("8765"); b0 = e.snapshot()["bus"]; self.assertEqual(b0["assign"]["G1"], "B"); self.assertEqual([i["level"] for i in b0["issues"]], ["warn"])
+        e = self.eng; op = self.login("4321"); en = self.login("8765"); b0 = e.snapshot()["bus"]; self.assertEqual(b0["assign"]["G1"], "A"); self.assertEqual(b0["issues"], [])      # 기본 구성은 약점이 없다
         self.assertFalse(self.req("/api/bus", {"op": "set", "node": "G1", "bus": "A"}, op)[1]["ok"])                                  # 운용자는 바꾸지 못한다
         try:
+            r = self.req("/api/bus", {"op": "set", "node": "G1", "bus": "B"}, en)[1]; self.assertEqual([i["level"] for i in r["bus"]["issues"]], ["warn"])          # 복합전력 ESS 를 모선 B 로 옮기면 모선 A 에 계통 형성 전원이 없어진다
             r = self.req("/api/bus", {"op": "auto"}, en)[1]; self.assertTrue(r["ok"]); self.assertEqual(r["bus"]["assign"]["G1"], "A"); self.assertEqual(r["bus"]["issues"], []); self.assertEqual(e.plant.bus["G1"], "A")
             self.assertFalse(self.req("/api/bus", {"op": "auto"}, en)[1]["ok"]); self.assertFalse(self.req("/api/bus", {"op": "set", "node": "X", "bus": "A"}, en)[1]["ok"])
             r = self.req("/api/bus", {"op": "set", "node": "ESS", "bus": "A"}, en)[1]; self.assertTrue(any(i["bus"] == "B" for i in r["bus"]["issues"]))

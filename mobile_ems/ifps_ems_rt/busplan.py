@@ -12,7 +12,7 @@
 
 NODES = ("GRID", "PV", "DG", "FC", "GDG", "ESS", "G1", "L1", "L2", "L3")
 NAME = {"GRID": "상전 수전", "PV": "태양광", "DG": "디젤 발전기", "FC": "연료전지", "GDG": "주둔지 발전기", "ESS": "이동형 ESS", "G1": "복합전력 ESS", "L1": "1등급 부하", "L2": "2등급 부하", "L3": "3등급 부하"}
-DEFAULT = {"GRID": "A", "PV": "A", "DG": "A", "FC": "A", "GDG": "B", "ESS": "B", "G1": "B", "L1": "A", "L2": "B", "L3": "B"}
+DEFAULT = {"GRID": "A", "PV": "A", "DG": "A", "FC": "A", "GDG": "B", "ESS": "B", "G1": "A", "L1": "A", "L2": "B", "L3": "B"}      # 계통 형성 전원을 모선마다 하나씩(복합전력 ESS = A, 이동형 ESS = B) — 연계 차단기가 열려도 두 모선이 모두 선다(Rev60)
 SOURCES = ("GRID", "PV", "DG", "FC", "GDG", "ESS", "G1"); LOADS = ("L1", "L2", "L3")
 FORMING = ("ESS", "G1")           # 자립 운전에서 모선의 전압 · 주파수를 늘 세우는 전원(계통 형성)
 STARTING = ("DG", "GDG", "GRID")  # 돌거나 붙어 있을 때만 전압을 주는 전원
