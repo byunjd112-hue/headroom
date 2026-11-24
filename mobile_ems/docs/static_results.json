@@ -1,6 +1,6 @@
 {
- "date": "2026-11-24 01:05",
- "unittest_s": 602.4,
+ "date": "2026-11-24 15:31",
+ "unittest_s": 585.4,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -67,6 +67,7 @@
   "test_7_forecast_accuracy_and_energy | ok",
   "test_8_breaker_trip_shown_and_deenergizes_feeder | ok",
   "test_9_layout_edit_persist_and_validate | ok",
+  "모선 구성을 바꾸면 스냅샷 · 가상 장치의 모선 전압 계산이 따라가고(엔지니어만), 배치의 크기 값이 저장된다. | ok",
   "앞선 지령에 밀려 늦어진 운용자 지령은 버린다(잊은 지령이 뒤늦게 나가지 않게). | ok",
   "부하 관리: 종류 · 수량을 바꾸면 스냅샷(모든 화면의 자료) · 가상 부하 배율 · 절감 가능 비율 · 저장 파일이 함께 바뀐다. 틀린 입력은 막는다. | ok",
   "절감 공급 지령(LDS = 3): 가상 부하가 절감 비율만큼 줄고 차단기는 그대로다. 복구(1)하면 돌아온다. 화면 상태도 따라간다. | ok",
@@ -197,6 +198,7 @@
   "test_kind_not_brought_is_marked_absent_and_replaced | ok",
   "설비 제어 화면의 − · ＋: 가상 장치를 놓으면 조작 없이 인식되고, 빼면 두절 경보 없이 빈 자리로 돌아간다. | ok",
   "차량 단위 대수: ④ 수소 차량은 연료전지와 수전해가 함께 늘고 줄며, ① 복합전력의 계통 형성 용량은 인식한 디젤 대수를 따른다. | ok",
+  "모선 구성: 모선마다 전압을 세울 전원이 있는지 점검하고, 고칠 수 있으면 고치는 방법을 준다. 모선 전압 계산은 구성을 따른다. | ok",
   "test_config_check_blocks_unsafe_values | ok",
   "복합전력 PCS 경보: 지령한 모드와 PCS 모드가 30초 넘게 다르면, ESS 충전율이 낮으면, 모르는 모드 값이면 알린다. 없는 장치의 경보는 꺼진다. | ok",
   "복합전력 PCS 의 운전 모드 선택: 디젤이 필요하면 발전기 + ESS 충전(가득이면 발전기 단독), 필요 없으면 ESS 방전. 복합전력 ESS 가 낮으면 발전기로 충전(이력). | ok",
@@ -210,19 +212,19 @@
   "test_parse_json_and_csv | ok",
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 207,
+ "n_tests": 209,
  "tests_ok": true,
  "retried": [],
  "coverage_pct": 92.5,
  "stmt": {
-  "n": 6827,
-  "hit": 6510,
+  "n": 6953,
+  "hit": 6636,
   "pct": 95.4
  },
  "branch": {
-  "n": 2412,
-  "hit": 2032,
-  "pct": 84.2
+  "n": 2450,
+  "hit": 2065,
+  "pct": 84.3
  },
  "coverage_files": [
   [
@@ -259,11 +261,11 @@
   ],
   [
    "ifps_ems_rt/hmi/server.py",
-   76.9,
-   221,
+   77.0,
+   222,
    68.8,
    144,
-   "21, 71-72, 86-88, 93-94, 111-112, 131-134, 136-144, 146, 160-162, 193-198, 200-204, 207-209, 219-220, 239-246"
+   "22, 72-73, 87-89, 94-95, 112-113, 132-135, 137-145, 147, 161-163, 194-199, 201-205, 208-210, 220-221, 240-247"
   ],
   [
    "ifps_ems_rt/hmi/archwatch.py",
@@ -299,11 +301,11 @@
   ],
   [
    "ifps_ems_rt/hmi/ringwatch.py",
-   89.9,
+   89.2,
    139,
-   68.8,
+   67.5,
    80,
-   "44, 138-143, 177-183"
+   "43-44, 138-143, 177-183"
   ],
   [
    "ifps_ems_rt/hmi/seqppt.py",
@@ -315,19 +317,11 @@
   ],
   [
    "ifps_ems_rt/hmi/eng_tools.py",
-   90.4,
-   115,
+   90.5,
+   116,
    78.1,
    64,
    "70-75, 84-86, 116-117"
-  ],
-  [
-   "ifps_ems_rt/hmi/eng_forecast.py",
-   90.7,
-   118,
-   90.6,
-   32,
-   "30, 46-47, 61-64, 67-69, 123"
   ],
   [
    "ifps_ems_rt/hmi/weatherwatch.py",
@@ -336,6 +330,14 @@
    50.0,
    22,
    "57-58, 66, 132-137"
+  ],
+  [
+   "ifps_ems_rt/hmi/eng_forecast.py",
+   92.4,
+   118,
+   90.6,
+   32,
+   "30, 61-64, 67-69, 123"
   ],
   [
    "ifps_ems_rt/hmi/archapi.py",
@@ -354,12 +356,20 @@
    "74, 126-127, 263-264, 309, 321-322, 345, 358, 362, 364, 366, 391-396, 426"
   ],
   [
+   "ifps_ems_rt/hmi/busctl.py",
+   94.0,
+   50,
+   93.8,
+   16,
+   "14, 55, 58"
+  ],
+  [
    "ifps_ems_rt/hmi/scenarios.py",
-   94.5,
-   256,
-   85.5,
-   110,
-   "59, 67, 70, 80, 90, 92, 94, 106, 110, 124, 133, 138, 226, 273"
+   94.6,
+   259,
+   84.8,
+   112,
+   "60, 68, 71, 81, 91, 93, 95, 107, 111, 125, 134, 139, 229, 276"
   ],
   [
    "ifps_ems_rt/hmi/scenextra.py",
@@ -426,14 +436,6 @@
    "70-72"
   ],
   [
-   "ifps_ems_rt/archive.py",
-   96.6,
-   148,
-   83.3,
-   30,
-   "95-96, 110, 128-129"
-  ],
-  [
    "ifps_ems_rt/hmi/eng_command.py",
    96.6,
    118,
@@ -498,20 +500,20 @@
    "93-94, 110"
   ],
   [
+   "ifps_ems_rt/archive.py",
+   98.0,
+   148,
+   83.3,
+   30,
+   "95-96, 110"
+  ],
+  [
    "ifps_ems_rt/hmi/docx.py",
    98.1,
    53,
    100.0,
    4,
    "65"
-  ],
-  [
-   "ifps_ems_rt/hmi/loadctl.py",
-   98.3,
-   59,
-   95.0,
-   20,
-   "39"
   ],
   [
    "ifps_ems_rt/modbus.py",
@@ -528,6 +530,14 @@
    94.8,
    134,
    "116, 275, 378, 538-540"
+  ],
+  [
+   "ifps_ems_rt/hmi/loadctl.py",
+   98.6,
+   69,
+   92.9,
+   28,
+   "39"
   ],
   [
    "ifps_ems_rt/hmi/report.py",
@@ -674,6 +684,14 @@
    ""
   ],
   [
+   "ifps_ems_rt/busplan.py",
+   100.0,
+   47,
+   80.0,
+   10,
+   ""
+  ],
+  [
    "ifps_ems_rt/hmi/__init__.py",
    100.0,
    0,
@@ -700,7 +718,7 @@
   [
    "ifps_ems_rt/hmi/eng_alarms.py",
    100.0,
-   80,
+   82,
    85.7,
    28,
    ""
@@ -725,7 +743,7 @@
    "ifps_ems_rt/hmi/fuelwatch.py",
    100.0,
    17,
-   90.0,
+   100.0,
    10,
    ""
   ],
@@ -772,9 +790,9 @@
   [
    "ifps_ems_rt/loads.py",
    100.0,
-   42,
-   83.3,
-   12,
+   54,
+   85.7,
+   14,
    ""
   ],
   [
@@ -1020,7 +1038,7 @@
     "W0201",
     "attribute-defined-outside-init",
     "ifps_ems_rt/simplant.py",
-    98,
+    99,
     "Plant._tick_power",
     "Attribute '_dt' defined outside __init__"
    ],
@@ -1308,7 +1326,7 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/server.py",
-    111,
+    112,
     "make_handler.H.do_GET",
     "Catching too general exception Exception"
    ],
@@ -1316,14 +1334,14 @@
     "W0718",
     "broad-exception-caught",
     "ifps_ems_rt/hmi/server.py",
-    219,
+    220,
     "make_handler.H.do_POST",
     "Catching too general exception Exception"
    ]
   ]
  },
  "metrics": {
-  "n_func": 877,
+  "n_func": 893,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1408,20 +1426,20 @@
     2
    ],
    [
-    "ifps_ems_rt/simplant.py",
-    "_tick_bus",
-    154,
+    "ifps_ems_rt/hmi/archcfg.py",
+    "check",
+    27,
     20,
-    10,
-    1,
-    0
+    18,
+    2,
+    2
    ]
   ],
   "top_len": [
    [
     "ifps_ems_rt/hmi/server.py",
     "make_handler",
-    24,
+    25,
     1,
     199,
     1,
@@ -1430,7 +1448,7 @@
    [
     "ifps_ems_rt/hmi/server.py",
     "do_POST",
-    123,
+    124,
     1,
     98,
     0,
@@ -1439,7 +1457,7 @@
    [
     "ifps_ems_rt/hmi/scenarios.py",
     "run_case",
-    178,
+    181,
     20,
     61,
     6,
@@ -1457,7 +1475,7 @@
    [
     "ifps_ems_rt/hmi/server.py",
     "do_GET",
-    67,
+    68,
     1,
     46,
     0,
@@ -1654,7 +1672,7 @@
    ],
    [
     "ifps_ems_rt/hmi/scenarios.py",
-    334
+    337
    ],
    [
     "ifps_ems_rt/hmi/cfgedit.py",
@@ -1662,7 +1680,7 @@
    ],
    [
     "ifps_ems_rt/hmi/server.py",
-    257
+    258
    ],
    [
     "ifps_ems/learner.py",
@@ -1750,7 +1768,7 @@
    ],
    [
     "ifps_ems_rt/hmi/eng_tools.py",
-    145
+    146
    ],
    [
     "ifps_ems/attn.py",
@@ -1789,6 +1807,14 @@
     107
    ],
    [
+    "ifps_ems_rt/hmi/eng_alarms.py",
+    101
+   ],
+   [
+    "ifps_ems_rt/loads.py",
+    100
+   ],
+   [
     "ifps_ems/nowcast.py",
     99
    ],
@@ -1797,7 +1823,7 @@
     99
    ],
    [
-    "ifps_ems_rt/hmi/eng_alarms.py",
+    "ifps_ems_rt/hmi/loadctl.py",
     99
    ],
    [
@@ -1817,10 +1843,6 @@
     86
    ],
    [
-    "ifps_ems_rt/hmi/loadctl.py",
-    85
-   ],
-   [
     "ifps_ems_rt/hmi/scenario_policy.py",
     84
    ],
@@ -1829,8 +1851,8 @@
     83
    ],
    [
-    "ifps_ems_rt/loads.py",
-    80
+    "ifps_ems_rt/busplan.py",
+    81
    ],
    [
     "ifps_ems_rt/pointmap.py",
@@ -1855,6 +1877,10 @@
    [
     "ifps_ems_rt/hmi/engdefs.py",
     69
+   ],
+   [
+    "ifps_ems_rt/hmi/busctl.py",
+    66
    ],
    [
     "ifps_ems_rt/hmi/eng_auth.py",
@@ -1945,7 +1971,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 8715,
+   "loc": 8867,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -2129,12 +2155,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.87,
- "cc_n": 901,
+ "cc_avg": 5.91,
+ "cc_n": 918,
  "cc_rank": {
-  "A": 532,
-  "B": 227,
-  "C": 142,
+  "A": 539,
+  "B": 232,
+  "C": 147,
   "D": 0,
   "E": 0,
   "F": 0
@@ -2165,12 +2191,6 @@
    "C"
   ],
   [
-   "ifps_ems_rt/simplant.py",
-   "_tick_bus",
-   20,
-   "C"
-  ],
-  [
    "ifps_ems_rt/opsmode.py",
    "step",
    20,
@@ -2185,6 +2205,12 @@
   [
    "ifps_ems_rt/ring.py",
    "alarms",
+   20,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/hmi/loadctl.py",
+   "_edit",
    20,
    "C"
   ],
@@ -2229,7 +2255,7 @@
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
-   16.1,
+   16.9,
    "B"
   ],
   [
@@ -2244,7 +2270,7 @@
   ],
   [
    "ifps_ems_rt/simplant.py",
-   23.2,
+   24.5,
    "A"
   ],
   [
@@ -2279,12 +2305,17 @@
   ],
   [
    "ifps_ems_rt/hmi/eng_tools.py",
-   31.8,
+   31.7,
    "A"
   ],
   [
    "ifps_ems_rt/hmi/eng_command.py",
    33.2,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/loadctl.py",
+   35.2,
    "A"
   ],
   [
@@ -2299,7 +2330,7 @@
   ],
   [
    "ifps_ems_rt/hmi/server.py",
-   36.9,
+   37.1,
    "A"
   ],
   [
@@ -2363,23 +2394,18 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/engine.py",
-   42.5,
+   "ifps_ems_rt/hmi/eng_alarms.py",
+   42.4,
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/loadctl.py",
-   42.9,
+   "ifps_ems_rt/hmi/engine.py",
+   42.4,
    "A"
   ],
   [
    "ifps_ems/skycam.py",
    43.1,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/hmi/eng_alarms.py",
-   43.2,
    "A"
   ],
   [
@@ -2413,6 +2439,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/busctl.py",
+   49.0,
+   "A"
+  ],
+  [
    "ifps_ems/security.py",
    50.8,
    "A"
@@ -2423,6 +2454,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/loads.py",
+   51.4,
+   "A"
+  ],
+  [
    "ifps_ems_rt/hmi/eng_auth.py",
    51.8,
    "A"
@@ -2430,11 +2466,6 @@
   [
    "ifps_ems_rt/hybrid.py",
    53.0,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/loads.py",
-   53.1,
    "A"
   ],
   [
@@ -2455,6 +2486,11 @@
   [
    "ifps_ems_rt/hmi/fcstats.py",
    55.2,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/busplan.py",
+   58.6,
    "A"
   ],
   [
@@ -2569,19 +2605,24 @@
   ]
  ],
  "loc_py": {
-  "files": 73,
-  "sloc": 7110,
-  "comments": 1021
+  "files": 75,
+  "sloc": 7237,
+  "comments": 1050
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   582,
+   584,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/archive.js",
    246,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/busplan.js",
+   36,
    true
   ],
   [
@@ -2606,7 +2647,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/loads.js",
-   76,
+   90,
    true
   ],
   [
@@ -2626,7 +2667,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/scentopo.js",
-   188,
+   197,
    true
   ],
   [
@@ -2636,12 +2677,12 @@
   ],
   [
    "ifps_ems_rt/hmi/static/site.js",
-   310,
+   359,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/sld.js",
-   200,
+   219,
    true
   ],
   [
