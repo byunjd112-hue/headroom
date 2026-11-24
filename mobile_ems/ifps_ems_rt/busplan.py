@@ -30,23 +30,34 @@ def _on(assign, bus, present, pick):
     return [n for n in pick if assign[n] == bus and n in present]
 
 
+def _no_forming(assign, bus, present, src, lds):
+    """① 이 모선에 늘 전압을 세우는 전원이 없을 때의 약점 한 건."""
+    form = [n for n in FORMING if n in present]; spare = _on(assign, OTHER[bus], present, FORMING)
+    fix = {spare[-1]: bus} if len(spare) >= 2 else None               # 반대쪽에 계통 형성 전원이 둘이면 하나를 옮긴다(복합전력 ESS 를 먼저)
+    gen = [n for n in src if n in STARTING]                           # 돌려야 전압이 서는 전원(디젤 · 주둔지 발전기 · 상전)
+    why = f"연계 차단기가 열리면 {NAME[gen[0]]}가 전압을 줄 때까지 이 모선은 정전된다" if gen else "연계 차단기가 열리면 이 모선은 정전된다"
+    tail = ""
+    if fix: tail = f" {NAME[spare[-1]]} 를 모선 {bus} 로 옮기면 해결된다."
+    elif len(form) < 2: tail = " 계통 형성 전원이 하나뿐이라 옮길 수 없다 — 연계 차단기를 닫아 두고 운용한다."
+    return {"level": "bad" if lds and not gen else "warn", "bus": bus, "fix": fix, "text": f"모선 {bus} 에 늘 전압을 세우는 전원(이동형 ESS · 복합전력 ESS)이 없다 — {why}." + tail}
+
+
+def _bus_issues(assign, bus, present, rated):
+    """모선 하나의 약점(①②③)."""
+    out = []
+    if not [n for n in NODES if assign[n] == bus and n in present]: return out
+    src = _on(assign, bus, present, SOURCES); lds = _on(assign, bus, present, LOADS)
+    if not _on(assign, bus, present, FORMING): out.append(_no_forming(assign, bus, present, src, lds))
+    if "L1" in lds and not src: out.append({"level": "bad", "bus": bus, "fix": None, "text": f"1등급 부하가 물린 모선 {bus} 에 전원이 하나도 없다 — 연계 차단기에만 기댄다."})
+    need = sum(rated.get(n, 0.0) for n in lds); have = sum(rated.get(n, 0.0) for n in src if n != "GRID")
+    if lds and src and rated and need > have + 0.5: out.append({"level": "warn", "bus": bus, "fix": None, "text": f"모선 {bus}: 부하 정격 {need:.0f} kW 가 전원 정격 {have:.0f} kW 보다 크다 — 연계 차단기가 열리면 부하를 다 감당하지 못한다(자동 절감 · 차단이 동작한다)."})
+    return out
+
+
 def check(assign, present, rated=None):
     """구성의 약점. present: 지금 있는 전원 · 부하의 이름 모음, rated: {이름: 정격 kW}(없으면 정격 비교를 건너뛴다).
     반환: [{"level": "bad" | "warn", "bus", "text", "fix": {이름: 모선} 또는 None}] — bad 는 정전으로 이어질 수 있는 것."""
-    out = []; rated = rated or {}; form = [n for n in FORMING if n in present]
-    for bus in ("A", "B"):
-        here = [n for n in NODES if assign[n] == bus and n in present]
-        if not here: continue
-        f = _on(assign, bus, present, FORMING); src = _on(assign, bus, present, SOURCES); lds = _on(assign, bus, present, LOADS)
-        if not f:
-            spare = _on(assign, OTHER[bus], present, FORMING); fix = {spare[-1]: bus} if len(spare) >= 2 else None      # 반대쪽에 계통 형성 전원이 둘이면 하나를 옮긴다(복합전력 ESS 를 먼저)
-            gen = [n for n in src if n in STARTING]                    # 돌려야 전압이 서는 전원(디젤 · 주둔지 발전기 · 상전)
-            why = f"연계 차단기가 열리면 {NAME[gen[0]]}가 전압을 줄 때까지 이 모선은 정전된다" if gen else "연계 차단기가 열리면 이 모선은 정전된다"
-            out.append({"level": "bad" if lds and not gen else "warn", "bus": bus, "fix": fix, "text": f"모선 {bus} 에 늘 전압을 세우는 전원(이동형 ESS · 복합전력 ESS)이 없다 — {why}."
-                        + (f" {NAME[spare[-1]]} 를 모선 {bus} 로 옮기면 해결된다." if fix else " 계통 형성 전원이 하나뿐이라 옮길 수 없다 — 연계 차단기를 닫아 두고 운용한다." if len(form) < 2 else "")})
-        if "L1" in lds and not src: out.append({"level": "bad", "bus": bus, "fix": None, "text": f"1등급 부하가 물린 모선 {bus} 에 전원이 하나도 없다 — 연계 차단기에만 기댄다."})
-        need = sum(rated.get(n, 0.0) for n in lds); have = sum(rated.get(n, 0.0) for n in src if n != "GRID")
-        if lds and src and rated and need > have + 0.5: out.append({"level": "warn", "bus": bus, "fix": None, "text": f"모선 {bus}: 부하 정격 {need:.0f} kW 가 전원 정격 {have:.0f} kW 보다 크다 — 연계 차단기가 열리면 부하를 다 감당하지 못한다(자동 절감 · 차단이 동작한다)."})
+    rated = rated or {}; out = _bus_issues(assign, "A", present, rated) + _bus_issues(assign, "B", present, rated)
     used = {assign[n] for n in SOURCES if n in present and n != "GRID"}
     if len(used) == 1 and any(assign[n] not in used for n in LOADS if n in present):
         out.append({"level": "warn", "bus": OTHER[next(iter(used))], "fix": None, "text": f"전원이 모두 모선 {next(iter(used))} 에 있다 — 반대쪽 모선의 부하는 연계 차단기 하나에 기댄다."})

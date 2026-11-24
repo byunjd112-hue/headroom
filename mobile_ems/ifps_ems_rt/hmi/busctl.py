@@ -17,6 +17,8 @@ class BusBook:
 
     def apply(self):
         if self.eng.plant is not None: self.eng.plant.bus = dict(self.assign)
+        from . import scenarios
+        scenarios.BUS = dict(self.assign)                                 # 운영 시나리오의 가상 장치도 같은 모선 구성으로 돈다
 
     def present(self):
         """지금 있는 전원 · 부하: 인식한 장치, 주둔지에서만 상전 · 주둔지 발전기, 부하 목록에 있는 등급."""

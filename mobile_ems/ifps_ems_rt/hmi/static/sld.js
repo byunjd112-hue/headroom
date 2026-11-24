@@ -42,23 +42,25 @@ function faultMark(id, x, y) {
 const SLD_HOME = Object.fromEntries(SRC.concat(LOADS).map(n => [n.id, n.bus]));
 function sldArrange() {
   if (!BusPlan.s()) return "";
-  BusPlan.place(SRC, SLD_HOME, "A", 70, 440); BusPlan.place(SRC, SLD_HOME, "B", 590, 880);
+  const cnt = b => SRC.filter(n => BusPlan.of(n.id, SLD_HOME[n.id]) === b).length, reg = { A: cnt("A") > 4 ? [58, 462] : [70, 440], B: cnt("B") > 3 ? [538, 942] : [590, 880] };      // 몰리면 모선 길이를 다 쓴다
+  for (const b of ["A", "B"]) { BusPlan.place(SRC, SLD_HOME, b, reg[b][0], reg[b][1]); const n = cnt(b), step = n > 1 ? (reg[b][1] - reg[b][0]) / (n - 1) : 999; SRC.filter(q => q.bus === b).forEach(q => { q.k = Math.min(1, step / 118); }); }
   const lx = id => ({ L1: 1, L2: 2, L3: 3 }[id]); BusPlan.place(LOADS, SLD_HOME, "A", 220, 420, lx); BusPlan.place(LOADS, SLD_HOME, "B", 665, 865, lx);
   return BusPlan.sig();
 }
 function sldSvg() {
   const ko = S.lang === "ko", ring = !!(S.snap && S.snap.ring), LO = BUS_Y, LYY = LY, SLD_H = ring ? RG.H : 610;      // 환망이 있으면 등급별 부하 그림은 감추고(값은 맨 아래 글과 오른쪽 표) 부하를 구간분전함 아래에 그린다
+  const fs = (n, px) => (n.k || 1) < 0.98 ? `style="font-size:${(px * Math.max(0.74, n.k)).toFixed(1)}px"` : "";      // 한 모선에 전원이 몰려 좁아지면 글자도 줄인다
   const hex = (n, cy, r, color, icon, isLoad) => `<g class="node" id="n-${n.id}">
-    <clipPath id="cp-${n.id}"><rect x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" rx="12"/></clipPath>
-    <rect class="hexbg" x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" rx="12"/>
-    <g clip-path="url(#cp-${n.id})"><g id="art-${n.id}" data-x="${n.x - r * 1.18}" data-y="${cy - r * .8}" data-w="${r * 2.36}" data-h="${r * 1.6}" class="eqimg"></g></g>
-    <rect class="hexo" x="${n.x - r * 1.18}" y="${cy - r * .8}" width="${r * 2.36}" height="${r * 1.6}" rx="12" style="fill:none"/>
-    <circle class="sdot" cx="${n.x + r * 1.18 - 10}" cy="${cy - r * .8 + 10}" r="5"/><g id="un-${n.id}" data-x="${n.x}" data-y="${cy - r * .8 - 12}"></g>
+    <clipPath id="cp-${n.id}"><rect x="${n.x - r * (n.k || 1) * 1.18}" y="${cy - r * (n.k || 1) * .8}" width="${r * (n.k || 1) * 2.36}" height="${r * (n.k || 1) * 1.6}" rx="12"/></clipPath>
+    <rect class="hexbg" x="${n.x - r * (n.k || 1) * 1.18}" y="${cy - r * (n.k || 1) * .8}" width="${r * (n.k || 1) * 2.36}" height="${r * (n.k || 1) * 1.6}" rx="12"/>
+    <g clip-path="url(#cp-${n.id})"><g id="art-${n.id}" data-x="${n.x - r * (n.k || 1) * 1.18}" data-y="${cy - r * (n.k || 1) * .8}" data-w="${r * (n.k || 1) * 2.36}" data-h="${r * (n.k || 1) * 1.6}" class="eqimg"></g></g>
+    <rect class="hexo" x="${n.x - r * (n.k || 1) * 1.18}" y="${cy - r * (n.k || 1) * .8}" width="${r * (n.k || 1) * 2.36}" height="${r * (n.k || 1) * 1.6}" rx="12" style="fill:none"/>
+    <circle class="sdot" cx="${n.x + r * (n.k || 1) * 1.18 - 10}" cy="${cy - r * (n.k || 1) * .8 + 10}" r="5"/><g id="un-${n.id}" data-x="${n.x}" data-y="${cy - r * (n.k || 1) * .8 - 12}"></g>
     <g class="ico" style="display:none" stroke="${color}" transform="translate(${n.x - 16.8},${cy - 16.8}) scale(1.4)">${icon}</g>
-    <text class="nm" x="${n.x}" y="${cy + r + 22}" text-anchor="middle">${ko ? n.name : n.en}</text>
-    <text x="${n.x}" y="${cy + r + 47}" text-anchor="middle"><tspan class="kw" id="kw-${n.id}">—</tspan><tspan class="u" dx="4">kW</tspan></text>
-    <text class="st" x="${n.x}" y="${cy + r + 64}" text-anchor="middle" id="st-${n.id}" fill="var(--muted)">—</text><text class="st" x="${n.x}" y="${cy + r + 80}" text-anchor="middle" id="ldn-${n.id}" fill="var(--muted)"></text>
-    ${isLoad ? "" : `<text class="tag" x="${n.x}" y="${cy + r + 80}" text-anchor="middle" id="tg-${n.id}" fill="var(--muted)">${n.sub}</text>`}</g>`;
+    <text class="nm" x="${n.x}" y="${cy + r + 22}" text-anchor="middle" ${fs(n, 12.5)}>${ko ? n.name : n.en}</text>
+    <text x="${n.x}" y="${cy + r + 47}" text-anchor="middle"><tspan class="kw" id="kw-${n.id}" ${fs(n, 20)}>—</tspan><tspan class="u" dx="4">kW</tspan></text>
+    <text class="st" x="${n.x}" y="${cy + r + 64}" text-anchor="middle" id="st-${n.id}" fill="var(--muted)" ${fs(n, 10.5)}>—</text><text class="st" x="${n.x}" y="${cy + r + 80}" text-anchor="middle" id="ldn-${n.id}" fill="var(--muted)"></text>
+    ${isLoad ? "" : `<text class="tag" x="${n.x}" y="${cy + r + 80}" text-anchor="middle" id="tg-${n.id}" fill="var(--muted)" ${fs(n, 9.5)}>${n.sub}</text>`}</g>`;
   const top = SY + SR + 92;                 // 급전선 시작(이름·값 아래)
   const src = SRC.map(n => `
     <path class="ln" id="lu-${n.id}" d="M${n.x} ${top} V${BUS_Y - 63}"/><path class="ln" id="ld-${n.id}" d="M${n.x} ${BUS_Y - 45} V${BUS_Y}"/>
@@ -133,7 +135,7 @@ function sldRing(s, live) {
             <text class="nm" x="${x}" y="${ty + 82}" text-anchor="middle" style="font-size:${lnm.length > 14 ? 11 : 13}px">${esc(lnm.length > 24 ? lnm.slice(0, 23) + "…" : lnm)}</text><text x="${x}" y="${ty + 103}" text-anchor="middle"><tspan class="kw" style="font-size:19px">${bad ? "0.0" : lds.length ? F.kw(lds.reduce((a, q) => a + (q.est_kw || 0), 0)) : p.kw == null ? "—" : F.kw(p.kw)}</tspan><tspan class="u" dx="4">kW</tspan></text>
             <text class="st" x="${x}" y="${ty + 119}" text-anchor="middle" fill="${bad ? "var(--alarm)" : fed ? "var(--ok)" : "var(--warn)"}">${bad ? (p.mccb === 2 ? "주 차단기 트립 · 정전" : "정전") : fed ? "급전 중" : "무전압"}</text>`); }).join(""); });
   const tot = [["1", "LOAD.p1_kw"], ["2", "LOAD.p2_kw"], ["3", "LOAD.p3_kw"]].map(([cl, t], q) => `<tspan style="fill:${CLS[q][1]}" dx="${q ? 16 : 8}">${cl}등급 ${F.kw(val(t))} kW</tspan><tspan class="${cbl(cl) === 2 ? "t" : cbl(cl) === 0 ? "o" : ""}" dx="5">CB-L${cl} ${cbl(cl) == null ? "미상" : ["개방", "투입", "트립"][cbl(cl)]}${LD.stage("L" + cl) === "save" ? " · 절감 공급" : ""}</tspan><tspan dx="5" style="fill:var(--muted)">(${LD.g("L" + cl) ? LD.g("L" + cl).n + "개 · 정격 " + F.n(LD.g("L" + cl).rated, 0) : "—"})</tspan>`).join("");
-  h += `<text class="sring-s" x="${X0}" y="${RG.H - 12}">부하 아래 값 = 부하 목록의 추정 전력(개요 · 부하 관리와 같은 값), 배전체계 칸 = 그 배전체계 전력계 · 등급별 합계와 차단기${tot}</text>`;
+  h += `<text class="sring-s" x="${X0}" y="${RG.H - 12}">부하 값 = 부하 목록의 추정 전력 · 배전체계 칸 = 전력계 · 등급별${tot}</text>`;
   g.innerHTML = h; g.onclick = () => { location.hash = "#ring"; };
 }
 /* 상태 갱신 */

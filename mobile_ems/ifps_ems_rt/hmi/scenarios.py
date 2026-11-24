@@ -13,6 +13,7 @@ from . import scenextra
 from .scenario_policy import METRICS, ScenarioPolicy, run_policy_case
 
 MAX_CASES = 64
+BUS = None  # bus plan (which source/load sits on bus A or B) set by the HMI bus book; None keeps the plant default
 MAX_STEPS = 30
 TICK_MS = 50
 MAX_MS = 10000
@@ -169,6 +170,8 @@ def _snapshot(plant, watch):
 def _plant(pts, units, profile):
     """Create the virtual plant; hybrid PCS mode codes follow the profile's settings."""
     plant = Plant(pts, units)
+    if BUS:
+        plant.bus = dict(BUS)
     if profile:
         with open(profile, encoding="utf-8") as source:
             plant.set_hybrid(hybrid.settings(json.load(source).get("hybrid"))["code"])
