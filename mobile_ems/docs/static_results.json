@@ -1,6 +1,6 @@
 {
- "date": "2026-11-24 00:02",
- "unittest_s": 620.8,
+ "date": "2026-11-24 01:05",
+ "unittest_s": 602.4,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -213,15 +213,15 @@
  "n_tests": 207,
  "tests_ok": true,
  "retried": [],
- "coverage_pct": 92.4,
+ "coverage_pct": 92.5,
  "stmt": {
   "n": 6827,
-  "hit": 6506,
-  "pct": 95.3
+  "hit": 6510,
+  "pct": 95.4
  },
  "branch": {
   "n": 2412,
-  "hit": 2030,
+  "hit": 2032,
   "pct": 84.2
  },
  "coverage_files": [
@@ -269,7 +269,7 @@
    "ifps_ems_rt/hmi/archwatch.py",
    79.4,
    102,
-   59.1,
+   56.8,
    44,
    "29-30, 43, 56, 59-63, 67-68, 108-110, 114-116, 126-128, 131"
   ],
@@ -299,11 +299,11 @@
   ],
   [
    "ifps_ems_rt/hmi/ringwatch.py",
-   89.2,
+   89.9,
    139,
-   67.5,
+   68.8,
    80,
-   "43-44, 138-143, 177-183"
+   "44, 138-143, 177-183"
   ],
   [
    "ifps_ems_rt/hmi/seqppt.py",
@@ -402,20 +402,20 @@
    "75, 131-132, 145, 184-185"
   ],
   [
-   "ifps_ems_rt/hmi/report.py",
-   96.1,
-   153,
-   78.6,
-   42,
-   "143, 147, 196-197, 199-200"
-  ],
-  [
    "ifps_ems_rt/hal.py",
    96.2,
    106,
    92.1,
    38,
    "104, 108-110"
+  ],
+  [
+   "ifps_ems/nowcast.py",
+   96.4,
+   84,
+   81.2,
+   32,
+   "32, 57, 60"
   ],
   [
    "ifps_ems/skycam.py",
@@ -474,14 +474,6 @@
    "53"
   ],
   [
-   "ifps_ems/nowcast.py",
-   97.6,
-   84,
-   84.4,
-   32,
-   "32, 57"
-  ],
-  [
    "ifps_ems/learner.py",
    97.7,
    173,
@@ -536,6 +528,14 @@
    94.8,
    134,
    "116, 275, 378, 538-540"
+  ],
+  [
+   "ifps_ems_rt/hmi/report.py",
+   98.7,
+   153,
+   85.7,
+   42,
+   "143, 147"
   ],
   [
    "ifps_ems_rt/fleet.py",
@@ -1945,7 +1945,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 8713,
+   "loc": 8715,
    "nosec": 0,
    "skipped_tests": 22
   },
