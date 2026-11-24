@@ -73,21 +73,24 @@ class TestHmi(unittest.TestCase):
             self.assertEqual(json.load(open(e.loadw.path, encoding="utf-8"))["rev"], e.loadw.rev); self.assertTrue(any(x["kind"] == "부하" for x in e.rt.events))
             snap = e.snapshot()["loads"]; self.assertEqual(len(snap["items"]), 5); self.assertTrue(all(i["est_kw"] is not None for i in snap["items"])); self.assertIn(snap["grades"][2]["stage"], ("on", "save", "off"))
             self.assertAlmostEqual(sum(i["est_kw"] for i in snap["items"] if i["feeder"] == "L2"), e.rt.val["LOAD.p2_kw"], delta=0.2)   # 추정 전력의 합 = 급전선 계측값
-            at = {i["id"]: (i["fsu"], i["ppdu"], i["fsu_auto"]) for i in snap["items"]}; pp = snap["ppdus"]; ff = [f["id"] for f in snap["fsus"]]; self.assertGreaterEqual(len(pp), 3)
-            self.assertEqual(at["med"], (pp[1]["at"], pp[1]["id"], True)); self.assertEqual(at["c2"], ("FSU1", "", True)); self.assertEqual((at["brk"][1], at["ammo"][1]), ("", pp[2]["id"]))   # 종류에 맞는 배전체계에 물린다(자동). 배전체계 정격 20 kW 를 넘는 부하는 가까운 구간분전함에 직결
-            self.assertEqual(snap["ppdu_kw"], 20.0)
-            free = next(f for f in ff if f not in {p["at"] for p in pp})
+            at = {i["id"]: (i["fsu"], i["need"], i["fsu_auto"]) for i in snap["items"]}; ff = [f["id"] for f in snap["fsus"]]
+            self.assertEqual((at["c2"], at["med"], at["ammo"]), (("FSU2", 2, True), ("FSU4", 1, True), ("FSU6", 1, True)))                                     # 종류에 따른 구간분전함(자동), 부하 앞 배전체계: 30 kW 는 20 kW 2대 병렬
+            self.assertEqual(at["brk"][1], 3); self.assertNotEqual(at[nid][0], "FSU4")                                                                         # 막사 3동은 동마다 1대. 출력 4회로가 다 찬 구간분전함 대신 가까운 곳으로
+            self.assertEqual((snap["ppdu_kw"], snap["fsu_a"], snap["fsu_out"]), (20.0, 630.0, 4)); full = lambda: all(len(i["ppdus"]) == i["need"] for i in e.snapshot()["loads"]["items"]) or len(e.snapshot()["ring"]["ppdu"]) == 8; t0 = time.time()
+            while not full() and time.time() - t0 < 12.0: time.sleep(0.3)
+            self.assertTrue(full())   # 가상 장치가 목록대로 배전체계를 놓는다(자리 8개까지)
+            free = next(f for f in ff if f not in {i["fsu"] for i in snap["items"]})
             r = self.req("/api/loads", {"op": "set", "id": "ammo", "grade": 1, "save_pct": 0, "fsu": free}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "ammo")
-            self.assertEqual((it["feeder"], it["fsu"], it["ppdu"], it["fsu_auto"]), ("L1", free, "", False))                                                       # 등급 · 자리를 바꾸면 급전선과 구간분전함이 따라간다(배전체계 없는 구간분전함에도 물린다)
+            self.assertEqual((it["feeder"], it["fsu"], it["fsu_auto"]), ("L1", free, False))                                                       # 등급 · 자리를 바꾸면 급전선과 구간분전함이 따라간다(배전체계 없는 구간분전함에도 물린다)
             self.assertFalse(self.req("/api/loads", {"op": "set", "id": "ammo", "fsu": "../x"}, tok)[1]["ok"])
-            r = self.req("/api/loads", {"op": "place", "at": {"med": pp[0]["at"]}, "names": {"med": "의무대"}}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "med")      # 개요 배치 저장: 옮긴 자리 · 고친 이름
-            self.assertEqual((it["fsu"], it["ppdu"], it["name"], it["fsu_auto"]), (pp[0]["at"], pp[0]["id"], "의무대", False)); self.assertFalse(self.req("/api/loads", {"op": "place", "at": {}, "names": {}}, tok)[1]["ok"])
+            r = self.req("/api/loads", {"op": "place", "at": {"med": "FSU2"}, "names": {"med": "의무대"}}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "med")      # 개요 배치 저장: 옮긴 자리 · 고친 이름
+            self.assertEqual((it["fsu"], it["name"], it["fsu_auto"]), ("FSU2", "의무대", False)); self.assertFalse(self.req("/api/loads", {"op": "place", "at": {}, "names": {}}, tok)[1]["ok"])
             r = self.req("/api/loads", {"op": "set", "id": "ammo", "fsu": "FSU19"}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "ammo"); self.assertTrue(it["fsu_auto"])   # 지금 없는 구간분전함이면 자동으로 붙인다
             self.assertTrue(self.req("/api/loads", {"op": "del", "id": nid}, tok)[1]["ok"])
             from ifps_ems_rt.hmi.loadctl import LoadBook
             b2 = LoadBook(e); self.assertEqual([i["n"] for i in b2.items], [1, 1, 3, 1])                                             # 다시 켜도 그대로
         finally:
-            self.assertTrue(self.req("/api/loads", {"op": "reset"}, tok)[1]["ok"]); self.assertEqual(e.plant.load_scale, {1: 1.0, 2: 1.0, 3: 1.0})
+            self.assertTrue(self.req("/api/loads", {"op": "reset"}, tok)[1]["ok"]); self.assertEqual(e.plant.load_scale, {1: 1.0, 2: 1.0, 3: 20.0 / 27.5})      # 3등급 곡선(최대 25 kW)은 기본 정격 20 kW 에서 최대 약 18 kW
         self.assertEqual(loads.check([dict(loads.DEFAULT[0], grade=1, save_pct=10)]), ["1번째(지휘통제(C2)): 1등급 부하는 절감하지 않는다(절감 비율 0)"])
         st = {"L1": "on", "L2": "save", "L3": "off"}; sh = loads.share(loads.DEFAULT, {"L1": 28.0, "L2": 30.0, "L3": 0.0}, st); self.assertEqual(sh["ammo"], 0.0); self.assertAlmostEqual(sh["med"] + sh["brk"], 30.0)
 

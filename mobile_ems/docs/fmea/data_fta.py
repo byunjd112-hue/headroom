@@ -132,6 +132,7 @@ B_DESIGN = [  # FM, 보완설계 반영 내용, 반영 대상, 검증 방법, �
  ["FM-71", "절감 지령(LDS = 3)의 부하 쪽 제어 방식 확정과 절감 비율 실측", "하드웨어 구성 기술자료, loads.py(save_pct)", "절감 지령 뒤 급전선 전력 감소 확인", "FAT", "체계통합(SI)"],
  ["FM-72", "부하 목록 관리 화면과 범위 검사(Rev55 반영), 부하 반입 · 철수 점검표", "loads.py(check), hmi/loadctl.py", "test_load_book_changes_follow_everywhere", "운용", "운용부대"],
  ["FM-73", "분기 전력계 대조 경보와 전력량 이상 처리(Rev56 반영), 전력계 사양 확정", "ring.py(meter_tags), hmi/ringwatch.py(_meters), branchfc.py", "test_branch_meters_and_forecast_view, test_meter_reset_falls_back_to_power_samples, 실장비 전력계 대조", "FAT", "체계통합(SI)"],
+ ["FM-75", "부하별 배전체계 대수(병렬) · 공급 경로 계산과 부족 · 초과 안내, 구간분전함 과부하 경보(Rev60 반영)", "loads.py(need·spots·attach·plan), ring.py(FSU 정격), hmi/loadctl.py · ringwatch.py", "test_branch_meters_and_forecast_view, test_load_book_changes_follow_everywhere, 병렬 배전체계 한 대 제거 시험", "SAT", "운용부대"],
  ["FM-74", "모선 구성의 점검 · 자동 보완 · 경보(Rev59 반영), 결선 점검표", "busplan.py(check·auto), hmi/busctl.py, static/busplan.js", "test_bus_plan_check_and_auto_fix, test_bus_plan_and_layout_scale, 연계 차단기 개방 시험", "SAT", "운용부대"],
 ]
 B_DESIGN_NOTE = "※ [신규] 표기는 현 리비전 소프트웨어에 없는 기능으로, 다음 리비전 설계 반영이 필요한 제안 사항이다. 구현·검증 전에는 해당 고장모드의 개선 후 RPN 을 인정하지 않는다."

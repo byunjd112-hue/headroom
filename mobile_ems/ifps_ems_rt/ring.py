@@ -24,6 +24,7 @@ V_LIVE = 300.0                   # 이 전압(V) 이상이면 그 마디에 전�
 MAX_FSU, MAX_PPDU = 12, 12
 KIND = {0x46: "FSU", 0x50: "PPDU"}       # 장치 ID 의 윗자리로 종류를 가린다(가정)
 KNAME = {"FSU": "구간분전함", "PPDU": "배전체계"}
+PLAIN = re.compile(r"^배전체계( \d+| \(ID \d+\))$")      # 따로 이름을 붙이지 않은 배전체계 — 부하 앞에 붙으면 그 부하의 이름으로 부른다
 RATED_KW = 20.0                  # PPDU-20 정격
 FSU_A, FSU_V, FSU_PF, FSU_OUT = 630.0, 380.0, 0.9, 4      # 구간분전함 정격: AC 380 V 3상 4선식 · 630 A · 출력 4회로(제안 발표 원본의 FSU 사양). 역률 0.9 는 kW 로 견주려는 가정
 FSU_KVA = round(3 ** 0.5 * FSU_V * FSU_A / 1000.0)        # 약 415 kVA
@@ -40,9 +41,9 @@ def _ch(names):
 
 DEFAULT = {"enabled": True, "auto": True, "fsu_slots": 7, "ppdu_slots": 8, "name": "부하 환망", "open": 4, "trip_ms": 1500, "close_ms": 2500,
            "fsu": [{"id": f"FSU{k}", "code": 0x4600 + k, "name": f"구간분전함 {k}"} for k in range(1, 8)],
-           "ppdu": [{"id": "PPDU1", "code": 0x5001, "at": "FSU2", "name": "지휘·통신 배전", "ch": _ch(("예비 동력", "", "지휘소", "통신소", "상황실 조명", "생활 전열"))},
-                    {"id": "PPDU2", "code": 0x5002, "at": "FSU4", "name": "의무·조명 배전", "ch": _ch(("의무 장비", "", "수술·처치", "의무 통신", "경계 조명", "생활 전열"))},
-                    {"id": "PPDU3", "code": 0x5003, "at": "FSU6", "name": "정비·작업 배전", "ch": _ch(("정비 동력", "", "정비 통신", "공구 충전", "작업 조명", "생활 전열"))}]}
+           "ppdu": [{"id": "PPDU1", "code": 0x5001, "at": "FSU2", "name": "배전체계 1", "ch": _ch(("예비 동력", "", "지휘소", "통신소", "상황실 조명", "생활 전열"))},
+                    {"id": "PPDU2", "code": 0x5002, "at": "FSU4", "name": "배전체계 2", "ch": _ch(("의무 장비", "", "수술·처치", "의무 통신", "경계 조명", "생활 전열"))},
+                    {"id": "PPDU3", "code": 0x5003, "at": "FSU6", "name": "배전체계 3", "ch": _ch(("정비 동력", "", "정비 통신", "공구 충전", "작업 조명", "생활 전열"))}]}
 
 
 def settings(cfg):
