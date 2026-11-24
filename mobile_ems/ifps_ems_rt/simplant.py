@@ -5,7 +5,7 @@
 시험용 조작: mute(장치) 무응답, noack(장치) 지령을 받고도 동작하지 않음, path_down(경로) 경로 단절.
 """
 import math, socket, socketserver, struct, threading, time
-from . import modbus as mb, fleet
+from . import modbus as mb, fleet, busplan
 
 
 class Plant:
@@ -13,6 +13,7 @@ class Plant:
         self.pts = pts; self.units = units; self.rev = {u: d for d, u in units.items()}
         self.reg = {d: {} for d in units}; self.lock = threading.Lock(); self.ack_delay = ack_delay
         self.gone = {d for d in units if fleet.is_slot(d)}                # 놓지 않은 장치(접속을 바로 끊는다). 같은 종류 추가 자리는 처음에 비어 있다
+        self.bus = dict(busplan.DEFAULT)                                  # 모선 구성(화면부의 모선 구성이 넣는다)
         self.save = set(); self.save_frac = {"L2": 0.3, "L3": 0.3}; self.load_scale = {1: 1.0, 2: 1.0, 3: 1.0}      # 절감 공급 중인 급전선 · 절감 비율 · 부하 배율(부하 목록이 넣는다)
         self.muted = set(); self.no_ack = set(); self.down = set(); self.pending = {}; self.srv = []; self.run = False; self._exp_t = None
         self.slow = {}             # {장치: 초} 지령 수용(seq_ack) 뒤 상태가 바뀌기까지 걸리는 시간(기동이 느린 장비 모사)
@@ -154,11 +155,10 @@ class Plant:
     def _tick_bus(self, now):
         g, cb = self._g, self._cb
         on = lambda k: any(g(f"{u}.status") > 0.5 for u in self.us(k))
-        src_a = (cb("DG") and on("DG")) or (cb("FC") and on("FC"))
-        src_a = src_a or ("CB.GDG" in self.by_tag and int(round(self.get("CB.GDG"))) == 1)
-        src_a = src_a or ("CB.GRID" in self.by_tag and int(round(self.get("CB.GRID"))) == 1)
-        a_live = src_a or (cb("TIE") and (cb("ESS") or cb("G1")))
-        b_live = (cb("ESS") and on("ESS")) or cb("G1") or (cb("TIE") and a_live)
+        up = {n for n in ("DG", "FC") if cb(n) and on(n)} | {n for n in ("GDG", "GRID") if f"CB.{n}" in self.by_tag and int(round(self.get(f"CB.{n}"))) == 1}
+        if cb("ESS") and on("ESS"): up.add("ESS")
+        if cb("G1"): up.add("G1")
+        a_live, b_live = busplan.live(self.bus, up, cb("TIE"))            # 모선 구성(어느 전원이 어느 모선에 물렸는지)대로
         self.set("BUS.a_v", 440.0 + (abs(math.sin(now)) * 1.5) if a_live else 0.0); self.set("BUS.b_v", 440.0 + abs(math.cos(now)) * 1.5 if b_live else 0.0)
         self.set("BUS.hz", 60.0 + math.sin(now / 7) * 0.03 if (a_live or b_live) else 0.0)
 

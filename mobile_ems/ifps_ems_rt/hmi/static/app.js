@@ -84,7 +84,7 @@ const P_OV = {
     <div class="pg" style="grid-template-rows:118px 1fr">
       <div class="tiles6">${TILE("tLoad", "load", "총 부하")}${TILE("tPv", "pv", "태양광 발전")}${TILE("tSoc", "ess", "ESS 충전율")}${TILE("tFuel", "dg", "연료 · 수소")}${TILE("tRes", "g1", "N-1 순동 예비력")}${TILE("tAuto", "accent", "자동 제어")}</div>
       <div class="pg" style="grid-template-columns:1fr 440px">
-        <div class="panel"><div class="hd"><h3>작전지 전개 현황</h3><span class="sub" id="layCnt"></span><div class="spacer"></div><span class="pill" id="siteSum">—</span><button class="btn sm" id="layEditBtn" data-act="layedit">배치 편집</button></div>
+        <div class="panel"><div class="hd"><h3>작전지 전개 현황</h3><span class="sub" id="layCnt"></span><div class="spacer"></div><span class="pill" id="siteSum">—</span><button class="btn sm" data-act="busplan">모선 구성</button><button class="btn sm" id="layEditBtn" data-act="layedit">배치 편집</button></div>
           <div class="bd sitebd">${siteHtml()}</div></div>
         <div class="col" style="grid-template-rows:auto auto 1fr">
           <div class="panel"><div class="hd"><h3>발전원 구성</h3><div class="spacer"></div><span class="sub" id="mixSub"></span></div><div class="bd mixbd"><div id="mixDn"></div><div class="mixleg" id="mixLeg"></div></div></div>
@@ -123,7 +123,7 @@ const P_OV = {
 /* ════════════════ 1-2. 단선결선도 */
 const P_SLD = {
   mount(m) {
-    m.innerHTML = `<div class="pagehd"><h2>단선결선도</h2><span class="sub">모선 A/B · 연계 차단기 · 급전선별 통전·무전압·고장 · 전력 흐름</span></div>
+    m.innerHTML = `<div class="pagehd"><h2>단선결선도</h2><span class="sub">모선 A/B · 연계 차단기 · 급전선별 통전·무전압·고장 · 전력 흐름 — 전원 · 부하의 자리는 개요 배치와 모선 구성을 따른다</span><div class="spacer"></div><button class="btn" data-act="busplan">모선 구성</button></div><div id="sldBus"></div>
     <div class="pg" style="grid-template-columns:1fr 420px">
       <div class="panel"><div class="hd"><h3>${t("ov.sld", "단선 결선도 · 실시간 전력 흐름")}</h3><span class="sub mono" id="busbal"></span><div class="spacer"></div><div class="legend sldleg"><span><i class="l on"></i>통전</span><span><i class="l off"></i>무전압</span><span><i class="l flt"></i>고장</span><span><i class="c closed"></i>투입</span><span><i class="c open"></i>개방</span><span><i class="c trip"></i>트립</span></div></div>
         <div class="bd sldbox">${sldSvg()}</div></div>
@@ -136,7 +136,9 @@ const P_SLD = {
     $("#sldLeg").innerHTML = this.chart.o.series.map(x => `<span><i style="background:${x.color}"></i>${x.label}</span>`).join("");
   },
   update(s) {
-    if (!!s.ring !== this.ring) { this.ring = !!s.ring; $(".sldbox").innerHTML = sldSvg(); }       // 환망이 생기거나 없어지면 그림 틀을 다시 짠다(부하가 환망 아래로 간다)
+    if (typeof L !== "undefined" && !L.items && !L.loading) layoutLoad();                                // 개요 배치(좌우 순서)를 아직 읽지 않았으면 읽는다
+    const sig = sldArrange(), bn = BusPlan.banner(), bx = $("#sldBus"); if (bx && bx.dataset.h !== bn) { bx.dataset.h = bn; bx.innerHTML = bn; }
+    if (!!s.ring !== this.ring || sig !== this.sig) { this.ring = !!s.ring; this.sig = sig; $(".sldbox").innerHTML = sldSvg(); }       // 환망이 생기거나 없어지면, 모선 구성 · 개요의 순서가 바뀌면 그림 틀을 다시 짠다
     sldUpdate(s);
     const k = s.kpi, gw = s.devices.MTR && s.devices.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? -1) : -1;
     $("#busKv").innerHTML = `<span class="k">모선 A 전압</span><span class="v">${F.n(val("BUS.a_v"), 1)} V</span><span class="k">모선 B 전압</span><span class="v">${F.n(val("BUS.b_v"), 1)} V</span>

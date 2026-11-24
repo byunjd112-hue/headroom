@@ -25,6 +25,14 @@ const ScTopo = (() => {
   // 시나리오용 추가 설비(scenario_extra.json): 급전선은 블록으로, 변압기는 급전선 위에, 보호 계전기는 차단기 옆에 정정값으로 보인다
   const BASE = Object.keys(NODES), SLOT = {Aload: [-1.6, -1.8], Bload: [14.2, 1.8], Asrc: [-1.4, -1.8], Bsrc: [14.2, 1.8]};      // [첫 자리, 간격] — 같은 줄에서 모선 바깥쪽으로 이어 붙인다
   let EXTRA = {feeders: [], transformers: [], relays: []};
+  // 모선 소속과 좌우 순서는 결선도와 같게: 모선 구성(BusPlan)과 개요 배치도의 순서를 따른다
+  const HOME = Object.fromEntries(BASE.map(k => [k, {bus: NODES[k].bus, y: NODES[k].at[1]}])), REG = {Asrc: [0.4, 5.8], Bsrc: [8.8, 12.4], Aload: [1.2, 4.6], Bload: [9.4, 11.8]};
+  function arrange() {
+    if (typeof BusPlan === "undefined" || !BusPlan.s()) return;
+    for (const kind of ["src", "load"]) { const ns = BASE.filter(k => NODES[k].kind === kind).map(k => ({id: k, x: 0, bus: HOME[k].bus})), home = Object.fromEntries(ns.map(n => [n.id, n.bus]));
+      for (const bus of ["A", "B"]) BusPlan.place(ns, home, bus, REG[bus + kind][0], REG[bus + kind][1], kind === "load" ? id => ({L1: 1, ELZ: 1.5, L2: 2, L3: 3}[id] || 9) : null);
+      ns.forEach(n => { NODES[n.id].bus = n.bus; NODES[n.id].at = [Math.round(n.x * 10) / 10, HOME[n.id].y]; }); }
+  }
   function configure(extra) {
     EXTRA = {feeders: extra?.feeders || [], transformers: extra?.transformers || [], relays: extra?.relays || []};
     Object.keys(NODES).filter(k => !BASE.includes(k)).forEach(k => delete NODES[k]);
@@ -95,6 +103,7 @@ const ScTopo = (() => {
   }
 
   function html(ctx) {
+    arrange();
     const {steps, rows, stepIndex, describe, picked} = ctx, row = rows.find(r => r.step === stepIndex), snap = row?.snap || rows.filter(r => r.step < stepIndex).pop()?.snap || null;
     const v = tag => snap && tag in snap ? snap[tag] : null, cb = name => v("CB." + name), closed = name => cb(name) === 1 || (cb(name) === null && !snap);
     const running = id => { const n = NODES[id]; return id === "GRID" ? cb("GRID") === 1 : n.st ? v(n.st) > 0.5 : Math.abs(v(n.kw) || 0) > 0.5; };

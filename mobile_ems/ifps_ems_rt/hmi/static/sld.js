@@ -38,6 +38,14 @@ function faultMark(id, x, y) {
   return `<g class="fltm" id="fm-${id}" style="display:none"><circle cx="${x}" cy="${y}" r="13"/><path d="M${x + 2} ${y - 9} ${x - 5} ${y + 1} ${x} ${y + 1} ${x - 2} ${y + 9} ${x + 5} ${y - 1} ${x} ${y - 1}z"/>
     <g transform="translate(${x + 18},${y - 10})"><rect width="118" height="20" rx="10"/><text x="10" y="14" id="fmt-${id}">고장</text></g></g>`;
 }
+/* 전원 · 부하의 모선 소속과 좌우 자리: 모선 구성(BusPlan)과 개요 배치도의 좌 → 우 순서를 따른다. 그림 틀을 다시 짜야 하는지 가릴 서명을 돌려준다 */
+const SLD_HOME = Object.fromEntries(SRC.concat(LOADS).map(n => [n.id, n.bus]));
+function sldArrange() {
+  if (!BusPlan.s()) return "";
+  BusPlan.place(SRC, SLD_HOME, "A", 70, 440); BusPlan.place(SRC, SLD_HOME, "B", 590, 880);
+  const lx = id => ({ L1: 1, L2: 2, L3: 3 }[id]); BusPlan.place(LOADS, SLD_HOME, "A", 220, 420, lx); BusPlan.place(LOADS, SLD_HOME, "B", 665, 865, lx);
+  return BusPlan.sig();
+}
 function sldSvg() {
   const ko = S.lang === "ko", ring = !!(S.snap && S.snap.ring), LO = BUS_Y, LYY = LY, SLD_H = ring ? RG.H : 610;      // 환망이 있으면 등급별 부하 그림은 감추고(값은 맨 아래 글과 오른쪽 표) 부하를 구간분전함 아래에 그린다
   const hex = (n, cy, r, color, icon, isLoad) => `<g class="node" id="n-${n.id}">

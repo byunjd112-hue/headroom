@@ -90,6 +90,23 @@ class TestHmi(unittest.TestCase):
         self.assertEqual(loads.check([dict(loads.DEFAULT[0], grade=1, save_pct=10)]), ["1번째(지휘통제(C2)): 1등급 부하는 절감하지 않는다(절감 비율 0)"])
         st = {"L1": "on", "L2": "save", "L3": "off"}; sh = loads.share(loads.DEFAULT, {"L1": 28.0, "L2": 30.0, "L3": 0.0}, st); self.assertEqual(sh["ammo"], 0.0); self.assertAlmostEqual(sh["med"] + sh["brk"], 30.0)
 
+    def test_bus_plan_and_layout_scale(self):
+        """모선 구성을 바꾸면 스냅샷 · 가상 장치의 모선 전압 계산이 따라가고(엔지니어만), 배치의 크기 값이 저장된다."""
+        e = self.eng; op = self.login("4321"); en = self.login("8765"); b0 = e.snapshot()["bus"]; self.assertEqual(b0["assign"]["G1"], "B"); self.assertEqual([i["level"] for i in b0["issues"]], ["warn"])
+        self.assertFalse(self.req("/api/bus", {"op": "set", "node": "G1", "bus": "A"}, op)[1]["ok"])                                  # 운용자는 바꾸지 못한다
+        try:
+            r = self.req("/api/bus", {"op": "auto"}, en)[1]; self.assertTrue(r["ok"]); self.assertEqual(r["bus"]["assign"]["G1"], "A"); self.assertEqual(r["bus"]["issues"], []); self.assertEqual(e.plant.bus["G1"], "A")
+            self.assertFalse(self.req("/api/bus", {"op": "auto"}, en)[1]["ok"]); self.assertFalse(self.req("/api/bus", {"op": "set", "node": "X", "bus": "A"}, en)[1]["ok"])
+            r = self.req("/api/bus", {"op": "set", "node": "ESS", "bus": "A"}, en)[1]; self.assertTrue(any(i["bus"] == "B" for i in r["bus"]["issues"]))
+            self.assertEqual(json.load(open(e.busw.path, encoding="utf-8"))["assign"]["ESS"], "A"); self.assertTrue(any(x["kind"] == "모선" for x in e.rt.events))
+        finally:
+            self.assertTrue(self.req("/api/bus", {"op": "reset"}, en)[1]["ok"]); self.assertEqual(e.plant.bus, e.snapshot()["bus"]["default"])
+        lay = e.layout(); items = lay.get("items") or [{"uid": "a", "kind": "DG", "bind": "G1", "name": "발전", "x": 300.4, "y": 400.26}]
+        items = [dict(i) for i in items]; items[0]["s"] = 0.55; items[0]["x"] = 301.23; r = self.req("/api/layout", {"items": items}, op)[1]; self.assertTrue(r["ok"], r)
+        try:
+            got = e.layout()["items"][0]; self.assertEqual((got["s"], got["x"]), (0.55, 301.2)); items[0]["s"] = 9; self.req("/api/layout", {"items": items}, op); self.assertEqual(e.layout()["items"][0]["s"], 1.6)   # 범위 밖 크기는 한도로
+        finally: self.req("/api/layout/reset", {}, op)
+
     def test_reduce_command_scales_the_virtual_load(self):
         """절감 공급 지령(LDS = 3): 가상 부하가 절감 비율만큼 줄고 차단기는 그대로다. 복구(1)하면 돌아온다. 화면 상태도 따라간다."""
         e = self.eng; p = e.plant; self.assertEqual(int(p.get("CB.L3")), 1); fr = p.save_frac["L3"]; self.assertGreater(fr, 0)

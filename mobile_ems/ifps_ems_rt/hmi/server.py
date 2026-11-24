@@ -9,10 +9,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from .. import modbus as mb
 from .engdefs import ROLES
-from . import scenarios, scenextra, archwatch, archcfg, seqppt, ringwatch, weatherwatch, unitctl, loadctl
+from . import scenarios, scenextra, archwatch, archcfg, seqppt, ringwatch, weatherwatch, unitctl, loadctl, busctl
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_BODY = 128 * 1024
+POSTS = {"/api/ring": ringwatch, "/api/weather": weatherwatch, "/api/units": unitctl, "/api/loads": loadctl, "/api/bus": busctl}      # 운용자 이상이 쓰는 요청(모듈의 http_post 로 넘긴다. 모선 구성은 그 안에서 엔지니어인지 다시 본다)
 
 
 def _quiet_write(out, body):
@@ -202,7 +203,7 @@ def make_handler(eng):
                     if p.endswith("restore"): return self._send(200, eng.cfged.restore(b.get("name"), s["name"]))
                     if b.get("kind") not in ("runtime", "pointmap"): return self._err(400, "kind 는 runtime 또는 pointmap")
                     return self._send(200, eng.cfged.check(b["kind"], b) if p.endswith("check") else eng.cfged.save(b["kind"], b, s["name"]))
-                if p in ("/api/ring", "/api/weather", "/api/units", "/api/loads"): return (lambda s: s and self._send(200, {"/api/ring": ringwatch, "/api/weather": weatherwatch, "/api/units": unitctl, "/api/loads": loadctl}[p].http_post(eng, b, s)))(self._sess("operator"))      # 환망: 배전체계 구성(운용자) · ID 확정과 가상 장치 조작(엔지니어)
+                if p in POSTS: return (lambda s: s and self._send(200, POSTS[p].http_post(eng, b, s)))(self._sess("operator"))      # 환망: 배전체계 구성(운용자) · ID 확정과 가상 장치 조작(엔지니어)
                 if p.startswith("/api/archive/"):                # 점검 기록 넣기 · 주둔지 서버 전달(묶음 만들기·보내기·완료 적기)
                     s = self._sess("engineer" if p.endswith("/collect") else "operator")      # 수집 항목 관리는 관리자(엔지니어)만
                     if s: self._send(200, archcfg.save(eng, b, s["name"]) if p.endswith("/collect") else archwatch.http_post(eng.archw.store, p, b, s["name"], eng.rt.site.name))

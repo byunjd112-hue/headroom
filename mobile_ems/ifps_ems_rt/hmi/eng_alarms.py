@@ -32,6 +32,8 @@ class AlarmsMixin:
             A.set(f"q3.{tag}", f == 3 and not lost, 3, dev, f"{tag} 값 갱신 지연(>{SUP['stale_s']:.0f}초)")
         A.set("ai.degraded", rt.ai_degraded, 3, "EMS", "예측 정확도 저하 — 계획 운전을 쉬고 규칙 운전 중(자료가 쌓이면 다시 학습)")
         A.set("audit", bool(rt.audit_err), 2, "EMS", f"감사 기록 쓰기 실패 — 저장 공간·권한 확인 ({rt.audit_err})")
+        bad = [i["text"] for i in self.busw.view()["issues"] if i["level"] == "bad"]
+        A.set("bus.plan", bool(bad), 3, "EMS", "모선 구성 점검 필요 — " + (bad[0] if bad else ""))
         A.set("hist", bool(rt.hist_err), 2, "EMS", f"운전 이력 쓰기 실패 — 저장 공간·권한 확인 ({rt.hist_err})")
         for n, lk in rt.links.items():
             A.set(f"part.{n}", bool(lk.miss) and rt.lm.state[n] != "두절", 3, n, f"{n} 일부 신호를 읽지 못함 — 장치가 '없는 주소'로 답함: {', '.join(lk.miss[:6])}{' …' if len(lk.miss) > 6 else ''}")

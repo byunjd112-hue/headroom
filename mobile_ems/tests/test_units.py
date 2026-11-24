@@ -50,6 +50,19 @@ class FleetUnitTest(unittest.TestCase):
             c = json.loads(json.dumps(cfg)); c[k] = v; self.assertTrue(any(b.startswith(k) for b in cfgedit.check_runtime(c)[0]), k)
         c = json.loads(json.dumps(cfg)); c.setdefault("hmi", {})["sbo_s"] = 0; self.assertTrue(any("hmi.sbo_s" in b for b in cfgedit.check_runtime(c)[0]))
 
+    def test_bus_plan_check_and_auto_fix(self):
+        """모선 구성: 모선마다 전압을 세울 전원이 있는지 점검하고, 고칠 수 있으면 고치는 방법을 준다. 모선 전압 계산은 구성을 따른다."""
+        from ifps_ems_rt import busplan as bp
+        P = {"PV", "DG", "FC", "ESS", "G1", "L1", "L2", "L3"}; R = {"DG": 100, "FC": 100, "PV": 400, "ESS": 500, "G1": 100, "L1": 30, "L2": 40, "L3": 25}
+        d = bp.settings(None); self.assertEqual(d, bp.DEFAULT); self.assertEqual(bp.settings({"PV": "B", "X": "A", "DG": "C"})["PV"], "B")
+        i0 = bp.check(d, P, R); self.assertEqual([(i["level"], i["bus"], i["fix"]) for i in i0], [("warn", "A", {"G1": "A"})])                  # 기본: 모선 A 는 디젤이 돌 때만 전압이 선다(주의) — 복합전력 ESS 를 옮기면 풀린다
+        a, done = bp.auto(d, P, R); self.assertEqual(a["G1"], "A"); self.assertEqual(done, ["복합전력 ESS → 모선 A"]); self.assertEqual(bp.check(a, P, R), [])
+        b = dict(d, DG="B"); i1 = bp.check(b, P, R); self.assertEqual(i1[0]["level"], "bad"); self.assertIn("정전", i1[0]["text"])                  # 모선 A 에 1등급 부하와 연료전지 · 태양광뿐: 정전 위험
+        c = dict(d, ESS="A", G1="A", DG="A", FC="A"); t = " ".join(i["text"] for i in bp.check(c, P, R)); self.assertIn("전원이 모두 모선 A", t); self.assertIn("모선 B 에 늘 전압을 세우는 전원", t)
+        self.assertEqual(bp.check(c, P, R)[0]["fix"], {"G1": "B"}); one = P - {"G1", "DG"}; self.assertIsNone(bp.check(dict(d, ESS="B"), one, R)[0]["fix"])  # 계통 형성 전원이 하나뿐이면 옮길 수 없다
+        over = bp.check(dict(a, L2="A", L3="A"), P, dict(R, L2=900)); self.assertTrue(any("부하 정격" in i["text"] for i in over))
+        self.assertEqual(bp.live(d, {"ESS"}, True), (True, True)); self.assertEqual(bp.live(d, {"ESS"}, False), (False, True)); self.assertEqual(bp.live(a, {"G1", "ESS"}, False), (True, True)); self.assertEqual(bp.live(d, set(), True), (False, False))
+
     def test_hybrid_alarms(self):
         """복합전력 PCS 경보: 지령한 모드와 PCS 모드가 30초 넘게 다르면, ESS 충전율이 낮으면, 모르는 모드 값이면 알린다. 없는 장치의 경보는 꺼진다."""
         from ifps_ems_rt import hybrid

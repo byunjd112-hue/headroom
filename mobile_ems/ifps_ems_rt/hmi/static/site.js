@@ -201,7 +201,7 @@ function siteMapSvg(s) {
   items.slice().sort((a, b) => a.y - b.y).forEach(it => {
     const kind = it.kind === "BARRACK" ? "BARRACK" : it.kind, [Lx, Ly] = ISO_EXT[kind] || ISO_EXT.FSU, [wx, wy] = mapWorld(it.x, it.y), [px, py] = I.p(wx - Lx / 2, wy - Ly / 2, 0);
     const sel = L.edit && L.sel === it.uid;
-    g += `<g class="meq ${L.edit ? "editable" : ""} ${sel ? "sel" : ""}" data-uid="${it.uid}">${sel ? `<ellipse cx="${it.x}" cy="${it.y}" rx="${(Lx + Ly) * ISO_C * MAP_S * .62}" ry="${(Lx + Ly) * ISO_S * MAP_S * .62}" class="msel"/>` : ""}${spriteSvg(kind, mapEqSt(s, it), it.x, it.y + (Lx + Ly) * ISO_S * MAP_S / 2 + 6, (Lx + Ly) * ISO_C * MAP_S * (kind === "FSU" ? 1.5 : kind === "PV" ? .78 : 1.12) * (it.sc || 1)) || isoPlace(kind, mapEqSt(s, it), px, py, MAP_S)}</g>`;
+    g += `<g class="meq ${L.edit ? "editable" : ""} ${sel ? "sel" : ""}" data-uid="${it.uid}">${sel ? `<ellipse cx="${it.x}" cy="${it.y}" rx="${(Lx + Ly) * ISO_C * MAP_S * .62}" ry="${(Lx + Ly) * ISO_S * MAP_S * .62}" class="msel"/>` : ""}${spriteSvg(kind, mapEqSt(s, it), it.x, it.y + (Lx + Ly) * ISO_S * MAP_S / 2 + 6, (Lx + Ly) * ISO_C * MAP_S * (kind === "FSU" ? 1.5 : kind === "PV" ? .78 : 1.12) * (it.sc || 1) * (it.s || 1)) || isoPlace(kind, mapEqSt(s, it), px, py, MAP_S)}</g>`;
   });
   if (ems && !L.edit) g += `<text x="${ems.x}" y="${ems.y + 58}" text-anchor="middle" class="mfsu sec">EMS 전원: 배전 모선(주) · 차량 28 V(예비) · 내장 무정전 전원</text><text x="${ems.x}" y="${ems.y + 72}" text-anchor="middle" class="mfsu sec">통신: 전력 케이블과 같은 경로 · 구간분전함은 환형</text>`;      // 하드웨어 설계의 전원 이중화
   const rg = !L.edit && s.ring ? s.ring : null;                                    // 구간분전함 이름표(환망 화면의 이름과 같다)
@@ -268,6 +268,8 @@ function siteUpdate(s, force) {
     const kf = KF(LAY_FLEET[it.kind]), u = kf && kf.units.length > 1 && kf.units.find(q => q.id === it.unit);
     const ld = it.load && LD.s().items.find(q => q.id === it.load);
     if (ld && !it.spare && /kW$/.test(x.v) && x.v !== "0 kW") x = Object.assign({}, x, { v: `${F.kw(ld.est_kw)} kW`, t: `${x.t} · ${ld.grade}등급${ld.fsu ? " · " + ld.fsu_name : ""}` });      // 그 부하의 추정 전력(부하 관리 화면과 같은 값) · 등급 · 물린 배전체계
+    const bn = !it.spare && !ld && { DG: ["DG", "G1"], ESS: ["ESS"], PV: ["PV"], FC: ["FC"] }[it.kind], bs = bn && BusPlan.s() && [...new Set(bn.map(q => BusPlan.of(q, "")))].filter(Boolean).join("·");
+    if (bs && x.t && !/모선/.test(x.t)) x = Object.assign({}, x, { t: `${x.t} · 모선 ${bs}` });      // 그 전원이 물린 모선(모선 구성)
     if (it.spare) x = { st: "idle", v: "—", t: LOAD_SPR.includes(it.kind) ? "부하 없음(예비 자리)" : "장치 없음(예비 자리)" };      // 부하 목록에 없는 그림: 급전선이 살아 있어도 '급전 중'이라고 쓰지 않는다
     if (u) x = { st: !u.live ? "bad" : u.on || it.kind === "ESS" || it.kind === "PV" ? "ok" : "idle", v: `${u.id}${u.kw == null ? "" : " · " + F.kw(u.kw) + " kW"}${it.kind === "ESS" && u.soc != null ? " · " + F.n(u.soc, 0) + "%" : ""}`, t: !u.live ? "통신 두절" : it.kind === "ESS" || it.kind === "PV" ? "연결" : u.on ? "운전" : "정지" };
     const hd = `${it.name || LAY_KINDS[it.kind].nm}${it.spare ? " · 예비 자리" : ""}`, sh = e.querySelector(".sh"); if (sh.textContent !== hd) sh.textContent = hd;      // 이름 · 예비 자리 표시도 부하 목록이 바뀌면 따라간다
@@ -287,9 +289,20 @@ function layBindDrag() {
     L.sel = it.uid; layToolbar();
     const p0 = _svgPt(svg, e); L.drag = { it, g: svg.querySelector(`.meq[data-uid="${it.uid}"]`), p0, x0: it.x, y0: it.y }; svg.setPointerCapture(e.pointerId); e.preventDefault();
   };
-  svg.onpointermove = e => { if (!L.drag) return; const p = _svgPt(svg, e), d = L.drag; const nx = Math.max(40, Math.min(1560, d.x0 + p.x - d.p0.x)), ny = Math.max(285, Math.min(880, d.y0 + p.y - d.p0.y));
+  svg.onpointermove = e => { if (!L.drag) return; const p = _svgPt(svg, e), d = L.drag; const nx = Math.max(LAY_BOX[0], Math.min(LAY_BOX[2], d.x0 + p.x - d.p0.x)), ny = Math.max(LAY_BOX[1], Math.min(LAY_BOX[3], d.y0 + p.y - d.p0.y));
     d.g.setAttribute("transform", `translate(${nx - d.x0} ${ny - d.y0})`); d.nx = nx; d.ny = ny; };
-  svg.onpointerup = () => { const d = L.drag; if (!d) return; L.drag = null; if (d.nx !== undefined) { d.it.x = Math.round(d.nx); d.it.y = Math.round(d.ny); L.dirty = true; } siteRebuild(); };
+  svg.onpointerup = () => { const d = L.drag; if (!d) return; L.drag = null; if (d.nx !== undefined) { d.it.x = Math.round(d.nx * 10) / 10; d.it.y = Math.round(d.ny * 10) / 10; L.dirty = true; } siteRebuild(); };
+  if (!layBindDrag.keys) { layBindDrag.keys = true; document.addEventListener("keydown", layKey); }
+}
+/* 배치 편집의 이동 범위(배치도 좌표) · 크기 배율의 범위 */
+const LAY_BOX = [20, 120, 1580, 890], LAY_S = [0.4, 1.6];
+function layScaleBy(it, f) { it.s = Math.round(Math.min(LAY_S[1], Math.max(LAY_S[0], (it.s || 1) * f)) * 100) / 100; if (Math.abs(it.s - 1) < 0.005) delete it.s; L.dirty = true; siteRebuild(); }
+/* 방향키로 선택한 그림을 조금씩 옮긴다(1칸, Shift 는 10칸, Alt 는 0.2칸). + · − 는 크기 */
+function layKey(e) {
+  if (!L.edit || !L.sel || /^(INPUT|SELECT|TEXTAREA)$/.test((e.target.tagName || "")) || !$("#siteMap")) return;
+  const it = L.items.find(i => i.uid === L.sel); if (!it) return; const step = e.shiftKey ? 10 : e.altKey ? 0.2 : 1, mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (mv) { it.x = Math.round(Math.max(LAY_BOX[0], Math.min(LAY_BOX[2], it.x + mv[0] * step)) * 10) / 10; it.y = Math.round(Math.max(LAY_BOX[1], Math.min(LAY_BOX[3], it.y + mv[1] * step)) * 10) / 10; L.dirty = true; e.preventDefault(); siteRebuild(); }
+  else if (e.key === "+" || e.key === "=") { e.preventDefault(); layScaleBy(it, 1.05); } else if (e.key === "-" || e.key === "_") { e.preventDefault(); layScaleBy(it, 1 / 1.05); }
 }
 function layToolbar() {
   const bar = $("#layBar"), btn = $("#layEditBtn"); if (btn) btn.textContent = L.edit ? "편집 종료" : "배치 편집";
@@ -299,15 +312,18 @@ function layToolbar() {
     <div class="grp"><span class="lab">추가</span><select class="in" id="layKind">${kinds.map(([k, v]) => `<option value="${k}">${v.nm}</option>`).join("")}</select><button class="btn sm pri" id="layAdd">＋ 추가</button></div>
     <div class="grp">${it ? `<span class="lab">선택</span><input class="in" id="layName" value="${esc(it.name || "")}" maxlength="24" style="width:150px">
       <select class="in" id="layBind" ${LAY_KINDS[it.kind].binds.length < 2 ? "disabled" : ""}>${LAY_KINDS[it.kind].binds.map(b => `<option value="${b}" ${b === it.bind ? "selected" : ""}>${BIND_TXT[b]}</option>`).join("")}</select>
-      <button class="btn sm" id="layDup">복제</button><button class="btn sm stop" id="layDel">삭제</button>` : `<span class="muted">장비를 누르면 선택, 끌면 이동 · 같은 종류를 더 놓으면 예비 자리(흐림)로 저장되고 그 장치가 인식되면 켜진다 · 대수는 설비 제어 화면의 − ＋</span>`}</div>
+      <span class="lab">크기</span><button class="btn sm" id="laySm" title="작게 (−)">－</button><b style="min-width:44px;text-align:center;display:inline-block">${Math.round((it.s || 1) * 100)}%</b><button class="btn sm" id="layLg" title="크게 (+)">＋</button><button class="btn sm" id="lay100">100%</button>
+      <span class="lab">자리</span><span class="mono" style="min-width:92px;display:inline-block">${it.x} , ${it.y}</span>
+      <button class="btn sm" id="layDup">복제</button><button class="btn sm stop" id="layDel">삭제</button><span class="muted" style="font-size:11.5px">방향키 1칸 · Shift 10칸 · Alt 0.2칸 · ＋ − 크기</span>` : `<span class="muted">장비를 누르면 선택, 끌면 이동 · 같은 종류를 더 놓으면 예비 자리(흐림)로 저장되고 그 장치가 인식되면 켜진다 · 대수는 설비 제어 화면의 − ＋</span>`}</div>
     <div class="grp end"><span class="muted" style="font-size:11.5px">${L.dirty ? "● 저장 안 된 변경" : esc(L.meta || "")}</span><button class="btn sm" id="layReset">기본값</button><button class="btn sm" id="layCancel">취소</button><button class="btn sm go" id="laySave">저장</button></div></div>`;
   $("#layAdd").onclick = () => { const k = $("#layKind").value, n = L.items.filter(i => i.kind === k).length + 1;
     const uid = "u" + Date.now().toString(36); L.items.push({ uid, kind: k, bind: LAY_KINDS[k].bind, name: `${LAY_KINDS[k].nm} #${n}`, x: 300 + (L.items.length * 97) % 1000, y: 700 + (L.items.length % 3) * 45 }); L.sel = uid; L.dirty = true; siteRebuild(); };
   if (it) {
     $("#layName").onchange = e => { it.name = e.target.value.trim(); L.dirty = true; layToolbar(); };
     $("#layBind").onchange = e => { it.bind = e.target.value; L.dirty = true; siteRebuild(); };
-    $("#layDup").onclick = () => { const c = Object.assign({}, it, { uid: "u" + Date.now().toString(36), name: (it.name || "") + " 복제", x: Math.min(1560, it.x + 60), y: Math.min(880, it.y + 30) }); L.items.push(c); L.sel = c.uid; L.dirty = true; siteRebuild(); };
+    $("#layDup").onclick = () => { const c = Object.assign({}, it, { uid: "u" + Date.now().toString(36), name: (it.name || "") + " 복제", x: Math.min(LAY_BOX[2], it.x + 60), y: Math.min(LAY_BOX[3], it.y + 30) }); L.items.push(c); L.sel = c.uid; L.dirty = true; siteRebuild(); };
     $("#layDel").onclick = () => layDelete();
+    $("#laySm").onclick = () => layScaleBy(it, 1 / 1.1); $("#layLg").onclick = () => layScaleBy(it, 1.1); $("#lay100").onclick = () => layScaleBy(it, 1 / (it.s || 1));
   }
   $("#layCancel").onclick = () => { L.edit = false; layoutLoad(); };
   $("#layReset").onclick = async () => { if (!confirm("기본 배치로 되돌립니까? (현재 저장본은 백업됩니다)")) return; const r = await api("/api/layout/reset", {}); if (r.ok) { toast("기본 배치 복원", "ok"); L.edit = false; layoutLoad(); } };

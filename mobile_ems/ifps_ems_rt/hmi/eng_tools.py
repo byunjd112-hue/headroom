@@ -129,7 +129,8 @@ class ToolsMixin:
             if not (0 <= x <= 1600 and 0 <= y <= 900): raise ValueError("배치 좌표 범위 밖")
             uid = str(it.get("uid", ""))[:24] or f"u{len(clean)}"
             if uid in uids: raise ValueError(f"중복 식별자 {uid}")
-            uids.add(uid); clean.append({"uid": uid, "kind": k, "bind": b, "name": str(it.get("name", ""))[:24], "x": round(x, 1), "y": round(y, 1)})
+            sc = it.get("s", 1); sc = min(1.6, max(0.4, float(sc))) if isinstance(sc, (int, float)) and not isinstance(sc, bool) and sc == sc else 1.0      # 그림 크기 배율(배치 편집에서 줄이고 키운 값)
+            uids.add(uid); clean.append(dict({"uid": uid, "kind": k, "bind": b, "name": str(it.get("name", ""))[:24], "x": round(x, 1), "y": round(y, 1)}, **({"s": round(sc, 2)} if abs(sc - 1) > 0.004 else {})))
         old = self.layout(); rev = int(old.get("rev", 0)) + 1
         out = {"rev": rev, "items": clean, "by": who, "t": wall_iso()}
         fsio.write_json(os.path.join(self.rt.state_dir, "layout.json"), out, indent=1)
