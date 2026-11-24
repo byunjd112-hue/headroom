@@ -45,17 +45,18 @@ const P_LOADS = {
   },
   update() { this.paint(); },
   grades(d) {
-    $("#ldGrades").innerHTML = d.grades.map(g => `<div class="panel"><div class="hd"><h3>${g.grade}등급 부하</h3><div class="spacer"></div>${LD.pill(g.stage)}</div>
-      <div class="bd"><div style="display:flex;gap:18px;align-items:baseline"><div><div class="lab">지금</div><div style="font-size:26px;font-weight:700">${F.kw(g.kw)}<span class="muted" style="font-size:13px"> kW</span></div></div>
+    $("#ldGrades").innerHTML = d.grades.map(g => `<div class="panel"><div class="hd"><h3>${g.grade}등급 부하</h3><div class="spacer"></div>${g.n ? LD.pill(g.stage) : '<span class="pill">부하 없음</span>'}</div>
+      <div class="bd"><div style="display:flex;gap:18px;align-items:baseline"><div><div class="lab">지금</div><div style="font-size:26px;font-weight:700">${g.n ? F.kw(g.kw) : "—"}<span class="muted" style="font-size:13px"> kW</span></div></div>
         <div><div class="lab">정격 합</div><div style="font-size:18px">${F.n(g.rated, 0)} kW</div></div><div><div class="lab">부하</div><div style="font-size:18px">${g.n}개</div></div>
         <div><div class="lab">절감 가능</div><div style="font-size:18px">${g.grade === 1 ? "—" : Math.round(g.save_frac * 100) + "%"}</div></div></div>
-        <div class="muted" style="margin-top:8px;min-height:18px;font-size:12px">${g.auto ? `EMS 자동 ${g.auto === "save" ? "절감" : "차단"} — ${esc(g.why)}` : g.grade === 1 ? "끊지 않는 부하(지휘 · 통신)" : "CB-" + g.feeder}</div>
+        <div style="margin-top:8px;font-size:12.5px;min-height:18px"><span class="muted">이 등급의 부하: </span>${esc(LD.names(g.feeder).join(", ")) || '<span class="muted">없음 — 목록에서 [고치기]로 등급을 바꾸거나 [＋ 부하 추가]</span>'}</div>
+        <div class="muted" style="margin-top:6px;min-height:18px;font-size:12px">${g.auto ? `EMS 자동 ${g.auto === "save" ? "절감" : "차단"} — ${esc(g.why)}` : g.grade === 1 ? "끊지 않는 부하(지휘 · 통신)" : "CB-" + g.feeder}</div>
         ${g.grade === 1 ? "" : `<div style="display:flex;gap:6px;margin-top:8px"><button class="btn sm" data-lds="${g.feeder}" data-v="3">절감 공급</button><button class="btn sm stop" data-lds="${g.feeder}" data-v="2">차단</button><button class="btn sm go" data-lds="${g.feeder}" data-v="1">복구</button></div>`}</div></div>`).join("");
     $$("#ldGrades [data-lds]").forEach(b => b.onclick = () => sbo("MTR", "set", { tag: "LDS." + b.dataset.lds, value: +b.dataset.v, label: `${b.dataset.lds === "L2" ? "2등급" : "3등급"} 부하 ${{ 1: "복구", 2: "차단", 3: "절감 공급" }[b.dataset.v]}` }));
   },
   rows(d) {
     const kn = Object.fromEntries(d.kinds.map(k => [k.id, k.name]));
-    $("#ldRows").innerHTML = d.items.map(i => `<tr class="${this.sel === i.id ? "sel" : ""}"><td><b>${esc(i.name)}</b></td><td>${esc(kn[i.kind] || i.kind)}</td><td>${i.grade}등급 <span class="muted">(${i.feeder})</span></td><td>${i.fsu ? `${esc(i.fsu_name)}${i.ppdu ? ` <span class="muted">· ${esc(i.ppdu_name)}</span>` : ""}${i.fsu_auto ? ' <span class="muted">(자동)</span>' : ""}` : '<span class="muted">환망 없음</span>'}</td><td class="n">${F.n(i.kw, 1)} kW</td>
+    $("#ldRows").innerHTML = d.items.map(i => `<tr class="${this.sel === i.id ? "sel" : ""}"><td><b>${esc(i.name)}</b></td><td>${esc(kn[i.kind] || i.kind)}</td><td><span class="pill ${i.grade === 1 ? "bad" : i.grade === 2 ? "warn" : "info"}">${i.grade}등급</span> <span class="muted">(${i.feeder})</span></td><td>${i.fsu ? `${esc(i.fsu_name)}${i.ppdu ? ` <span class="muted">· ${esc(i.ppdu_name)}</span>` : ""}${i.fsu_auto ? ' <span class="muted">(자동)</span>' : ""}` : '<span class="muted">환망 없음</span>'}</td><td class="n">${F.n(i.kw, 1)} kW</td>
       <td style="text-align:center;white-space:nowrap"><button class="btn sm" data-q="${i.id}" data-dv="-1" ${i.n <= 0 ? "disabled" : ""}>−</button> <b style="display:inline-block;min-width:22px">${i.n}</b> <button class="btn sm" data-q="${i.id}" data-dv="1" ${i.n >= d.max_n ? "disabled" : ""}>＋</button></td>
       <td class="n">${F.n(i.rated, 0)} kW</td><td class="n">${i.n ? F.kw(i.est_kw) : "—"}</td><td class="n">${i.grade === 1 ? "—" : i.save_pct + "%"}</td><td>${i.n ? LD.pill(LD.stage(i.feeder)) : '<span class="pill">없음</span>'}</td>
       <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-ed="${i.id}">고치기</button> <button class="btn sm stop" data-del="${i.id}">삭제</button></td></tr>`).join("") || `<tr><td colspan="11" class="muted" style="text-align:center;padding:18px">부하가 없습니다 — [＋ 부하 추가]로 넣으십시오</td></tr>`;
