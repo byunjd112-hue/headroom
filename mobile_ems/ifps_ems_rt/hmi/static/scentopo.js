@@ -134,7 +134,7 @@ const ScTopo = (() => {
             <text x="${p[0]}" y="${p[1] - 36}" text-anchor="middle" fill="${n.c}" class="tp-code">${id}</text>
             ${n.photo ? `<image href="photos/${n.photo}.jpg" x="${p[0] - 35}" y="${p[1] - 64}" width="70" height="46" preserveAspectRatio="xMidYMid slice" clip-path="inset(0 round 4px)"/>` : ""}</g>`;
       return `<g class="tp-node ${cut || none ? "off" : run === true ? "on" : run === false ? "off" : ""} ${picked === id && !ctx.part ? "picked" : ""}" data-node="${id}" tabindex="0" role="button" aria-label="${esc(n.name)}">
-        ${box(gx, gy, 0.52, 10, n.c)}${card}<text class="tp-name" x="${p[0]}" y="${p[1] - (chip ? 86 : 72)}" text-anchor="middle">${esc(n.name)}${n.extra ? (n.ems ? " ＊수급" : " ＊") : ""}${n.kind === "load" && n.cb && LD.g(n.cb) ? ` · ${LD.g(n.cb).n}개` : ""}</text>
+        ${box(gx, gy, 0.52, 10, n.c)}${card}<text class="tp-name" x="${p[0]}" y="${p[1] - (chip ? 86 : 72)}" text-anchor="middle">${esc(n.name)}${n.extra ? (n.ems ? " ＊수급" : " ＊") : ""}${n.kind === "load" && n.cb && LD.g(n.cb) ? ` · ${LD.names(n.cb).slice(0, 2).join(", ") || "부하 없음"}${LD.names(n.cb).length > 2 ? " 외" : ""}` : ""}</text>
         ${chip ? `<text class="tp-chip" x="${p[0]}" y="${p[1] - 72}" text-anchor="middle">${esc(chip)}</text>` : ""}</g>`; }).join("");
 
     // 지금 단계의 신호 흐름

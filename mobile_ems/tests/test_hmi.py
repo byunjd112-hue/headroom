@@ -73,12 +73,15 @@ class TestHmi(unittest.TestCase):
             self.assertEqual(json.load(open(e.loadw.path, encoding="utf-8"))["rev"], e.loadw.rev); self.assertTrue(any(x["kind"] == "부하" for x in e.rt.events))
             snap = e.snapshot()["loads"]; self.assertEqual(len(snap["items"]), 5); self.assertTrue(all(i["est_kw"] is not None for i in snap["items"])); self.assertIn(snap["grades"][2]["stage"], ("on", "save", "off"))
             self.assertAlmostEqual(sum(i["est_kw"] for i in snap["items"] if i["feeder"] == "L2"), e.rt.val["LOAD.p2_kw"], delta=0.2)   # 추정 전력의 합 = 급전선 계측값
-            at = {i["id"]: (i["ppdu"], i["fsu"], i["ppdu_auto"]) for i in snap["items"]}; pp = snap["ppdus"]; self.assertGreaterEqual(len(pp), 3)
-            self.assertEqual(at["c2"], (pp[0]["id"], pp[0]["at"], True)); self.assertEqual(at["brk"][0], pp[1]["id"]); self.assertEqual(at["ammo"][0], pp[2]["id"])          # 종류에 따라 배전체계에 붙는다(자동)
-            r = self.req("/api/loads", {"op": "set", "id": "ammo", "grade": 1, "save_pct": 0, "ppdu": pp[0]["id"]}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "ammo")
-            self.assertEqual((it["feeder"], it["ppdu"], it["fsu"], it["ppdu_auto"]), ("L1", pp[0]["id"], pp[0]["at"], False))                                       # 등급 · 배전체계를 바꾸면 급전선과 구간분전함이 따라간다
-            self.assertFalse(self.req("/api/loads", {"op": "set", "id": "ammo", "ppdu": "../x"}, tok)[1]["ok"])
-            r = self.req("/api/loads", {"op": "set", "id": "ammo", "ppdu": "PPDU8"}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "ammo"); self.assertTrue(it["ppdu_auto"])   # 지금 없는 배전체계를 고르면 자동으로 붙인다
+            at = {i["id"]: (i["fsu"], i["ppdu"], i["fsu_auto"]) for i in snap["items"]}; pp = snap["ppdus"]; ff = [f["id"] for f in snap["fsus"]]; self.assertGreaterEqual(len(pp), 3)
+            self.assertEqual(at["c2"], (pp[0]["at"], pp[0]["id"], True)); self.assertEqual(at["brk"][0], pp[1]["at"]); self.assertEqual(at["ammo"][0], pp[2]["at"])          # 종류에 따라 배전체계가 붙은 구간분전함에 물린다(자동)
+            free = next(f for f in ff if f not in {p["at"] for p in pp})
+            r = self.req("/api/loads", {"op": "set", "id": "ammo", "grade": 1, "save_pct": 0, "fsu": free}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "ammo")
+            self.assertEqual((it["feeder"], it["fsu"], it["ppdu"], it["fsu_auto"]), ("L1", free, "", False))                                                       # 등급 · 자리를 바꾸면 급전선과 구간분전함이 따라간다(배전체계 없는 구간분전함에도 물린다)
+            self.assertFalse(self.req("/api/loads", {"op": "set", "id": "ammo", "fsu": "../x"}, tok)[1]["ok"])
+            r = self.req("/api/loads", {"op": "place", "at": {"med": pp[0]["at"]}, "names": {"med": "의무대"}}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "med")      # 개요 배치 저장: 옮긴 자리 · 고친 이름
+            self.assertEqual((it["fsu"], it["ppdu"], it["name"], it["fsu_auto"]), (pp[0]["at"], pp[0]["id"], "의무대", False)); self.assertFalse(self.req("/api/loads", {"op": "place", "at": {}, "names": {}}, tok)[1]["ok"])
+            r = self.req("/api/loads", {"op": "set", "id": "ammo", "fsu": "FSU19"}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "ammo"); self.assertTrue(it["fsu_auto"])   # 지금 없는 구간분전함이면 자동으로 붙인다
             self.assertTrue(self.req("/api/loads", {"op": "del", "id": nid}, tok)[1]["ok"])
             from ifps_ems_rt.hmi.loadctl import LoadBook
             b2 = LoadBook(e); self.assertEqual([i["n"] for i in b2.items], [1, 1, 3, 1])                                             # 다시 켜도 그대로

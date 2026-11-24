@@ -49,12 +49,12 @@ class LoadBook:
     def view(self):
         rt = self.eng.rt; st = self.stage(); kw = {"L1": rt.val.get("LOAD.p1_kw"), "L2": rt.val.get("LOAD.p2_kw"), "L3": rt.val.get("LOAD.p3_kw")}
         est = loads.share(self.items, kw, st); r = loads.rated(self.items); fr = loads.save_frac(self.items)
-        rg = self.eng.ringw.status() if getattr(self.eng, "ringw", None) is not None else None; pp = [{"id": p["id"], "name": p["name"], "at": p["at"]} for p in (rg or {}).get("ppdu", [])]; at = loads.attach(self.items, pp)
+        rg = self.eng.ringw.status() if getattr(self.eng, "ringw", None) is not None else None; pp = [{"id": p["id"], "name": p["name"], "at": p["at"]} for p in (rg or {}).get("ppdu", [])]; ff = [{"id": f["id"], "name": f["name"]} for f in (rg or {}).get("fsu", [])]; at = loads.attach(self.items, pp, ff)
         items = [dict(i, feeder=loads.FEEDER[i["grade"]], rated=round(i["kw"] * i["n"], 1), est_kw=None if est[i["id"]] is None else round(est[i["id"]], 1), spr=loads.KINDS[i["kind"]][4],
-                      ppdu=at[i["id"]]["ppdu"], ppdu_name=at[i["id"]]["ppdu_name"], fsu=at[i["id"]]["fsu"], ppdu_auto=at[i["id"]]["auto"]) for i in self.items]
+                      **{k: at[i["id"]][k] for k in ("fsu", "fsu_name", "ppdu", "ppdu_name")}, fsu_auto=at[i["id"]]["auto"]) for i in self.items]
         grades = [{"grade": g, "feeder": f, "rated": round(r[g], 1), "kw": kw[f], "stage": st[f], "n": sum(i["n"] for i in self.items if i["grade"] == g), "save_frac": round(fr.get(f, 0.0), 3),
                    "auto": "save" if f in rt.shedder.saved else "shed" if f in rt.shedder.mine else "", "why": rt.shedder.why.get(f, "")} for g, f in loads.FEEDER.items()]
-        return {"rev": self.rev, "by": self.by, "t": self.t, "items": items, "grades": grades, "limit": self.limit(), "ppdus": pp,
+        return {"rev": self.rev, "by": self.by, "t": self.t, "items": items, "grades": grades, "limit": self.limit(), "ppdus": pp, "fsus": ff,
                 "kinds": [{"id": k, "name": v[0], "grade": v[1], "kw": v[2], "save_pct": v[3]} for k, v in loads.KINDS.items()], "max_n": loads.MAX_N, "max_items": loads.MAX_ITEMS}
 
 
@@ -66,19 +66,31 @@ def _add(items, k):
     return items + [it], f"부하 추가: {it['name']}({g}등급 · {kw:.0f} kW)"
 
 
+def _place(items, b):
+    """개요 배치도를 저장할 때: 그림을 옮긴 자리에서 가장 가까운 구간분전함(at: {부하: 구간분전함})과 고친 이름(names: {부하: 이름})을 부하 목록에 반영한다."""
+    at, names = b.get("at") or {}, b.get("names") or {}; done = []
+    if not isinstance(at, dict) or not isinstance(names, dict): raise ValueError("형식 오류")
+    for it in items:
+        if it["id"] in at and it.get("fsu", "") != at[it["id"]]: it["fsu"] = at[it["id"]]; done.append(f"{it['name']} → {at[it['id']]}")
+        if it["id"] in names and isinstance(names[it["id"]], str) and names[it["id"]].strip() and names[it["id"]].strip() != it["name"]: done.append(f"{it['name']} 이름 → {names[it['id']].strip()}"); it["name"] = names[it["id"]].strip()
+    if not done: raise ValueError("바뀐 것이 없음")
+    return items, "개요 배치 반영: " + ", ".join(done[:6]) + (" …" if len(done) > 6 else "")
+
+
 def _edit(items, b):
     """목록에 한 가지 변경을 한다. 반환: (새 목록, 기록할 글). 할 수 없으면 ValueError."""
     op = b.get("op"); it = next((i for i in items if i["id"] == b.get("id")), None)
     if op == "add": return _add(items, b.get("kind"))
     if op == "reset": return [dict(i) for i in loads.DEFAULT], "부하 목록을 기본으로 되돌림"
+    if op == "place": return _place(items, b)
     if it is None: raise ValueError("없는 부하")
     if op == "count": it["n"] = it["n"] + int(b.get("delta", 0)); return items, f"{it['name']} 수량 {it['n']}"
     if op == "del": items.remove(it); return items, f"부하 삭제: {it['name']}"
     if op != "set": raise ValueError(f"동작 없음: {op}")
-    for k in ("name", "grade", "kw", "save_pct", "ppdu"):
+    for k in ("name", "grade", "kw", "save_pct", "fsu"):
         if k in b: it[k] = b[k].strip() if k == "name" and isinstance(b[k], str) else b[k]
     if it["grade"] == 1 and "grade" in b and "save_pct" not in b: it["save_pct"] = 0
-    return items, f"{it['name']} 변경: {it['grade']}등급 · 대당 {it['kw']:g} kW · 절감 {it['save_pct']:g}%" + (f" · 배전체계 {it['ppdu'] or '자동'}" if "ppdu" in b else "")
+    return items, f"{it['name']} 변경: {it['grade']}등급 · 대당 {it['kw']:g} kW · 절감 {it['save_pct']:g}%" + (f" · 구간분전함 {it['fsu'] or '자동'}" if "fsu" in b else "")
 
 
 def http_post(eng, b, sess):

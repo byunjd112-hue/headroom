@@ -557,7 +557,7 @@ function render() {
   if (!S.snap) return; const p = PAGES[S.page] ? S.page : "overview";
   $$("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === p));
   if (mounted !== p + S.lang + S.theme) { clearInterval(P_ENG._ex); const m = $("#main"); PAGES[p].mount(m); applyI18n(m); decoratePage(p); decorateHelp(p); mounted = p + S.lang + S.theme; }
-  try { PAGES[p].update(S.snap); } catch (e) { console.error(e); }
+  try { PAGES[p].update(S.snap); LD.note(p); } catch (e) { console.error(e); }
 }
 window.addEventListener("hashchange", () => {
   if (L.edit) { if (L.dirty) toast("저장하지 않은 배치 변경을 버렸습니다", "bad"); L.edit = false; L.sel = null; L.dirty = false; layoutLoad(); }     // 배치 편집은 개요 화면 안에서만

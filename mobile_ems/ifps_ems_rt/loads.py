@@ -43,7 +43,7 @@ def _check1(i, it, ids, bad):
              (isinstance(nm, str) and 1 <= len(nm.strip()) <= 24, "이름은 1~24자"), (it.get("grade") in (1, 2, 3), "등급은 1 · 2 · 3"), (_num(it.get("kw"), 0.1, 500), "대당 정격은 0.1~500 kW"),
              (isinstance(n, int) and not isinstance(n, bool) and 0 <= n <= MAX_N, f"수량은 0~{MAX_N}"), (_num(it.get("save_pct"), 0, 80), "절감 비율은 0~80 %"))
     bad.extend(f"{tag}: {why}" for ok, why in rules if not ok)
-    if not (isinstance(it.get("ppdu", ""), str) and re.fullmatch(r"(PPDU[1-9][0-9]?)?", it.get("ppdu", ""))): bad.append(f"{tag}: 배전체계 이름 오류")
+    if not (isinstance(it.get("fsu", ""), str) and re.fullmatch(r"(FSU[1-9][0-9]?)?", it.get("fsu", ""))): bad.append(f"{tag}: 구간분전함 이름 오류")
     if _num(it.get("save_pct"), 0, 80) and it.get("grade") == 1 and it["save_pct"] > 0: bad.append(f"{tag}: 1등급 부하는 절감하지 않는다(절감 비율 0)")
 
 
@@ -75,14 +75,18 @@ def scale(items):
     r = rated(items); return {g: r[g] / BASE[g] for g in BASE}
 
 
-def attach(items, ppdus):
-    """부하마다 물린 배전체계를 정한다. ppdus: 지금 있는 배전체계 [{id, name, at}] (환망 순서). 부하에 정해 둔 배전체계가 있으면 그것, 없거나 그 배전체계가 지금 없으면 종류에 따른 차례로.
-    반환: {부하 id: {"ppdu", "ppdu_name", "fsu", "auto"}} — 배전체계가 하나도 없으면 빈 값."""
-    out = {}; by = {p["id"]: p for p in ppdus}
+def attach(items, ppdus, fsus=()):
+    """부하마다 물린 자리를 정한다 — 구간분전함(fsu)이 기준이고, 그 구간분전함에 배전체계가 있으면 그것이 물린 배전체계다.
+    ppdus: 지금 있는 배전체계 [{id, name, at}], fsus: 지금 있는 구간분전함 [{id, name}] (환망 순서).
+    부하에 정해 둔 구간분전함(개요 배치도에서 옮기거나 부하 관리에서 고른 것)이 지금 있으면 그것, 아니면 종류에 따른 차례의 배전체계가 붙은 구간분전함으로('자동').
+    반환: {부하 id: {"fsu", "fsu_name", "ppdu", "ppdu_name", "auto"}} — 환망이 없으면 빈 값."""
+    out = {}; fn = {f["id"]: f["name"] for f in fsus}; at = {}
+    for p in ppdus: at.setdefault(p["at"], p)
     for it in items:
-        p = by.get(it.get("ppdu") or ""); auto = p is None
-        if auto and ppdus: p = ppdus[min(KIND_AT.get(it["kind"], 0), len(ppdus) - 1)]
-        out[it["id"]] = {"ppdu": p["id"] if p else "", "ppdu_name": p["name"] if p else "", "fsu": p["at"] if p else "", "auto": auto}
+        f = it.get("fsu") or ""; auto = f not in fn
+        if auto: p = ppdus[min(KIND_AT.get(it["kind"], 0), len(ppdus) - 1)] if ppdus else None; f = p["at"] if p else ""
+        p = at.get(f)
+        out[it["id"]] = {"fsu": f, "fsu_name": fn.get(f, f), "ppdu": p["id"] if p else "", "ppdu_name": p["name"] if p else "", "auto": auto}
     return out
 
 

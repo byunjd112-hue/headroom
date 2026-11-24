@@ -89,6 +89,14 @@ function sldUnits(id) {
 }
 /* 환망(구간분전함 · 휴대용 배전체계)을 결선도 안에 그린다 — 모선과 부하 사이에: 모선 A ─(구간 0)─ 구간분전함 1 … n ─(구간 n)─ 모선 B.
    등급별 부하는 이 고리 아래에 등급별 차단기를 거쳐 달린다(모선 → 환망 → 차단기 → 부하). 자동 인식한 대수가 바뀌면 스스로 다시 그린다 */
+/* 구간분전함에 바로 물린 부하(그 자리에 배전체계가 없을 때): 개요 배치도에서 그 구간분전함으로 이은 부하를 같은 자리에 그린다 */
+function sldDirect(f, x, YR) {
+  const lds = LD.atFsu(f.id), fed = f.live === true, ty = YR + 26 + 52, nm = lds.map(q => LD.label(q)).join(" · "), sp = spriteSvg(lds[0].spr, { on: fed, fault: f.live === false }, x, ty + 62, 92);
+  return `<path class="ln ${fed ? "on" : "off"}" d="M${x} ${YR + 13} V${ty}"/><rect class="sring-ld ${fed ? "on" : ""}" x="${x - 50}" y="${ty}" width="100" height="64" rx="9"/>${sp.replace(/url\(#sp/g, "url(#spRG")}
+    <text class="nm" x="${x}" y="${ty + 82}" text-anchor="middle" style="font-size:${nm.length > 14 ? 11 : 13}px">${esc(nm.length > 24 ? nm.slice(0, 23) + "…" : nm)}</text>
+    <text x="${x}" y="${ty + 103}" text-anchor="middle"><tspan class="kw" style="font-size:19px">${fed ? F.kw(lds.reduce((a, q) => a + (q.est_kw || 0), 0)) : "0.0"}</tspan><tspan class="u" dx="4">kW</tspan></text>
+    <text class="st" x="${x}" y="${ty + 119}" text-anchor="middle" fill="${fed ? "var(--ok)" : "var(--warn)"}">${fed ? "급전 중 · 직결" : "무전압"}</text>`;
+}
 function sldRing(s, live) {
   const g = document.getElementById("sldRingG"); if (!g) return; const r = s.ring;
   const sig = r ? JSON.stringify([live, S.lang, [1, 2, 3].map(c => [Math.round(val("CB.L" + c) ?? 1), Math.round((val("LOAD.p" + c + "_kw") || 0) * 2)]), !!(S.sprites && S.sprites.l1), r.ppdu.map(p => p.ch.map(q => Math.round((q.kw || 0) * 5))), r.sections.map(x => x.state), r.fsu.map(f => [f.id, f.name, f.live]), r.ppdu.map(p => [p.id, p.name, p.at, p.live, p.mccb, p.vital, Math.round((p.kw || 0) * 2), p.ch.filter(c => c.cb === 2 && c.cls > 0).length])]) : "";
@@ -106,9 +114,10 @@ function sldRing(s, live) {
   const CLS = [["1", "#ff6b8a"], ["2", "#ffb547"], ["3", TV("--load")]], cbl = c => { const v = val("CB.L" + c); return v == null ? null : Math.round(v); }, shed = c => cbl(c) != null && cbl(c) !== 1;      // 등급별 차단기가 열렸으면 그 등급 회로는 끊긴 것으로 보인다
   const PIC = ["L1", "L2", "L3"]; let tile = 0; h += `<defs>${SPRITE_FILTERS.replace(/id="sp/g, 'id="spRG')}</defs>`;
   r.fsu.forEach((f, k) => { const x = xs(k), c = f.live == null ? "na" : f.live ? "on" : "off", pp = r.ppdu.filter(p => p.at === f.id), one = pp.length === 1;
+    if (!pp.length && LD.atFsu(f.id).length) h += sldDirect(f, x, YR);      // 배전체계 없이 구간분전함에 바로 물린 부하
     h += `<circle class="sring-n ${c}" cx="${x}" cy="${YR}" r="13"/><text class="sring-k" x="${x}" y="${YR + 4}" text-anchor="middle">${k + 1}</text><text class="sring-nm ${c}" x="${x}" y="${YR - 19}" text-anchor="middle">${esc(f.name)}</text>` +
       pp.map((p, j) => { const bad = p.live === false || p.mccb === 2, tr = p.ch.filter(q => q.cb === 2 && q.cls > 0).length, y = YR + 26 + j * 46, w = 108, st = bad ? "off" : tr || p.over || p.gnd_bad ? "warn" : "on", fed = !bad && f.live === true;
-        const kw = cl => p.ch.filter(q => q.cls === cl).reduce((a, q) => a + (q.kw || 0), 0), has = cl => p.ch.some(q => q.cls === cl), ty = y + 52, lds = LD.at(p.id), sp = one ? spriteSvg(lds.length ? lds[0].spr : PIC[tile++ % 3], { on: fed, fault: bad }, x, ty + 62, 92) : null, lnm = lds.length ? lds.map(q => LD.label(q)).join(" · ") : "물린 부하 없음";      // 부하 목록(부하 관리)에서 이 배전체계에 물린 부하 — 개요 배치도와 같은 부하
+        const kw = cl => p.ch.filter(q => q.cls === cl).reduce((a, q) => a + (q.kw || 0), 0), has = cl => p.ch.some(q => q.cls === cl), ty = y + 52, lds = LD.atFsu(f.id), sp = one ? spriteSvg(lds.length ? lds[0].spr : PIC[tile++ % 3], { on: fed, fault: bad }, x, ty + 62, 92) : null, lnm = lds.length ? lds.map(q => LD.label(q)).join(" · ") : "물린 부하 없음";      // 부하 목록(부하 관리)에서 이 배전체계에 물린 부하 — 개요 배치도와 같은 부하
         return `<path class="ln ${bad ? "flt" : fed ? "on" : "off"}" d="M${x} ${j ? y - 10 : YR + 13} V${y}"/><rect class="sring-p ${st}" x="${x - w / 2}" y="${y}" width="${w}" height="16" rx="4"/>
           <text class="sring-pt" x="${x}" y="${y + 11.5}" text-anchor="middle">${esc(p.name.length > 9 ? p.name.slice(0, 9) + "…" : p.name)}${p.vital ? " ★" : ""}</text>` +
           CLS.map(([cl, col], q) => !has(+cl) ? "" : `<rect class="sring-c ${bad || shed(cl) ? "off" : ""}" x="${x - 54 + q * 37}" y="${y + 20}" width="34" height="14" rx="3" style="stroke:${col}"/><text class="sring-ct" x="${x - 37 + q * 37}" y="${y + 30.5}" text-anchor="middle" style="fill:${bad || shed(cl) ? "var(--muted)" : col}">${cl}급 ${bad || shed(cl) ? "✕" : kw(+cl).toFixed(1)}</text>`).join("") +
