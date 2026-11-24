@@ -61,7 +61,7 @@ class TestHmi(unittest.TestCase):
     def test_load_book_changes_follow_everywhere(self):
         """부하 관리: 종류 · 수량을 바꾸면 스냅샷(모든 화면의 자료) · 가상 부하 배율 · 절감 가능 비율 · 저장 파일이 함께 바뀐다. 틀린 입력은 막는다."""
         from ifps_ems_rt import loads
-        e = self.eng; tok = self.login("4321"); v0 = e.snapshot()["loads"]; self.assertEqual([i["id"] for i in v0["items"]], ["c2", "med", "brk", "ammo"]); self.assertEqual([g["rated"] for g in v0["grades"]], [30.0, 40.0, 25.0])
+        e = self.eng; tok = self.login("4321"); v0 = e.snapshot()["loads"]; self.assertEqual([i["id"] for i in v0["items"]], ["c2", "med", "brk", "ammo"]); self.assertEqual([g["rated"] for g in v0["grades"]], [30.0, 40.0, 20.0])
         self.assertEqual(self.req("/api/loads", {"op": "count", "id": "brk", "delta": 1})[0], 403)                                     # 로그인 없이 못 바꾼다
         try:
             r = self.req("/api/loads", {"op": "count", "id": "brk", "delta": 1}, tok)[1]; self.assertTrue(r["ok"]); g2 = r["loads"]["grades"][1]; self.assertEqual((g2["n"], g2["rated"]), (4, 52.0))
@@ -74,7 +74,7 @@ class TestHmi(unittest.TestCase):
             snap = e.snapshot()["loads"]; self.assertEqual(len(snap["items"]), 5); self.assertTrue(all(i["est_kw"] is not None for i in snap["items"])); self.assertIn(snap["grades"][2]["stage"], ("on", "save", "off"))
             self.assertAlmostEqual(sum(i["est_kw"] for i in snap["items"] if i["feeder"] == "L2"), e.rt.val["LOAD.p2_kw"], delta=0.2)   # 추정 전력의 합 = 급전선 계측값
             at = {i["id"]: (i["fsu"], i["ppdu"], i["fsu_auto"]) for i in snap["items"]}; pp = snap["ppdus"]; ff = [f["id"] for f in snap["fsus"]]; self.assertGreaterEqual(len(pp), 3)
-            self.assertEqual(at["med"], (pp[1]["at"], pp[1]["id"], True)); self.assertEqual(at["c2"], ("FSU1", "", True)); self.assertEqual((at["brk"][1], at["ammo"][1]), ("", ""))   # 종류에 맞는 배전체계에 물린다(자동). 배전체계 정격 20 kW 를 넘는 부하는 가까운 구간분전함에 직결
+            self.assertEqual(at["med"], (pp[1]["at"], pp[1]["id"], True)); self.assertEqual(at["c2"], ("FSU1", "", True)); self.assertEqual((at["brk"][1], at["ammo"][1]), ("", pp[2]["id"]))   # 종류에 맞는 배전체계에 물린다(자동). 배전체계 정격 20 kW 를 넘는 부하는 가까운 구간분전함에 직결
             self.assertEqual(snap["ppdu_kw"], 20.0)
             free = next(f for f in ff if f not in {p["at"] for p in pp})
             r = self.req("/api/loads", {"op": "set", "id": "ammo", "grade": 1, "save_pct": 0, "fsu": free}, tok)[1]; it = next(i for i in r["loads"]["items"] if i["id"] == "ammo")

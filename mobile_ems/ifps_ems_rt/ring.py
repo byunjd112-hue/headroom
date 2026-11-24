@@ -25,6 +25,9 @@ MAX_FSU, MAX_PPDU = 12, 12
 KIND = {0x46: "FSU", 0x50: "PPDU"}       # 장치 ID 의 윗자리로 종류를 가린다(가정)
 KNAME = {"FSU": "구간분전함", "PPDU": "배전체계"}
 RATED_KW = 20.0                  # PPDU-20 정격
+FSU_A, FSU_V, FSU_PF, FSU_OUT = 630.0, 380.0, 0.9, 4      # 구간분전함 정격: AC 380 V 3상 4선식 · 630 A · 출력 4회로(제안 발표 원본의 FSU 사양). 역률 0.9 는 kW 로 견주려는 가정
+FSU_KVA = round(3 ** 0.5 * FSU_V * FSU_A / 1000.0)        # 약 415 kVA
+FSU_KW = round(FSU_KVA * FSU_PF)                          # 약 373 kW — 아래 배전체계 · 부하의 합이 넘으면 과부하
 LOAD_REF = 60.0                  # 가상 장치: 등급별 부하가 이 값(kW)일 때 회로가 정격의 90% 를 쓴다고 본다
 GND_LIMIT = 100.0                # 접지저항이 이 값(Ω)을 넘으면 주회로 투입 금지(인터록 IL-1)
 CH_SPEC = (("3상 16 A", 10.5), ("3상 16 A", 10.5), ("단상 20 A", 4.4), ("단상 20 A", 4.4), ("단상 20 A", 4.4), ("단상 20 A", 4.4))      # CH1~CH6 정격(형식, kW)
@@ -158,7 +161,7 @@ def _ppdus(r, g, fsu_live):
 
 def _fsus(r, g, fed):
     """구간분전함들의 읽은 값. kw · kwh 는 그 구간분전함의 분기 전력계다."""
-    return [dict(_unit(f, g, fed[k]), kw=g(f"{f['id']}.kw"), kwh=g(f"{f['id']}.kwh")) for k, f in enumerate(r["fsu"])]
+    return [dict(_unit(f, g, fed[k]), kw=g(f"{f['id']}.kw"), kwh=g(f"{f['id']}.kwh"), over=None if g(f"{f['id']}.kw") is None else g(f"{f['id']}.kw") > FSU_KW) for k, f in enumerate(r["fsu"])]
 
 
 def _recog(r, units):
@@ -245,6 +248,7 @@ def alarms(r, s):
         out.append((f"ring.dead.{f['id']}", f["live"] is False, 1 if vital else 2, f["id"], f"{f['name']}({f['id']}) 무전압 — 이 마디의 부하 정전" + (" [중요 부하]" if vital else "")))
         out.append((f"ring.comm.{f['id']}", f.get("comm") is False, 2, f["id"], f"{f['name']}({f['id']}) 통신 고립 — 양쪽 구간이 모두 끊겨 환형 통신으로도 닿지 않음(값은 마지막 값). 끊긴 구간 가운데 하나를 먼저 복구"))
         out.append((f"ring.id.{f['id']}", f["id_ok"] is False and f["id_read"] not in (None, 0), 3, f["id"], _id_text(f)))
+        out.append((f"ring.over.{f['id']}", bool(f.get("over")), 2, f["id"], f"{f['name']}({f['id']}) 과부하 {f.get('kw') or 0:.1f} kW — 정격 {FSU_A:.0f} A(약 {FSU_KW:.0f} kW) 초과. 부하 일부를 다른 구간분전함으로 옮기십시오"))
     for p in s["ppdu"]:
         i = p["id"]; top = 1 if p["vital"] else 2
         out.append((f"ring.dead.{i}", p["live"] is False and p["at_live"] is not False, top, i, _dead_text(p)))      # 물린 구간분전함이 정전이면 그쪽 경보 하나로 충분하다
@@ -264,7 +268,7 @@ class Model:
     def __init__(self, r, plant, kw=None):
         self.r = r if r and "RING.sw0" in plant.by_tag else None; self.p = plant; self.kw = kw or {"L1": "LOAD.p1_kw", "L2": "LOAD.p2_kw", "L3": "LOAD.p3_kw"}
         self.e = {}; self.dt = 0.0; self.t_last = None                 # 분기 전력량계의 누적값 · 걸음 길이
-        self.branch = None; self.w = None; self.live = {}              # 부하 목록의 분기별 몫(화면부가 넣는다) — 있으면 분기 전력계가 '그 자리에 물린 부하'를 따른다
+        self.branch = None; self.w = None; self.live = {}; self.want = None; self.want_sig = None              # 부하 목록의 분기별 몫(화면부가 넣는다) — 있으면 분기 전력계가 '그 자리에 물린 부하'를 따른다
         self.brk = set(); self.t_brk = {}; self.t_trip = None; self.init = set(); self.armed = False; self.swap = None; self.place = {}; self.zero = set(); self.t_fix = {}
         if self.r is None: return
         self._place0(); self._ids(); e = self.eff()
@@ -332,7 +336,7 @@ class Model:
         """이 배전체계에 물린 부하의 전력을 회로 6개에 나눈다: 등급이 같은 회로에 회로 정격 비율로 싣고, 그 회로들의 정격을 넘는 몫은 쓰는 회로 전체에 정격 비율로 싣는다(가상 장치의 가정)."""
         out = [0.0] * len(p["ch"]); used = [n for n, c in enumerate(p["ch"]) if c["cls"] > 0] or [0]; cap = lambda ns: sum(CH_SPEC[n][1] for n in ns)
         for g in (1, 2, 3):
-            kw = sum(self._feeder(g) * w["frac"] for w in self.w if w["ppdu"] == p["id"] and w["grade"] == g)
+            kw = sum(self._feeder(g) * w["frac"] / len(w["ppdus"]) for w in self.w if p["id"] in w["ppdus"] and w["grade"] == g)      # 부하 앞에 여러 대면 고르게 나눠 싣는다
             if kw <= 0: continue
             tg = [n for n, c in enumerate(p["ch"]) if c["cls"] == g] or used; a = min(kw, cap(tg))
             for n in tg: out[n] += a * CH_SPEC[n][1] / cap(tg)
@@ -349,7 +353,7 @@ class Model:
         for f in e["fsu"]:
             if f"{f['id']}.kw" not in self.p.by_tag: continue
             kw = sum(self.p.get(f"{p['id']}.kw") for p in e["ppdu"] if p["at"] == f["id"] and f"{p['id']}.kw" in self.p.by_tag)
-            if self.w is not None and self.live.get(f["id"]): kw += sum(self._feeder(w["grade"]) * w["frac"] for w in self.w if w["fsu"] == f["id"] and not w["ppdu"])
+            if self.w is not None and self.live.get(f["id"]): kw += sum(self._feeder(w["grade"]) * w["frac"] for w in self.w if w["fsu"] == f["id"] and not w["ppdus"])
             self.p.set(f"{f['id']}.kw", round(kw, 1)); self._meter(f"{f['id']}.kwh", kw)
 
     def _update(self, e):
@@ -365,7 +369,7 @@ class Model:
     def tick(self, now):
         if self.r is None: return
         self.dt = 0.0 if self.t_last is None else min(60.0, max(0.0, now - self.t_last)); self.t_last = now
-        self._ids(); e = self.eff(); sw = sw_tags(e); auto = self.p.get("RING.auto") > 0.5
+        self._follow(); self._ids(); e = self.eff(); sw = sw_tags(e); auto = self.p.get("RING.auto") > 0.5
         for i, t in enumerate(sw):
             if not self._broken(i) or int(round(self.p.get(t))) != 1: self.t_brk.pop(i, None); continue
             if not auto: continue
@@ -377,6 +381,13 @@ class Model:
             self.t_trip = None
         if auto: self._repair(e, sw, now)
         self._update(e)
+
+    def _follow(self):
+        """부하 목록이 바뀌면 배전체계를 그 목록대로 다시 놓는다(부하 앞에 필요한 대수만큼). 자리가 모자라면 앞에서부터 놓는다."""
+        ws = self.want() if self.want else None
+        if ws is None or tuple(ws) == self.want_sig: return
+        self.want_sig = tuple(ws); fs = self.place["fsu"]; nos = [int(re.sub(r"\D", "", f) or 0) for f in ws][:self._n("ppdu")]
+        self.place["ppdu"] = {k + 1: [0x5001 + k, no if no in fs else min(fs)] for k, no in enumerate(nos)}; self.init.clear()
 
     def _repair(self, e, sw, now):
         """복구 절차: 단선이 없어진(고친) 차단 구간을 close_ms 뒤에 다시 잇고, 고리가 모두 이어지면 상시 개방점을 다시 연다(평소 상태로)."""
@@ -414,6 +425,6 @@ class Model:
     def restore(self):
         """고장을 없애고 처음 상태(처음 배치, 상시 개방점만 열림)로 되돌린다."""
         if self.r is None: return
-        self.brk.clear(); self.swap = None; self.t_trip = None; self.t_brk.clear(); self.t_fix.clear(); self._place0(); self._ids(); e = self.eff()
+        self.brk.clear(); self.swap = None; self.t_trip = None; self.want_sig = None; self.t_brk.clear(); self.t_fix.clear(); self._place0(); self._ids(); e = self.eff()
         for i, t in enumerate(sw_tags(e)): self.p.set(t, 0 if i == e["open"] else 1)
         self.p.set("RING.auto", 1); self.init.clear()

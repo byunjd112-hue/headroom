@@ -26,8 +26,9 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
     const dg = await p.evaluate(() => ({ at: Object.fromEntries([...document.querySelectorAll("#rgBody .rv-load")].map(e => [e.dataset.load, e.dataset.fsu])), ring: S.snap.ring, items: S.snap.loads.items }));
     on.forEach(i => { n++; if (dg.at[i.id] !== i.fsu) miss.push(`환망 구성도: ${i.name} 이 ${dg.at[i.id] || "없음"} 아래(목록은 ${i.fsu})`); });
     const est = f => dg.items.filter(f).reduce((a, i) => a + (i.n > 0 ? i.est_kw || 0 : 0), 0), near = (a, b) => Math.abs(a - b) <= Math.max(2.5, 0.12 * Math.max(a, b));
+    on.forEach(i => { n++; if ((i.ppdus || []).length !== i.need && dg.ring.ppdu.length < 8) miss.push(`${i.name}: 배전체계 ${(i.ppdus || []).length}대(필요 ${i.need}대)`); });      // 부하 앞에 필요한 대수만큼 붙었는지(가상 장치의 자리 8개가 다 차면 모자랄 수 있다)
     dg.ring.fsu.forEach(f => { n++; const e = est(i => i.fsu === f.id); if (f.kw != null && !near(f.kw, e)) miss.push(`분기 전력계 ${f.id} ${f.kw.toFixed(1)} kW ≠ 물린 부하 ${e.toFixed(1)} kW`); });
-    dg.ring.ppdu.forEach(q => { n++; const e = est(i => i.ppdu === q.id); if (q.kw != null && !near(q.kw, e)) miss.push(`배전체계 ${q.id} ${q.kw.toFixed(1)} kW ≠ 물린 부하 ${e.toFixed(1)} kW`); n++; const v = dg.items.some(i => i.ppdu === q.id && i.grade === 1 && i.n > 0); if (!!q.vital !== v) miss.push(`배전체계 ${q.id} 중요 부하 표시(★) ${q.vital} — 1등급 부하 ${v ? "있음" : "없음"}`); });
+    dg.ring.ppdu.forEach(q => { n++; const e = dg.items.reduce((a, i) => a + (i.n > 0 && (i.ppdus || []).includes(q.id) ? (i.est_kw || 0) / i.ppdus.length : 0), 0); if (q.kw != null && !near(q.kw, e)) miss.push(`배전체계 ${q.id} ${q.kw.toFixed(1)} kW ≠ 물린 부하 ${e.toFixed(1)} kW`); n++; const v = dg.items.some(i => (i.ppdus || []).includes(q.id) && i.grade === 1 && i.n > 0); if (!!q.vital !== v) miss.push(`배전체계 ${q.id} 중요 부하 표시(★) ${q.vital} — 1등급 부하 ${v ? "있음" : "없음"}`); });
     for (const [pg, nm] of [["control", "설비 제어"], ["energy", "발전·예측"], ["trends", "추세"], ["scenarios", "운영 시나리오"]]) need(nm, await text(pg, "#main .pagehd .ld-note", 2200), pill);
     await p.goto(B + "#control"); await p.waitForTimeout(2000); const ct = await p.evaluate(() => [...document.querySelectorAll("#cbRows tr")].map(e => e.title).join(" | "));      // 차단기 줄의 이름(풍선 도움말) d.grades.filter(g => g.n > 0).forEach(g => need("설비 제어", ct, d.items.find(i => i.feeder === g.feeder && i.n > 0).name));
     bad += miss.length; console.log(`${miss.length ? "✕" : "○"} ${what} | ${on.map(i => `${lab(i)}@${i.fsu}`).join(", ")}` + (miss.length ? "\n    " + miss.slice(0, 8).join("\n    ") : ""));
@@ -38,7 +39,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await post("/api/loads", { op: "count", id: "brk", delta: 1 }); await post("/api/loads", { op: "count", id: "brk", delta: 1 }); await compare("막사 4동으로");
   await post("/api/loads", { op: "set", id: "ammo", grade: 1, save_pct: 0 }); await compare("탄약저장 3등급 → 1등급");
   const add = await post("/api/loads", { op: "add", kind: "hvac" }); await compare("냉난방 추가");
-  const free = (await loads()).fsus.map(f => f.id).find(f => !(add.loads.ppdus || []).some(q => q.at === f)); await post("/api/loads", { op: "set", id: "med", fsu: free }); await compare(`의무시설을 배전체계 없는 ${free} 로`);
+  const free = (await loads()).fsus.map(f => f.id).find(f => !(add.loads.items || []).some(q => q.fsu === f)); await post("/api/loads", { op: "set", id: "med", fsu: free }); await compare(`의무시설을 비어 있던 ${free} 로(배전체계가 따라간다)`);
   await post("/api/loads", { op: "count", id: "med", delta: -1 }); await compare("의무시설 0개(빼기)"); await post("/api/loads", { op: "count", id: "med", delta: 1 });
   // 개요의 [배치 편집]: 탄약저장 그림을 다른 구간분전함 옆으로 옮기고 이름을 고쳐 저장 → 부하 목록 · 결선도 · 환망이 따라가는지
   await p.goto(B + "#overview"); await p.waitForTimeout(4000);

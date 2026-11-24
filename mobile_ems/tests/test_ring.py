@@ -122,7 +122,7 @@ class RingWatchTest(unittest.TestCase):
         e = self.eng; w = e.ringw; self.assertTrue(self._wait(lambda: (e.snapshot()["ring"] or {}).get("ok")))
         used = lambda: {x["fsu"] for x in w.status().get("w", [])}
         self.assertTrue(self._wait(lambda: used() and all(f.get("kwh") for f in w.status()["fsu"] if f["id"] in used()), 12.0)); s = w.status(); self.assertEqual(s["meters_missing"], [])
-        items = e.snapshot()["loads"]["items"]; self.assertEqual({i["id"]: (i["fsu"], i["ppdu"]) for i in items}, {"c2": ("FSU1", ""), "med": ("FSU4", "PPDU2"), "brk": ("FSU3", ""), "ammo": ("FSU5", "")})      # 배전체계 정격(20 kW)을 넘는 부하는 직결
+        items = e.snapshot()["loads"]["items"]; self.assertEqual({i["id"]: (i["fsu"], i["ppdu"]) for i in items}, {"c2": ("FSU1", ""), "med": ("FSU4", "PPDU2"), "brk": ("FSU3", ""), "ammo": ("FSU6", "PPDU3")})      # 배전체계 정격(20 kW)을 넘는 부하는 직결
         for f in s["fsu"]:                                                # 구간분전함 전력계 = 그 자리에 물린 부하의 추정 전력 합(개요 · 결선도 · 환망이 같은 값)
             self.assertAlmostEqual(f["kw"], sum(i["est_kw"] for i in items if i["fsu"] == f["id"]), delta=1.5, msg=f["id"])
             self.assertAlmostEqual(f["kw"], sum(p["kw"] for p in s["ppdu"] if p["at"] == f["id"]) + (w._direct(e, f["id"]) or 0), delta=0.6, msg=f["id"])

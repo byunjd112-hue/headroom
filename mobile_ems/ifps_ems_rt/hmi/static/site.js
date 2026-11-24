@@ -229,8 +229,8 @@ function siteMarkers() {
   const box = $("#siteMk"); if (!box || !L.items) return;
   if (L.edit) { box.innerHTML = ""; return; }
   const seen = {};
-  const rg = S.snap && S.snap.ring, pp = !rg ? "" : rg.ppdu.map((p, j) => { const it = (L.view || L.items).find(i => i.kind === "FSU" && _fsuNo(i) === p.at); if (!it) return "";
-    return `<div class="spt mini ppdu" data-pp="${esc(p.id)}" style="left:${it.x / MAP_W * 100}%;top:${(it.y + 50) / MAP_H * 100}%"><i class="core"></i><div class="scard"><div class="sh">${esc(p.name)}${p.vital ? " ★" : ""}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`; }).join("");
+  const rg = S.snap && S.snap.ring, pp = !rg ? "" : rg.ppdu.map((p, j) => { const it = (L.view || L.items).find(i => i.kind === "FSU" && _fsuNo(i) === p.at); if (!it || rg.ppdu.findIndex(q => q.at === p.at) !== j) return "";      // 구간분전함마다 표지 하나(그 아래 배전체계 묶음)
+    return `<div class="spt mini ppdu" data-at="${esc(p.at)}" style="left:${it.x / MAP_W * 100}%;top:${(it.y + 50) / MAP_H * 100}%"><i class="core"></i><div class="scard"><div class="sh">—</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`; }).join("");
   box.dataset.n = (L.view || L.items).length + (rg ? rg.ppdu.length * 100 : 0); box.innerHTML = pp + (L.view || L.items).filter(i => i.kind !== "FSU").map(it => {
     const key = it.load ? "ld:" + it.load : it.bind, [x, y] = _mkPos(it), mini = it.load ? !!seen[key] : it.kind === "BARRACK" || seen[key]; seen[key] = 1;      // 부하는 목록의 한 줄마다 첫 그림에 표지를 단다
     return `<div class="spt ${mini ? "mini" : ""}" data-act="goctl" data-uid="${it.uid}" style="left:${x}%;top:${y}%"><i class="pulse"></i><i class="core"></i>
@@ -262,8 +262,8 @@ function siteUpdate(s, force) {
     });
   }
   const mk = $("#siteMk"); if (mk && !L.edit && (!mk.children.length || +mk.dataset.n !== L.view.length + (s.ring ? s.ring.ppdu.length * 100 : 0))) siteMarkers();            // 대수가 바뀌면 표지도 다시 만든다
-  $$("#siteMk .spt.ppdu").forEach(e => { const p = s.ring && s.ring.ppdu.find(q => q.id === e.dataset.pp); if (!p) return; const bad = p.live === false || p.mccb === 2, tr = p.ch.filter(c => c.cb === 2 && c.cls > 0).length;
-    e.className = `spt mini ppdu ${bad ? "bad" : tr || p.over || p.gnd_bad ? "idle" : "ok"}`; e.querySelector(".sv .mono").textContent = p.kw == null ? "—" : F.kw(p.kw) + " kW"; e.querySelector(".ss").textContent = bad ? (p.mccb === 2 ? "주 차단기 트립" : "정전") : tr ? `회로 트립 ${tr}` : p.over ? "과부하" : "공급"; });
+  $$("#siteMk .spt.ppdu").forEach(e => { const p = RingView.group(s.ring ? s.ring.ppdu.filter(q => q.at === e.dataset.at) : []); if (!p.n) return; const bad = p.bad, tr = p.trip;
+    e.className = `spt mini ppdu ${bad ? "bad" : p.warn ? "idle" : "ok"}`; e.querySelector(".sh").textContent = p.name + (p.vital ? " ★" : ""); e.querySelector(".sv .mono").textContent = p.kw == null ? "—" : F.kw(p.kw) + " kW"; e.querySelector(".ss").textContent = bad ? (p.mccb === 2 ? "주 차단기 트립" : "정전") : tr ? `회로 트립 ${tr}` : p.over ? "과부하" : "공급"; });
   $$("#siteMk .spt:not(.ppdu)").forEach(e => { const it = L.view.find(i => i.uid === e.dataset.uid); if (!it) return; let x = st[it.bind] || { st: "ok", v: "", t: "" };
     const kf = KF(LAY_FLEET[it.kind]), u = kf && kf.units.length > 1 && kf.units.find(q => q.id === it.unit);
     const ld = it.load && LD.s().items.find(q => q.id === it.load);

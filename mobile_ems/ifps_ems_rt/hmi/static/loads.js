@@ -10,7 +10,7 @@ const LD = {
   sum(f) { const it = this.s().items.filter(i => i.feeder === f && i.n > 0), g = this.g(f); return g ? `${it.length}종 ${g.n}개 · 정격 ${F.n(g.rated, 0)} kW` : ""; },
   names(f) { return this.s().items.filter(i => i.feeder === f && i.n > 0).map(i => i.n > 1 ? `${i.name} ×${i.n}` : i.name); },
   /* 그 배전체계(PPDU)에 물린 부하 — 개요 · 결선도 · 환망이 같은 목록을 쓴다 */
-  at(ppdu) { return this.s().items.filter(i => i.ppdu === ppdu && i.n > 0); },
+  at(ppdu) { return this.s().items.filter(i => (i.ppdus || []).includes(ppdu) && i.n > 0); },      // 그 배전체계가 앞에 붙은 부하
   atFsu(fsu) { return this.s().items.filter(i => i.fsu === fsu && i.n > 0); },      // 그 구간분전함에 물린 부하(개요 배치도의 케이블과 같은 연결)
   /* 예측 · 추세 · 시나리오 · 설비 제어 화면의 머리에 붙이는 부하 구성 표지(같은 부하 목록) */
   note(page) {
@@ -30,7 +30,7 @@ const P_LOADS = {
       <div class="engbox" style="margin-bottom:14px"><b>공급이 부하를 따라가지 못할 때</b> — ① 3등급 절감 공급 → ② 3등급 차단 → ③ 2등급 절감 공급 → ④ 2등급 차단 순서로 내려간다(절감 뒤 10초 지켜봄). 1등급은 끊지 않는다. 모자람이 풀리면 60초 뒤 되살린다.
         절감 공급은 그 급전선의 '절감 비율'만큼만 줄인다(냉난방 완화 · 조명 감광 · 비필수 회로). 태세(저소음 · 자립)나 ESS 충전율 때문에 끊을 때는 절감을 거치지 않고 바로 끊는다.</div>
       <div class="panel"><div class="hd"><h3>부하 목록</h3><div class="spacer"></div><select class="in" id="ldKind"></select><button class="btn go" id="ldAdd">＋ 부하 추가</button></div>
-        <div class="bd np"><table class="t"><thead><tr><th>이름</th><th>종류</th><th>등급</th><th>물린 자리</th><th class="n">대당 정격</th><th style="text-align:center">수량</th><th class="n">정격 합</th><th class="n">지금(추정)</th><th class="n">절감 비율</th><th>상태</th><th></th></tr></thead><tbody id="ldRows"></tbody></table></div>
+        <div class="bd np"><table class="t"><thead><tr><th>이름</th><th>종류</th><th>등급</th><th>공급 경로</th><th class="n">대당 정격</th><th style="text-align:center">수량</th><th class="n">정격 합</th><th class="n">지금(추정)</th><th class="n">절감 비율</th><th>상태</th><th></th></tr></thead><tbody id="ldRows"></tbody></table></div>
         <div class="bd muted" style="font-size:12px;border-top:1px solid var(--line)">EMS 가 재는 것은 급전선(등급)별 합계다. 부하 하나하나의 '지금' 값은 급전선 계측값을 정격 비율로 나눈 추정값이다. 등급별 정격 합은 그 급전선의 계측 범위를 넘을 수 없다(<span id="ldLim"></span>).</div></div>
       <div class="panel" style="margin-top:14px;display:none" id="ldEdit"></div>`;
     $("#ldReset").onclick = () => { if (confirm("부하 목록을 기본으로 되돌립니다. 계속합니까?")) this.post({ op: "reset" }); };
@@ -56,7 +56,7 @@ const P_LOADS = {
   },
   rows(d) {
     const kn = Object.fromEntries(d.kinds.map(k => [k.id, k.name]));
-    $("#ldRows").innerHTML = d.items.map(i => `<tr class="${this.sel === i.id ? "sel" : ""}"><td><b>${esc(i.name)}</b></td><td>${esc(kn[i.kind] || i.kind)}</td><td><span class="pill ${i.grade === 1 ? "bad" : i.grade === 2 ? "warn" : "info"}">${i.grade}등급</span> <span class="muted">(${i.feeder})</span></td><td>${i.fsu ? `${esc(i.fsu_name)}${i.ppdu ? ` <span class="muted">· ${esc(i.ppdu_name)}</span>` : ' <span class="muted">· 직결</span>'}${i.fsu_auto ? ' <span class="muted">(자동)</span>' : ""}${i.ppdu_over ? ` <span class="warnc" title="이 배전체계에 물린 부하의 정격 합이 배전체계 정격(${d.ppdu_kw} kW)을 넘는다 — 일부를 배전체계가 없는 구간분전함으로 옮기십시오">· 배전체계 정격 초과</span>` : ""}` : '<span class="muted">환망 없음</span>'}</td><td class="n">${F.n(i.kw, 1)} kW</td>
+    $("#ldRows").innerHTML = d.items.map(i => `<tr class="${this.sel === i.id ? "sel" : ""}"><td><b>${esc(i.name)}</b></td><td>${esc(kn[i.kind] || i.kind)}</td><td><span class="pill ${i.grade === 1 ? "bad" : i.grade === 2 ? "warn" : "info"}">${i.grade}등급</span> <span class="muted">(${i.feeder})</span></td><td>${i.fsu ? `${esc(i.fsu_name)}${i.n ? ` <span class="muted">→ ${i.ppdus.length ? esc(i.ppdus.join(" · ")) + (i.ppdus.length > 1 ? " 병렬" : "") : "직결"} → 부하</span>` : ""}${i.fsu_auto ? ' <span class="muted">(자동)</span>' : ""}${i.n && i.ppdus.length < i.need ? ` <span class="warnc" title="이 부하의 정격을 감당하려면 배전체계(PPDU-20, ${d.ppdu_kw} kW)가 ${i.need}대 필요하다 — 배전체계를 더 놓으십시오">· 배전체계 부족(필요 ${i.need}대)</span>` : ""}${i.fsu_over ? ` <span class="warnc" title="이 구간분전함에 물린 부하의 정격 합이 구간분전함 용량(${d.fsu_kw} kW)을 넘는다 — 일부를 다른 구간분전함으로 옮기십시오">· 구간분전함 용량 초과</span>` : ""}${i.out_over ? ` <span class="warnc" title="이 구간분전함에 필요한 배전체계가 출력 회로 ${d.fsu_out}개를 넘는다 — 일부를 다른 구간분전함으로 옮기십시오">· 출력 회로 초과</span>` : ""}` : '<span class="muted">환망 없음</span>'}</td><td class="n">${F.n(i.kw, 1)} kW</td>
       <td style="text-align:center;white-space:nowrap"><button class="btn sm" data-q="${i.id}" data-dv="-1" ${i.n <= 0 ? "disabled" : ""}>−</button> <b style="display:inline-block;min-width:22px">${i.n}</b> <button class="btn sm" data-q="${i.id}" data-dv="1" ${i.n >= d.max_n ? "disabled" : ""}>＋</button></td>
       <td class="n">${F.n(i.rated, 0)} kW</td><td class="n">${i.n ? F.kw(i.est_kw) : "—"}</td><td class="n">${i.grade === 1 ? "—" : i.save_pct + "%"}</td><td>${i.n ? LD.pill(LD.stage(i.feeder)) : '<span class="pill">없음</span>'}</td>
       <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-ed="${i.id}">고치기</button> <button class="btn sm stop" data-del="${i.id}">삭제</button></td></tr>`).join("") || `<tr><td colspan="11" class="muted" style="text-align:center;padding:18px">부하가 없습니다 — [＋ 부하 추가]로 넣으십시오</td></tr>`;
@@ -80,7 +80,7 @@ const P_LOADS = {
       <label>대당 정격(kW)<input class="in" id="leKw" type="number" min="0.1" max="500" step="0.1" value="${it.kw}" style="width:100px"></label>
       <label>절감 비율(%)<input class="in" id="leSave" type="number" min="0" max="80" step="5" value="${it.save_pct}" style="width:90px"></label>
       <button class="btn go" id="leOk">저장</button><button class="btn" id="leNo">닫기</button></div>
-      <div class="muted" style="margin-top:8px;font-size:12px">등급이 급전선을 정한다(1등급 L1 · 2등급 L2 · 3등급 L3). 1등급은 절감하지 않는다. 물린 구간분전함은 개요 배치도의 케이블과 결선도 · 환망의 부하 자리를 정한다 — 개요의 [배치 편집]에서 부하 그림을 옮겨 저장해도 가장 가까운 구간분전함으로 바뀐다. '자동'이면 종류에 맞는 배전체계(PPDU-20)에 물리되, 그 배전체계의 정격(${d.ppdu_kw} kW)을 넘게 되면 가까운 구간분전함에 직결한다. 절감 비율은 그 부하가 절감 공급 때 줄일 수 있는 몫이다.</div></div>`;
+      <div class="muted" style="margin-top:8px;font-size:12px">등급이 급전선을 정한다(1등급 L1 · 2등급 L2 · 3등급 L3). 1등급은 절감하지 않는다. 물린 구간분전함은 개요 배치도의 케이블과 결선도 · 환망의 부하 자리를 정한다 — 개요의 [배치 편집]에서 부하 그림을 옮겨 저장해도 가장 가까운 구간분전함으로 바뀐다. 공급 경로는 구간분전함(정격 ${d.fsu_a} A · 약 ${d.fsu_kw} kW · 출력 ${d.fsu_out}회로) → 배전체계(PPDU-20, ${d.ppdu_kw} kW, 부하 바로 앞) → 부하다. 부하 하나의 정격이 ${d.ppdu_kw} kW 보다 크면 배전체계를 병렬로 여러 대 붙여 정격을 맞춘다. 자리가 '자동'인 부하는 그 구간분전함의 출력 회로가 모자라면 가까운 구간분전함으로 간다. 절감 비율은 그 부하가 절감 공급 때 줄일 수 있는 몫이다.</div></div>`;
     $("#leNo").onclick = () => { this.sel = null; this.paint(); };
     $("#leOk").onclick = async () => {
       const g = +$("#leGrade").value, r = await this.post({ op: "set", id: it.id, name: $("#leName").value, grade: g, kw: parseFloat($("#leKw").value), save_pct: g === 1 ? 0 : parseFloat($("#leSave").value), fsu: $("#lePp").value });
