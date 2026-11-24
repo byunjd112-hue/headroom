@@ -66,6 +66,8 @@ def check_slide(n, slide, w, h):
         if odd:
             bad.append(f"{n}쪽: 글자 크기 {odd} — '{sh.name}'")
         x0, y0, x1, y1 = box(sh)
+        if sh.name.startswith(("번호", "표식")) and abs((x1 - x0) - (y1 - y0)) > 0.01:      # 번호 동그라미가 타원으로 늘어나지 않았는지
+            bad.append(f"{n}쪽: 번호 동그라미 비율 — '{sh.name}' {x1 - x0:.2f} × {y1 - y0:.2f}")
         if x0 < -TOL or y0 < -TOL or x1 > w + TOL or y1 > h + TOL:
             bad.append(f"{n}쪽: 슬라이드 밖 — '{sh.name}' ({x0:.2f},{y0:.2f})~({x1:.2f},{y1:.2f})")
     body = content(slide)

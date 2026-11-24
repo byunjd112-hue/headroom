@@ -114,7 +114,8 @@ function makeDeck(cfg) {
       if (!small) { p.o.w *= f; if (p.o.h > g.o.h * 0.9) p.o.h *= f; } });
     g.o.w *= f; g.o.h *= f;
     const nx = gx + g.o.w + (colX - gx - w0), sx = (L.R - nx) / (L.R - colX);
-    rest.forEach(p => { p.o.x = nx + (p.o.x - colX) * sx; if (p.o.w) p.o.w *= sx; if (p.o.colW) p.o.colW = p.o.colW.map(c => c * sx); });
+    const sq = d => d < 0.7 ? d : d * sx;                                   // 단 왼쪽의 안쪽 여백 · 번호 동그라미 자리(0.7 안쪽)는 그대로 두고 그 오른쪽만 좁힌다
+    rest.forEach(p => { const d0 = p.o.x - colX, d1 = d0 + (p.o.w || 0); p.o.x = nx + sq(d0); if (p.o.w) p.o.w = sq(d1) - sq(d0); if (p.o.colW) { const f2 = p.o.w / p.o.colW.reduce((a, b) => a + b, 0); p.o.colW = p.o.colW.map(c => c * f2); } });
     return [g, ...rd];
   }
   function spread(ops, foot) {
@@ -125,7 +126,8 @@ function makeDeck(cfg) {
     const moved = new Map(it.map(p => [p, p.o.y])), ny = y => L.TOP + (y - L.TOP) * k;
     it.forEach(p => { const g = p.fn === "addImage" ? null : ride(p), y0 = moved.get(p);
       if (g) p.o.y = ny(moved.get(g)) + (y0 - moved.get(g));          // 그림에 딸린 것: 그림과 같은 만큼 옮긴다
-      else { p.o.y = ny(y0); if (p.fn !== "addImage") { if (p.o.rowH) p.o.rowH = p.o.rowH.map(v => v * k); else if (p.o.h) p.o.h *= k; } } });
+      else { const small = !p.o.rowH && (p.o.w || 0) < 0.7 && (p.o.h || 0) < 0.7;      // 번호 동그라미 같은 작은 도형 · 글: 크기를 지킨다(늘리면 타원이 된다)
+        p.o.y = ny(y0); if (p.fn !== "addImage" && !small) { if (p.o.rowH) p.o.rowH = p.o.rowH.map(v => v * k); else if (p.o.h) p.o.h *= k; } } });
   }
   let cur_ops = [];
   function closePage() {
