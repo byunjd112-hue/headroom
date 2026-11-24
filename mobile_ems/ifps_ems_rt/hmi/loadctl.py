@@ -23,7 +23,7 @@ class LoadBook:
         """부하마다 물린 자리(지금 인식한 환망 배치 기준). 반환: (자리, 배전체계 목록, 구간분전함 목록)"""
         rg = self.eng.ringw.status() if getattr(self.eng, "ringw", None) is not None else None
         pp = [{"id": p["id"], "name": p["name"], "at": p["at"]} for p in (rg or {}).get("ppdu", [])]; ff = [{"id": f["id"], "name": f["name"]} for f in (rg or {}).get("fsu", [])]
-        sp = self.spec(); return loads.attach(self.items, pp, ff, sp["ppdu_ok"], sp["fsu_kw"], sp["fsu_out"]), pp, ff
+        sp = self.spec(); return loads.attach(self.items, pp, ff, sp["ppdu_ok"], sp["fsu_kw"], sp["fsu_out"], bool(sp["n1"])), pp, ff
 
     def spec(self):
         """환망의 정격 · 가정값(ring.spec) — 엔지니어가 환망 화면에서 고친 값이 여기로 온다."""
@@ -32,7 +32,7 @@ class LoadBook:
     def want(self):
         """부하 목록대로 배전체계를 놓을 자리(loads.plan) — 가상 장치가 이대로 놓는다. 실장비에서는 실제로 놓은 장치를 ID 로 알아낸다."""
         rg = self.eng.ringw.status() if getattr(self.eng, "ringw", None) is not None else None
-        sp = self.spec(); return loads.plan(self.items, (rg or {}).get("fsu", []), sp["ppdu_ok"], sp["fsu_out"])
+        sp = self.spec(); return loads.plan(self.items, (rg or {}).get("fsu", []), sp["ppdu_ok"], sp["fsu_out"], bool(sp["n1"]))
 
     def branch(self):
         """분기별 몫(loads.weights) — 환망의 분기 전력계 · 중요 부하 표시가 쓴다."""
@@ -72,7 +72,7 @@ class LoadBook:
         est = loads.share(self.items, kw, st); r = loads.rated(self.items); fr = loads.save_frac(self.items)
         at, pp, ff = self.where()
         items = [dict(i, feeder=loads.FEEDER[i["grade"]], rated=round(i["kw"] * i["n"], 1), est_kw=None if est[i["id"]] is None else round(est[i["id"]], 1), spr=loads.KINDS[i["kind"]][4],
-                      **{k: at[i["id"]][k] for k in ("fsu", "fsu_name", "ppdu", "ppdu_name", "ppdus", "need")}, fsu_auto=at[i["id"]]["auto"], fsu_over=at[i["id"]]["over"], out_over=at[i["id"]]["out_over"]) for i in self.items]
+                      **{k: at[i["id"]][k] for k in ("fsu", "fsu_name", "ppdu", "ppdu_name", "ppdus", "need", "base")}, fsu_auto=at[i["id"]]["auto"], fsu_over=at[i["id"]]["over"], out_over=at[i["id"]]["out_over"]) for i in self.items]
         grades = [{"grade": g, "feeder": f, "rated": round(r[g], 1), "kw": kw[f], "stage": st[f], "n": sum(i["n"] for i in self.items if i["grade"] == g), "save_frac": round(fr.get(f, 0.0), 3),
                    "auto": "save" if f in rt.shedder.saved else "shed" if f in rt.shedder.mine else "", "why": rt.shedder.why.get(f, "")} for g, f in loads.FEEDER.items()]
         return {"rev": self.rev, "by": self.by, "t": self.t, "items": items, "grades": grades, "limit": self.limit(), "ppdus": pp, "fsus": ff, "ring_rated": round(sum(i["rated"] for i in items if i["fsu"]), 1), "ppdu_need": sum(i["need"] for i in items), "ppdu_have": len(pp), "ppdu_slots": int((self.eng.cfg.get("ring") or {}).get("ppdu_slots", ring.DEFAULT["ppdu_slots"])), **{k: self.spec()[k] for k in ("ppdu_kw", "ppdu_ok", "fsu_kw", "fsu_a", "fsu_out", "pf")},

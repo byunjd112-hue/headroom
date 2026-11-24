@@ -4,7 +4,7 @@
 계산은 ifps_ems_rt/ring.py 가 한다. 여기서는 값을 넘기고 결과를 화면·경보·설정 파일로 옮긴다.
 """
 import json, math, os, time
-from .. import ring, branchfc, fsio
+from .. import ring, branchfc, fsio, contingency
 from . import cfgedit
 
 EDIT = ("at", "name")                           # 운용자가 현장에서 고칠 수 있는 배전체계(PPDU) 항목 — 회로별 이름·등급은 따로 다룬다
@@ -14,7 +14,7 @@ class RingWatch:
     def __init__(self, eng):
         self.r = ring.settings(eng.cfg.get("ring")); self.model = None; self.last = None; self.keys = set(); self.sig = None; self.hold = 0; self.on = set()
         if self.r and eng.sim and eng.plant is not None: self.model = ring.Model(self.r, eng.plant)
-        self.bpath = os.path.join(eng.rt.state_dir, "branch.json"); self.t_meter = {}; self.bsig = None; self.bwait = 0
+        self.bpath = os.path.join(eng.rt.state_dir, "branch.json"); self.t_meter = {}; self.bsig = None; self.bwait = 0; self.t_n1 = None
         try:
             with open(self.bpath, encoding="utf-8") as f: self.book = branchfc.Book(json.load(f))
         except (OSError, ValueError): self.book = branchfc.Book()
@@ -35,7 +35,17 @@ class RingWatch:
         keys |= self._meters(eng); keys.add("ring.over.total"); tot = [f.get("kw") for f in self.last["fsu"]]; amp = None if any(x is None for x in tot) else sum(tot)
         sp = ring.spec(self.r); eng.alarms.set("ring.over.total", amp is not None and amp > sp["fsu_kw"], 2, "환망", f"환망 전체 부하 {amp or 0:.0f} kW — 한 구간이 끊겨 한쪽에서만 받으면 환망 간선 정격 {sp['fsu_a']:.0f} A(약 {sp['fsu_kw']:.0f} kW)를 넘는다. 부하를 줄이거나 낮은 등급부터 끊으십시오")
         for key in self.keys - keys: eng.alarms.set(key, False, 3, "환망", ""); self.on.discard(key)     # 빠진 장치의 경보는 내린다
-        self.keys = keys; self._branch(eng)
+        self.keys = keys; self._branch(eng); self._n1(eng)
+
+    def _n1(self, eng):
+        """무정전 점검(단일 고장): 약점을 찾아 상태에 붙이고(화면), 정전으로 이어질 약점이 20초 넘게 있으면 알린다(배치가 바뀌는 동안의 잠깐은 넘긴다)."""
+        lw = getattr(eng, "loadw", None)
+        if lw is None or self.last is None: return
+        r = contingency.check(self.last, lw.view()["items"], ring.spec(self.r), eng.busw.view() if getattr(eng, "busw", None) is not None else None, dict(eng.kpi(), mode=eng.rt.mode))
+        self.last["n1"] = r; bad = next((x for x in r["items"] if x["level"] == "bad"), None); now = eng.rt.now()
+        if bad is None: self.t_n1 = None
+        elif self.t_n1 is None: self.t_n1 = now
+        eng.alarms.set("n1.weak", bad is not None and now - self.t_n1 >= 20.0, 2, "무정전", "무정전 점검: " + (bad["text"] if bad else "") + (f" → {bad['fix']}" if bad and bad["fix"] else ""))
 
     def _mark(self, eng, st, prev=None):
         """중요 부하 표시를 부하 목록에 맞춘다: 1등급 부하가 물린 구간분전함 · 배전체계가 중요 부하다(부하 목록이 비어 있으면 회로 등급 설정을 그대로 쓴다)."""
@@ -107,7 +117,7 @@ class RingWatch:
     def view(self, eng):
         """환망 화면이 받는 것: 상태 + 초기 기동 점검 결과 + 구성."""
         if self.r is None: return {"ok": False, "why": "환망을 쓰지 않습니다(runtime.json 의 ring)"}
-        st = self._mark(eng, ring.status(self.r, eng.rt.val, self._lost(eng)))
+        st = self._mark(eng, ring.status(self.r, eng.rt.val, self._lost(eng))); st["n1"] = (self.last or {}).get("n1")
         return {"ok": True, "branch": self.branch_view(eng), "status": st, "discover": ring.discover(self.r, eng.rt.val, self._lost(eng)), "config": {k: v for k, v in st["eff"].items() if k != "empty"}, "spec": {"rated_kw": ring.spec(self.r)["ppdu_kw"], **ring.spec(self.r), "items": [{"k": k, "v": ring.spec(self.r)[k], "lo": v[1], "hi": v[2], "src": v[3], "text": v[4], "set": k in (self.r.get("spec") or {})} for k, v in ring.SPEC.items()], "gnd_limit": ring.GND_LIMIT, "ch": [{"type": t, "kw": k} for t, k in ring.CH_SPEC]}, "sim": bool(self.model),
                 "sim_break": sorted(self.model.brk) if self.model else [], "sim_swap": self.model.swap if self.model else None, "sim_place": {k: sorted(v) for k, v in self.model.place.items()} if self.model else None}
 

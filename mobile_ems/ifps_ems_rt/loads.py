@@ -75,9 +75,10 @@ def scale(items):
     r = rated(items); return {g: r[g] / BASE[g] for g in BASE}
 
 
-def need(it, unit):
-    """그 부하 앞에 붙일 배전체계(정격 unit kW) 대수: 부하 하나마다 정격을 감당할 만큼(20 kW 이하 1대, 30 kW 는 2대). 수량이 여럿이면 하나마다 따로 붙인다."""
-    return it["n"] * max(1, math.ceil(it["kw"] / unit - 1e-9)) if it["n"] > 0 else 0
+def need(it, unit, spare=False):
+    """그 부하 앞에 붙일 배전체계(한 대에 싣는 한계 unit kW) 대수: 부하 하나마다 정격을 감당할 만큼(20 kW 이하 1대, 30 kW 는 2대). 수량이 여럿이면 하나마다 따로 붙인다.
+    spare 면 1등급 부하에 한 대를 더 둔다(N+1) — 한 대가 고장 나도 남은 것으로 정격을 감당한다."""
+    return it["n"] * (max(1, math.ceil(it["kw"] / unit - 1e-9)) + (1 if spare and it["grade"] == 1 else 0)) if it["n"] > 0 else 0
 
 
 def _home(it, order):
@@ -92,40 +93,40 @@ def _room(order, home, n, outs, used):
     return cand[0] if cand else home
 
 
-def spots(items, order, unit=20.0, outs=None):
+def spots(items, order, unit=20.0, outs=None, spare=False):
     """부하마다 물릴 구간분전함: {부하 id: (구간분전함, 자동 여부)}. 정해 둔 자리가 지금 있으면 그것, 아니면 종류에 따른 자리('자동').
     자동 자리는 그 구간분전함의 출력 회로(outs)가 모자라면 가까운 구간분전함으로 옮긴다 — 배전체계 한 대가 출력 회로 하나를 쓴다."""
     out = {}; used = {}
     for it in items:                                                   # 자리를 정해 둔 부하 먼저
         f = it.get("fsu") or ""
-        if f in order: out[it["id"]] = (f, False); used[f] = used.get(f, 0) + need(it, unit)
+        if f in order: out[it["id"]] = (f, False); used[f] = used.get(f, 0) + need(it, unit, spare)
     for it in items:
         if it["id"] in out: continue
-        f = _room(order, _home(it, order), need(it, unit), outs, used); out[it["id"]] = (f, True); used[f] = used.get(f, 0) + need(it, unit)
+        f = _room(order, _home(it, order), need(it, unit, spare), outs, used); out[it["id"]] = (f, True); used[f] = used.get(f, 0) + need(it, unit, spare)
     return out
 
 
-def attach(items, ppdus, fsus=(), unit=20.0, cap=None, outs=None):
+def attach(items, ppdus, fsus=(), unit=20.0, cap=None, outs=None, spare=False):
     """부하마다의 공급 경로를 정한다: 구간분전함(FSU)의 출력 회로 → 배전체계(PPDU, 부하 바로 앞 · 정격이 모자라면 여러 대를 병렬로) → 부하.
     ppdus: 지금 있는 배전체계 [{id, name, at}], fsus: 지금 있는 구간분전함 [{id, name}] (환망 순서), unit: 배전체계 한 대의 정격(kW), cap: 구간분전함의 용량(kW), outs: 구간분전함의 출력 회로 수.
     그 구간분전함에 물린 배전체계를 부하 순서대로 필요한 대수(need)만큼 나눠 준다 — 모자라면 있는 만큼만(ppdus 가 need 보다 짧다), 하나도 없으면 구간분전함 직결.
     반환: {부하 id: {"fsu", "fsu_name", "ppdus", "need", "ppdu", "ppdu_name", "auto", "over", "out_over"}} — over: 그 구간분전함의 정격 합이 cap 을 넘음, out_over: 필요한 배전체계가 출력 회로 수를 넘음. 환망이 없으면 빈 값."""
-    out = {}; fn = {f["id"]: f["name"] for f in fsus}; order = [f["id"] for f in fsus]; pool = {}; kw = {}; cnt = {}; pn = {p["id"]: p["name"] for p in ppdus}; sp = spots(items, order, unit, outs)
+    out = {}; fn = {f["id"]: f["name"] for f in fsus}; order = [f["id"] for f in fsus]; pool = {}; kw = {}; cnt = {}; pn = {p["id"]: p["name"] for p in ppdus}; sp = spots(items, order, unit, outs, spare)
     for p in ppdus: pool.setdefault(p["at"], []).append(p["id"])
     for it in items:
-        f, auto = sp[it["id"]]; nd = need(it, unit); take = pool.get(f, [])[:nd]; pool[f] = pool.get(f, [])[nd:]; kw[f] = kw.get(f, 0.0) + it["kw"] * it["n"]; cnt[f] = cnt.get(f, 0) + nd
-        out[it["id"]] = {"fsu": f, "fsu_name": fn.get(f, f), "ppdus": take, "need": nd, "ppdu": take[0] if take else "", "ppdu_name": pn.get(take[0], "") if take else "", "auto": auto}
+        f, auto = sp[it["id"]]; nd = need(it, unit, spare); take = pool.get(f, [])[:nd]; pool[f] = pool.get(f, [])[nd:]; kw[f] = kw.get(f, 0.0) + it["kw"] * it["n"]; cnt[f] = cnt.get(f, 0) + nd
+        out[it["id"]] = {"fsu": f, "fsu_name": fn.get(f, f), "ppdus": take, "need": nd, "base": need(it, unit), "ppdu": take[0] if take else "", "ppdu_name": pn.get(take[0], "") if take else "", "auto": auto}
     for v in out.values():
         v["over"] = bool(cap is not None and v["fsu"] and kw.get(v["fsu"], 0.0) > cap + 1e-9); v["out_over"] = bool(outs is not None and v["fsu"] and cnt.get(v["fsu"], 0) > outs)
     return out
 
 
-def plan(items, fsus, unit=20.0, outs=None):
+def plan(items, fsus, unit=20.0, outs=None, spare=False):
     """부하 목록대로 배전체계를 놓을 자리: 배전체계마다 물릴 구간분전함의 이름을 차례로(가상 장치가 이대로 놓는다). 환망을 모르면 None."""
     order = [f["id"] for f in fsus]
     if not order: return None
-    sp = spots(items, order, unit, outs); out = []
-    for it in items: out += [sp[it["id"]][0]] * need(it, unit)
+    sp = spots(items, order, unit, outs, spare); out = []
+    for it in items: out += [sp[it["id"]][0]] * need(it, unit, spare)
     return out
 
 

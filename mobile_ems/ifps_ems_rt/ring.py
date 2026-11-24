@@ -33,6 +33,7 @@ FSU_KW = round(FSU_KVA * FSU_PF)                          # 약 373 kW — 아�
 SPEC = {"fsu_a": (FSU_A, 50.0, 2000.0, "문서", "구간분전함 · 환망 간선의 정격 전류(A)"), "fsu_v": (FSU_V, 200.0, 480.0, "문서", "정격 전압(V, 3상)"), "fsu_out": (FSU_OUT, 1, 12, "문서", "구간분전함의 출력 회로 수(배전체계 한 대가 하나를 쓴다)"),
         "ppdu_kw": (RATED_KW, 5.0, 100.0, "문서", "배전체계 한 대의 정격(kW)"), "pf": (FSU_PF, 0.7, 1.0, "가정", "전류 정격을 kW 로 견줄 때의 역률"),
         "ppdu_use": (1.0, 0.5, 1.0, "가정", "배전체계를 여러 대 나란히 쓸 때 한 대에 싣는 몫(1 = 정격까지, 0.8 = 정격의 80%까지 — 전류 분담이 고르지 않을 것에 대비한 여유)"),
+        "n1": (1, 0, 1, "설계", "1등급 부하 앞에 배전체계를 한 대 더 둔다(N+1: 한 대가 고장 나도 남은 것으로 정격을 감당. 1 = 둔다)"),
         "sts": (1, 0, 1, "가정", "1등급 부하의 배전체계가 반대쪽 급전을 STS 로 바로 넘겨받는가(1 = 받는다, 0 = 다른 부하처럼 절체를 기다린다)")}
 
 
@@ -40,7 +41,7 @@ def spec(r):
     """환망의 정격 · 가정값(설정의 spec 으로 덮어쓴 것)과 거기서 나온 값: fsu_kva · fsu_kw(환망 간선의 한계), ppdu_ok(배전체계 한 대에 싣는 한계 kW)."""
     o = (r or {}).get("spec") if isinstance((r or {}).get("spec"), dict) else {}
     s = {k: (o[k] if _int_in(o.get(k), v[1], v[2]) else v[0]) for k, v in SPEC.items()}
-    s["fsu_out"] = int(s["fsu_out"]); s["sts"] = int(s["sts"]); s["fsu_kva"] = round(3 ** 0.5 * s["fsu_v"] * s["fsu_a"] / 1000.0); s["fsu_kw"] = round(s["fsu_kva"] * s["pf"]); s["ppdu_ok"] = round(s["ppdu_kw"] * s["ppdu_use"], 2)
+    s["fsu_out"] = int(s["fsu_out"]); s["sts"] = int(s["sts"]); s["n1"] = int(s["n1"]); s["fsu_kva"] = round(3 ** 0.5 * s["fsu_v"] * s["fsu_a"] / 1000.0); s["fsu_kw"] = round(s["fsu_kva"] * s["pf"]); s["ppdu_ok"] = round(s["ppdu_kw"] * s["ppdu_use"], 2)
     return s
 LOAD_REF = 60.0                  # 가상 장치: 등급별 부하가 이 값(kW)일 때 회로가 정격의 90% 를 쓴다고 본다
 GND_LIMIT = 100.0                # 접지저항이 이 값(Ω)을 넘으면 주회로 투입 금지(인터록 IL-1)
@@ -294,7 +295,7 @@ class Model:
     def __init__(self, r, plant, kw=None):
         self.r = r if r and "RING.sw0" in plant.by_tag else None; self.p = plant; self.kw = kw or {"L1": "LOAD.p1_kw", "L2": "LOAD.p2_kw", "L3": "LOAD.p3_kw"}
         self.e = {}; self.dt = 0.0; self.t_last = None                 # 분기 전력량계의 누적값 · 걸음 길이
-        self.branch = None; self.w = None; self.live = {}; self.want = None; self.want_sig = None              # 부하 목록의 분기별 몫(화면부가 넣는다) — 있으면 분기 전력계가 '그 자리에 물린 부하'를 따른다
+        self.branch = None; self.w = None; self.live = {}; self.want = None; self.want_sig = None; self.alive = {}              # 부하 목록의 분기별 몫(화면부가 넣는다) — 있으면 분기 전력계가 '그 자리에 물린 부하'를 따른다
         self.brk = set(); self.t_brk = {}; self.t_trip = None; self.init = set(); self.armed = False; self.swap = None; self.place = {}; self.zero = set(); self.t_fix = {}
         if self.r is None: return
         self._place0(); self._ids(); e = self.eff()
@@ -369,7 +370,7 @@ class Model:
         """이 배전체계에 물린 부하의 전력을 회로 6개에 나눈다: 등급이 같은 회로에 회로 정격 비율로 싣고, 그 회로들의 정격을 넘는 몫은 쓰는 회로 전체에 정격 비율로 싣는다(가상 장치의 가정)."""
         out = [0.0] * len(p["ch"]); used = [n for n, c in enumerate(p["ch"]) if c["cls"] > 0] or [0]; cap = lambda ns: sum(CH_SPEC[n][1] for n in ns)
         for g in (1, 2, 3):
-            kw = sum(self._feeder(g) * w["frac"] / len(w["ppdus"]) for w in self.w if p["id"] in w["ppdus"] and w["grade"] == g)      # 부하 앞에 여러 대면 고르게 나눠 싣는다
+            kw = sum(self._feeder(g) * w["frac"] / max(1, sum(1 for x in w["ppdus"] if self.alive.get(x))) for w in self.w if p["id"] in w["ppdus"] and w["grade"] == g)      # 부하 앞에 여러 대면 살아 있는 것끼리 고르게 나눠 싣는다(한 대가 빠지면 남은 것이 떠안는다)
             if kw <= 0: continue
             tg = [n for n, c in enumerate(p["ch"]) if c["cls"] == g] or used; a = min(kw, cap(tg))
             for n in tg: out[n] += a * CH_SPEC[n][1] / cap(tg)
@@ -393,10 +394,12 @@ class Model:
         """구간분전함 전압 → 배전체계(PPDU) 전압·주 차단기·회로별 전력. 회로 전력은 그 등급 부하(LOAD.pN_kw)의 크기에 비례하는 것으로 본다(가상 장치의 가정)."""
         live = self._fsu_live(e); here = {p["id"]: p for p in e["ppdu"]}; self.live = live; self.w = self.branch() if self.branch else None
         sts = {x for w in (self.w or []) if w["grade"] == 1 for x in w["ppdus"]} if spec(self.r)["sts"] else set(); alt = self._alt(e) if sts else {}      # 1등급 부하 앞의 배전체계: STS 로 반대쪽 급전을 바로 받는다
+        fed = {i: bool(live.get(p["at"], False) or (i in sts and alt.get(p["at"], False))) for i, p in here.items()}
+        self.alive = {i: fed[i] and (i not in self.init or int(round(self.p.get(f"{i}.mccb"))) == 1) for i in here if f"{i}.mccb" in self.p.by_tag}      # 전기가 들어오고 주 차단기가 투입된 배전체계
         for k in range(1, self._n("ppdu") + 1):
             i = f"PPDU{k}"
             if f"{i}.mccb" not in self.p.by_tag: continue
-            if i in here: self._one(here[i], bool(live.get(here[i]["at"], False) or (i in sts and alt.get(here[i]["at"], False))))
+            if i in here: self._one(here[i], fed[i])
             else: self._clear(i)
         self._fsu_meters(e)
 
