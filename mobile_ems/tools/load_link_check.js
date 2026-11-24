@@ -21,7 +21,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
     const sl = await text("sld", "#main svg text, #sldCb", 3500); on.forEach(i => need("결선도", sl, lab(i).slice(0, 10)));
     const rg = await text("ring", "#rgBody", 3500); on.forEach(i => need("환망", rg, lab(i)));
     for (const [pg, nm] of [["control", "설비 제어"], ["energy", "발전·예측"], ["trends", "추세"], ["scenarios", "운영 시나리오"]]) need(nm, await text(pg, "#main .pagehd .ld-note", 2200), pill);
-    const ct = await text("control", "#cbRows", 1500); d.grades.filter(g => g.n > 0).forEach(g => need("설비 제어", ct, d.items.find(i => i.feeder === g.feeder && i.n > 0).name));
+    await p.goto(B + "#control"); await p.waitForTimeout(2000); const ct = await p.evaluate(() => [...document.querySelectorAll("#cbRows tr")].map(e => e.title).join(" | "));      // 차단기 줄의 이름(풍선 도움말) d.grades.filter(g => g.n > 0).forEach(g => need("설비 제어", ct, d.items.find(i => i.feeder === g.feeder && i.n > 0).name));
     bad += miss.length; console.log(`${miss.length ? "✕" : "○"} ${what} | ${on.map(i => `${lab(i)}@${i.fsu}`).join(", ")}` + (miss.length ? "\n    " + miss.slice(0, 8).join("\n    ") : ""));
   }
   await p.reload(); await p.waitForTimeout(2000);

@@ -268,8 +268,8 @@ const P_CTL = {
     if (rr) { const sig = rg ? JSON.stringify([rg.sections.map(x => x.state), rg.fsu.map(f => [f.name, f.live])]) : ""; if (rr.dataset.sig !== sig) { rr.dataset.sig = sig;
       rr.innerHTML = !rg ? "" : `<tr><td colspan="5" class="muted" style="font-size:11.5px;padding-top:10px">환망 구간 개폐기 · <a href="#ring" style="color:var(--accent);text-decoration:none">환망 화면 →</a></td></tr>` + rg.sections.map(x => { const [a, b] = RingView.ends(rg, x.i);
         return `<tr title="감시 전용"><td class="mono"><b>구간 ${x.i}</b></td><td>${x.state == null ? '<span class="pill">미상</span>' : x.state === 1 ? '<span class="pill ok">투입</span>' : x.state === 2 ? '<span class="pill bad">차단</span>' : '<span class="pill warn">개방</span>'}</td><td colspan="3" class="muted" style="font-size:11.5px">${esc(a)} ↔ ${esc(b)}${x.open ? " · 상시 개방점" : ""}</td></tr>`; }).join(""); } }
-    for (const [f] of CB_ROWS) {
-      const c = cb(f), code = Math.round(val("FLT." + f) || 0);
+    for (const [f, nm] of cbRows()) {
+      const c = cb(f), code = Math.round(val("FLT." + f) || 0), tr = $("#cbs2-" + f).parentElement; if (tr.title !== nm) tr.title = nm;      // 차단기 이름(부하 급전선은 부하 목록의 이름)을 목록이 바뀔 때마다 맞춘다
       $("#cbs2-" + f).innerHTML = c === 1 ? `<span class="pill ok">투입</span>` : c === 2 ? `<span class="pill bad">트립</span>` : c === 0 ? `<span class="pill warn">개방</span>` : `<span class="pill">미상</span>`;
       $("#cbf-" + f).textContent = code ? (ANSI_TXT[code] || code) : "—"; $("#cbk-" + f).textContent = ld[f] === undefined ? "" : gw ? F.kw(ld[f]) : "####";
       $$(`#cbRows [data-shed="${f}"]`).forEach(b => { b.disabled = !can("operator") || !gw || (b.dataset.v === "2" ? c !== 1 : c === 1); });
