@@ -77,11 +77,11 @@ class Slide:
         return self
 
     def table(self, x, y, w, head, rows, *opt, **o):
-        """표. opt 는 차례로 (열 너비 비율, 글자 크기, 줄 높이, 이름표) — 이름으로도 줄 수 있다."""
-        widths, size, row_h, name = [o.get(k, opt[n] if n < len(opt) else d) for n, (k, d) in enumerate((("widths", None), ("size", 10), ("row_h", 0.3), ("name", "table")))]; head_fill = o.get("head_fill", "5B4A34"); i = self._id(); n = len(head); ws = widths or [1.0] * n; tot = float(sum(ws)); cw = [emu(w * v / tot) for v in ws]
+        """표. opt 는 차례로 (열 너비 비율, 글자 크기, 줄 높이, 이름표) — 이름으로도 줄 수 있다. head_size 는 머리줄 글자 크기(없으면 본문과 같게)."""
+        widths, size, row_h, name = [o.get(k, opt[n] if n < len(opt) else d) for n, (k, d) in enumerate((("widths", None), ("size", 10), ("row_h", 0.3), ("name", "table")))]; head_fill = o.get("head_fill", "5B4A34"); head_size = o.get("head_size", size); i = self._id(); n = len(head); ws = widths or [1.0] * n; tot = float(sum(ws)); cw = [emu(w * v / tot) for v in ws]
         def cell(t, hd):
             f = f'<a:solidFill><a:srgbClr val="{head_fill}"/></a:solidFill>' if hd else '<a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>'; b = "".join(f'<a:{s} w="6350"><a:solidFill><a:srgbClr val="999999"/></a:solidFill></a:{s}>' for s in ("lnL", "lnR", "lnT", "lnB"))
-            return f'<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>{_runs(t, size, hd, "FFFFFF" if hd else "222222", "ctr" if hd else "l")}</a:txBody><a:tcPr marL="45720" marR="45720" marT="22860" marB="22860" anchor="ctr">{b}{f}</a:tcPr></a:tc>'
+            return f'<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>{_runs(t, head_size if hd else size, hd, "FFFFFF" if hd else "222222", "ctr" if hd else "l")}</a:txBody><a:tcPr marL="45720" marR="45720" marT="22860" marB="22860" anchor="ctr">{b}{f}</a:tcPr></a:tc>'
         body = "".join(f'<a:tr h="{emu(row_h)}">' + "".join(cell("" if c is None else c, k == 0) for c in (list(r) + [""] * n)[:n]) + "</a:tr>" for k, r in enumerate([head] + list(rows)))
         self.xml.append(f'<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="{i}" name="{esc(name)}"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="{emu(x)}" y="{emu(y)}"/><a:ext cx="{emu(w)}" cy="{emu(row_h * (len(rows) + 1))}"/></p:xfrm>'
                         f'<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr firstRow="1"/><a:tblGrid>{"".join(GRID.format(c) for c in cw)}</a:tblGrid>{body}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>')

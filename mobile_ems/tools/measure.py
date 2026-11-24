@@ -8,6 +8,14 @@ from ifps_ems_rt.hmi.engine import Engine
 from ifps_ems_rt.hmi.server import serve
 
 
+
+def _rss_now():
+    """이 프로세스가 지금 쓰는 메모리(MB). 최대치(ru_maxrss)는 한 번 올라가면 내려오지 않아 누수 판정에 맞지 않는다."""
+    with open("/proc/self/status", encoding="ascii") as f:
+        for line in f:
+            if line.startswith("VmRSS:"): return round(int(line.split()[1]) / 1024, 1)
+    return float("nan")
+
 def q(base, path, body=None, tok=None):
     r = urllib.request.Request(base + path, data=None if body is None else json.dumps(body).encode(), method="GET" if body is None else "POST")
     if tok: r.add_header("X-EMS-Token", tok)
@@ -91,10 +99,10 @@ def main():
     ths = [threading.Thread(target=worker) for _ in range(20)]; t0 = time.monotonic(); [t.start() for t in ths]; [t.join() for t in ths]; dur = time.monotonic() - t0
     R["http"] = {"requests": len(lat) + err[0], "errors": err[0], "rps": round(len(lat) / dur, 1), "p50_ms": round(pct(lat, .5), 1), "p95_ms": round(pct(lat, .95), 1), "max_ms": round(max(lat), 1)}
     # 9) 장시간(soak): 수집 주기·주기 초과·메모리
-    n0, o0 = eng.rt.n_scan, eng.rt.n_over; eng.scan_ms.clear(); time.sleep(soak)
+    n0, o0 = eng.rt.n_scan, eng.rt.n_over; eng.scan_ms.clear(); time.sleep(soak / 2); mid = _rss_now(); time.sleep(soak - soak / 2); end = _rss_now()      # 메모리: 지금 쓰는 양을 구간 가운데와 끝에서 잰다(최대치가 아니라)
     sm = list(eng.scan_ms)
     R["soak"] = {"seconds": soak, "scans": eng.rt.n_scan - n0, "overruns": eng.rt.n_over - o0, "avg_ms": round(st.mean(sm), 2), "p95_ms": round(pct(sm, .95), 2), "max_ms": round(max(sm), 2),
-                 "rss_mb_start": round(rss0 / 1024, 1), "rss_mb_end": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1)}
+                 "rss_mb_start": round(rss0 / 1024, 1), "rss_mb_end": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1), "rss_mb_mid": mid, "rss_mb_last": end}
     R["audit"] = {"seq": eng.rt.audit.seq, "verify": eng.rt.audit.verify()}
     httpd.shutdown(); eng.stop(); shutil.rmtree(td, ignore_errors=True)
     json.dump(R, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=1); print(json.dumps(R, ensure_ascii=False, indent=1))

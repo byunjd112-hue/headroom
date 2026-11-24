@@ -1,6 +1,6 @@
 {
- "date": "2026-11-23 21:23",
- "unittest_s": 521.6,
+ "date": "2026-11-23 23:45",
+ "unittest_s": 516.5,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -117,12 +117,15 @@
   "test_R19_wrong_json_shapes_are_400_not_500 | ok",
   "R-26: 주둔지 자립 태세 = 전시·유사시 상전 상실. 가상 장치에서는 자립을 고르면 수전 차단기가 열린 상태가 되고 정전 논리로 운전한다. | ok",
   "test_never_answered_device_is_treated_as_not_installed | ok",
+  "test_meter_reset_falls_back_to_power_samples | ok",
+  "test_profile_level_and_error | ok",
   "test_alarms_priority_follows_vital_load | ok",
   "test_auto_layout_follows_ids | ok",
   "test_fixed_layout_reports_swapped_units | ok",
   "test_ppdu_circuits_overload_ground_and_trip | ok",
   "test_settings_and_check | ok",
   "test_status_normal_cut_and_isolated | ok",
+  "분기 전력계: 구간분전함 전력 = 아래 배전체계의 합, 전력량이 쌓이고, 환망 화면에 분기별 전력 · 전력량 · 예측이 나온다. 전력계가 어긋나면 알린다. | ok",
   "test_monitor_break_discover_and_configure | ok",
   "test_units_removed_added_and_shuffled_without_any_setting | ok",
   "장치마다 순서가 다른 현장을 모의: 32비트 점 3종 + 장치 기본 DCBA(16비트 지령까지 바이트 뒤집힘). | ok",
@@ -207,18 +210,18 @@
   "test_parse_json_and_csv | ok",
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 204,
+ "n_tests": 207,
  "tests_ok": true,
  "retried": [],
- "coverage_pct": 92.3,
+ "coverage_pct": 92.4,
  "stmt": {
-  "n": 6697,
-  "hit": 6380,
-  "pct": 95.3
+  "n": 6827,
+  "hit": 6511,
+  "pct": 95.4
  },
  "branch": {
-  "n": 2386,
-  "hit": 2008,
+  "n": 2412,
+  "hit": 2030,
   "pct": 84.2
  },
  "coverage_files": [
@@ -287,14 +290,6 @@
    "33-34, 48-50"
   ],
   [
-   "ifps_ems_rt/hmi/ringwatch.py",
-   88.3,
-   111,
-   65.3,
-   72,
-   "104-109, 143-149"
-  ],
-  [
    "ifps_ems_rt/hmi/__main__.py",
    88.6,
    44,
@@ -303,12 +298,20 @@
    "28-29, 33-34, 56"
   ],
   [
-   "ifps_ems_rt/hmi/seqppt.py",
-   89.0,
-   155,
-   68.8,
+   "ifps_ems_rt/hmi/ringwatch.py",
+   89.2,
+   139,
+   67.5,
    80,
-   "160, 198-210, 214-216"
+   "43-44, 138-143, 177-183"
+  ],
+  [
+   "ifps_ems_rt/hmi/seqppt.py",
+   90.1,
+   171,
+   67.9,
+   78,
+   "186, 224-236, 240-242"
   ],
   [
    "ifps_ems_rt/hmi/eng_tools.py",
@@ -319,20 +322,20 @@
    "70-75, 84-86, 116-117"
   ],
   [
-   "ifps_ems_rt/hmi/eng_forecast.py",
-   90.7,
-   118,
-   90.6,
-   32,
-   "30, 46-47, 61-64, 67-69, 123"
-  ],
-  [
    "ifps_ems_rt/hmi/weatherwatch.py",
    90.9,
    99,
    50.0,
    22,
    "57-58, 66, 132-137"
+  ],
+  [
+   "ifps_ems_rt/hmi/eng_forecast.py",
+   92.4,
+   118,
+   90.6,
+   32,
+   "30, 61-64, 67-69, 123"
   ],
   [
    "ifps_ems_rt/hmi/archapi.py",
@@ -471,14 +474,6 @@
    "32, 57"
   ],
   [
-   "ifps_ems_rt/hmi/docx.py",
-   97.6,
-   42,
-   100.0,
-   4,
-   "51"
-  ],
-  [
    "ifps_ems/learner.py",
    97.7,
    173,
@@ -503,20 +498,20 @@
    "93-94, 110"
   ],
   [
+   "ifps_ems_rt/hmi/docx.py",
+   98.1,
+   53,
+   100.0,
+   4,
+   "65"
+  ],
+  [
    "ifps_ems_rt/hmi/loadctl.py",
    98.3,
    59,
    95.0,
    20,
    "39"
-  ],
-  [
-   "ifps_ems_rt/simplant.py",
-   98.3,
-   178,
-   92.4,
-   66,
-   "176, 188-189"
   ],
   [
    "ifps_ems_rt/modbus.py",
@@ -549,6 +544,14 @@
    97.1,
    34,
    "64"
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   98.9,
+   178,
+   93.9,
+   66,
+   "188-189"
   ],
   [
    "ifps_ems_rt/mbtool.py",
@@ -660,6 +663,14 @@
    2,
    100.0,
    0,
+   ""
+  ],
+  [
+   "ifps_ems_rt/branchfc.py",
+   100.0,
+   60,
+   85.7,
+   14,
    ""
   ],
   [
@@ -793,15 +804,15 @@
   [
    "ifps_ems_rt/ring.py",
    100.0,
-   251,
-   92.6,
-   94,
+   266,
+   91.0,
+   100,
    ""
   ]
  ],
  "pylint": {
   "E": 1,
-  "W": 54,
+  "W": 55,
   "by_id": [
    [
     "W0718 broad-exception-caught",
@@ -836,6 +847,10 @@
     3
    ],
    [
+    "W1113 keyword-arg-before-vararg",
+    2
+   ],
+   [
     "E1121 too-many-function-args",
     1
    ],
@@ -849,10 +864,6 @@
    ],
    [
     "W0108 unnecessary-lambda",
-    1
-   ],
-   [
-    "W1113 keyword-arg-before-vararg",
     1
    ],
    [
@@ -1017,7 +1028,7 @@
     "W0106",
     "expression-not-assigned",
     "ifps_ems_rt/ring.py",
-    300,
+    311,
     "Model._one",
     "Expression \"[P.set(f'{i}.ch{n}', 1) for n in range(1, 7)]\" is assigned to nothing"
    ],
@@ -1137,7 +1148,7 @@
     "W0012",
     "unknown-option-value",
     "ifps_ems_rt/hmi/seqppt.py",
-    178,
+    204,
     "",
     "Unknown option value for 'disable', expected a valid pylint message and got 'scenarios'"
    ],
@@ -1145,7 +1156,7 @@
     "W0012",
     "unknown-option-value",
     "ifps_ems_rt/hmi/seqppt.py",
-    178,
+    204,
     "",
     "Unknown option value for 'disable', expected a valid pylint message and got 'engine'"
    ],
@@ -1153,9 +1164,17 @@
     "W0012",
     "unknown-option-value",
     "ifps_ems_rt/hmi/seqppt.py",
-    187,
+    213,
     "",
     "Unknown option value for 'disable', expected a valid pylint message and got 'ModbusError'"
+   ],
+   [
+    "W1113",
+    "keyword-arg-before-vararg",
+    "ifps_ems_rt/hmi/seqppt.py",
+    120,
+    "_frame",
+    "Keyword argument before variable positional arguments list in the definition of _frame function"
    ],
    [
     "W0212",
@@ -1304,7 +1323,7 @@
   ]
  },
  "metrics": {
-  "n_func": 855,
+  "n_func": 877,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1363,8 +1382,17 @@
    ],
    [
     "ifps_ems_rt/ring.py",
+    "status",
+    175,
+    20,
+    12,
+    3,
+    0
+   ],
+   [
+    "ifps_ems_rt/ring.py",
     "alarms",
-    221,
+    231,
     20,
     23,
     2,
@@ -1387,15 +1415,6 @@
     10,
     1,
     0
-   ],
-   [
-    "ifps_ems_rt/hmi/archcfg.py",
-    "check",
-    27,
-    20,
-    18,
-    2,
-    2
    ]
   ],
   "top_len": [
@@ -1631,7 +1650,7 @@
    ],
    [
     "ifps_ems_rt/ring.py",
-    372
+    397
    ],
    [
     "ifps_ems_rt/hmi/scenarios.py",
@@ -1654,6 +1673,10 @@
     249
    ],
    [
+    "ifps_ems_rt/hmi/seqppt.py",
+    243
+   ],
+   [
     "ifps_ems/forecast.py",
     236
    ],
@@ -1668,10 +1691,6 @@
    [
     "ifps_ems_rt/simplant.py",
     223
-   ],
-   [
-    "ifps_ems_rt/hmi/seqppt.py",
-    217
    ],
    [
     "ifps_ems_rt/opsmode.py",
@@ -1692,6 +1711,10 @@
    [
     "ifps_ems_rt/hmi/engine.py",
     186
+   ],
+   [
+    "ifps_ems_rt/hmi/ringwatch.py",
+    184
    ],
    [
     "ifps_ems_rt/hmi/pptx.py",
@@ -1716,10 +1739,6 @@
    [
     "ifps_ems_rt/hmi/eng_command.py",
     153
-   ],
-   [
-    "ifps_ems_rt/hmi/ringwatch.py",
-    150
    ],
    [
     "ifps_ems_rt/fleet.py",
@@ -1782,6 +1801,14 @@
     99
    ],
    [
+    "ifps_ems_rt/branchfc.py",
+    96
+   ],
+   [
+    "ifps_ems_rt/hmi/docx.py",
+    90
+   ],
+   [
     "ifps_ems_rt/hmi/simdriver.py",
     90
    ],
@@ -1824,10 +1851,6 @@
    [
     "ifps_ems_rt/hmi/unitctl.py",
     73
-   ],
-   [
-    "ifps_ems_rt/hmi/docx.py",
-    72
    ],
    [
     "ifps_ems_rt/hmi/engdefs.py",
@@ -1922,7 +1945,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 8457,
+   "loc": 8713,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -2085,7 +2108,7 @@
    "B310",
    "MEDIUM",
    "tools/measure.py",
-   14,
+   22,
    "Audit url open for permitted schemes. Allowing use of file:/ or custom schemes is often unexpected.",
    "CWE-22"
   ],
@@ -2106,12 +2129,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 5.85,
- "cc_n": 878,
+ "cc_avg": 5.87,
+ "cc_n": 901,
  "cc_rank": {
-  "A": 522,
-  "B": 217,
-  "C": 139,
+  "A": 532,
+  "B": 227,
+  "C": 142,
   "D": 0,
   "E": 0,
   "F": 0
@@ -2155,6 +2178,12 @@
   ],
   [
    "ifps_ems_rt/ring.py",
+   "status",
+   20,
+   "C"
+  ],
+  [
+   "ifps_ems_rt/ring.py",
    "alarms",
    20,
    "C"
@@ -2168,12 +2197,6 @@
   [
    "ifps_ems_rt/hmi/report.py",
    "_current",
-   20,
-   "C"
-  ],
-  [
-   "ifps_ems_rt/hmi/ringwatch.py",
-   "configure",
    20,
    "C"
   ]
@@ -2211,7 +2234,12 @@
   ],
   [
    "ifps_ems_rt/hmi/seqppt.py",
-   21.1,
+   19.6,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/ringwatch.py",
+   20.0,
    "A"
   ],
   [
@@ -2237,11 +2265,6 @@
   [
    "ifps_ems/forecast.py",
    27.4,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/hmi/ringwatch.py",
-   28.4,
    "A"
   ],
   [
@@ -2375,6 +2398,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/branchfc.py",
+   45.0,
+   "A"
+  ],
+  [
    "ifps_ems_rt/hal.py",
    45.4,
    "A"
@@ -2382,11 +2410,6 @@
   [
    "ifps_ems_rt/hmi/simdriver.py",
    46.8,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/hmi/docx.py",
-   48.3,
    "A"
   ],
   [
@@ -2412,6 +2435,11 @@
   [
    "ifps_ems_rt/loads.py",
    53.1,
+   "A"
+  ],
+  [
+   "ifps_ems_rt/hmi/docx.py",
+   53.3,
    "A"
   ],
   [
@@ -2541,9 +2569,9 @@
   ]
  ],
  "loc_py": {
-  "files": 72,
-  "sloc": 6975,
-  "comments": 998
+  "files": 73,
+  "sloc": 7110,
+  "comments": 1021
  },
  "js": [
   [
@@ -2588,7 +2616,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/ring.js",
-   107,
+   122,
    true
   ],
   [

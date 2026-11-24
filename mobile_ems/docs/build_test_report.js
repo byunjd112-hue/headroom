@@ -31,7 +31,7 @@ const sum = [
   ["24시간 예측 오차(부하/PV)", "15% 이하", `${D.forecast_acc.load_nmae}% / ${D.forecast_acc.pv_nmae}%`, ok(D.forecast_acc.load_nmae <= 15 && D.forecast_acc.pv_nmae <= 15)],
   ["예측 구간 포함률", "70% 이상", `${D.forecast_acc.load_cov}% / ${D.forecast_acc.pv_cov}%`, ok(D.forecast_acc.load_cov >= 70 && D.forecast_acc.pv_cov >= 70)],
   ["웹 API 부하", "오류 0, p95 200ms 이하", `${D.http.requests}회, 오류 ${D.http.errors}, p95 ${D.http.p95_ms}ms`, ok(D.http.errors === 0 && D.http.p95_ms <= 200)],
-  ["메모리 증가(300초)", "증가 없음", `${D.soak.rss_mb_start} → ${D.soak.rss_mb_end} MB`, ok(D.soak.rss_mb_end - D.soak.rss_mb_start < 5)],
+  ["메모리 증가(연속 운전 후반)", "5 MB 미만", `${D.soak.rss_mb_mid} → ${D.soak.rss_mb_last} MB (최대 ${D.soak.rss_mb_end} MB)`, ok(D.soak.rss_mb_last - D.soak.rss_mb_mid < 5)],
   ["감사 기록 무결성", "검증 통과", D.audit.verify[1], ok(D.audit.verify[0])],
   ["정적 결함(pyflakes)", "0건", `${S.pyflakes.length}건`, ok(S.pyflakes.length === 0)],
   ["보안 약점(bandit)", "중간 이상 0건", `${S.bandit.results.length}건 (사유 기재 예외 ${S.bandit_nosec.length}건)`, ok(S.bandit.results.filter(r => r[1] !== "LOW").length === 0)],

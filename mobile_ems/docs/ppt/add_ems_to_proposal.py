@@ -14,15 +14,18 @@ from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 
 HERE = os.path.dirname(os.path.abspath(__file__)); REV = sys.argv[1] if len(sys.argv) > 1 else "Rev00"
 SRC = os.path.join(HERE, "base", "IFPS_제안발표_원본.pptx"); IMG = os.path.join(HERE, "img")
-OUT = os.path.join(HERE, "..", "out", f"IFPS_제안발표_EMS보완_{REV}.pptx"); LIMIT = 25_000_000
+OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, "..", "out", f"IFPS_제안발표_EMS보완_{REV}.pptx"); LIMIT = 25_000_000
 if not os.path.exists(SRC): print("건너뜀: 원본 없음 —", SRC); sys.exit(0)
 p = Presentation(SRC); base = p.slides[8]; N0 = len(p.slides)
 assert "이동형 전력체계 EMS" in base.shapes[5].text_frame.text
 C = lambda h: RGBColor.from_string(h)
 INK, DARK, CREAM, GOLD, BROWN, LINE, GRAY, WHITE = "2B2723", "35302A", "F9F1E6", "8A7449", "7B674F", "E0D7C8", "6F6B68", "FFFFFF"
+# 글자 크기 · 위치는 원본 발표 자료의 것(= docs/ppt/deck_lib.js 의 FS · L, tools/deck_check.py 가 점검)
+FS_HEAD, FS_BODY, FS_NOTE = 16, 12, 8.8
+TOP, BODY_BOT, STRIP_Y, NOTE_Y = 1.72, 5.80, 5.92, 6.56
 
 
-def text(s, x, y, w, h, t, size=12, bold=False, color=INK, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP):
+def text(s, x, y, w, h, t, size=FS_BODY, bold=False, color=INK, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP):
     tb = s.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h)); tf = tb.text_frame; tf.word_wrap = True
     tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0; tf.vertical_anchor = anchor
     for i, line in enumerate(t if isinstance(t, list) else [t]):
@@ -49,23 +52,23 @@ def new_slide(title, sub):
     return s
 
 
-def tile(s, i, n, img, head, lines, ratio, y=1.68, cap=None):
+def tile(s, i, n, img, head, lines, ratio, y=TOP):
     """그림 한 장 + 머리 + 요점. i 번째(0부터), 한 줄에 n 장."""
     gap = 0.14; w = (12.33 - gap * (n - 1)) / n; x = 0.5 + i * (w + gap); h = w / ratio
     s.shapes.add_picture(f"{IMG}/{img}.jpg", Inches(x), Inches(y), Inches(w), Inches(h))
     fr = rect(s, x, y, w, h, WHITE, LINE); fr.fill.background()
-    rect(s, x, y + h, w, 0.34, BROWN); text(s, x + 0.1, y + h, w - 0.2, 0.34, head, 12.5, True, WHITE, anchor=MSO_ANCHOR.MIDDLE)
-    bh = 5.72 - (y + h + 0.34); rect(s, x, y + h + 0.34, w, bh, CREAM, LINE)
-    text(s, x + 0.1, y + h + 0.42, w - 0.2, bh - 0.12, ["· " + t for t in lines], 10.5)
+    rect(s, x, y + h, w, 0.4, BROWN); text(s, x + 0.1, y + h, w - 0.2, 0.4, head, FS_HEAD, True, WHITE, anchor=MSO_ANCHOR.MIDDLE)
+    bh = BODY_BOT - (y + h + 0.4); rect(s, x, y + h + 0.4, w, bh, CREAM, LINE)
+    text(s, x + 0.1, y + h + 0.46, w - 0.2, bh - 0.1, ["· " + t for t in lines])
 
 
 def strip(s, items, note):
     """아래 띠: 핵심 수치·요점 상자와 주석."""
     n = len(items); gap = 0.14; w = (12.33 - gap * (n - 1)) / n
     for i, (lab, val) in enumerate(items):
-        x = 0.5 + i * (w + gap); rect(s, x, 5.86, w, 0.74, DARK)
-        text(s, x, 5.89, w, 0.24, lab, 10, False, "EFE6D8", PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE); text(s, x, 6.13, w, 0.42, val, 15, True, WHITE, PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
-    text(s, 0.5, 6.66, 12.33, 0.3, note, 8.8, False, GRAY, anchor=MSO_ANCHOR.MIDDLE)
+        x = 0.5 + i * (w + gap); rect(s, x, STRIP_Y, w, 0.58, DARK)
+        text(s, x, STRIP_Y + 0.02, w, 0.22, lab, FS_BODY, False, "EFE6D8", PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE); text(s, x, STRIP_Y + 0.24, w, 0.32, val, FS_HEAD, True, WHITE, PP_ALIGN.CENTER, MSO_ANCHOR.MIDDLE)
+    text(s, 0.5, NOTE_Y, 12.33, 0.24, note, FS_NOTE, False, GRAY, anchor=MSO_ANCHOR.MIDDLE)
 
 
 HW, SW = 1024 / 688, 16 / 9
@@ -78,7 +81,7 @@ tile(s1, 0, 4, "hw_pls", "PLS 적재 · 하역", ["ISO 규격 치수·모서리 
 tile(s1, 1, 4, "hw_tiedown", "고박", ["모서리 쇠 4곳 잠금 + 고박 고리", "도로·야지·철도·선박 하중 방향별 대응", "내부 장비는 레일 잠금·전면 고정 바"], HW)
 tile(s1, 2, 4, "hw_rack", "방진 랙", ["와이어로프 방진기로 랙 전체를 매달아 충격·진동 저감", "회전 디스크 금지(SSD), 풀림 방지 체결", "방진 행정만큼 공간·케이블 여유"], HW)
 tile(s1, 3, 4, "hw_interior", "쉘터 내부", ["방진 랙 2 + 운용 콘솔, 냉난방·등화관제", "무거운 장비는 아래 — 무게중심 낮춤", "랙 전면 정비, 예비품 차폐 보관"], HW)
-strip(s1, [("진동 · 충격", "MIL-STD-810H 514.8 · 516.8"), ("철도 충격", "MIL-STD-810H 526.2"), ("수송 규격", "ISO 668 · 1496-1"), ("방진 구조", "쉘터 – 랙 – 장비 3단계")],
+strip(s1, [("진동 · 충격 — MIL-STD-810H", "514.8 · 516.8"), ("철도 충격 — MIL-STD-810H", "526.2"), ("수송 규격", "ISO 668 · 1496-1"), ("방진 구조", "쉘터 – 랙 – 장비 3단계")],
       "※ 구성안(제작·시험 전). 시험 수준·후크 높이·허용 중량은 발주처 요구와 운용 차량 제원으로 확정. 그림은 개념도(AI 생성).")
 # ── 하드웨어 ②
 s2 = new_slide("3-4.  ⑤ EMS 하드웨어 ② — EMP 방호 · 전원 · 연산 · 접속", "차폐 구역 + 관통부 보호(전원은 필터, 신호는 광)  |  무정전 전원  |  서버·제어망 이중화  |  접속반 한 곳에서 연결")
