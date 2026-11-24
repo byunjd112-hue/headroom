@@ -215,6 +215,16 @@ function siteMapSvg(s) {
   return `<svg viewBox="0 0 ${MAP_W} ${MAP_H}" class="sitemap ${L.edit ? "editing" : ""}" preserveAspectRatio="xMidYMid slice">${g}</svg>`;
 }
 function _mkPos(it) { const [Lx, Ly, Lz] = ISO_EXT[it.kind] || ISO_EXT.FSU; return [it.x / MAP_W * 100, Math.max(12, (it.y - ((Lx + Ly) * ISO_S / 2 + Lz) * MAP_S * .9) / MAP_H * 100)]; }
+/* 표지가 서로 겹치면 위쪽 표지를 더 위로 올려 떼어 놓는다(부하 · 장비가 늘어 표지가 포개져 읽히지 않는 일을 막는다). 아래 것부터 자리를 정한다 */
+function layUnstack() {
+  const cs = $$("#siteMk .spt .scard").filter(c => c.getClientRects().length); cs.forEach(c => { c.style.top = ""; });
+  const R = cs.map(c => ({ c, r: c.getBoundingClientRect(), dy: 0 })).sort((a, b) => b.r.top - a.r.top);
+  for (let pass = 0, hit = true; hit && pass < 8; pass++) { hit = false;      // 올린 표지가 다른 표지와 다시 겹칠 수 있어 겹침이 없어질 때까지 되풀이한다
+    for (let i = 1; i < R.length; i++) for (let j = 0; j < i; j++) { const a = R[i], q = R[j], ab = a.r.bottom + a.dy, qt = q.r.top + q.dy;
+      if (a.r.left < q.r.right + 6 && a.r.right > q.r.left - 6 && ab > qt - 4 && a.r.top + a.dy < q.r.bottom + q.dy + 4) { a.dy -= ab - qt + 6; hit = true; } }
+    R.sort((a, b) => (b.r.top + b.dy) - (a.r.top + a.dy)); }
+  R.forEach(x => { if (x.dy) x.c.style.top = `${-18 + x.dy}px`; });
+}
 function siteMarkers() {
   const box = $("#siteMk"); if (!box || !L.items) return;
   if (L.edit) { box.innerHTML = ""; return; }
@@ -260,7 +270,9 @@ function siteUpdate(s, force) {
     if (ld && !it.spare && /kW$/.test(x.v) && x.v !== "0 kW") x = Object.assign({}, x, { v: `${F.kw(ld.est_kw)} kW`, t: `${x.t} · ${ld.grade}등급${ld.fsu ? " · " + ld.fsu_name : ""}` });      // 그 부하의 추정 전력(부하 관리 화면과 같은 값) · 등급 · 물린 배전체계
     if (it.spare) x = { st: "idle", v: "—", t: LOAD_SPR.includes(it.kind) ? "부하 없음(예비 자리)" : "장치 없음(예비 자리)" };      // 부하 목록에 없는 그림: 급전선이 살아 있어도 '급전 중'이라고 쓰지 않는다
     if (u) x = { st: !u.live ? "bad" : u.on || it.kind === "ESS" || it.kind === "PV" ? "ok" : "idle", v: `${u.id}${u.kw == null ? "" : " · " + F.kw(u.kw) + " kW"}${it.kind === "ESS" && u.soc != null ? " · " + F.n(u.soc, 0) + "%" : ""}`, t: !u.live ? "통신 두절" : it.kind === "ESS" || it.kind === "PV" ? "연결" : u.on ? "운전" : "정지" };
+    const hd = `${it.name || LAY_KINDS[it.kind].nm}${it.spare ? " · 예비 자리" : ""}`, sh = e.querySelector(".sh"); if (sh.textContent !== hd) sh.textContent = hd;      // 이름 · 예비 자리 표시도 부하 목록이 바뀌면 따라간다
     e.className = `spt ${e.classList.contains("mini") ? "mini" : ""} ${x.st}`; e.querySelector(".sv .mono").textContent = x.v; e.querySelector(".ss").textContent = x.t; });
+  layUnstack();
   const sum = $("#layCnt"); if (sum) { const A = L.edit ? L.items : layAuto(L.items).filter(i => !i.spare), c = k => A.filter(i => i.kind === k).length, ld = LD.s().grades.reduce((a, g) => a + g.n, 0);      // 화면에 놓인 것(자동으로 놓인 장치 · 부하 포함)
     sum.textContent = `장비 ${A.filter(i => !["FSU", "BARRACK", "L1", "L2", "L3"].includes(i.kind)).length} · 부하 ${L.edit ? c("BARRACK") + c("L1") + c("L2") + c("L3") : ld} · FSU ${c("FSU")}`; }
 }
