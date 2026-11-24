@@ -147,6 +147,20 @@ class RingWatchTest(unittest.TestCase):
         e = self.eng
         with e.lock: e.ringw.model.want = None; e.loadw.items = []; e.ringw.sim({"action": "restore"})
 
+    def test_ring_keeps_supplying_through_a_break(self):
+        """무정전 원칙(원본 자료의 기준): 한 구간이 끊겨도 환망이 반대쪽에서 보낸다 — 1등급 부하는 STS 절체로 끊기지 않고, 나머지는 3초 안에 복구된다. 환망 전체가 간선 정격을 넘으면 알린다."""
+        e = self.eng; w = e.ringw; full = lambda: all(len(i["ppdus"]) == i["need"] for i in e.snapshot()["loads"]["items"])
+        self.assertTrue(self._wait(lambda: (e.snapshot()["ring"] or {}).get("ok") and full(), 15.0)); self.assertLessEqual(w.r["trip_ms"] + w.r["close_ms"], 3000)
+        pp = lambda i: next(p for p in w.status()["ppdu"] if p["id"] == i); seen = {"c2": [], "med": [], "fsu": []}; w.sim({"action": "break", "section": 1}); t0 = time.monotonic()      # 지휘통제(FSU2) · 의무(FSU4)가 물린 쪽의 급전 구간을 끊는다
+        while time.monotonic() - t0 < 6.0:
+            s = w.status(); seen["c2"].append(pp("PPDU1")["live"] and pp("PPDU2")["live"]); seen["med"].append((time.monotonic() - t0, pp("PPDU3")["live"])); seen["fsu"].append(next(f for f in s["fsu"] if f["id"] == "FSU2")["live"]); time.sleep(0.1)
+        self.assertTrue(all(seen["c2"]), "1등급 부하의 배전체계가 끊겼다"); self.assertIn(False, seen["fsu"])                                   # 구간분전함은 잠깐 무전압이 됐지만 1등급은 STS 로 이어 받았다
+        dead = [t for t, v in seen["med"] if v is False]; self.assertTrue(dead); self.assertLess(max(dead) - min(dead), 5.0)                  # 2등급은 끊겼다가 복구(설정은 2.6초 — 가상 장치의 걸음과 수집 주기 때문에 화면에는 1~2초 늦게 보인다)
+        s = w.status(); self.assertTrue(s["ok"] and s["switched"] and s["cut"] == [1]); w.sim({"action": "restore"})
+        with e.lock:                                                                                                                         # 환망 전체 부하가 간선 정격(630 A)을 넘으면 경보
+            w.last = copy.deepcopy(w.status()); [f.update(kw=80.0) for f in w.last["fsu"]]; tot = sum(f["kw"] for f in w.last["fsu"])
+            e.alarms.set("ring.over.total", tot > ring.FSU_KW, 2, "환망", "시험"); self.assertGreater(tot, ring.FSU_KW); self.assertEqual((ring.FSU_A, ring.FSU_OUT, ring.FSU_KVA), (630.0, 4, 415))
+
     def test_monitor_break_discover_and_configure(self):
         e = self.eng; w = e.ringw; self.assertTrue(self._wait(lambda: (e.snapshot()["ring"] or {}).get("ok")))
         v = w.view(e); self.assertEqual(v["status"]["missing"], []); self.assertTrue(self._wait(lambda: w.view(e)["discover"]["n"] == 13 and w.view(e)["discover"]["ok"]))      # 구간분전함 7 + 부하 앞 배전체계 6

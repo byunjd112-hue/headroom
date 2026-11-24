@@ -126,7 +126,7 @@ function sldRing(s, live) {
   r.fsu.forEach((f, k) => { const x = xs(k), c = f.live == null ? "na" : f.live ? "on" : "off", pp = r.ppdu.filter(p => p.at === f.id), one = pp.length >= 1;
     if (!pp.length && LD.atFsu(f.id).length) h += sldDirect(f, x, YR);      // 배전체계 없이 구간분전함에 바로 물린 부하
     h += `<circle class="sring-n ${c}" cx="${x}" cy="${YR}" r="13"/><text class="sring-k" x="${x}" y="${YR + 4}" text-anchor="middle">${k + 1}</text><text class="sring-nm ${c}" x="${x}" y="${YR - 19}" text-anchor="middle">${esc(f.name)}</text>` +
-      (pp.length ? [RingView.group(pp)] : []).map((p, j) => { const bad = p.bad, tr = p.trip, y = YR + 26 + j * 46, w = 108, st = bad ? "off" : p.warn ? "warn" : "on", fed = !bad && f.live === true;
+      (pp.length ? [RingView.group(pp)] : []).map((p, j) => { const bad = p.bad, tr = p.trip, y = YR + 26 + j * 46, w = 108, st = bad ? "off" : p.warn ? "warn" : "on", fed = !bad && (f.live === true || p.live === true);
         const lds = LD.atFsu(f.id), kw = cl => lds.filter(q => q.grade === cl).reduce((a, q) => a + (q.est_kw || 0), 0), has = cl => lds.some(q => q.grade === cl), ty = y + 52, sp = one ? spriteSvg(lds.length ? lds[0].spr : PIC[tile++ % 3], { on: fed, fault: bad }, x, ty + 62, 92) : null, lnm = lds.length ? lds.map(q => LD.label(q)).join(" · ") : "예비 · 물린 부하 없음";      // 부하 목록(부하 관리)에서 이 배전체계에 물린 부하 — 개요 배치도와 같은 부하
         return `<path class="ln ${bad ? "flt" : fed ? "on" : "off"}" d="M${x} ${j ? y - 10 : YR + 13} V${y}"/><rect class="sring-p ${st}" x="${x - w / 2}" y="${y}" width="${w}" height="16" rx="4"/>
           <text class="sring-pt" x="${x}" y="${y + 11.5}" text-anchor="middle">${esc(p.name.length > 9 ? p.name.slice(0, 9) + "…" : p.name)}${p.vital ? " ★" : ""}</text>` +

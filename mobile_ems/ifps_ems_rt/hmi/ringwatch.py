@@ -32,7 +32,8 @@ class RingWatch:
             if not (quiet and on and key not in self.on): eng.alarms.set(key, bool(on), prio, src, text)      # 배치가 막 바뀐 동안에는 새 경보를 올리지 않는다(값이 한 주기 엇갈려 읽힐 수 있다)
             if not on: self.on.discard(key)
             elif not quiet: self.on.add(key)
-        keys |= self._meters(eng)
+        keys |= self._meters(eng); keys.add("ring.over.total"); tot = [f.get("kw") for f in self.last["fsu"]]; amp = None if any(x is None for x in tot) else sum(tot)
+        eng.alarms.set("ring.over.total", amp is not None and amp > ring.FSU_KW, 2, "환망", f"환망 전체 부하 {amp or 0:.0f} kW — 한 구간이 끊겨 한쪽에서만 받으면 환망 간선 정격 {ring.FSU_A:.0f} A(약 {ring.FSU_KW:.0f} kW)를 넘는다. 부하를 줄이거나 낮은 등급부터 끊으십시오")
         for key in self.keys - keys: eng.alarms.set(key, False, 3, "환망", ""); self.on.discard(key)     # 빠진 장치의 경보는 내린다
         self.keys = keys; self._branch(eng)
 

@@ -39,7 +39,7 @@ def _ch(names):
     return [{"name": n or d[1], "cls": d[0]} for n, d in zip(names, CH_DEFAULT)]
 
 
-DEFAULT = {"enabled": True, "auto": True, "fsu_slots": 7, "ppdu_slots": 18, "name": "부하 환망", "open": 4, "trip_ms": 1500, "close_ms": 2500,
+DEFAULT = {"enabled": True, "auto": True, "fsu_slots": 7, "ppdu_slots": 18, "name": "부하 환망", "open": 4, "trip_ms": 100, "close_ms": 2500,      # 선택 차단 100 ms(GOOSE 블로킹) + 절체 2.5초 = 2.6초 — 원본의 '2등급 FDIR 3초 이내 복구' 안
            "fsu": [{"id": f"FSU{k}", "code": 0x4600 + k, "name": f"구간분전함 {k}"} for k in range(1, 8)],
            "ppdu": [{"id": "PPDU1", "code": 0x5001, "at": "FSU2", "name": "배전체계 1", "ch": _ch(("예비 동력", "", "지휘소", "통신소", "상황실 조명", "생활 전열"))},
                     {"id": "PPDU2", "code": 0x5002, "at": "FSU4", "name": "배전체계 2", "ch": _ch(("의무 장비", "", "수술·처치", "의무 통신", "경계 조명", "생활 전열"))},
@@ -237,6 +237,17 @@ def _vital(s, f):
     return bool(f.get("vital")) or any(p["vital"] for p in s["ppdu"] if p["at"] == f["id"])
 
 
+def _fsu_alarms(s, f):
+    """구간분전함 한 대의 경보."""
+    out = []
+    vital = _vital(s, f); sts = f["live"] is False and any(p["vital"] and p["live"] for p in s["ppdu"] if p["at"] == f["id"])      # 1등급 부하의 배전체계가 STS 절체로 살아 있는가
+    out.append((f"ring.dead.{f['id']}", f["live"] is False, 1 if vital else 2, f["id"], f"{f['name']}({f['id']}) 무전압 — 이 마디의 부하 정전" + (" [중요 부하]" if vital else "") + (" — 1등급 부하는 STS 절체로 공급 중" if sts else "")))
+    out.append((f"ring.comm.{f['id']}", f.get("comm") is False, 2, f["id"], f"{f['name']}({f['id']}) 통신 고립 — 양쪽 구간이 모두 끊겨 환형 통신으로도 닿지 않음(값은 마지막 값). 끊긴 구간 가운데 하나를 먼저 복구"))
+    out.append((f"ring.id.{f['id']}", f["id_ok"] is False and f["id_read"] not in (None, 0), 3, f["id"], _id_text(f)))
+    out.append((f"ring.over.{f['id']}", bool(f.get("over")), 2, f["id"], f"{f['name']}({f['id']}) 과부하 {f.get('kw') or 0:.1f} kW — 정격 {FSU_A:.0f} A(약 {FSU_KW:.0f} kW) 초과. 부하 일부를 다른 구간분전함으로 옮기십시오"))
+    return out
+
+
 def alarms(r, s):
     """경보 목록: [(열쇠, 발생 여부, 등급, 대상, 글)]. 값이 없는 신호는 따지지 않는다(통신 경보가 따로 난다)."""
     out = []; r = s.get("eff", r)
@@ -244,12 +255,7 @@ def alarms(r, s):
         a = "전원" if sec["i"] == 0 else r["fsu"][sec["i"] - 1]["id"]; b = "전원" if sec["i"] == len(r["fsu"]) else r["fsu"][sec["i"]]["id"]
         out.append((f"ring.cut.{sec['i']}", sec["state"] == 2, 2, "환망", f"환망 구간 {sec['i']}({a} ↔ {b}) 차단 — 그 구간의 케이블·접속부 점검"))
     out.append(("ring.switched", bool(s["switched"]), 3, "환망", "환망 상시 개방점이 닫혀 있음 — 반대쪽 공급 중(다음 고장에 여유 없음). 고장 구간 복구 뒤 원래대로 되돌리십시오"))
-    for f in s["fsu"]:
-        vital = _vital(s, f)
-        out.append((f"ring.dead.{f['id']}", f["live"] is False, 1 if vital else 2, f["id"], f"{f['name']}({f['id']}) 무전압 — 이 마디의 부하 정전" + (" [중요 부하]" if vital else "")))
-        out.append((f"ring.comm.{f['id']}", f.get("comm") is False, 2, f["id"], f"{f['name']}({f['id']}) 통신 고립 — 양쪽 구간이 모두 끊겨 환형 통신으로도 닿지 않음(값은 마지막 값). 끊긴 구간 가운데 하나를 먼저 복구"))
-        out.append((f"ring.id.{f['id']}", f["id_ok"] is False and f["id_read"] not in (None, 0), 3, f["id"], _id_text(f)))
-        out.append((f"ring.over.{f['id']}", bool(f.get("over")), 2, f["id"], f"{f['name']}({f['id']}) 과부하 {f.get('kw') or 0:.1f} kW — 정격 {FSU_A:.0f} A(약 {FSU_KW:.0f} kW) 초과. 부하 일부를 다른 구간분전함으로 옮기십시오"))
+    for f in s["fsu"]: out += _fsu_alarms(s, f)
     for p in s["ppdu"]:
         i = p["id"]; top = 1 if p["vital"] else 2
         out.append((f"ring.dead.{i}", p["live"] is False and p["at_live"] is not False, top, i, _dead_text(p)))      # 물린 구간분전함이 정전이면 그쪽 경보 하나로 충분하다
@@ -309,6 +315,13 @@ class Model:
             if f"FSU{k}.v" in self.p.by_tag: self.p.set(f"FSU{k}.v", 380.0 if live.get(f"FSU{k}") else 0.0)
         return live
 
+    def _alt(self, e):
+        """STS 가 넘겨받을 수 있는지: 상시 개방점을 건너 반대쪽에서 닿는 구간분전함(끊기거나 차단된 구간은 못 건넌다). 반환: {FSU: 닿는지}
+        1등급 부하의 배전체계는 양쪽 급전을 다 받아 STS(10 ms)로 넘긴다는 원본 자료의 전제를 따른 모형이다(둘째 입력의 결선은 가정)."""
+        sw = sw_tags(e); bus = lambda t: t not in self.p.by_tag or self.p.get(t) > V_LIVE; a, b = bus("BUS.a_v"), bus("BUS.b_v")
+        ok = [not self._broken(i) and (int(round(self.p.get(t))) == 1 or (i == e["open"] and int(round(self.p.get(t))) == 0)) for i, t in enumerate(sw)]
+        return {f["id"]: (a and all(ok[:k + 1])) or (b and all(ok[k + 1:])) for k, f in enumerate(e["fsu"])}
+
     def _clear(self, i):
         """빈 자리의 배전체계 신호를 0 으로."""
         if i not in self.init and i in self.zero: return                              # 이미 비운 자리는 다시 쓰지 않는다
@@ -360,10 +373,11 @@ class Model:
     def _update(self, e):
         """구간분전함 전압 → 배전체계(PPDU) 전압·주 차단기·회로별 전력. 회로 전력은 그 등급 부하(LOAD.pN_kw)의 크기에 비례하는 것으로 본다(가상 장치의 가정)."""
         live = self._fsu_live(e); here = {p["id"]: p for p in e["ppdu"]}; self.live = live; self.w = self.branch() if self.branch else None
+        sts = {x for w in (self.w or []) if w["grade"] == 1 for x in w["ppdus"]}; alt = self._alt(e) if sts else {}      # 1등급 부하 앞의 배전체계: STS 로 반대쪽 급전을 바로 받는다
         for k in range(1, self._n("ppdu") + 1):
             i = f"PPDU{k}"
             if f"{i}.mccb" not in self.p.by_tag: continue
-            if i in here: self._one(here[i], bool(live.get(here[i]["at"], False)))
+            if i in here: self._one(here[i], bool(live.get(here[i]["at"], False) or (i in sts and alt.get(here[i]["at"], False))))
             else: self._clear(i)
         self._fsu_meters(e)
 

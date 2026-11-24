@@ -442,7 +442,7 @@
     "ppdu_slots": 18,
     "name": "부하 환망",
     "open": 4,
-    "trip_ms": 1500,
+    "trip_ms": 100,
     "close_ms": 2500,
     "fsu": [
       {

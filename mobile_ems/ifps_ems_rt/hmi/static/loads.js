@@ -69,6 +69,7 @@ const P_LOADS = {
     if (!$("#ldKind").options.length) $("#ldKind").innerHTML = d.kinds.map(k => `<option value="${k.id}">${esc(k.name)} (${k.grade}등급 · ${k.kw} kW)</option>`).join("");
     const lim = d.limit || {}; $("#ldLim").textContent = `1등급 ${lim[1] ?? "—"} · 2등급 ${lim[2] ?? "—"} · 3등급 ${lim[3] ?? "—"} · 합계 ${lim[0] ?? "—"} kW`;
     const short = d.ppdu_need > d.ppdu_have; $("#ldPp").innerHTML = `필요 ${d.ppdu_need}대 · 인식 ${d.ppdu_have}대 · 자리 ${d.ppdu_slots}개${d.ppdu_need > d.ppdu_slots ? ' <span class="warnc">— 자리보다 많다(부하를 줄이거나 나눠 물린다)</span>' : short ? ' <span class="warnc">— 놓는 중이거나 모자란다</span>' : ""}`;
+    if (d.ring_rated > d.fsu_kw) $("#ldPp").innerHTML += ` <span class="warnc">환망에 물린 정격 합 ${F.n(d.ring_rated, 0)} kW 가 환망 간선 정격(${d.fsu_a} A · 약 ${d.fsu_kw} kW)을 넘는다 — 한 구간이 끊겨 한쪽에서만 받을 때 과부하가 된다.</span>`;
     this.grades(d); this.rows(d);
     const it = d.items.find(x => x.id === this.sel), E = $("#ldEdit"), sig = it ? JSON.stringify([it.id, d.rev]) : "";
     if (!it) { E.style.display = "none"; this.sig = ""; return; }
