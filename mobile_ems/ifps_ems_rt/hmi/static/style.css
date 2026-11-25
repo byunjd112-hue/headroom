@@ -491,9 +491,11 @@ canvas.tspark { display: block; width: calc(100% + 40px); margin: 8px -20px 0; h
 .sld .hexbg { fill: #171a14; }
 
 /* 배치도 상태 카드: 장비 위 말풍선(간결) */
-.spt .scard { left: 50%; right: auto; top: auto; bottom: 14px; transform: translateX(-50%); min-width: 0; padding: 4px 9px 5px; border-radius: 9px; }
+.spt .scard { left: 50%; right: auto; top: auto; bottom: 14px; transform: translate(calc(-50% + var(--dx, 0px)), var(--dy, 0px)); cursor: grab; touch-action: none; min-width: 0; padding: 4px 9px 5px; border-radius: 9px; }
 .spt.l .scard { left: 50%; right: auto; }
-.spt:hover .scard { transform: translateX(-50%) translateY(-2px); }
+.spt:hover .scard { transform: translate(calc(-50% + var(--dx, 0px)), calc(var(--dy, 0px) - 2px)); }
+.spt.moved .scard::after { display: none; } .spt.dragging .scard { cursor: grabbing; border-color: var(--accent); transition: none; }
+.spt .lead { display: none; position: absolute; left: 0; top: 0; height: 0; border-top: 1.5px solid rgba(255,255,255,.7); transform-origin: 0 0; pointer-events: none; } .spt.moved:not(.mini) .lead { display: block; }
 .spt .scard::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 8px; height: 8px; background: inherit; border-right: 1px solid rgba(255,255,255,.12); border-bottom: 1px solid rgba(255,255,255,.12); transform: translateX(-50%) rotate(45deg); }
 .scard .sh { font-size: 10.5px; } .scard .sv { gap: 8px; } .scard .sv .mono { font-size: 12px; } .scard .ss { font-size: 10.5px; }
 .spt .core { width: 9px; height: 9px; left: -4.5px; top: -4.5px; } .spt .pulse { width: 24px; height: 24px; left: -12px; top: -12px; }

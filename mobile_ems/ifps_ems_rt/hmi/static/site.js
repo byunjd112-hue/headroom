@@ -220,7 +220,7 @@ function _mkPos(it) {      // 표지의 자리 = 그림의 윗변. 그림은 아
 }
 /* 표지가 서로 겹치면 위쪽 표지를 더 위로 올려 떼어 놓는다(부하 · 장비가 늘어 표지가 포개져 읽히지 않는 일을 막는다). 아래 것부터 자리를 정한다 */
 function layUnstack() {
-  const cs = $$("#siteMk .spt .scard").filter(c => c.getClientRects().length); cs.forEach(c => { c.style.top = ""; });
+  const cs = $$("#siteMk .spt:not(.moved) .scard").filter(c => c.getClientRects().length);      // 손으로 옮긴 글상자는 그대로 둔다 cs.forEach(c => { c.style.top = ""; });
   const R = cs.map(c => ({ c, r: c.getBoundingClientRect(), dy: 0 })).sort((a, b) => b.r.top - a.r.top);
   for (let pass = 0, hit = true; hit && pass < 8; pass++) { hit = false;      // 올린 표지가 다른 표지와 다시 겹칠 수 있어 겹침이 없어질 때까지 되풀이한다
     for (let i = 1; i < R.length; i++) for (let j = 0; j < i; j++) { const a = R[i], q = R[j], ab = a.r.bottom + a.dy, qt = q.r.top + q.dy;
@@ -228,16 +228,49 @@ function layUnstack() {
     R.sort((a, b) => (b.r.top + b.dy) - (a.r.top + a.dy)); }
   R.forEach(x => { if (x.dy) x.c.style.top = `${-18 + x.dy}px`; });
 }
+/* 표지의 자리를 그림의 실제 자리에서 잰다(주기마다): 점 = 그 그림의 윗변 가운데. 화면 비율이 달라 배치도가 잘려 보이거나, 그림이 줄거나(여러 대) 옮겨져도 점이 그림을 따라간다.
+   글상자는 끌어서 옮긴다(겹침을 피하게). 옮긴 자리는 이 브라우저에 기억하고, 운용자 이상이면 배치에도 같이 저장한다. 오른쪽 버튼 = 제자리 */
+const MK = { drag: null, t: 0,
+  all() { try { return JSON.parse(localStorage.getItem("ems.lbl") || "{}"); } catch (e) { return {}; } },
+  of(uid) { const a = this.all()[uid], it = (L.items || []).find(i => i.uid === uid); return a || (it && it.lb) || null; },
+  put(uid, v) { const a = this.all(); if (v) a[uid] = v; else delete a[uid]; try { localStorage.setItem("ems.lbl", JSON.stringify(a)); } catch (e) { /* 저장소를 못 쓰면 이번 화면에서만 */ }
+    const it = (L.items || []).find(i => i.uid === uid); if (!it) return; if (v) it.lb = v; else delete it.lb;
+    if (can("operator") && !L.edit) api("/api/layout", { items: L.items }).then(r => { if (r.ok) L.rev = r.rev; }); },
+  show(e, v, k) { const c = e.querySelector(".scard"), ld = e.querySelector(".lead"); e.classList.toggle("moved", !!v); if (!c) return;
+    const dx = v ? v[0] * k : 0, dy = v ? v[1] * k : 0; c.style.setProperty("--dx", dx + "px"); c.style.setProperty("--dy", dy + "px");
+    if (ld) { ld.style.width = Math.hypot(dx, dy - 14) + "px"; ld.style.transform = `rotate(${Math.atan2(dy - 14, dx)}rad)`; } },
+  place() {
+    const box = $("#siteMk"), svg = $("#siteMap svg"); if (!box || !svg || L.edit || !L.view) return; const b = box.getBoundingClientRect(), m = svg.getScreenCTM(); if (!m || !b.width || !box.offsetWidth) return;
+    const z = b.width / box.offsetWidth; this.k = m.a / z;                                   // z: 화면 맞춤 배율, k: 배치도 1칸 = 몇 px
+    $$("#siteMk .spt").forEach(e => { let x, y;
+      if (e.dataset.at) { const it = L.view.find(i => i.kind === "FSU" && _fsuNo(i) === e.dataset.at); if (!it) return; x = m.a * it.x + m.e; y = m.d * (it.y + 50) + m.f; }
+      else { const g = svg.querySelector(`.meq[data-uid="${CSS.escape(e.dataset.uid)}"]`); if (!g) return; const r = g.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height * .1; }
+      e.style.left = (x - b.left) / z + "px"; e.style.top = Math.max(10, (y - b.top) / z) + "px";
+      if (!e.dataset.at && !(this.drag && this.drag.e === e)) this.show(e, this.of(e.dataset.uid), this.k); });
+  },
+  init(box) {
+    if (box.dataset.mk) return; box.dataset.mk = 1;
+    box.addEventListener("pointerdown", e => { const c = e.target.closest(".scard"), sp = c && c.closest(".spt"); if (!sp || sp.dataset.at || e.button) return;
+      const v = this.of(sp.dataset.uid) || [0, 0]; this.drag = { e: sp, x0: e.clientX, y0: e.clientY, v0: v, v: v, moved: false }; });
+    addEventListener("pointermove", e => { const d = this.drag; if (!d) return; const b = box.getBoundingClientRect(), z = b.width / box.offsetWidth || 1, k = this.k || 1;
+      if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 5) return; d.moved = true; d.e.classList.add("dragging");
+      d.v = [Math.round((d.v0[0] + (e.clientX - d.x0) / z / k) * 10) / 10, Math.round((d.v0[1] + (e.clientY - d.y0) / z / k) * 10) / 10]; this.show(d.e, d.v, k); });
+    addEventListener("pointerup", () => { const d = this.drag; this.drag = null; if (!d || !d.moved) return; d.e.classList.remove("dragging"); this.t = Date.now(); this.put(d.e.dataset.uid, d.v); });
+    box.addEventListener("click", e => { if (Date.now() - this.t < 500) { e.stopPropagation(); e.preventDefault(); } }, true);                     // 끌어 놓은 직후의 누름은 화면 이동으로 치지 않는다
+    box.addEventListener("contextmenu", e => { const sp = e.target.closest(".spt"); if (!sp || !sp.classList.contains("moved")) return; e.preventDefault(); this.put(sp.dataset.uid, null); this.show(sp, null, 1); });
+    addEventListener("resize", () => this.place());
+  },
+};
 function siteMarkers() {
-  const box = $("#siteMk"); if (!box || !L.items) return;
+  const box = $("#siteMk"); if (!box || !L.items) return; MK.init(box);
   if (L.edit) { box.innerHTML = ""; return; }
   const seen = {};
   const rg = S.snap && S.snap.ring, pp = !rg ? "" : rg.ppdu.map((p, j) => { const it = (L.view || L.items).find(i => i.kind === "FSU" && _fsuNo(i) === p.at); if (!it || rg.ppdu.findIndex(q => q.at === p.at) !== j) return "";      // 구간분전함마다 표지 하나(그 아래 배전체계 묶음)
     return `<div class="spt mini ppdu" data-at="${esc(p.at)}" style="left:${it.x / MAP_W * 100}%;top:${(it.y + 50) / MAP_H * 100}%"><i class="core"></i><div class="scard"><div class="sh">—</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`; }).join("");
-  box.dataset.n = (L.view || L.items).length + (rg ? rg.ppdu.length * 100 : 0); box.innerHTML = pp + (L.view || L.items).filter(i => i.kind !== "FSU").map(it => {
+  box.dataset.n = (L.view || L.items).length + (rg ? rg.ppdu.length * 100 : 0); box.dataset.ids = (L.view || L.items).map(i => i.uid).join(); box.innerHTML = pp + (L.view || L.items).filter(i => i.kind !== "FSU").map(it => {
     const key = it.load ? "ld:" + it.load : it.bind, [x, y] = _mkPos(it), mini = it.load ? !!seen[key] : it.kind === "BARRACK" || seen[key]; seen[key] = 1;      // 부하는 목록의 한 줄마다 첫 그림에 표지를 단다
-    return `<div class="spt ${mini ? "mini" : ""}" data-act="goctl" data-uid="${it.uid}" style="left:${x}%;top:${y}%"><i class="pulse"></i><i class="core"></i>
-      <div class="scard"><div class="sh">${esc(it.name || LAY_KINDS[it.kind].nm)}${it.spare ? " · 예비 자리" : ""}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`;
+    return `<div class="spt ${mini ? "mini" : ""}" data-act="goctl" data-uid="${it.uid}" style="left:${x}%;top:${y}%"><i class="lead"></i><i class="pulse"></i><i class="core"></i>
+      <div class="scard" title="끌어서 글상자를 옮긴다 · 오른쪽 버튼 = 제자리"><div class="sh">${esc(it.name || LAY_KINDS[it.kind].nm)}${it.spare ? " · 예비 자리" : ""}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`;
   }).join("");
 }
 function siteRebuild() { const box = $("#siteMap"); if (box && S.snap) { box.dataset.sig = ""; siteUpdate(S.snap, true); } siteMarkers(); layToolbar(); }
@@ -264,7 +297,7 @@ function siteUpdate(s, force) {
       const x = document.getElementById("mx-" + i); if (x) x.style.display = c === 2 ? "" : "none";
     });
   }
-  const mk = $("#siteMk"); if (mk && !L.edit && (!mk.children.length || +mk.dataset.n !== L.view.length + (s.ring ? s.ring.ppdu.length * 100 : 0))) siteMarkers();            // 대수가 바뀌면 표지도 다시 만든다
+  const mk = $("#siteMk"); if (mk && !L.edit && (!mk.children.length || +mk.dataset.n !== L.view.length + (s.ring ? s.ring.ppdu.length * 100 : 0) || mk.dataset.ids !== L.view.map(i => i.uid).join())) siteMarkers();            // 대수가 바뀌면 표지도 다시 만든다
   $$("#siteMk .spt.ppdu").forEach(e => { const p = RingView.group(s.ring ? s.ring.ppdu.filter(q => q.at === e.dataset.at) : []); if (!p.n) return; const bad = p.bad, tr = p.trip;
     e.className = `spt mini ppdu ${bad ? "bad" : p.warn ? "idle" : "ok"}`; e.querySelector(".sh").textContent = p.name + (p.vital ? " ★" : ""); e.querySelector(".sv .mono").textContent = p.kw == null ? "—" : F.kw(p.kw) + " kW"; e.querySelector(".ss").textContent = bad ? (p.mccb === 2 ? "주 차단기 트립" : "정전") : tr ? `회로 트립 ${tr}` : p.over ? "과부하" : "공급"; });
   $$("#siteMk .spt:not(.ppdu)").forEach(e => { const it = L.view.find(i => i.uid === e.dataset.uid); if (!it) return; let x = st[it.bind] || { st: "ok", v: "", t: "" };
@@ -278,7 +311,7 @@ function siteUpdate(s, force) {
     if (bs && x.t && !/모선/.test(x.t)) x = Object.assign({}, x, { t: `${x.t} · 모선 ${bs}` });      // 그 전원(여러 대면 그 한 대)이 물린 모선(모선 구성)
     const hd = `${it.name || LAY_KINDS[it.kind].nm}${it.spare ? " · 예비 자리" : ""}`, sh = e.querySelector(".sh"); if (sh.textContent !== hd) sh.textContent = hd;      // 이름 · 예비 자리 표시도 부하 목록이 바뀌면 따라간다
     e.className = `spt ${e.classList.contains("mini") ? "mini" : ""} ${x.st}`; e.querySelector(".sv .mono").textContent = x.v; e.querySelector(".ss").textContent = x.t; });
-  layUnstack();
+  MK.place(); layUnstack();      // 점 = 그림 바로 위, 옮긴 글상자는 그 자리(상태 글을 채운 뒤에 — 상태가 표지의 class 를 다시 쓴다)
   const sum = $("#layCnt"); if (sum) { const A = L.edit ? L.items : layAuto(L.items).filter(i => !i.spare), c = k => A.filter(i => i.kind === k).length, ld = LD.s().grades.reduce((a, g) => a + g.n, 0);      // 화면에 놓인 것(자동으로 놓인 장치 · 부하 포함)
     sum.textContent = `장비 ${A.filter(i => !["FSU", "BARRACK", "L1", "L2", "L3"].includes(i.kind)).length} · 부하 ${L.edit ? c("BARRACK") + c("L1") + c("L2") + c("L3") : ld} · FSU ${c("FSU")}`; }
 }

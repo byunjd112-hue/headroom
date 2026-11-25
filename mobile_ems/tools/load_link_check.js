@@ -88,6 +88,9 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   const aft = await p.evaluate(async () => { const s = await (await fetch("/api/snapshot")).json(); return { pv: s.fleet.PV.units.length, brk: s.loads.items.filter(q => q.kind === "barrack").reduce((a, q) => a + q.n, 0), ammo: s.loads.items.filter(q => q.kind === "ammo").reduce((a, q) => a + q.n, 0),
     spare: [...document.querySelectorAll("#siteMk .spt:not(.ppdu)")].map(e => e.textContent.replace(/\s+/g, " ")).filter(t => /예비 자리/.test(t)), pvs: [...document.querySelectorAll("#siteMk .spt:not(.ppdu)")].map(e => e.textContent.replace(/\s+/g, " ")).filter(t => /이동형 PV/.test(t)) }; });
   chk(aft.pv === 2 && aft.brk === 3 && aft.ammo === 2 && !aft.spare.length && aft.pvs.length === 2 && aft.pvs.every(t => /모선/.test(t)), "그림을 추가해 저장 → 이동형 PV 2대 · 막사 3 · 탄약저장 2, 예비 자리 없음: " + JSON.stringify(aft));
+  const dots = await p.evaluate(() => [...document.querySelectorAll("#siteMk .spt:not(.ppdu)")].map(e => { const g = document.querySelector(`#siteMap .meq[data-uid="${CSS.escape(e.dataset.uid)}"]`); if (!g) return [e.dataset.uid, 999, 999, 1];
+    const r = g.getBoundingClientRect(), c = e.querySelector(".core").getBoundingClientRect(); return [e.dataset.uid, Math.round(c.left + c.width / 2 - r.left - r.width / 2), Math.round(c.top + c.height / 2 - r.top), Math.round(r.height)]; }).filter(q => Math.abs(q[1]) > 3 || q[2] < 0 || q[2] > q[3] * .3));
+  chk(!dots.length, "개요의 점이 그 그림 바로 위에 있다: " + JSON.stringify(dots));
   await compare("배치 편집에서 장비 · 부하 그림을 추가해 저장");
   await p.goto(B + "#sld"); await p.waitForTimeout(4500); chk(await p.evaluate(() => [...document.querySelectorAll("#un-PV .uchip")].length === 2), "결선도에 PV 호기 칩 2개");
   console.log("○ 배치 편집에서 추가한 그림 = 실제 장비 · 부하");
