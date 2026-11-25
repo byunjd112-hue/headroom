@@ -74,7 +74,7 @@ class TestHmi(unittest.TestCase):
             snap = e.snapshot()["loads"]; self.assertEqual(len(snap["items"]), 5); self.assertTrue(all(i["est_kw"] is not None for i in snap["items"])); self.assertIn(snap["grades"][2]["stage"], ("on", "save", "off"))
             self.assertAlmostEqual(sum(i["est_kw"] for i in snap["items"] if i["feeder"] == "L2"), e.rt.val["LOAD.p2_kw"], delta=0.2)   # 추정 전력의 합 = 급전선 계측값
             at = {i["id"]: (i["fsu"], i["need"], i["fsu_auto"]) for i in snap["items"]}; ff = [f["id"] for f in snap["fsus"]]
-            self.assertEqual((at["c2"], at["med"], at["ammo"]), (("FSU2", 3, True), ("FSU4", 1, True), ("FSU6", 1, True)))                                     # 종류에 따른 구간분전함(자동), 부하 앞 배전체계: 30 kW 는 20 kW 2대 병렬 + 1등급이라 한 대 더
+            self.assertEqual((at["c2"], at["med"], at["ammo"]), (("FSU2", 4, True), ("FSU4", 1, True), ("FSU6", 1, True)))                                     # 종류에 따른 구간분전함(자동), 부하 앞 배전체계: 30 kW 는 20 kW 2대 병렬 + 1등급이라 한 대 더
             self.assertEqual(at["brk"][1], 3); self.assertNotEqual(at[nid][0], "FSU4")                                                                         # 막사 3동은 동마다 1대. 출력 4회로가 다 찬 구간분전함 대신 가까운 곳으로
             self.assertEqual((snap["ppdu_kw"], snap["fsu_a"], snap["fsu_out"]), (20.0, 630.0, 4)); full = lambda: all(len(i["ppdus"]) == i["need"] for i in e.snapshot()["loads"]["items"]) or len(e.snapshot()["ring"]["ppdu"]) == 18; t0 = time.time()
             while not full() and time.time() - t0 < 12.0: time.sleep(0.3)

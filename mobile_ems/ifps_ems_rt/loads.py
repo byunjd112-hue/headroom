@@ -77,8 +77,13 @@ def scale(items):
 
 def need(it, unit, spare=False):
     """그 부하 앞에 붙일 배전체계(한 대에 싣는 한계 unit kW) 대수: 부하 하나마다 정격을 감당할 만큼(20 kW 이하 1대, 30 kW 는 2대). 수량이 여럿이면 하나마다 따로 붙인다.
-    spare 면 1등급 부하에 한 대를 더 둔다(N+1) — 한 대가 고장 나도 남은 것으로 정격을 감당한다."""
-    return it["n"] * (max(1, math.ceil(it["kw"] / unit - 1e-9)) + (1 if spare and it["grade"] == 1 else 0)) if it["n"] > 0 else 0
+    spare 면 1등급 부하에 한 대를 더 둔다(N+1) — 한 대가 고장 나도 남은 것으로 정격을 감당한다.
+    spare: 거짓 · 참, 또는 (참 · 거짓, 우회 결선 한 줄의 용량 kW) — 뒤의 것을 주면 1등급 부하는 우회 중에도 한 줄의 용량을 넘지 않을 만큼 대수를 잡는다."""
+    by = spare[1] if isinstance(spare, tuple) else None; sp = spare[0] if isinstance(spare, tuple) else spare
+    if it["n"] <= 0: return 0
+    k = max(1, math.ceil(it["kw"] / unit - 1e-9)) + (1 if sp and it["grade"] == 1 else 0)
+    if by and it["grade"] == 1: k = max(k, math.ceil(it["kw"] / by - 1e-9))
+    return it["n"] * k
 
 
 def _home(it, order):

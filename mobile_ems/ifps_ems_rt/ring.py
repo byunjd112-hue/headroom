@@ -35,7 +35,7 @@ SPEC = {"fsu_a": (FSU_A, 50.0, 2000.0, "문서", "구간분전함 · 환망 간�
         "ppdu_use": (1.0, 0.5, 1.0, "가정", "배전체계를 여러 대 나란히 쓸 때 한 대에 싣는 몫(1 = 정격까지, 0.8 = 정격의 80%까지 — 전류 분담이 고르지 않을 것에 대비한 여유)"),
         "n1": (1, 0, 1, "설계", "1등급 부하 앞에 배전체계를 한 대 더 둔다(N+1: 한 대가 고장 나도 남은 것으로 정격을 감당. 1 = 둔다)"),
         "bypass": (1, 0, 1, "설계", "1등급 부하의 배전체계에 우회 결선(둘째 입력 — 반대쪽 급전의 구간분전함에서, 평소 열림 · 우회 때만 닫힘)을 둔다(1 = 둔다)"),
-        "bypass_kw": (10.5, 1.0, 100.0, "문서", "우회 결선 한 줄의 용량(kW) — PPDU-20 의 환상 연결 회로 CH-2(3상 16 A)"),
+        "bypass_a": (16.0, 6.0, 125.0, "문서", "우회 결선 한 줄의 회로 정격(A) — PPDU-20 의 환상 연결 회로 CH-2(3상 16 A). kW 로는 역률을 곱해 본다"),
         "sts": (1, 0, 1, "가정", "우회 결선을 STS(10 ms)로 넘기는가(1 = 끊김 없이 넘긴다, 0 = 5초 이내 우회 — 그동안 끊긴다)")}
 BYPASS_S = 5.0                   # STS 가 없을 때 우회 결선이 닫히기까지(PPDU-20 자료의 '5초 이내 우회')
 
@@ -44,7 +44,7 @@ def spec(r):
     """환망의 정격 · 가정값(설정의 spec 으로 덮어쓴 것)과 거기서 나온 값: fsu_kva · fsu_kw(환망 간선의 한계), ppdu_ok(배전체계 한 대에 싣는 한계 kW)."""
     o = (r or {}).get("spec") if isinstance((r or {}).get("spec"), dict) else {}
     s = {k: (o[k] if _int_in(o.get(k), v[1], v[2]) else v[0]) for k, v in SPEC.items()}
-    s["fsu_out"] = int(s["fsu_out"]); s["sts"] = int(s["sts"]); s["n1"] = int(s["n1"]); s["bypass"] = int(s["bypass"]); s["fsu_kva"] = round(3 ** 0.5 * s["fsu_v"] * s["fsu_a"] / 1000.0); s["fsu_kw"] = round(s["fsu_kva"] * s["pf"]); s["ppdu_ok"] = round(s["ppdu_kw"] * s["ppdu_use"], 2)
+    s["fsu_out"] = int(s["fsu_out"]); s["sts"] = int(s["sts"]); s["n1"] = int(s["n1"]); s["bypass"] = int(s["bypass"]); s["fsu_kva"] = round(3 ** 0.5 * s["fsu_v"] * s["fsu_a"] / 1000.0); s["fsu_kw"] = round(s["fsu_kva"] * s["pf"]); s["ppdu_ok"] = round(s["ppdu_kw"] * s["ppdu_use"], 2); s["bypass_kw"] = round(3 ** 0.5 * s["fsu_v"] * s["bypass_a"] * s["pf"] / 1000.0, 2)      # 16 A · 역률 0.9 → 약 9.5 kW(역률 1 이면 자료의 10.5 kW)
     return s
 LOAD_REF = 60.0                  # 가상 장치: 등급별 부하가 이 값(kW)일 때 회로가 정격의 90% 를 쓴다고 본다
 GND_LIMIT = 100.0                # 접지저항이 이 값(Ω)을 넘으면 주회로 투입 금지(인터록 IL-1)

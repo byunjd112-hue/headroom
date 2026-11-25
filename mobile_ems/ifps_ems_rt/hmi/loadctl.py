@@ -24,7 +24,7 @@ class LoadBook:
         rg = self.eng.ringw.status() if getattr(self.eng, "ringw", None) is not None else None
         pp = [{"id": p["id"], "name": p["name"], "at": p["at"]} for p in (rg or {}).get("ppdu", [])]; ff = [{"id": f["id"], "name": f["name"]} for f in (rg or {}).get("fsu", [])]
         sp = self.spec(); order = [f["id"] for f in ff]; alt = (lambda f: loads.alt_fsu(f, order, (rg or {}).get("open"))) if sp["bypass"] else None
-        return loads.attach(self.items, pp, ff, sp["ppdu_ok"], sp["fsu_kw"], sp["fsu_out"], bool(sp["n1"]), alt), pp, ff
+        return loads.attach(self.items, pp, ff, sp["ppdu_ok"], sp["fsu_kw"], sp["fsu_out"], (bool(sp["n1"]), sp["bypass_kw"] if sp["bypass"] else None), alt), pp, ff
 
     def spec(self):
         """환망의 정격 · 가정값(ring.spec) — 엔지니어가 환망 화면에서 고친 값이 여기로 온다."""
@@ -33,7 +33,7 @@ class LoadBook:
     def want(self):
         """부하 목록대로 배전체계를 놓을 자리(loads.plan) — 가상 장치가 이대로 놓는다. 실장비에서는 실제로 놓은 장치를 ID 로 알아낸다."""
         rg = self.eng.ringw.status() if getattr(self.eng, "ringw", None) is not None else None
-        sp = self.spec(); return loads.plan(self.items, (rg or {}).get("fsu", []), sp["ppdu_ok"], sp["fsu_out"], bool(sp["n1"]))
+        sp = self.spec(); return loads.plan(self.items, (rg or {}).get("fsu", []), sp["ppdu_ok"], sp["fsu_out"], (bool(sp["n1"]), sp["bypass_kw"] if sp["bypass"] else None))
 
     def branch(self):
         """분기별 몫(loads.weights) — 환망의 분기 전력계 · 중요 부하 표시가 쓴다."""

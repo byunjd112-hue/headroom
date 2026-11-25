@@ -8,7 +8,7 @@ const PY = `import json, sys
 sys.path.insert(0, ${JSON.stringify(EMS)})
 from ifps_ems_rt import ring, loads
 sp = ring.spec(None); order = [f["id"] for f in ring.DEFAULT["fsu"]]; fs = [{"id": f["id"], "name": f["name"]} for f in ring.DEFAULT["fsu"]]
-at = loads.attach(loads.DEFAULT, [], fs, sp["ppdu_ok"], sp["fsu_kw"], sp["fsu_out"], bool(sp["n1"]), lambda f: loads.alt_fsu(f, order, ring.DEFAULT["open"]))
+at = loads.attach(loads.DEFAULT, [], fs, sp["ppdu_ok"], sp["fsu_kw"], sp["fsu_out"], (bool(sp["n1"]), sp["bypass_kw"] if sp["bypass"] else None), lambda f: loads.alt_fsu(f, order, ring.DEFAULT["open"]))
 rows = [{"name": i["name"], "grade": i["grade"], "kw": i["kw"], "n": i["n"], "need": at[i["id"]]["need"], "base": at[i["id"]]["base"], "fsu": at[i["id"]]["fsu_name"], "alt": at[i["id"]]["alt_name"]} for i in loads.DEFAULT]
 print(json.dumps({"sp": sp, "rows": rows, "nfsu": len(order), "open": ring.DEFAULT["open"], "trip": ring.DEFAULT["trip_ms"], "close": ring.DEFAULT["close_ms"], "slots": ring.DEFAULT["ppdu_slots"], "bypass_s": ring.BYPASS_S, "src": {k: v[3] for k, v in ring.SPEC.items()}}))`;
 const V = JSON.parse(cp.execFileSync(process.env.PYTHON || "python3", ["-c", PY], { encoding: "utf8" })), SP = V.sp;
@@ -64,7 +64,7 @@ D.cover({ kicker: "IFPS · Integrated Field Power System", title: "이동형 배
   table(s, L.X, TOP, L.CW, ["구성 요소", "정격 · 수량", "근거", "EMS 가 쓰는 곳"], [
     ["환망 간선 · 구간분전함(FSU)", `AC ${SP.fsu_v} V 3상 4선식 · ${SP.fsu_a} A(약 ${SP.fsu_kva} kVA) · 출력 ${SP.fsu_out}회로`, "제안 발표 자료(FSU 사양)", "한쪽 급전 때 환망 전체 부하의 한계, 구간분전함당 배전체계 수"],
     ["휴대용 배전체계(PPDU-20)", `${SP.ppdu_kw} kW · 주 차단기 40 A · 분기 6회로`, "PPDU-20 상세기술자료", "부하마다 필요한 대수(병렬), 과부하 경보"],
-    ["우회 결선(환상 연결 회로 CH-2)", `3상 16 A · ${SP.bypass_kw} kW · 평소 열림`, "PPDU-20 상세기술자료", "우회 때 배전체계 한 대가 맡는 몫의 한계"],
+    ["우회 결선(환상 연결 회로 CH-2)", `3상 ${SP.bypass_a} A(역률 ${SP.pf} 에서 약 ${n1(SP.bypass_kw)} kW) · 평소 열림`, "PPDU-20 상세기술자료", "우회 때 배전체계 한 대가 맡는 몫의 한계"],
     ["역률(전류 → kW 환산)", `${SP.pf} → 간선 한계 약 ${SP.fsu_kw} kW`, "가정", "kW 로 견주는 용량 점검"],
     ["병렬 배전체계 한 대에 싣는 몫", `${SP.ppdu_use} (한 대에 ${n1(SP.ppdu_ok)} kW 까지)`, "가정", "전류 분담이 고르지 않을 것에 대비해 낮추면 대수가 는다"],
     ["1등급 부하의 N+1 · 우회 결선 · STS", `${SP.n1 ? "한 대 더" : "없음"} · ${SP.bypass ? "둠" : "없음"} · ${SP.sts ? "STS 10 ms" : V.bypass_s + "초 이내 우회"}`, "설계 · 가정", "무정전 모형과 무정전 점검"],
@@ -93,7 +93,7 @@ D.cover({ kicker: "IFPS · Integrated Field Power System", title: "이동형 배
 { const s = page(3, "병렬 배전체계와 N+1", "부하 하나의 정격이 배전체계 한 대보다 크면 병렬로 여러 대 — 1등급 부하에는 한 대를 더 둔다",
     "정격이 모자라면 배전체계를 병렬로 여러 대 붙입니다. 1등급 부하에는 한 대를 더 둡니다.");
   picTable(s, "pd_parallel", "부하 앞에 나란히 놓은 배전체계 — 한 대마다 구간분전함의 출력 회로를 하나씩 받는다", [["부하(기본 목록)", "정격", "배전체계", "물린 곳"],
-    V.rows.map(r => [`${r.name}${r.n > 1 ? " ×" + r.n : ""} · ${r.grade}등급`, `${n1(r.kw)} kW${r.n > 1 ? " × " + r.n : ""}`, `${r.need}대${r.need > r.base ? ` (${r.base} + 1)` : r.n > 1 ? " (하나마다 1)" : ""}`, r.fsu]).concat([["합계", `${n1(RATED)} kW`, `${NEED}대`, `간선 한계 약 ${SP.fsu_kw} kW`]]), [36, 20, 22, 22], { dense: true }],
+    V.rows.map(r => [`${r.name}${r.n > 1 ? " ×" + r.n : ""} · ${r.grade}등급`, `${n1(r.kw)} kW${r.n > 1 ? " × " + r.n : ""}`, `${r.need}대${r.need > r.base ? ` (정격 ${r.base} → N+1 · 우회)` : r.n > 1 ? " (하나마다 1)" : ""}`, r.fsu]).concat([["합계", `${n1(RATED)} kW`, `${NEED}대`, `간선 한계 약 ${SP.fsu_kw} kW`]]), [36, 20, 22, 22], { dense: true }],
     [["병렬의 뜻", ["구간분전함에서 배전체계마다 따로 분기해 부하의 전력을 나눠 맡는다 — 한 대가 빠지면 남은 것이 떠안는다", "배전체계끼리의 전류 분담 조건은 하드웨어 설계에서 확정한다(여유는 '한 대에 싣는 몫'으로 둔다)"]]]); }
 
 // ═══ 4. 무정전
@@ -108,8 +108,8 @@ D.cover({ kicker: "IFPS · Integrated Field Power System", title: "이동형 배
   picTable(s, "pd_bypass", "배전체계의 주 입력(검정)과 우회 결선(주황 띠 · 잠금 표찰)", [["항목", "내용"], [
     ["받는 곳", "상시 개방점 건너편(반대쪽 급전)에서 가장 가까운 구간분전함 — 한 구간이 끊기거나 제 구간분전함이 고장 나도 그쪽은 살아 있다"],
     ["평소", "열림 — 두 급전을 함께 잇지 않는다(순환 전류 방지)"], ["닫히는 때", "제 구간분전함은 무전압이고 우회 쪽은 살아 있을 때만"], ["다시 여는 때", "제 구간분전함이 살아나면"],
-    ["용량", `한 줄 ${SP.bypass_kw} kW(CH-2) — 배전체계 한 대가 맡는 몫이 이보다 크면 EMS 가 알린다`], ["넘기는 시간", SP.sts ? "STS 10 ms(끊김 없음). STS 가 없으면 5초 이내 우회 — 그동안 끊긴다" : `${V.bypass_s}초 이내 우회 — 그동안 끊긴다`]], [26, 74]],
-    [["기본 구성의 예", V.rows.filter(r => r.alt).map(r => `${r.name}: ${r.fsu} → 우회 ${r.alt}, 배전체계 ${r.need}대가 ${n1(r.kw * r.n / r.need)} kW 씩(한 줄 ${SP.bypass_kw} kW 이내)`)]]); }
+    ["용량", `한 줄 ${SP.bypass_a} A(약 ${n1(SP.bypass_kw)} kW, CH-2) — 1등급 부하는 한 대의 몫이 이를 넘지 않게 대수를 잡는다`], ["넘기는 시간", SP.sts ? "STS 10 ms(끊김 없음). STS 가 없으면 5초 이내 우회 — 그동안 끊긴다" : `${V.bypass_s}초 이내 우회 — 그동안 끊긴다`]], [26, 74]],
+    [["기본 구성의 예", V.rows.filter(r => r.alt).map(r => `${r.name}: ${r.fsu} → 우회 ${r.alt}, 배전체계 ${r.need}대가 ${n1(r.kw * r.n / r.need)} kW 씩(한 줄 약 ${n1(SP.bypass_kw)} kW 이내)`)]]); }
 { const s = page(4, "구간분전함이 고장 나거나 고립됐을 때", "환망으로는 메우지 못하는 고장 — 1등급 부하는 우회 결선이 이어 받는다",
     "구간분전함 자체가 고장 났을 때입니다. 1등급 부하는 우회 결선이 이어 받습니다.");
   shotSide(s, "ring_iso", [[1, 598, 392], [2, 598, 520]], "구간분전함 2 를 양쪽에서 끊어 고립시킨 화면: 구간분전함은 빨강(정전)이지만 지휘통제의 배전체계 3대는 우회 결선으로 받는다.",
