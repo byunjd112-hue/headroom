@@ -31,7 +31,9 @@ const ScTopo = (() => {
     if (typeof BusPlan === "undefined" || !BusPlan.s()) return;
     for (const kind of ["src", "load"]) { const ns = BASE.filter(k => NODES[k].kind === kind).map(k => ({id: k, x: 0, bus: HOME[k].bus})), home = Object.fromEntries(ns.map(n => [n.id, n.bus]));
       for (const bus of ["A", "B"]) BusPlan.place(ns, home, bus, REG[bus + kind][0], REG[bus + kind][1], kind === "load" ? id => ({L1: 1, ELZ: 1.5, L2: 2, L3: 3}[id] || 9) : null);
-      ns.forEach(n => { NODES[n.id].bus = n.bus; NODES[n.id].at = [Math.round(n.x * 10) / 10, HOME[n.id].y]; }); }
+      ns.forEach(n => { NODES[n.id].bus = n.bus; NODES[n.id].at = [Math.round(n.x * 10) / 10, HOME[n.id].y];
+        const f = kind === "src" && typeof KF === "function" && ["PV", "DG", "FC", "ESS"].includes(n.id) ? KF(n.id) : null, all = BusPlan.all(n.id); NAME0[n.id] = NAME0[n.id] || NODES[n.id].name;      // 여러 대면 이름에 대수와 물린 모선을 붙인다(이 구성도는 종류별 합계로 그린다)
+        NODES[n.id].name = NAME0[n.id] + (f && f.units.length > 1 ? ` ×${f.units.length}${all.length > 1 ? " (모선 " + all + ")" : ""}` : ""); }); }
   }
   function configure(extra) {
     EXTRA = {feeders: extra?.feeders || [], transformers: extra?.transformers || [], relays: extra?.relays || []};
@@ -49,7 +51,7 @@ const ScTopo = (() => {
   const CB_TEXT = {0: "개방", 1: "투입", 2: "트립"}, CB_COLOR = {0: "#8a97a5", 1: "#55d08a", 2: "#ff6b6b"};
   const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const P = (gx, gy) => [(gx - gy) * U, (gx + gy) * V];
-  let layout = {}, busy = false;                              // busy: 블록을 끄는 중(실시간 보기는 그동안 다시 그리지 않는다)
+  let layout = {}, busy = false; const NAME0 = {};                              // busy: 블록을 끄는 중(실시간 보기는 그동안 다시 그리지 않는다)
   try { layout = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (_) { layout = {}; }
   const at = id => layout[id] || NODES[id].at;
   // 모선 길이: 붙은 설비가 바깥으로 나가면 그만큼 늘어난다(A 는 왼쪽, B 는 오른쪽)

@@ -7,7 +7,7 @@ const BusPlan = {
   /* 그 종류의 장비가 물린 모선들(추가 장비가 다른 모선에 있으면 둘 다): "A" · "B" · "A·B" */
   all(id) { const b = this.s(); if (!b) return ""; return [...new Set([b.assign[id], ...(b.units || []).filter(u => u.kind === id).map(u => u.bus)])].filter(Boolean).sort().join("·"); },
   /* 종류와 다른 모선에 물린 추가 장비 요약(결선도 위의 띠) */
-  split() { const b = this.s(), d = b ? (b.units || []).filter(u => u.bus !== b.assign[u.kind]) : []; return d.length ? `<div class="engbox" style="margin-bottom:10px"><b>호기별 모선</b> — ${d.map(u => `${esc(u.name)} → 모선 ${u.bus}`).join(" · ")} <span class="muted">(결선도의 전원 그림은 종류마다 하나 — 첫 장비의 모선에 그린다)</span> <a href="#" data-act="busplan" style="color:var(--accent)">[모선 구성 열기]</a></div>` : ""; },
+  split() { const b = this.s(), d = b ? (b.units || []).filter(u => u.bus !== b.assign[u.kind]) : []; return d.length ? `<div class="engbox" style="margin-bottom:10px"><b>호기별 모선</b> — ${d.map(u => `${esc(u.name)} → 모선 ${u.bus}`).join(" · ")} <span class="muted">(결선도는 장비 한 대마다 그림 하나 — 그림을 끌어 다른 모선으로 옮긴다)</span> <a href="#" data-act="busplan" style="color:var(--accent)">[모선 구성 열기]</a></div>` : ""; },
   /* 개요 배치도에서 그 전원 그림의 가로 자리(없으면 상전 · 주둔지 발전기는 맨 왼쪽, 나머지는 원래 순서) */
   ox(id, i) { const k = this.LAY[id], it = k && typeof L !== "undefined" && L.items && L.items.find(q => q.kind === k); return it ? it.x : id === "GRID" || id === "GDG" ? -1e6 + i : 1e6 + i; },
   /* 한 모선의 전원 · 부하를 개요의 좌 → 우 순서로 [x0, x1] 사이에 고르게 놓는다. nodes: [{id, x, bus}] 를 고쳐 쓴다 */

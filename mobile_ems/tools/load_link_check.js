@@ -12,15 +12,15 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   const text = async (pg, sel, ms = 2600) => { await p.goto(B + "#" + pg); await p.waitForTimeout(ms); return p.evaluate(s => [...document.querySelectorAll(s)].map(e => e.textContent).join(" | ").replace(/\s+/g, " "), sel); };
   const loads = () => p.evaluate(async () => (await (await fetch("/api/snapshot")).json()).loads);
   const lab = i => i.n > 1 ? `${i.name} ×${i.n}` : i.name;
-  async function compare(what) {
-    await p.waitForTimeout(2500); const d = await loads(), on = d.items.filter(i => i.n > 0), miss = [], tot = d.grades.reduce((a, g) => a + g.n, 0), pill = `부하 ${tot}개`;
+  async function compare(what, again) {
+    const n0 = n; await p.waitForTimeout(again ? 9000 : 2500); const d = await loads(), on = d.items.filter(i => i.n > 0), miss = [], tot = d.grades.reduce((a, g) => a + g.n, 0), pill = `부하 ${tot}개`;
     const need = (scr, txt, want) => { n++; if (!txt.includes(want)) miss.push(`${scr}: '${want}' 없음`); };
     const lp = await text("loads", "#ldRows tr"); on.forEach(i => { need("부하 관리", lp, i.name); need("부하 관리", lp, i.fsu_name); });
     const ov = await text("overview", "#siteMk .spt:not(.ppdu)", 4500); on.forEach(i => { need("개요", ov, i.name); need("개요", ov, `${i.grade}등급 · ${i.fsu_name}`); });
     const spare = await p.evaluate(() => [...document.querySelectorAll("#siteMk .spt:not(.ppdu)")].filter(e => /예비 자리/.test(e.querySelector(".sh").textContent)).map(e => e.querySelector(".ss").textContent));
     n++; if (spare.some(t => /급전 중|kW/.test(t))) miss.push(`개요: 예비 자리에 '${spare.find(t => /급전 중|kW/.test(t))}'`);      // 부하가 없는 예비 자리는 급전 중이라고 나오면 안 된다
     const cnt = await p.evaluate(() => document.querySelector("#layCnt").textContent); need("개요", cnt, pill.replace("개", "").trim());
-    const sl = await text("sld", "#main svg text, #sldCb", 3500); on.forEach(i => need("결선도", sl, lab(i).slice(0, 10)));
+    const sl = await text("sld", "#main svg text, #main svg title, #sldCb", 3500); on.forEach(i => need("결선도", sl, lab(i).slice(0, 10)));
     const rg = await text("ring", "#rgBody", 3500); on.forEach(i => need("환망", rg, lab(i)));
     // 환망 구성도: 부하가 개요 · 결선도와 같은 구간분전함 아래에 그려지는지, 분기 전력계(구간분전함 · 배전체계)가 그 자리에 물린 부하의 추정 전력과 맞는지
     const dg = await p.evaluate(() => ({ at: Object.fromEntries([...document.querySelectorAll("#rgBody .rv-load")].map(e => [e.dataset.load, e.dataset.fsu])), ring: S.snap.ring, items: S.snap.loads.items }));
@@ -31,6 +31,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
     dg.ring.ppdu.forEach(q => { n++; const e = dg.items.reduce((a, i) => a + (i.n > 0 && (i.ppdus || []).includes(q.id) ? (i.est_kw || 0) / i.ppdus.length : 0), 0); if (q.kw != null && !near(q.kw, e)) miss.push(`배전체계 ${q.id} ${q.kw.toFixed(1)} kW ≠ 물린 부하 ${e.toFixed(1)} kW`); n++; const v = dg.items.some(i => (i.ppdus || []).includes(q.id) && i.grade === 1 && i.n > 0); if (!!q.vital !== v) miss.push(`배전체계 ${q.id} 중요 부하 표시(★) ${q.vital} — 1등급 부하 ${v ? "있음" : "없음"}`); });
     for (const [pg, nm] of [["control", "설비 제어"], ["energy", "발전·예측"], ["trends", "추세"], ["scenarios", "운영 시나리오"]]) need(nm, await text(pg, "#main .pagehd .ld-note", 2200), pill);
     await p.goto(B + "#control"); await p.waitForTimeout(2000); const ct = await p.evaluate(() => [...document.querySelectorAll("#cbRows tr")].map(e => e.title).join(" | "));      // 차단기 줄의 이름(풍선 도움말) d.grades.filter(g => g.n > 0).forEach(g => need("설비 제어", ct, d.items.find(i => i.feeder === g.feeder && i.n > 0).name));
+    if (miss.length && !again && miss.every(m => / kW ≠ 물린 부하 /.test(m))) { n = n0; console.log(`  … ${what}: 분기 전력계가 부하 변경을 따라올 때까지 한 번 더 기다린다(${miss[0]})`); return compare(what, true); }      // 전력계는 부하 목록이 바뀐 뒤 몇 초 늦게 따라온다 — 그 어긋남만 한 번 다시 본다
     bad += miss.length; console.log(`${miss.length ? "✕" : "○"} ${what} | ${on.map(i => `${lab(i)}@${i.fsu}`).join(", ")}` + (miss.length ? "\n    " + miss.slice(0, 8).join("\n    ") : ""));
   }
   await p.reload(); await p.waitForTimeout(2000);
@@ -63,10 +64,11 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   let r1 = await post("/api/bus", { op: "set", node: "ESS", bus: "A" }); const srcBus = b => Object.fromEntries(b.sources.filter(q => q.kind === "ESS").map(q => [q.id, q.bus]));
   chk(r1.ok && srcBus(r1.bus).ESS === "A" && srcBus(r1.bus).ESS2 === "B", "이동형 ESS 1호기만 모선 A 로(2호기는 그대로 B): " + JSON.stringify(r1.ok ? srcBus(r1.bus) : r1.why));
   await p.goto(B + "#sld"); await p.waitForTimeout(4500);
-  chk(await p.evaluate(() => [...document.querySelectorAll("#un-ESS .uchip text")].map(e => e.textContent).join(" ") === "ESS ESS2·B"), "결선도의 호기 칩(ESS · ESS2·B)");
+  chk(await p.evaluate(() => { const a = SRC.find(n => n.id === "ESS"), b = SRC.find(n => n.id === "ESS2"); return !!(a && b && a.bus === "A" && a.x < 480 && b.bus === "B" && b.x > 520 && document.querySelector("#n-ESS") && document.querySelector("#n-ESS2") && Math.abs(a.k - b.k) < .01); }), "결선도: ESS 1호기는 모선 A 쪽, 2호기는 모선 B 쪽에 따로 그려진다(같은 크기)");
+  chk(await p.evaluate(() => { const u = S.snap.fleet.ESS.units, t = id => document.querySelector("#kw-" + id).textContent; return t("ESS") === F.kw(u[0].kw) && t("ESS2") === F.kw(u[1].kw); }), "결선도: 그림마다 그 한 대의 출력");
   chk(await p.evaluate(() => val("BUS.a_v") > 300 && val("BUS.b_v") > 300), "두 모선 전압");
-  await drag(await center('#un-ESS .uchip[data-unit="ESS2"]'), await toClient(250, 200));                       // 호기 칩을 모선 A 쪽으로 끈다
-  let sb2 = await snapBus(); chk(srcBus(sb2).ESS2 === "A", "결선도에서 ESS2 칩을 끌어 모선 A 로: " + JSON.stringify(srcBus(sb2)));
+  await drag(await center("#n-ESS2 .hexbg"), await toClient(250, 200));                       // 2호기 그림을 모선 A 쪽으로 끈다
+  let sb2 = await snapBus(); chk(srcBus(sb2).ESS2 === "A", "결선도에서 ESS 2호기 그림을 끌어 모선 A 로: " + JSON.stringify(srcBus(sb2)));
   await drag(await center("#n-ESS .hexbg"), await toClient(760, 200)); sb2 = await snapBus();                             // 전원 그림(첫 장비)을 모선 B 쪽으로 끈다 → 1호기만
   chk(srcBus(sb2).ESS === "B" && srcBus(sb2).ESS2 === "A", "결선도에서 ESS 그림을 끌어 모선 B 로(1호기만): " + JSON.stringify(srcBus(sb2)));
   await p.goto(B + "#overview"); await p.waitForTimeout(4500);
@@ -92,7 +94,9 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
     const r = g.getBoundingClientRect(), c = e.querySelector(".core").getBoundingClientRect(); return [e.dataset.uid, Math.round(c.left + c.width / 2 - r.left - r.width / 2), Math.round(c.top + c.height / 2 - r.top), Math.round(r.height)]; }).filter(q => Math.abs(q[1]) > 3 || q[2] < 0 || q[2] > q[3] * .3));
   chk(!dots.length, "개요의 점이 그 그림 바로 위에 있다: " + JSON.stringify(dots));
   await compare("배치 편집에서 장비 · 부하 그림을 추가해 저장");
-  await p.goto(B + "#sld"); await p.waitForTimeout(4500); chk(await p.evaluate(() => [...document.querySelectorAll("#un-PV .uchip")].length === 2), "결선도에 PV 호기 칩 2개");
+  await p.goto(B + "#sld"); await p.waitForTimeout(4500); chk(await p.evaluate(() => !!document.querySelector("#n-PV") && !!document.querySelector("#n-PV2")), "결선도에 PV 그림 2개(한 대 = 그림 하나)");
+  chk(await p.evaluate(() => { const it = LD.s().items.filter(i => i.n > 0); return it.every(i => document.querySelector(`.sld-ld-drag[data-load="${i.id}"]`)); }), "결선도에 부하마다 그림 하나");
+  await p.goto(B + "#control"); await p.waitForTimeout(3500); chk(await p.evaluate(() => /1호기.*모선/.test((document.querySelector("#ur-PV") || {}).textContent || "") && /2호기.*모선/.test(document.querySelector("#ur-PV").textContent)), "설비 제어: PV 카드에 한 대마다 출력 · 모선");
   console.log("○ 배치 편집에서 추가한 그림 = 실제 장비 · 부하");
   await post("/api/units", { kind: "PV", delta: -1 });
   await post("/api/loads", { op: "reset" }); await p.goto(B + "#overview"); await p.waitForTimeout(9000); await post("/api/layout/reset", {});

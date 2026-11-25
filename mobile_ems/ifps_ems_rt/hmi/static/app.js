@@ -123,7 +123,7 @@ const P_OV = {
 /* ════════════════ 1-2. 단선결선도 */
 const P_SLD = {
   mount(m) {
-    m.innerHTML = `<div class="pagehd"><h2>단선결선도</h2><span class="sub">모선 A/B · 연계 차단기 · 급전선별 통전·무전압·고장 · 전력 흐름 — 전원 그림 · 호기 칩 · 부하 그림을 끌어 모선 · 구간분전함을 바꾼다. 전원 · 부하의 자리는 개요 배치와 모선 구성을 따른다</span><div class="spacer"></div><button class="btn" data-act="busplan">모선 구성</button></div><div id="sldBus"></div>
+    m.innerHTML = `<div class="pagehd"><h2>단선결선도</h2><span class="sub">모선 A/B · 차단기 · 전력 흐름 — 장비 한 대 · 부하 하나 = 그림 하나. 그림을 끌어 모선 · 구간분전함을 바꾼다</span><div class="spacer"></div><button class="btn" data-act="busplan">모선 구성</button></div><div id="sldBus"></div>
     <div class="pg" style="grid-template-columns:1fr 420px">
       <div class="panel"><div class="hd"><h3>${t("ov.sld", "단선 결선도 · 실시간 전력 흐름")}</h3><span class="sub mono" id="busbal"></span><div class="spacer"></div><div class="legend sldleg"><span><i class="l on"></i>통전</span><span><i class="l off"></i>무전압</span><span><i class="l flt"></i>고장</span><span><i class="c closed"></i>투입</span><span><i class="c open"></i>개방</span><span><i class="c trip"></i>트립</span></div></div>
         <div class="bd sldbox">${sldSvg()}</div></div>
@@ -204,7 +204,7 @@ const P_CTL = {
     $("#devs").className = "devs devs4" + (units.length > 8 ? " devs5" : "");                       // 9~10장이면 5칸 × 2줄
     $("#devs").innerHTML = units.map(u => `<div class="panel dev" id="dv-${u.id}"><div class="hd"><span class="lamp" id="lp-${u.id}"></span><h3 style="color:var(--text)"><span class="dno">${u.no}</span>${u.nm}</h3><div class="spacer"></div><span class="pill" id="lk-${u.id}">—</span></div>
       <div class="bd"><div class="toprow"><div style="flex:1;min-width:0"><div class="muted" style="font-size:12px;margin:-4px 0 8px">${u.en}${u.dev ? ` · <span class="mono">${u.dev}</span>` : ""}</div><div class="row"><div><div class="lab">${u.id === "EMS" ? "수집 주기" : u.id === "MTR" ? "총 부하" : u.id === "ELZ" ? "소비" : "출력"}</div><div class="big" id="kw2-${u.id}" style="color:var(--${u.col})">—</div></div><div class="spacer"></div><div style="text-align:right"><div class="lab">상태</div><div class="mid" id="sx-${u.id}">—</div></div></div></div><div class="eqimg" id="eq-${u.id}"></div>${(u.uq || u.dev) && KF(u.uq || u.dev) && KF(u.uq || u.dev).slots > 1 ? `<span class="uq" title="차량(장치) 대수 — 가상 장치는 놓고 빼고, 실장비는 빈 자리를 다시 찾거나 철수한 장치를 지운다. ① 복합전력(디젤 + 계통 형성 ESS)과 ④ 수소(연료전지 + 수전해)는 한 차량이라 함께 바뀐다"><button class="btn sm" data-uq="${u.uq || u.dev}" data-dv="-1">−</button><b id="uq-${u.id}">—</b><button class="btn sm" data-uq="${u.uq || u.dev}" data-dv="1">＋</button></span>` : ""}</div>
-      <div class="meta" id="mt-${u.id}"></div>
+      <div class="meta" id="mt-${u.id}"></div><div class="unitrows" id="ur-${u.id}"></div>
       ${u.ctl ? `<div class="acts"><button class="btn go" data-c="start" data-d="${u.dev}">▶ ${u.on || t("btn.start", "기동")}</button><button class="btn stop" data-c="stop" data-d="${u.dev}">■ ${u.off || t("btn.stop", "정지")}</button>
         ${u.sp ? `<div class="spacer"></div><input class="in" id="sp-${u.id}" type="number" min="0" max="${u.sp[2]}" step="${u.sp[3]}" style="width:80px" placeholder="kW"><button class="btn" data-sp="${u.id}">${u.sp[1]}</button>` : ""}</div><div class="interlock" id="il-${u.id}"></div>`
         : `<div class="interlock muted" style="color:var(--muted)">${u.id === "EMS" ? "EMS 자체 상태 — 자동 제어는 오른쪽 패널에서 전환" : u.id === "G1" ? `<span class="hym">${HY_KEYS.map(k => `<button class="btn sm" data-hm="${k}">${esc(hyCfg().label[k])}</button>`).join("")}</span><span class="hyn">발전기 · ESS 모두 복합전력 PCS 를 거쳐 감시 · 제어 — 자동 제어 중에는 EMS 가 모드를 정한다</span>` : "감시 전용 — EMS는 지령하지 않음"}</div>`}</div></div>`).join("");
@@ -230,6 +230,9 @@ const P_CTL = {
       const on = u.id === "EMS" ? true : u.id === "G1" ? cb("G1") === 1 && hyOn(val("DG.pcs_mode")) : u.id === "GRID" ? (garr && cb("GRID") === 1) : u.id === "MTR" ? !lost : kf ? kOn(u.dev) : !!(d && d.on);
       lp.className = "lamp " + (lost ? "lost" : on ? "on" : "");
       const lk = $("#lk-" + u.id), uq = $("#uq-" + u.id), qf = KF(u.uq || u.dev); if (uq && qf) uq.textContent = `${qf.units.length} / ${qf.slots}대`;
+      const ur = $("#ur-" + u.id); if (ur) { const src = (BusPlan.s() || {}).sources || [], bus = id => (src.find(q => q.id === id) || {}).bus;      // 여러 대면 한 대마다: 출력 · 충전율 · 물린 모선(결선도 · 모선 구성과 같은 값)
+        const h = kf && kf.units.length > 1 ? kf.units.map((x, i) => `<span class="${x.live ? "" : "bad"}"><b>${i + 1}호기</b> ${x.live ? (x.kw == null ? (x.on ? "운전" : "정지") : F.kw(x.kw) + " kW") : "두절"}${x.soc != null ? " · " + F.n(x.soc, 0) + "%" : ""}${bus(x.id) ? " · 모선 " + bus(x.id) : ""}</span>`).join("") : "";
+        if (ur.dataset.h !== h) { ur.dataset.h = h; ur.innerHTML = h; } }
       if (d) { const best = kf && kf.units.find(x => x.live); lk.className = "pill " + (gone ? "" : LINK_CLS[best ? best.link : d.link]); lk.textContent = gone ? "미설치" : linkTxt(best ? best.link : d.link) + (kf ? kCnt(u.dev) : ""); lk.title = kf && kf.units.length > 1 ? kf.units.map(x => `${x.id}: ${x.live ? (x.on ? "운전" : "정지") : "두절"}${x.kw == null ? "" : " " + F.kw(x.kw) + " kW"}`).join(" / ") + " — 지령은 있는 장치 모두에게 간다" : ""; }
       else if (u.id === "EMS") { lk.className = "pill " + (s.alarm_cnt[1].act ? "bad" : "ok"); lk.textContent = s.alarm_cnt[1].act ? `긴급 ${s.alarm_cnt[1].act}` : "정상"; }
       else if (u.id === "GRID" && !lost) { const g2 = s.ops || {}, t2 = g2.mode !== "grid" ? "미연계" : g2.outage ? "정전" : "연계"; lk.className = "pill " + (t2 === "정전" ? "bad" : t2 === "연계" ? "ok" : "info"); lk.textContent = t2; }
