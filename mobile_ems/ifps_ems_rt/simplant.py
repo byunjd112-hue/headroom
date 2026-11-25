@@ -23,8 +23,9 @@ class Plant:
             for i in range(mb.NREG[p["type"]]): self.reg[p["device"]][(p["fc"], p["addr"] + i)] = 0
         for tag, v in {"LOAD.kw": 80.0, "LOAD.p1_kw": 30.0, "LOAD.p2_kw": 30.0, "LOAD.p3_kw": 20.0, "PV.kw": 40.0, "ESS.soc": 60.0, "ESS.status": 1,
                        "H2.nm3": 700.0, "DG.fuel_l": 900.0, "GDG.fuel_pct": 85.0, "ENV.temp": 20.0, "ENV.press": 1013.0, "ENV.rh": 50.0, "BUS.hz": 60.0,
-                       "PV.status": 1, **{f"CB.{f}": 1 for f in ("PV", "DG", "FC", "ESS", "G1", "TIE", "L1", "L2", "L3")}, **{f"CB.{d}": 1 for d in units if fleet.is_slot(d)}}.items():
+                       "PV.status": 1, **{f"CB.{f}": 1 for f in ("PV", "DG", "FC", "ESS", "G1", "TIE", "L1", "L2", "L3")}}.items():
             if tag in self.by_tag: self.set(tag, v)
+        self._close_units(units)
         for d in units:                                                   # 추가 자리의 장치도 첫 장치와 같은 처음 값
             for suf, v in (("soc", 60.0), ("status", 1 if fleet.kind(d) in ("ESS", "PV") else 0), ("fuel_l", 900.0)):
                 if fleet.is_slot(d) and f"{d}.{suf}" in self.by_tag: self.set(f"{d}.{suf}", v)
@@ -90,6 +91,10 @@ class Plant:
 
     def _g(self, t): return self.get(t) if t in self.by_tag else 0.0
     def _cb(self, f): return (int(round(self.get(f"CB.{f}"))) == 1) if f"CB.{f}" in self.by_tag else True     # 차단기 투입(1)일 때만 모선과 연결
+    def _close_units(self, units):
+        """추가 자리 장비의 차단기(CB.<장치>)도 처음에는 투입."""
+        self._put([(f"CB.{d}", 1) for d in units if fleet.is_slot(d)])
+
     def _cbu(self, u):
         """그 장비 한 대의 차단기(CB.<장치>)가 대응표에 있으면 그 값, 없으면 종류의 차단기 — 첫 장비는 종류 이름의 차단기(CB.DG)가 제 차단기다."""
         return self._cb(u) if f"CB.{u}" in self.by_tag else self._cb(fleet.kind(u))
@@ -132,9 +137,20 @@ class Plant:
         for u in us:
             x = min(100.0, max(0.0, short) / len(us)); self._put(((f"{u}.ess_kw", x), (f"{u}.ess_soc", max(0.0, g(f"{u}.ess_soc") - x * dt / 3600.0 / 200.0 * 100.0))))
 
+    def _ess_con(self, ess_u):
+        """차단기가 닫힌 ESS 들과 '붙은 ESS 가 있는가'(0 · 1). ESS 장치가 없으면 종류의 차단기를 본다."""
+        con = [u for u in ess_u if self._cbu(u)]
+        return con, (int(bool(con)) if ess_u else int(self._cb("ESS")))
+
+    def _ess_share(self, ess_u, con, ess, dt):
+        """ESS 출력을 차단기가 닫힌 장치끼리 똑같이 나눈다(열린 장치는 0)."""
+        for u in ess_u:
+            x = ess / len(con) if u in con else 0.0
+            self._put(((f"{u}.kw", x), (f"{u}.soc", min(90.0, max(10.0, self._g(f"{u}.soc") - x * dt / 3600 / 1000.0 * 100)))))
+
     def _tick_tied(self, now, dt, net, ess_u, ess_set, soc_avg):
         """상전·주둔지 발전기·ESS 가 나머지 전력을 나누어 맡는다."""
-        g = self._g; n_e = max(1, len(ess_u)); con = [u for u in ess_u if self._cbu(u)]; ce = int(bool(con)) if ess_u else int(self._cb("ESS"))      # 차단기가 닫힌 ESS 만 나누어 맡는다
+        g = self._g; n_e = max(1, len(ess_u)); con, ce = self._ess_con(ess_u)
         tied = "CB.GRID" in self.by_tag and int(round(self.get("CB.GRID"))) == 1
         if tied and "GDG.status" in self.by_tag:
             self.set("GDG.kw", 0.0)
@@ -154,7 +170,7 @@ class Plant:
             ess = (net - gdg) * ce; grid = 0.0; self._hybrid_cover((net - gdg) - (ess if ess_u else 0.0), dt); self._exp_t = now                        # 연계가 아닐 때는 역송 시간을 세지 않는다(재투입 직후 곧바로 트립하지 않게)
         if "BUS.a_v" in self.by_tag: self._tick_bus(now)
         self._put((("GRID.kw", grid),))
-        for u in ess_u: x = ess / len(con) if u in con else 0.0; self._put(((f"{u}.kw", x), (f"{u}.soc", min(90.0, max(10.0, g(f"{u}.soc") - x * dt / 3600 / 1000.0 * 100)))))     # 여러 대면 똑같이 나누어 부담
+        self._ess_share(ess_u, con, ess, dt)     # 여러 대면 똑같이 나누어 부담
 
     def _tick_bus(self, now):
         g, cb = self._g, self._cb
