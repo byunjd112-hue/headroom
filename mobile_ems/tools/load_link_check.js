@@ -97,6 +97,14 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   await p.goto(B + "#sld"); await p.waitForTimeout(4500); chk(await p.evaluate(() => !!document.querySelector("#n-PV") && !!document.querySelector("#n-PV2")), "결선도에 PV 그림 2개(한 대 = 그림 하나)");
   chk(await p.evaluate(() => { const it = LD.s().items.filter(i => i.n > 0); return it.every(i => document.querySelector(`.sld-ld-drag[data-load="${i.id}"]`)); }), "결선도에 부하마다 그림 하나");
   await p.goto(B + "#control"); await p.waitForTimeout(3500); chk(await p.evaluate(() => /1호기.*모선/.test((document.querySelector("#ur-PV") || {}).textContent || "") && /2호기.*모선/.test(document.querySelector("#ur-PV").textContent)), "설비 제어: PV 카드에 한 대마다 출력 · 모선");
+  // 그림을 지우고 저장하면(확인) 장비 · 부하도 같이 빠진다
+  await p.goto(B + "#overview"); await p.reload(); await p.waitForTimeout(8000);
+  await p.evaluate(async () => { layToggleEdit(); await new Promise(r => setTimeout(r, 500)); for (const k of ["PV", "BARRACK", "L3"]) { const its = L.items.filter(i => i.kind === k); L.sel = its[its.length - 1].uid; layDelete(); }
+    document.querySelector("#laySave").click(); await new Promise(r => setTimeout(r, 4000)); });
+  await p.waitForTimeout(10000);
+  const del = await p.evaluate(async () => { const s = await (await fetch("/api/snapshot")).json(); return { pv: s.fleet.PV.units.length, brk: s.loads.items.filter(q => q.kind === "barrack").reduce((a, q) => a + q.n, 0), ammo: s.loads.items.filter(q => q.kind === "ammo").reduce((a, q) => a + q.n, 0) }; });
+  chk(del.pv === 1 && del.brk === 2 && del.ammo === 1, "그림을 지우고 저장 → 이동형 PV 1대 · 막사 2 · 탄약저장 1: " + JSON.stringify(del));
+  await compare("배치 편집에서 장비 · 부하 그림을 지우고 저장");
   console.log("○ 배치 편집에서 추가한 그림 = 실제 장비 · 부하");
   await post("/api/units", { kind: "PV", delta: -1 });
   await post("/api/loads", { op: "reset" }); await p.goto(B + "#overview"); await p.waitForTimeout(9000); await post("/api/layout/reset", {});

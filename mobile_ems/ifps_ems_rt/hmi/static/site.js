@@ -313,7 +313,7 @@ function siteUpdate(s, force) {
     const bn = !it.spare && !ld && { DG: ["DG", "G1"], ESS: ["ESS"], PV: ["PV"], FC: ["FC"] }[it.kind], one = bn && BusPlan.s() && it.unit && (BusPlan.s().sources || []).find(q => q.id === it.unit),      // 그림 하나 = 장비 한 대: 그 한 대의 모선(복합전력 차량은 디젤 · ESS 둘 다)
       bs = one ? [...new Set([one.bus].concat(it.kind === "DG" ? [BusPlan.of("G1", "")] : []))].filter(Boolean).sort().join("·") : bn && BusPlan.s() && [...new Set(bn.flatMap(q => BusPlan.all(q).split("·")))].filter(Boolean).sort().join("·");
     if (it.spare) x = { st: "idle", v: "—", t: LOAD_SPR.includes(it.kind) ? "부하 없음(예비 자리)" : "장치 없음(예비 자리)" };      // 부하 목록에 없는 그림: 급전선이 살아 있어도 '급전 중'이라고 쓰지 않는다
-    if (u) x = { st: !u.live ? "bad" : u.on || it.kind === "ESS" || it.kind === "PV" ? "ok" : "idle", v: `${u.id}${u.kw == null ? "" : " · " + F.kw(u.kw) + " kW"}${it.kind === "ESS" && u.soc != null ? " · " + F.n(u.soc, 0) + "%" : ""}`, t: !u.live ? "통신 두절" : it.kind === "ESS" || it.kind === "PV" ? "연결" : u.on ? "운전" : "정지" };
+    if (u) x = { st: !u.live ? "bad" : u.on || it.kind === "ESS" || it.kind === "PV" ? "ok" : "idle", v: `${u.id}${unitKw(LAY_FLEET[it.kind], u) == null ? "" : " · " + (unitEst(LAY_FLEET[it.kind]) ? "≈ " : "") + F.kw(unitKw(LAY_FLEET[it.kind], u)) + " kW"}${it.kind === "ESS" && u.soc != null ? " · " + F.n(u.soc, 0) + "%" : ""}`, t: !u.live ? "통신 두절" : it.kind === "ESS" || it.kind === "PV" ? "연결" : u.on ? "운전" : "정지" };
     if (bs && x.t && !/모선/.test(x.t)) x = Object.assign({}, x, { t: `${x.t} · 모선 ${bs}` });      // 그 전원(여러 대면 그 한 대)이 물린 모선(모선 구성)
     const hd = `${it.name || LAY_KINDS[it.kind].nm}${it.spare ? " · 예비 자리" : ""}`, sh = e.querySelector(".sh"); if (sh.textContent !== hd) sh.textContent = hd;      // 이름 · 예비 자리 표시도 부하 목록이 바뀌면 따라간다
     e.className = `spt ${e.classList.contains("mini") ? "mini" : ""} ${x.st}`; e.querySelector(".sv .mono").textContent = x.v; e.querySelector(".ss").textContent = x.t; });
@@ -374,7 +374,7 @@ function layToolbar() {
     const r = await api("/api/layout", { items: L.items });
     if (!r.ok) return toast(r.why || "저장 실패", "bad");
     if (place) { const q = await api("/api/loads", place); if (q.ok) { S.snap.loads = q.loads; toast(q.msg, "ok"); } }
-    await laySync(fresh);      // 부하의 자리 · 이름이 바뀌었으면 부하 목록에 반영(결선도 · 환망 · 부하 관리가 같이 바뀐다)
+    await laySync(fresh); await layDrop();      // 부하의 자리 · 이름이 바뀌었으면 부하 목록에 반영(결선도 · 환망 · 부하 관리가 같이 바뀐다)
     toast(`배치 저장 rev${r.rev} — 감사 기록됨`, "ok"); L.edit = false; layoutLoad(); };
 }
 /* 배치를 저장할 때: 그림이 장비 · 부하보다 많으면 그만큼 장비 · 부하를 늘린다 — 그림만 있고 '예비 자리'로 남지 않게.
@@ -405,7 +405,25 @@ async function laySync(fresh) {
 function layDelete() {
   const it = L.items.find(i => i.uid === L.sel); if (!it) return;
   if (["DIST", "EMS"].includes(it.kind) && L.items.filter(i => i.kind === it.kind).length === 1 && !confirm(`마지막 ${LAY_KINDS[it.kind].nm}입니다. 삭제합니까?`)) return;
+  const v = layLoads(L.items, true).find(q => q.uid === it.uid); (L.gone = L.gone || []).push({ kind: it.kind, load: v && !v.spare ? v.load : null, fresh: !!it.fresh });      // 저장할 때 장비 · 부하도 뺄지 묻는다(layDrop)
   L.items = L.items.filter(i => i.uid !== it.uid); L.sel = null; L.dirty = true; siteRebuild();
+}
+/* 배치를 저장할 때: 이번 편집에서 지운 그림만큼 장비 대수 · 부하 목록에서도 뺀다(물어보고). 취소하면 그림만 지워지고, 장비 · 부하가 그대로라 그림은 다시 자동으로 그려진다.
+   장비는 그 종류의 마지막 한 대는 빼지 않는다(설비 제어의 − 로 뺀다). 실제 장치는 응답이 끊겨야 빠진다 — 서버가 까닭을 알려 준다 */
+async function layDrop() {
+  const gone = (L.gone || []).filter(g => !g.fresh); L.gone = []; if (!gone.length || !S.snap) return;
+  const fl = S.snap.fleet || {}, cnt = k => L.items.filter(i => i.kind === k).length, todo = [];
+  gone.forEach(g => { const ld = g.load && S.snap.loads.items.find(q => q.id === g.load), k = LAY_FLEET[g.kind];
+    if (ld) todo.push({ load: ld.id, nm: ld.name });
+    else if (k && fl[k] && fl[k].units.length - todo.filter(t => t.kind === k).length > Math.max(1, cnt(g.kind))) todo.push({ kind: k, nm: LAY_KINDS[g.kind].nm }); });
+  if (!todo.length || !confirm(`지운 그림: ${todo.map(t => t.nm).join(", ")}\n장비 대수 · 부하 목록에서도 뺍니까? (취소 = 그림만 지움 — 장비 · 부하가 그대로면 그림은 다시 자동으로 그려집니다)`)) return;
+  const done = [], fail = [];
+  for (const t of todo) { let r;
+    if (t.load) { const ld = S.snap.loads.items.find(q => q.id === t.load); if (!ld) continue; r = await api("/api/loads", ld.n > 1 ? { op: "count", id: ld.id, delta: -1 } : { op: "del", id: ld.id }); if (r.ok) S.snap.loads = r.loads; }
+    else r = await api("/api/units", { kind: t.kind, delta: -1 });
+    (r.ok ? done : fail).push(r.ok ? t.nm : r.why); }
+  if (done.length) toast(`그림과 함께 뺐습니다: ${done.join(", ")} — 결선도 · 환망 · 부하 관리에 같이 반영됩니다`, "ok");
+  if (fail.length) toast(fail[0], "bad");
 }
 /* 배치를 저장할 때 부하 목록에 반영할 것: 부하 그림(그 부하의 첫 그림)에서 가장 가까운 구간분전함, 편집에서 고친 이름. 바뀐 것이 없으면 null */
 function layPlace() {
@@ -421,9 +439,9 @@ function layPlace() {
 function layToggleEdit() {
   if (!can("operator")) return loginDialog();
   if (L.edit && L.dirty && !confirm("저장하지 않은 변경을 버리고 편집을 끝냅니까?")) return;
-  if (L.edit) { L.edit = false; layoutLoad(); return; }
+  if (L.edit) { L.edit = false; L.gone = []; layoutLoad(); return; }
   layAdopt(); const view = layAuto(L.items); L.items.forEach(i => { const q = view.find(x => x.uid === i.uid); if (q && q.load) i.name = q.name; });      // 편집 화면의 부하 이름 = 지금 보이는 이름(부하 목록)
   L.names0 = Object.fromEntries(L.items.map(i => [i.uid, i.name])); L.pos0 = Object.fromEntries(L.items.map(i => [i.uid, [i.x, i.y]]));
-  L.edit = true; L.sel = null; siteRebuild();
+  L.edit = true; L.sel = null; L.gone = []; siteRebuild();
 }
 document.addEventListener("keydown", e => { if (S.page === "overview" && $("#siteBox") && L.edit && L.sel && (e.key === "Delete" || e.key === "Backspace") && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); layDelete(); } });

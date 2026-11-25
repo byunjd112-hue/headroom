@@ -504,7 +504,7 @@ canvas.tspark { display: block; width: calc(100% + 40px); margin: 8px -20px 0; h
 #siteMk { position: absolute; inset: 0; pointer-events: none; } #siteMk .spt { pointer-events: auto; }
 .unitrows { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 6px; } .unitrows:empty { display: none; } .unitrows span { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,.05); color: var(--text2); white-space: nowrap; } .unitrows span b { color: var(--accent); font-weight: 600; } .unitrows span.bad { color: var(--alarm); }
 .spt.ppdu { cursor: default; } .spt.ppdu .scard { padding: 2px 7px 3px; background: rgba(12,14,11,.66); } .spt.ppdu .scard .sh { font-size: 10px; } .spt.ppdu .scard .sv .mono { font-size: 10.5px; } .spt.ppdu .scard .ss { font-size: 10px; } .spt.ppdu .core { width: 7px; height: 7px; left: -3.5px; top: -3.5px; }
-.spt.mini .scard { opacity: 0; pointer-events: none; transition: opacity .15s; } .spt.mini:hover .scard { opacity: 1; }
+.spt.mini .scard { opacity: 0; pointer-events: none; transition: opacity .15s; } .spt.mini:hover .scard, .spt.mini.dragging .scard { opacity: 1; pointer-events: auto; }      /* 점에 마우스를 올리면 나타난 글상자도 끌어 옮길 수 있다 */
 .sitemap.editing .meq { cursor: grab; } .sitemap.editing .meq:active { cursor: grabbing; }
 .sitemap .msel { fill: rgba(182,211,107,.14); stroke: #b6d36b; stroke-width: 2; stroke-dasharray: 8 6; animation: flow 1.2s linear infinite; }
 .sitemap.editing .meq.sel { filter: drop-shadow(0 0 10px rgba(182,211,107,.55)); }

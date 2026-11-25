@@ -27,13 +27,28 @@ const ScTopo = (() => {
   let EXTRA = {feeders: [], transformers: [], relays: []};
   // 모선 소속과 좌우 순서는 결선도와 같게: 모선 구성(BusPlan)과 개요 배치도의 순서를 따른다
   const HOME = Object.fromEntries(BASE.map(k => [k, {bus: NODES[k].bus, y: NODES[k].at[1]}])), REG = {Asrc: [0.4, 5.8], Bsrc: [8.8, 12.4], Aload: [1.2, 4.6], Bload: [9.4, 11.8]};
+  /* 같은 종류가 여러 대면 둘째 장비부터 블록을 따로 만든다(장비 한 대 = 블록 하나 — 결선도와 같다). 값은 그 한 대의 신호(ESS2.kw …), 차단기는 종류의 차단기를 같이 본다.
+     태양광은 인버터가 출력을 내주지 않아 한 대별 kW 는 없다(합계는 첫 블록에). 반환: 만든 블록의 이름들 */
+  const MULTI = ["PV", "DG", "FC", "ESS"];
+  let LIVE = false;                                                   // 실시간 보기일 때만 한 대별 블록을 만든다 — 검증 결과(구성도 재생)는 그 검증을 돌린 가상 장치의 값이라 지금의 대수와 상관이 없다
+  function units() {
+    Object.keys(NODES).filter(k => NODES[k].unit).forEach(k => delete NODES[k]);
+    const src = BusPlan.s().sources || [], out = [];
+    for (const k of MULTI) { const f = LIVE && typeof KF === "function" ? KF(k) : null, b = NODES[k]; NAME0[k] = NAME0[k] || b.name; b.name = NAME0[k] + (f && f.units.length > 1 ? " 1" : "");
+      (f && f.units.length > 1 ? f.units.slice(1) : []).forEach((u, n) => { const q = src.find(z => z.id === u.id);
+        NODES[u.id] = {name: `${NAME0[k]} ${n + 2}`, kind: "src", bus: (q && q.bus) || HOME[k].bus, at: b.at.slice(), cb: b.cb, kw: u.id + ".kw", st: u.id + ".status", soc: b.soc ? u.id + ".soc" : undefined, c: b.c, photo: b.photo, icon: b.icon, unit: k}; out.push(u.id); }); }
+    return out;
+  }
   function arrange() {
     if (typeof BusPlan === "undefined" || !BusPlan.s()) return;
-    for (const kind of ["src", "load"]) { const ns = BASE.filter(k => NODES[k].kind === kind).map(k => ({id: k, x: 0, bus: HOME[k].bus})), home = Object.fromEntries(ns.map(n => [n.id, n.bus]));
-      for (const bus of ["A", "B"]) BusPlan.place(ns, home, bus, REG[bus + kind][0], REG[bus + kind][1], kind === "load" ? id => ({L1: 1, ELZ: 1.5, L2: 2, L3: 3}[id] || 9) : null);
-      ns.forEach(n => { NODES[n.id].bus = n.bus; NODES[n.id].at = [Math.round(n.x * 10) / 10, HOME[n.id].y];
-        const f = kind === "src" && typeof KF === "function" && ["PV", "DG", "FC", "ESS"].includes(n.id) ? KF(n.id) : null, all = BusPlan.all(n.id); NAME0[n.id] = NAME0[n.id] || NODES[n.id].name;      // 여러 대면 이름에 대수와 물린 모선을 붙인다(이 구성도는 종류별 합계로 그린다)
-        NODES[n.id].name = NAME0[n.id] + (f && f.units.length > 1 ? ` ×${f.units.length}${all.length > 1 ? " (모선 " + all + ")" : ""}` : ""); }); }
+    const extra = units(), SRCK = BASE.filter(k => NODES[k].kind === "src"), STEP = 1.8;
+    for (const bus of ["A", "B"]) {                                    // 전원: 모선마다 개요의 좌 → 우 순서로. 많아지면 모선 바깥쪽으로 자리를 넓힌다(블록이 겹치지 않게 — 모선 길이는 따라 늘어난다)
+      const mine = SRCK.concat(extra).filter(k => (NODES[k].unit ? NODES[k].bus : BusPlan.of(k, HOME[k].bus)) === bus).sort((p, q) => { const a = NODES[p].unit || p, c = NODES[q].unit || q; return BusPlan.ox(a, SRCK.indexOf(a)) - BusPlan.ox(c, SRCK.indexOf(c)) || SRCK.indexOf(a) - SRCK.indexOf(c) || (p > q ? 1 : -1); });
+      const [r0, r1] = REG[bus + "src"], m = mine.length, wide = (m - 1) * STEP > r1 - r0, x0 = !wide ? r0 : bus === "A" ? r1 - (m - 1) * STEP : r0, step = m < 2 ? 0 : wide ? STEP : (r1 - r0) / (m - 1);
+      mine.forEach((k, i) => { NODES[k].bus = bus; NODES[k].at = [Math.round((m === 1 ? (r0 + r1) / 2 : x0 + step * i) * 10) / 10, HOME[NODES[k].unit || k].y]; }); }
+    const ns = BASE.filter(k => NODES[k].kind === "load").map(k => ({id: k, x: 0, bus: HOME[k].bus})), home = Object.fromEntries(ns.map(n => [n.id, n.bus]));
+    for (const bus of ["A", "B"]) BusPlan.place(ns, home, bus, REG[bus + "load"][0], REG[bus + "load"][1], id => ({L1: 1, ELZ: 1.5, L2: 2, L3: 3}[id] || 9));
+    ns.forEach(n => { NODES[n.id].bus = n.bus; NODES[n.id].at = [Math.round(n.x * 10) / 10, HOME[n.id].y]; });
   }
   function configure(extra) {
     EXTRA = {feeders: extra?.feeders || [], transformers: extra?.transformers || [], relays: extra?.relays || []};
@@ -104,10 +119,17 @@ const ScTopo = (() => {
     const p = P(...at(id)); return [p[0], p[1] - 44];
   }
 
+  /* 실시간 보기의 한 대별 값: 종류 이름의 신호(ESS.kw)는 합계라, 블록마다 그 한 대의 값(fleet.units)으로 바꿔 읽는다. 태양광은 합계를 연결된 대수로 나눈 추정값 */
+  function unitVals(fleet) {
+    const o = {};
+    for (const k of MULTI) { const f = fleet && fleet[k]; if (!f || f.units.length < 2) continue;
+      f.units.forEach(u => { o[u.id + ".kw"] = typeof unitKw === "function" ? unitKw(k, u) : u.kw; o[u.id + ".status"] = u.live === false ? 0 : u.on ? 1 : 0; if (u.soc != null) o[u.id + ".soc"] = u.soc; }); }
+    return o;
+  }
   function html(ctx) {
-    arrange();
+    LIVE = !!ctx.fleet; arrange(); const uv = LIVE ? unitVals(ctx.fleet) : {};
     const {steps, rows, stepIndex, describe, picked} = ctx, row = rows.find(r => r.step === stepIndex), snap = row?.snap || rows.filter(r => r.step < stepIndex).pop()?.snap || null;
-    const v = tag => snap && tag in snap ? snap[tag] : null, cb = name => v("CB." + name), closed = name => cb(name) === 1 || (cb(name) === null && !snap);
+    const v = tag => tag in uv ? uv[tag] : snap && tag in snap ? snap[tag] : null, cb = name => v("CB." + name), closed = name => cb(name) === 1 || (cb(name) === null && !snap);
     const running = id => { const n = NODES[id]; return id === "GRID" ? cb("GRID") === 1 : n.st ? v(n.st) > 0.5 : Math.abs(v(n.kw) || 0) > 0.5; };
     const feeds = bus => Object.keys(NODES).some(id => NODES[id].kind === "src" && NODES[id].bus === bus && id !== "PV" && running(id) && cb(NODES[id].cb) === 1);
     let liveA = !!snap && feeds("A"), liveB = !!snap && feeds("B"); if (snap && cb("TIE") === 1) liveA = liveB = liveA || liveB;
@@ -138,7 +160,7 @@ const ScTopo = (() => {
     const nodes = order.map(id => { const n = NODES[id], [gx, gy] = at(id), p = P(gx, gy), k = kw(id), seen = id === "GRID" ? cb("GRID") !== null : v(n.st || n.kw) !== null, run = snap && n.kind !== "ctl" && seen ? running(id) : null;
       const cut = n.kind === "load" && n.cb && snap && cb(n.cb) !== null && cb(n.cb) !== 1;                 // 부하 차단기가 열려 있으면 급전되지 않는다(표시값은 부하 요구량)
       const un = snap ? Object.keys(snap).filter(t => t.startsWith("UNIT." + id) && /^\d*$/.test(t.slice(5 + id.length))) : [], placed = un.filter(t => snap[t] > 0.5).length;      // 검증 중 놓인 대수(모의 신호)
-      const fl = ctx.fleet && ctx.fleet[id], none = fl ? fl.seen === 0 : un.length > 0 && placed === 0, many = fl ? (fl.units.length > 1 ? ` · ${fl.units.length}대(운전 ${fl.units.filter(u => u.on).length})` : "") : placed > 1 ? ` · ${placed}대` : "";      // 자동 인식한 대수(개요 · 결선도와 같은 자료)
+      const fl = ctx.fleet && ctx.fleet[id], none = fl ? fl.seen === 0 : un.length > 0 && placed === 0, many = fl ? (fl.units.length > 1 && !(LIVE && MULTI.includes(id)) ? ` · ${fl.units.length}대(운전 ${fl.units.filter(u => u.on).length})` : "") : placed > 1 ? ` · ${placed}대` : "";      // 자동 인식한 대수(개요 · 결선도와 같은 자료)
       const chip = none ? (fl ? "미설치(인식된 장치 없음)" : "없음(미휴대 · 철수)") : !snap || n.kind === "ctl" ? "" : !seen && k === null ? "값 없음" : cut ? `급전 차단${k ? " · 요구 " + k.toFixed(0) + " kW" : ""}` : [k === null ? "" : `${k.toFixed(k % 1 ? 1 : 0)} kW`, n.soc && v(n.soc) !== null ? `SOC ${v(n.soc)}%` : "", n.st ? (run ? "운전" : "정지") : ""].filter(Boolean).join(" · ") + many;
       const card = n.icon ? `<g transform="translate(${p[0]} ${p[1] - 40})" stroke="${n.c}" fill="none" class="tp-icon"><circle r="27" fill="#16201e" stroke-width="2"/>${ICON[n.icon]}</g>`
         : `<g class="tp-card"><rect x="${p[0] - 37}" y="${p[1] - 66}" width="74" height="50" rx="6" fill="#16201e" stroke="${n.c}" stroke-width="2"/>

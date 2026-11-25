@@ -80,7 +80,7 @@ function sldSvg() {
     <path class="ln" id="lu-${n.id}" d="M${n.x} ${top} V${BUS_Y - 63}"/><path class="ln" id="ld-${n.id}" d="M${n.x} ${BUS_Y - 45} V${BUS_Y}"/>
     <path class="flow" id="f-${n.id}" d="M${n.x} ${BUS_Y - 44} V${BUS_Y - 2}" stroke="var(--${n.col})"/>
     <text class="fv" id="fv-${n.id}" x="${n.x - 12}" y="${BUS_Y - 18}" text-anchor="end"></text>
-    ${cbSym(n.id, n.x, BUS_Y - 54, false, (n.k || 1) < .6 ? "" : n.kind || n.id)}${faultMark(n.id, n.x, top + 14)}${hex(n, SY, SR, `var(--${n.col})`, ICON[n.kind || n.id], false)}`).join("");
+    ${cbSym(n.id, n.x, BUS_Y - 54, false, (n.k || 1) < .6 ? "" : n.unit && n.no && val("CB." + n.unit) != null ? n.unit : n.kind || n.id)}${faultMark(n.id, n.x, top + 14)}${hex(n, SY, SR, `var(--${n.col})`, ICON[n.kind || n.id], false)}`).join("");
   const lds = LOADS.map(n => `
     <path class="ln" id="lu-${n.id}" d="M${n.x} ${LO} V${LYY - 121}"/><path class="ln" id="ld-${n.id}" d="M${n.x} ${LYY - 103} V${LYY - LR}"/>
     <path class="flow" id="f-${n.id}" d="M${n.x} ${LYY - 101} V${LYY - LR - 2}" stroke="var(--live)"/>
@@ -215,38 +215,39 @@ function sldUpdate(s) {
   const running = { PV: k.pv > 0.5, DG: kOn("DG"), FC: kOn("FC"), ESS: val("ESS.status") > 0.5, G1: hyOn(val("DG.pcs_mode")), GRID: garr && cbv("GRID") === 1, GDG: !!(D.GDG && D.GDG.on) };
   // 모선 통전: 실측 전압 우선
   const unit = n => n.unit && KF(n.kind) ? KF(n.kind).units.find(u => u.id === n.unit) : null;      // 그 칸의 장비 한 대(여러 대일 때)
-  const nodeOn = n => { const u = unit(n); return u ? u.live !== false && (n.kind === "PV" ? (u.kw == null ? !!u.on : u.kw > 0.5) : n.kind === "ESS" ? true : !!u.on) : running[n.kind]; };
+  const nodeOn = n => { const u = unit(n); return u ? u.live !== false && (n.kind === "PV" ? (unitKw("PV", u) == null ? !!u.on : unitKw("PV", u) > 0.5) : n.kind === "ESS" ? true : !!u.on) : running[n.kind]; };
   const est = bus => SRC.some(n => n.bus === bus && n.kind !== "PV" && nodeOn(n) && closed(n.kind));
   let aLive = est("A"), bLive = est("B"); if (closed("TIE")) { const x = aLive || bLive; aLive = bLive = x; }
   const va = val("BUS.a_v"), vb = val("BUS.b_v"); if (gw && va !== null && va !== undefined) aLive = va > 300; if (gw && vb !== null && vb !== undefined) bLive = vb > 300;
   const live = { A: aLive, B: bLive };
   const setCls = (id, cls) => { const e = document.getElementById(id); if (e) e.setAttribute("class", cls); };
-  const cbDraw = (f, K) => { K = K || f;
-    const c = cbv(K), txt = c === null ? (ko ? "상태 미상" : "UNKNOWN") : c === 1 ? (ko ? "투입" : "CLOSED") : c === 2 ? (ko ? "트립" : "TRIPPED") : (ko ? "개방" : "OPEN");
+  const cbn = n => { const v = n.unit && n.no && gw ? val("CB." + n.unit) : null; return v === null || v === undefined ? cbv(n.kind) : Math.round(v); };      // 그 한 대의 차단기 신호(CB.PV2 …)가 대응표에 있으면 그 값, 없으면 종류의 차단기
+  const cbDraw = (f, K, cv) => { K = K || f;
+    const c = cv === undefined ? cbv(K) : cv, txt = c === null ? (ko ? "상태 미상" : "UNKNOWN") : c === 1 ? (ko ? "투입" : "CLOSED") : c === 2 ? (ko ? "트립" : "TRIPPED") : (ko ? "개방" : "OPEN");
     setCls("cb-" + f, "cbk " + (c === null ? "unk" : c === 1 ? "closed" : c === 2 ? "trip" : "open")); const e = $("#cbs-" + f); if (e) { e.textContent = txt; e.setAttribute("class", "cbs " + (c === 2 ? "t" : c === 0 ? "o" : "")); }
     const fm = $("#fm-" + f); if (fm) { fm.style.display = c === 2 ? "" : "none"; $("#fmt-" + f).textContent = "⚡ " + (ANSI_TXT[code(K)] || (ko ? "보호 동작 " : "PROT ") + code(K)); }
   };
   const st = (id, txt, col) => { const e = $("#st-" + id); if (e) { e.textContent = txt; e.setAttribute("fill", col); } };
   const pk = { PV: k.pv, DG: k.dg, FC: k.fc, ESS: k.ess, G1: val("DG.ess_kw") || 0, GRID: k.grid || 0, GDG: k.gdg || 0 };
-  SRC.forEach(n => { const K = n.kind, u = unit(n), kwv = u ? (u.kw || 0) : pk[K], soc = u && u.soc != null ? u.soc : k.soc; n._kw = kwv;
+  SRC.forEach(n => { const K = n.kind, u = unit(n), uk = u ? unitKw(K, u) : null, kwv = u ? (uk || 0) : pk[K], soc = u && u.soc != null ? u.soc : k.soc; n._kw = kwv;
     if (K === "GDG" && !D.GDG) { const e = $("#n-GDG"); if (e) e.style.opacity = .25; return; }      // 주둔지 발전기를 연동하지 않은 현장
-    const lost = u ? u.live === false : devLost(K), c = cbv(K), trip = c === 2, on = nodeOn(n) && !lost, g = $("#n-" + n.id); if (!g) return;
+    const lost = u ? u.live === false : devLost(K), c = cbn(n), trip = c === 2, on = nodeOn(n) && !lost, g = $("#n-" + n.id); if (!g) return;
     if (KF(K) && kAbsent(K)) {                                     // 가져오지 않은 종류: 흐리게 두고 '미설치'
       g.setAttribute("class", "node off absent"); if (n.kw) $("#kw-" + n.id).textContent = "—"; sldArt(n.id, { on: false }, K); cbDraw(n.id, K); setCls("lu-" + n.id, "ln off"); setCls("ld-" + n.id, "ln " + (live[n.bus] ? "on" : "off"));
       setFlow(n.id, 0); $("#fv-" + n.id).textContent = ""; st(n.id, ko ? "미설치 · 자동 인식" : "NOT INSTALLED", "var(--muted)"); return; }
     g.setAttribute("class", "node " + (trip ? "flt" : lost ? "lost" : on ? "on" : "off"));
-    if (n.kw) $("#kw-" + n.id).textContent = lost ? "####" : u && u.kw == null ? "—" : F.kw(kwv);      // 그 한 대의 출력을 따로 읽지 못하면 0 이라고 쓰지 않는다
+    if (n.kw) $("#kw-" + n.id).textContent = lost ? "####" : u && uk == null ? "—" : (u && unitEst(K) ? "≈ " : "") + F.kw(kwv);      // 그 한 대의 출력을 따로 읽지 못하면 0 이라고 쓰지 않는다
     sldArt(n.id, { on: K === "G1" ? kOn("DG") : on, lost, soc: K === "ESS" ? Math.round(soc / 5) * 5 : undefined }, K);
-    cbDraw(n.id, K);
+    cbDraw(n.id, K, c);
     setCls("lu-" + n.id, "ln " + (trip ? "flt" : on ? "on" : "off")); setCls("ld-" + n.id, "ln " + (live[n.bus] ? "on" : "off"));
-    const flowing = closed(K) && on && n.kw; setFlow(n.id, flowing ? kwv : 0, (K === "PV" ? 400 : K === "ESS" || K === "GRID" ? 300 : K === "GDG" ? 1000 : 100) * (u ? 1 : Math.max(1, kN(K))));
+    const flowing = (c === null || c === 1) && on && n.kw; setFlow(n.id, flowing ? kwv : 0, (K === "PV" ? 400 : K === "ESS" || K === "GRID" ? 300 : K === "GDG" ? 1000 : 100) * (u ? 1 : Math.max(1, kN(K))));
     $("#fv-" + n.id).textContent = flowing && Math.abs(kwv) > 0.5 ? `${kwv < 0 ? "▲" : "▼"} ${F.kw(Math.abs(kwv))}` : "";
     if (trip) st(n.id, (ko ? "차단기 트립 · " : "CB TRIP · ") + (ANSI_TXT[code(K)] || code(K)), "var(--alarm)");
     else if (lost) st(n.id, ko ? "통신 두절" : "COMM LOSS", "var(--alarm)");
     else if (K === "GRID") st(n.id, !garr ? (ko ? "미연계(작전지)" : "NOT CONNECTED") : c === 1 ? (ops.outage ? (ko ? "복전 확인 중" : "RESTORING") : (ko ? "수전 중" : "IMPORTING")) : (ko ? "정전 · 자립 전환" : "OUTAGE"), !garr ? "var(--muted)" : c === 1 && !ops.outage ? "var(--ok)" : "var(--alarm)");
     else if (K === "GDG" && !on) st(n.id, garr ? (ko ? "대기" : "STANDBY") : (ko ? "미사용(작전지)" : "NOT USED"), "var(--muted)");
     else if (c === 0) st(n.id, ko ? "차단기 개방 · 분리" : "CB OPEN · ISOLATED", "var(--warn)");
-    else if (u && u.kw == null) st(n.id, ko ? "연결 · 출력은 합계에 포함" : "CONNECTED", "var(--muted)");
+    else if (u && uk == null) st(n.id, ko ? "연결 · 출력은 합계에 포함" : "CONNECTED", "var(--muted)");
     else if (K === "PV") st(n.id, kwv > 0.5 ? (ko ? "발전 중" : "GENERATING") : (ko ? "발전 없음" : "IDLE"), kwv > 0.5 ? "var(--pv)" : "var(--muted)");
     else if (K === "ESS") st(n.id, kwv > 0.5 ? (ko ? "방전" : "DISCHARGING") : kwv < -0.5 ? (ko ? "충전" : "CHARGING") : (ko ? "대기" : "STANDBY"), "var(--ess)");
     else if (K === "G1") st(n.id, ko ? hyMode(val("DG.pcs_mode")) : ({ stop: "STOP", gen: "GEN ONLY", charge: "GEN + CHARGE", ess: "ESS DISCHARGE" })[hyKey(val("DG.pcs_mode")) || "ess"] || "?", "var(--g1)");

@@ -17,6 +17,9 @@ const val = tag => kv(S.snap && S.snap.values[tag], "v");
 /* 같은 종류 주 장치 묶음(자동 인식): 대수 · 하나라도 운전 · 한 대도 없음(미설치) · 모두 두절. 묶음 정보가 없으면 장치 하나의 상태로 본다 */
 const KF = k => (S.snap && S.snap.fleet && S.snap.fleet[k]) || null, _kd = k => (S.snap && S.snap.devices[k]) || null;
 const kN = k => { const f = KF(k); return f ? f.n : 1; };
+/* 장비 한 대의 출력. 태양광은 인버터가 출력을 내주지 않고 계측 게이트웨이가 합계(PV.kw)만 재므로, 여러 대면 연결된 대수로 똑같이 나눈 값을 쓴다(추정 — 화면에 ≈ 로 표시) */
+const unitKw = (kind, u) => { const f = KF(kind); if (!u || kind !== "PV" || !f || f.units.length < 2) return u ? u.kw : null; const on = f.units.filter(x => x.live && x.on); return on.some(x => x.id === u.id) ? (val("PV.kw") || 0) / on.length : 0; };
+const unitEst = kind => kind === "PV" && KF("PV") && KF("PV").units.length > 1;
 const kOn = k => { const f = KF(k), d = _kd(k); return f ? f.on : !!(d && d.on); };
 const kAbsent = k => { const f = KF(k), d = _kd(k); return f ? f.seen === 0 && !!d && d.link === "두절" : !!(d && d.absent); };
 const kLost = k => { const f = KF(k), d = _kd(k); return f ? f.n === 0 && !!d && d.link === "두절" : !!(d && d.link === "두절"); };
@@ -231,7 +234,7 @@ const P_CTL = {
       lp.className = "lamp " + (lost ? "lost" : on ? "on" : "");
       const lk = $("#lk-" + u.id), uq = $("#uq-" + u.id), qf = KF(u.uq || u.dev); if (uq && qf) uq.textContent = `${qf.units.length} / ${qf.slots}대`;
       const ur = $("#ur-" + u.id); if (ur) { const src = (BusPlan.s() || {}).sources || [], bus = id => (src.find(q => q.id === id) || {}).bus;      // 여러 대면 한 대마다: 출력 · 충전율 · 물린 모선(결선도 · 모선 구성과 같은 값)
-        const h = kf && kf.units.length > 1 ? kf.units.map((x, i) => `<span class="${x.live ? "" : "bad"}"><b>${i + 1}호기</b> ${x.live ? (x.kw == null ? (x.on ? "운전" : "정지") : F.kw(x.kw) + " kW") : "두절"}${x.soc != null ? " · " + F.n(x.soc, 0) + "%" : ""}${bus(x.id) ? " · 모선 " + bus(x.id) : ""}</span>`).join("") : "";
+        const h = kf && kf.units.length > 1 ? kf.units.map((x, i) => `<span class="${x.live ? "" : "bad"}"><b>${i + 1}호기</b> ${x.live ? (unitKw(u.dev, x) == null ? (x.on ? "운전" : "정지") : (unitEst(u.dev) ? "≈ " : "") + F.kw(unitKw(u.dev, x)) + " kW") : "두절"}${x.soc != null ? " · " + F.n(x.soc, 0) + "%" : ""}${bus(x.id) ? " · 모선 " + bus(x.id) : ""}</span>`).join("") : "";
         if (ur.dataset.h !== h) { ur.dataset.h = h; ur.innerHTML = h; } }
       if (d) { const best = kf && kf.units.find(x => x.live); lk.className = "pill " + (gone ? "" : LINK_CLS[best ? best.link : d.link]); lk.textContent = gone ? "미설치" : linkTxt(best ? best.link : d.link) + (kf ? kCnt(u.dev) : ""); lk.title = kf && kf.units.length > 1 ? kf.units.map(x => `${x.id}: ${x.live ? (x.on ? "운전" : "정지") : "두절"}${x.kw == null ? "" : " " + F.kw(x.kw) + " kW"}`).join(" / ") + " — 지령은 있는 장치 모두에게 간다" : ""; }
       else if (u.id === "EMS") { lk.className = "pill " + (s.alarm_cnt[1].act ? "bad" : "ok"); lk.textContent = s.alarm_cnt[1].act ? `긴급 ${s.alarm_cnt[1].act}` : "정상"; }
