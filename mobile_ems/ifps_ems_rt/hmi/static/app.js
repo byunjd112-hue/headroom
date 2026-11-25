@@ -18,7 +18,7 @@ const val = tag => kv(S.snap && S.snap.values[tag], "v");
 const KF = k => (S.snap && S.snap.fleet && S.snap.fleet[k]) || null, _kd = k => (S.snap && S.snap.devices[k]) || null;
 const kN = k => { const f = KF(k); return f ? f.n : 1; };
 /* 장비 한 대의 출력. 태양광은 인버터가 출력을 내주지 않고 계측 게이트웨이가 합계(PV.kw)만 재므로, 여러 대면 연결된 대수로 똑같이 나눈 값을 쓴다(추정 — 화면에 ≈ 로 표시) */
-const unitKw = (kind, u) => { const f = KF(kind); if (!u || kind !== "PV" || !f || f.units.length < 2) return u ? u.kw : null; const on = f.units.filter(x => x.live && x.on); return on.some(x => x.id === u.id) ? (val("PV.kw") || 0) / on.length : 0; };
+const unitKw = (kind, u) => { const f = KF(kind); if (!u || kind !== "PV" || !f || f.units.length < 2) return u ? u.kw : null; const shut = (x, i) => { const c = val("CB." + (i ? x.id : kind)); return c != null && Math.round(c) !== 1; }, on = f.units.filter((x, i) => x.live && x.on && !shut(x, i)); return on.some(x => x.id === u.id) ? (val("PV.kw") || 0) / on.length : 0; };
 const unitEst = kind => kind === "PV" && KF("PV") && KF("PV").units.length > 1;
 const kOn = k => { const f = KF(k), d = _kd(k); return f ? f.on : !!(d && d.on); };
 const kAbsent = k => { const f = KF(k), d = _kd(k); return f ? f.seen === 0 && !!d && d.link === "두절" : !!(d && d.absent); };
@@ -168,7 +168,9 @@ const CTL_UNITS = [
   { id: "GRID", no: "주", nm: "주둔지 상전 수전점 · 22.9kV", en: "Utility incoming (no export)", col: "g1", dev: null, kw: "GRID.kw", need: "GRID.kw" },
 ];
 /* 차단기 줄의 이름: 부하 급전선은 부하 목록(부하 관리)의 이름을 붙인다 */
-const cbRows = () => CB_ROWS.map(([f, nm]) => /^L[123]$/.test(f) && LD.names(f).length ? [f, `${f[1]}등급 부하 (${LD.names(f).slice(0, 3).join(" · ")}${LD.names(f).length > 3 ? " …" : ""})`] : [f, nm]);
+/* 추가 자리 장비의 차단기(CB.DG2 …): 인식한 장비 가운데 대응표에 차단기 신호가 있는 것 */
+const cbUnits = () => ["DG", "FC", "ESS", "PV"].flatMap(k => { const f = KF(k); return f ? f.units.slice(1).filter(u => val("CB." + u.id) != null).map((u, i) => [u.id, `${{ DG: "① 디젤", FC: "④ 연료전지", ESS: "② ESS", PV: "③ PV" }[k]} ${i + 2}호기 인입`]) : []; });
+const cbRows = () => CB_ROWS.slice(0, 5).concat(cbUnits(), CB_ROWS.slice(5)).map(([f, nm]) => /^L[123]$/.test(f) && LD.names(f).length ? [f, `${f[1]}등급 부하 (${LD.names(f).slice(0, 3).join(" · ")}${LD.names(f).length > 3 ? " …" : ""})`] : [f, nm]);
 const CB_ROWS = [["PV", "③ PV 인입"], ["DG", "① 디젤 인입"], ["FC", "④ 연료전지 인입"], ["ESS", "② ESS 인입"], ["G1", "① 복합전력 인입"], ["TIE", "모선 A·B 연계"], ["L1", "1등급 부하"], ["L2", "2등급 부하"], ["L3", "3등급 부하"]];
 /* 복합전력 PCS 의 운전 모드: 값과 이름은 설정(runtime.json 의 hybrid — 관리자 화면에서 고친다)에서 온다. 스냅샷 kpi.hy = {code: {stop, gen, charge, ess}, label: {...}} */
 const HY_KEYS = ["gen", "charge", "ess", "stop"], HY0 = { code: { stop: 0, gen: 1, charge: 2, ess: 3 }, label: { stop: "정지", gen: "발전기 단독", charge: "발전기 + ESS 충전", ess: "ESS 방전" } };
@@ -509,7 +511,8 @@ const P_ENG = {
     $("#simUnit").innerHTML = Object.entries(s.devices).filter(([, d]) => d.kind).map(([n]) => { const g = (ss.gone || []).includes(n); return `<button class="btn sm ${g ? "go" : ""}" data-a="unit" data-t="${n}" data-on="${g ? 1 : 0}">${n} ${g ? "놓기" : "빼기"}</button>`; }).join("");
     $("#simPath").innerHTML = ["A", "B"].map(p => `<span>경로 ${p} ${tog(ss.down.includes(p), "down", p)}</span>`).join("");
     const FD = [["PV", "태양광"], ["DG", "디젤"], ["FC", "연료전지"], ["ESS", "ESS"], ["G1", "복합전력 G1"], ["TIE", "모선 연계"], ["L1", "1등급 부하"], ["L2", "2등급 부하"], ["L3", "3등급 부하"]];
-    const cbE = $("#simCb"); if (cbE && !cbE.dataset.built) { cbE.dataset.built = 1; cbE.innerHTML = FD.map(([f, nm]) => `<tr><td><b>CB-${f}</b> <span class="muted">${nm}</span></td><td id="sc-${f}"></td><td class="mono" id="sf-${f}"></td>
+    cbUnits().forEach(([f, nm]) => FD.push([f, nm.replace(/^\S+ /, "").replace(" 인입", "")]));
+    const cbE = $("#simCb"), fsig = FD.map(q => q[0]).join(); if (cbE && cbE.dataset.built !== fsig) { cbE.dataset.built = fsig; cbE.innerHTML = FD.map(([f, nm]) => `<tr><td><b>CB-${f}</b> <span class="muted">${nm}</span></td><td id="sc-${f}"></td><td class="mono" id="sf-${f}"></td>
         <td><select class="in" id="scd-${f}" style="height:26px"><option value="51">51 한시 과전류</option><option value="50">50 순시 과전류</option><option value="87">87 차동</option><option value="64">64 지락</option><option value="27">27 저전압</option><option value="59">59 과전압</option><option value="81">81 주파수</option><option value="32">32 역전력</option></select>
         <button class="btn sm stop" data-flt="${f}">트립</button></td><td><button class="btn sm" data-cbo="${f}">개방</button> <button class="btn sm go" data-cbc="${f}">투입·복구</button></td></tr>`).join("");
       $$("#simCb [data-flt]").forEach(b => b.onclick = () => this._simAct({ action: "fault", target: b.dataset.flt, code: +$("#scd-" + b.dataset.flt).value }));

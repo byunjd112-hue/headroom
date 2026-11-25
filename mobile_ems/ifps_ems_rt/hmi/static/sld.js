@@ -222,7 +222,7 @@ function sldUpdate(s) {
   const live = { A: aLive, B: bLive };
   const setCls = (id, cls) => { const e = document.getElementById(id); if (e) e.setAttribute("class", cls); };
   const cbn = n => { const v = n.unit && n.no && gw ? val("CB." + n.unit) : null; return v === null || v === undefined ? cbv(n.kind) : Math.round(v); };      // 그 한 대의 차단기 신호(CB.PV2 …)가 대응표에 있으면 그 값, 없으면 종류의 차단기
-  const cbDraw = (f, K, cv) => { K = K || f;
+  const cbDraw = (f, K, cv) => { K = K || f; if (cv !== undefined && f !== K && val("CB." + f) != null) K = f;      // 한 대별 차단기 신호가 있으면 보호 코드도 그 한 대의 것
     const c = cv === undefined ? cbv(K) : cv, txt = c === null ? (ko ? "상태 미상" : "UNKNOWN") : c === 1 ? (ko ? "투입" : "CLOSED") : c === 2 ? (ko ? "트립" : "TRIPPED") : (ko ? "개방" : "OPEN");
     setCls("cb-" + f, "cbk " + (c === null ? "unk" : c === 1 ? "closed" : c === 2 ? "trip" : "open")); const e = $("#cbs-" + f); if (e) { e.textContent = txt; e.setAttribute("class", "cbs " + (c === 2 ? "t" : c === 0 ? "o" : "")); }
     const fm = $("#fm-" + f); if (fm) { fm.style.display = c === 2 ? "" : "none"; $("#fmt-" + f).textContent = "⚡ " + (ANSI_TXT[code(K)] || (ko ? "보호 동작 " : "PROT ") + code(K)); }
@@ -242,7 +242,8 @@ function sldUpdate(s) {
     setCls("lu-" + n.id, "ln " + (trip ? "flt" : on ? "on" : "off")); setCls("ld-" + n.id, "ln " + (live[n.bus] ? "on" : "off"));
     const flowing = (c === null || c === 1) && on && n.kw; setFlow(n.id, flowing ? kwv : 0, (K === "PV" ? 400 : K === "ESS" || K === "GRID" ? 300 : K === "GDG" ? 1000 : 100) * (u ? 1 : Math.max(1, kN(K))));
     $("#fv-" + n.id).textContent = flowing && Math.abs(kwv) > 0.5 ? `${kwv < 0 ? "▲" : "▼"} ${F.kw(Math.abs(kwv))}` : "";
-    if (trip) st(n.id, (ko ? "차단기 트립 · " : "CB TRIP · ") + (ANSI_TXT[code(K)] || code(K)), "var(--alarm)");
+    const CK = n.unit && n.no && val("CB." + n.unit) != null ? n.unit : K;      // 보호 코드도 그 한 대의 것(신호가 있으면)
+    if (trip) st(n.id, (ko ? "차단기 트립 · " : "CB TRIP · ") + (ANSI_TXT[code(CK)] || code(CK)), "var(--alarm)");
     else if (lost) st(n.id, ko ? "통신 두절" : "COMM LOSS", "var(--alarm)");
     else if (K === "GRID") st(n.id, !garr ? (ko ? "미연계(작전지)" : "NOT CONNECTED") : c === 1 ? (ops.outage ? (ko ? "복전 확인 중" : "RESTORING") : (ko ? "수전 중" : "IMPORTING")) : (ko ? "정전 · 자립 전환" : "OUTAGE"), !garr ? "var(--muted)" : c === 1 && !ops.outage ? "var(--ok)" : "var(--alarm)");
     else if (K === "GDG" && !on) st(n.id, garr ? (ko ? "대기" : "STANDBY") : (ko ? "미사용(작전지)" : "NOT USED"), "var(--muted)");

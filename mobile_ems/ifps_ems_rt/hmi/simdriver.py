@@ -33,7 +33,7 @@ class SimDriver:
         p1 *= k[1]; p2 *= k[2] * sv("L2"); p3 = max(0.0, p3 - self.extra_load) * k[3] * sv("L3") + self.extra_load      # 시나리오로 얹은 부하(extra_load)는 그대로
         clear = float(clear_pv_kw(self.site, doy, hr)); self._cloud_step(clear); pv = max(0.0, clear * self.cloud * (1 + random.gauss(0, 0.01)))
         if "PV.status" in self.p.by_tag:                                    # 인버터 분리 → 0, 출력 제한 적용. 여러 대면 대수만큼 더한다
-            pv = sum(0.0 if self.p.get(f"{u}.status") < .5 else min(pv, self.p.get(f"{u}.lim_set") or 400.0) for u in self.p.us("PV"))
+            pv = sum(0.0 if self.p.get(f"{u}.status") < .5 or not self.p._cbu(u) else min(pv, self.p.get(f"{u}.lim_set") or 400.0) for u in self.p.us("PV"))
         temp = 16 + 7 * math.sin(2 * math.pi * (hr - 9) / 24) + random.gauss(0, 0.05)
         vals = {"LOAD.p1_kw": p1, "LOAD.p2_kw": p2, "LOAD.p3_kw": max(0.0, p3), "PV.kw": pv, "ENV.temp": temp,
                 "ENV.press": 1012.5 + random.gauss(0, 0.05), "ENV.rh": 55 + random.gauss(0, 0.3)}
@@ -66,7 +66,8 @@ class SimDriver:
 
     def trip(self, f, code):
         """급전선 고장: 보호 IED가 차단기를 트립(2)하고 보호 요소 코드를 남긴 상태를 모사."""
-        self.p.set(f"CB.{f}", 2); self.p.set(f"FLT.{f}", code)
+        self.p.set(f"CB.{f}", 2)
+        if f"FLT.{f}" in self.p.by_tag: self.p.set(f"FLT.{f}", code)
 
     def scenario(self, name):
         self.scn = name

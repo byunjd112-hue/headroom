@@ -228,6 +228,12 @@ class FleetLiveTest(unittest.TestCase):
         self.assertTrue(self._wait(lambda: (fl()["DG"]["n"], fl()["ESS"]["n"], fl()["PV"]["n"]) == (2, 2, 2)))                                                # 조작 없이 인식
         self.assertTrue([x for x in rt.events if "DG 2대 인식" in x["text"]]); s = e.snapshot(); self.assertEqual(s["devices"]["DG2"]["absent"], False)
         self.assertTrue(self._wait(lambda: abs(rt.val["ESS.kw"] - rt.fleet.unit("ESS", "kw", rt.val) - rt.fleet.unit("ESS2", "kw", rt.val)) < 0.5 and abs(rt.fleet.unit("ESS", "kw", rt.val) - rt.fleet.unit("ESS2", "kw", rt.val)) < 0.5))
+        self.assertEqual(rt.val.get("CB.ESS2"), 1); e.sim_action({"action": "cb", "target": "ESS2", "on": False}, "시험")                                    # 장비 한 대마다 차단기: 2호기 차단기만 열면 그 한 대만 떨어지고 1호기가 다 맡는다
+        self.assertTrue(self._wait(lambda: rt.val.get("CB.ESS2") == 0 and abs(rt.fleet.unit("ESS2", "kw", rt.val)) < 0.05 and abs(rt.val["ESS.kw"] - rt.fleet.unit("ESS", "kw", rt.val)) < 0.5 and rt.val.get("CB.ESS") == 1))
+        e.sim_action({"action": "fault", "target": "PV2", "code": 51}, "시험"); self.assertTrue(self._wait(lambda: rt.val.get("CB.PV2") == 2 and rt.val.get("FLT.PV2") == 51 and rt.val.get("CB.PV") == 1))
+        self.assertRaises(ValueError, e.sim_action, {"action": "cb", "target": "ESS9", "on": False}, "시험")
+        for n in ("ESS2", "PV2"): e.sim_action({"action": "cb", "target": n, "on": True}, "시험")
+        self.assertTrue(self._wait(lambda: rt.val.get("CB.ESS2") == 1 and rt.val.get("CB.PV2") == 1 and abs(rt.fleet.unit("ESS", "kw", rt.val) - rt.fleet.unit("ESS2", "kw", rt.val)) < 0.5))
         with e.lock: rt.t_ctl = -1e9; e.sim_action({"action": "set", "tag": "ESS.soc", "value": 22.0, "hold": False}, "시험"); e.plant.set("ESS2.soc", 22.0)
         self.assertTrue(self._wait(lambda: e.plant.get("DG.status") > 0.5 and e.plant.get("DG2.status") > 0.5, 40.0), "두 대 모두 기동")                          # 기동 지령은 있는 장치 모두에게
         self.assertTrue(self._wait(lambda: abs(rt.val.get("DG.kw", 0) - 180.0) < 1.0)); self.assertEqual(e.kpi()["online_kw"].count(rt.site.dg_kw), 2)             # 합산과 용량

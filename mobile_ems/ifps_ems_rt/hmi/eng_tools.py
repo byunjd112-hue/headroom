@@ -61,9 +61,10 @@ class ToolsMixin:
 
     def _sim_feeder(self, q):
         f = q["target"]
-        if f not in FEEDERS: raise ValueError(f"급전선 없음: {f}")
-        if q["action"] == "fault": self.simdrv.trip(f, int(q.get("code", 51)))
-        else: self.plant.set(f"CB.{f}", 1 if q.get("on", True) else 0); self.plant.set(f"FLT.{f}", 0)
+        if f not in FEEDERS and not (fleet.is_slot(f) and f"CB.{f}" in self.plant.by_tag): raise ValueError(f"급전선 없음: {f}")      # 추가 자리 장비의 차단기(CB.DG2 …)도 받는다
+        if q["action"] == "fault": self.simdrv.trip(f, int(q.get("code", 51))); return
+        self.plant.set(f"CB.{f}", 1 if q.get("on", True) else 0)
+        if f"FLT.{f}" in self.plant.by_tag: self.plant.set(f"FLT.{f}", 0)
 
     def _sim_clock(self, hour):
         """시연용 모의 시각: 가상 장치(태양광·부하)와 EMS 시간대 판단을 같은 시각으로 옮긴다. hour 가 없으면 실제 시각으로 되돌린다."""

@@ -23,7 +23,7 @@ class Plant:
             for i in range(mb.NREG[p["type"]]): self.reg[p["device"]][(p["fc"], p["addr"] + i)] = 0
         for tag, v in {"LOAD.kw": 80.0, "LOAD.p1_kw": 30.0, "LOAD.p2_kw": 30.0, "LOAD.p3_kw": 20.0, "PV.kw": 40.0, "ESS.soc": 60.0, "ESS.status": 1,
                        "H2.nm3": 700.0, "DG.fuel_l": 900.0, "GDG.fuel_pct": 85.0, "ENV.temp": 20.0, "ENV.press": 1013.0, "ENV.rh": 50.0, "BUS.hz": 60.0,
-                       "PV.status": 1, **{f"CB.{f}": 1 for f in ("PV", "DG", "FC", "ESS", "G1", "TIE", "L1", "L2", "L3")}}.items():
+                       "PV.status": 1, **{f"CB.{f}": 1 for f in ("PV", "DG", "FC", "ESS", "G1", "TIE", "L1", "L2", "L3")}, **{f"CB.{d}": 1 for d in units if fleet.is_slot(d)}}.items():
             if tag in self.by_tag: self.set(tag, v)
         for d in units:                                                   # 추가 자리의 장치도 첫 장치와 같은 처음 값
             for suf, v in (("soc", 60.0), ("status", 1 if fleet.kind(d) in ("ESS", "PV") else 0), ("fuel_l", 900.0)):
@@ -90,6 +90,10 @@ class Plant:
 
     def _g(self, t): return self.get(t) if t in self.by_tag else 0.0
     def _cb(self, f): return (int(round(self.get(f"CB.{f}"))) == 1) if f"CB.{f}" in self.by_tag else True     # 차단기 투입(1)일 때만 모선과 연결
+    def _cbu(self, u):
+        """그 장비 한 대의 차단기(CB.<장치>)가 대응표에 있으면 그 값, 없으면 종류의 차단기 — 첫 장비는 종류 이름의 차단기(CB.DG)가 제 차단기다."""
+        return self._cb(u) if f"CB.{u}" in self.by_tag else self._cb(fleet.kind(u))
+
     def _put(self, pairs):
         for tag, v in pairs:
             if tag in self.by_tag: self.set(tag, v)
@@ -104,8 +108,8 @@ class Plant:
     def _tick_units(self):
         """장치마다 출력을 낸다(같은 종류가 여러 대면 대마다). 반환: (디젤 합, 연료전지 합, 수전해 합) kW"""
         g, cb = self._g, self._cb; dg = fc = elz = 0.0
-        for u in self.us("DG"): dg += self._tick_hybrid(u, cb("DG"))
-        for u in self.us("FC"): x = (100.0 * g(f"{u}.status") * 0.05 if g(f"{u}.kw_set") == 0 else g(f"{u}.kw_set") * g(f"{u}.status")) * cb("FC"); self._put(((f"{u}.kw", x),)); fc += x
+        for u in self.us("DG"): dg += self._tick_hybrid(u, self._cbu(u))
+        for u in self.us("FC"): x = (100.0 * g(f"{u}.status") * 0.05 if g(f"{u}.kw_set") == 0 else g(f"{u}.kw_set") * g(f"{u}.status")) * self._cbu(u); self._put(((f"{u}.kw", x),)); fc += x
         for u in self.us("ELZ"): x = 150.0 * g(f"{u}.status"); self._put(((f"{u}.kw", x), (f"{u}.h2_rate", 30.0 * g(f"{u}.status")))); elz += x      # 수전해 소비(150kW, 30Nm³/h)
         self._put([(f"{u}.lim", g(f"{u}.lim_set") or 400.0) for u in self.us("PV")])
         return dg, fc, elz
@@ -130,14 +134,14 @@ class Plant:
 
     def _tick_tied(self, now, dt, net, ess_u, ess_set, soc_avg):
         """상전·주둔지 발전기·ESS 가 나머지 전력을 나누어 맡는다."""
-        g, cb = self._g, self._cb; n_e = max(1, len(ess_u))
+        g = self._g; n_e = max(1, len(ess_u)); con = [u for u in ess_u if self._cbu(u)]; ce = int(bool(con)) if ess_u else int(self._cb("ESS"))      # 차단기가 닫힌 ESS 만 나누어 맡는다
         tied = "CB.GRID" in self.by_tag and int(round(self.get("CB.GRID"))) == 1
         if tied and "GDG.status" in self.by_tag:
             self.set("GDG.kw", 0.0)
             if int(round(g("CB.GDG"))) != 2: self.set("CB.GDG", 0)
         if tied:                                                             # 상전 연계: ESS 는 EMS 지령대로(충전율 한계 안에서), 나머지는 상전이 메운다
             soc = soc_avg; sp = ess_set; ess = (min(sp, 500.0 * n_e) if soc > 10.5 else min(sp, 0.0)) if sp >= 0 else (max(sp, -500.0 * n_e) if soc < 89.5 else 0.0)
-            ess *= cb("ESS"); grid = net - ess
+            ess *= ce; grid = net - ess
             self._exp_t = self._exp_t if (grid < -20 and self._exp_t is not None) else now
             if now - self._exp_t > 3.0: self.set("CB.GRID", 2); self.set("FLT.GRID", 32)        # 역송 3초 지속 → 역전력 보호(32) 트립
         else:
@@ -147,15 +151,15 @@ class Plant:
                 self.set("CB.GDG", 2 if int(round(g("CB.GDG"))) == 2 else int(on))
                 if on: gdg = min(1000.0, max(0.0, net - max(-500.0 * n_e, min(500.0 * n_e, ess_set))))
                 self.set("GDG.kw", gdg); self.set("GDG.fuel_pct", max(0.0, g("GDG.fuel_pct") - gdg * 0.26 / 5000.0 * 100.0 * dt / 3600.0))
-            ess = (net - gdg) * cb("ESS"); grid = 0.0; self._hybrid_cover((net - gdg) - (ess if ess_u else 0.0), dt); self._exp_t = now                        # 연계가 아닐 때는 역송 시간을 세지 않는다(재투입 직후 곧바로 트립하지 않게)
+            ess = (net - gdg) * ce; grid = 0.0; self._hybrid_cover((net - gdg) - (ess if ess_u else 0.0), dt); self._exp_t = now                        # 연계가 아닐 때는 역송 시간을 세지 않는다(재투입 직후 곧바로 트립하지 않게)
         if "BUS.a_v" in self.by_tag: self._tick_bus(now)
         self._put((("GRID.kw", grid),))
-        for u in ess_u: self._put(((f"{u}.kw", ess / n_e), (f"{u}.soc", min(90.0, max(10.0, g(f"{u}.soc") - ess / n_e * dt / 3600 / 1000.0 * 100)))))     # 여러 대면 똑같이 나누어 부담
+        for u in ess_u: x = ess / len(con) if u in con else 0.0; self._put(((f"{u}.kw", x), (f"{u}.soc", min(90.0, max(10.0, g(f"{u}.soc") - x * dt / 3600 / 1000.0 * 100)))))     # 여러 대면 똑같이 나누어 부담
 
     def _tick_bus(self, now):
         g, cb = self._g, self._cb
         on = lambda k: any(g(f"{u}.status") > 0.5 for u in self.us(k))
-        up = {u for n in ("DG", "FC", "ESS") if cb(n) for u in self.us(n) if g(f"{u}.status") > 0.5} | {n for n in ("GDG", "GRID") if f"CB.{n}" in self.by_tag and int(round(self.get(f"CB.{n}"))) == 1}      # 운전 중인 장치 하나하나(호기마다 물린 모선이 다를 수 있다)
+        up = {u for n in ("DG", "FC", "ESS") for u in self.us(n) if self._cbu(u) and g(f"{u}.status") > 0.5} | {n for n in ("GDG", "GRID") if f"CB.{n}" in self.by_tag and int(round(self.get(f"CB.{n}"))) == 1}      # 운전 중인 장치 하나하나(호기마다 물린 모선이 다를 수 있다)
         if cb("G1"): up.add("G1")
         a_live, b_live = busplan.live(self.bus, up, cb("TIE"))            # 모선 구성(어느 전원이 어느 모선에 물렸는지)대로
         self.set("BUS.a_v", 440.0 + (abs(math.sin(now)) * 1.5) if a_live else 0.0); self.set("BUS.b_v", 440.0 + abs(math.cos(now)) * 1.5 if b_live else 0.0)
