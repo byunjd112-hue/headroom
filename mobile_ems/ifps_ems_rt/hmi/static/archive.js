@@ -25,7 +25,8 @@ const ARC = {
       <b id="arcTitle" class="arc-title"></b><div class="spacer"></div><span id="arcMsg" class="sub"></span>
       <a class="btn" id="arcCsv" title="지금 보는 표를 CSV 로">CSV 내려받기</a>
       <select class="in" id="arcDays" title="보고서에 담을 최근 기간"><option value="1">최근 1일</option><option value="7" selected>최근 7일</option><option value="31">최근 1달</option><option value="92">최근 3달</option><option value="366">최근 1년</option></select>
-      <button class="btn pri" id="arcRep" title="현재 현황 · 최근 운영 현황 · 상황 기록 · 운전 시퀀스 · 점검 기록을 Word 문서로">보고서 출력(Word)</button></div></div>
+      <button class="btn pri" id="arcRep" title="현재 현황 · 최근 운영 현황 · 상황 기록 · 운전 시퀀스 · 점검 기록을 Word 문서로">보고서 출력(Word)</button>
+      ${this.standalone ? "" : `<span class="arc-fm" title="지금 화면에 보이는 구성(장비 대수 · 모선 · 환망 · 부하)으로 FMEA 의 해당 항목을 펼치고 FAT 점검표를 만든다. 점수는 새로 매기지 않고, 구성 때문에 달라지는 줄은 '재검토'로 표시한다"><span class="muted" style="font-size:12px;margin:0 2px 0 10px">현재 구성으로 FMEA · FAT 내보내기</span><button class="btn sm" data-fm="fmea,html">FMEA · FTA(HTML)</button><button class="btn sm" data-fm="fat,html">FAT 점검표(HTML)</button><button class="btn sm" data-fm="site,xlsx">FMEA · FAT(Excel)</button></span>`}</div></div>
     <div class="tabs" id="arcTabs"><button data-t="meter">운전 실적 · 검침</button><button data-t="device">장치별 자료</button><button data-t="ess">ESS 안전 기록</button><button data-t="events">상황 기록</button><button data-t="inspect">점검 기록</button><button data-t="xfer">서버 전달</button><button data-t="collect">수집 항목</button><button data-t="store">보관 상태</button></div><div id="arcBody"></div>`;
     m.querySelectorAll("#arcUnit button").forEach(b => b.onclick = () => { this.unit = b.dataset.u; this.load(); });
     m.querySelectorAll("#arcTabs button").forEach(b => b.onclick = () => { this.tab = b.dataset.t; this.load(); });
@@ -33,6 +34,7 @@ const ARC = {
     m.querySelector("#arcPrev").onclick = () => this.shift(-1); m.querySelector("#arcNext").onclick = () => this.shift(1);
     m.querySelector("#arcNow").onclick = () => { this.at = this.today(); this.load(); };
     m.querySelector("#arcRep").onclick = () => this.report(); this.load();
+    m.querySelectorAll("[data-fm]").forEach(b => { b.onclick = () => { const [doc, fmt] = b.dataset.fm.split(","); this.fetchFile(`/api/archive/fmexport?doc=${doc}&fmt=${fmt}`, `EMS_${doc}.${fmt}`, "문서"); }; });
   },
   update() { },
   shift(k) {
@@ -235,12 +237,14 @@ const ARC = {
       <p>· 바꾸는 곳: 이 화면의 <b>수집 항목</b> 탭(엔지니어 권한) — 주기 · 보관 기간 · ESS 항목 · 장치별 수집 신호를 고치면 바로 적용된다.</p><p>· 별도 조회: <span class="mono">python -m ifps_ems_rt.archview state/archive.db</span> — EMS 를 켜지 않고 보관소 파일만 읽는다.</p></div></div></div>`;
   },
 
-  async report() {
-    if (!this.standalone && !this.role("operator")) { this.say("보고서 출력은 운용자 로그인이 필요합니다", "bad"); if (typeof loginDialog === "function") loginDialog(); return; }
-    const days = document.querySelector("#arcDays").value, h = {}; if (typeof S !== "undefined" && S.token) h["X-EMS-Token"] = S.token; this.say("보고서를 만드는 중…");
-    const r = await fetch(`/api/report.docx?days=${days}`, { headers: h }); if (!r.ok) { let w = ""; try { w = (await r.json()).why; } catch (e) { } return this.say(w || "보고서를 만들지 못했습니다", "bad"); }
-    const m = /filename\*=UTF-8''([^;]+)/.exec(r.headers.get("Content-Disposition") || ""), a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = m ? decodeURIComponent(m[1]) : "EMS_report.docx";
-    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); this.say("보고서를 내려받았습니다", "ok");
+  async report() { const days = document.querySelector("#arcDays").value; return this.fetchFile(`/api/report.docx?days=${days}`, "EMS_report.docx", "보고서"); },
+  /* 서버가 만든 문서를 내려받는다(운용자 로그인). 파일 이름은 서버가 준 것을 쓴다 */
+  async fetchFile(url, fallback, what) {
+    if (!this.standalone && !this.role("operator")) { this.say(`${what} 출력은 운용자 로그인이 필요합니다`, "bad"); if (typeof loginDialog === "function") loginDialog(); return; }
+    const h = {}; if (typeof S !== "undefined" && S.token) h["X-EMS-Token"] = S.token; this.say(`${what}를 만드는 중…`);
+    const r = await fetch(url, { headers: h }); if (!r.ok) { let w = ""; try { w = (await r.json()).why; } catch (e) { } return this.say(w || `${what}를 만들지 못했습니다`, "bad"); }
+    const m = /filename\*=UTF-8''([^;]+)/.exec(r.headers.get("Content-Disposition") || ""), a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = m ? decodeURIComponent(m[1]) : fallback;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); this.say(`${what}를 내려받았습니다`, "ok");
   },
 };
 const P_ARCHIVE = { mount(m) { ARC.mount(m); }, update() { } };

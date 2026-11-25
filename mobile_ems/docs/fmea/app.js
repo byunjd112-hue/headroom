@@ -411,6 +411,9 @@ aoa("11_최소절단집합",[["MCS","차수","사상","—","내용","경로","P
   aoa("18_약어·참고문헌",[["약어"],["약어","원어","뜻"]].concat(DATA.b_abbr).concat([[],["참고문헌·근거 문서"],["구분","문서","내용"]]).concat(DATA.b_ref),[16,70,60]);
   const log=[["항목","필드","기준 값","편집 값"]]; for(const [id,o] of Object.entries(state.ov)){ const b=DATA.fmea.find(f=>f.id===id); for(const [k,v] of Object.entries(o)) log.push([id,k,b[k],v]); } for(const [no,o] of Object.entries(state.act)) log.push(["조치 "+no,"상태/비고",DATA.s10.find(a=>a[0]===no)[6],(o.status||"")+" / "+(o.note||"")]);
   aoa("20_시나리오·FAT연결",[["번호","부체계","고장모드","확인 수단","연결된 운영 시나리오","시나리오 결과","시험 시기","검증 방법(실장비 시험에서 확인할 것)"]].concat(scnLink().map(x=>[x.id,x.ss,x.mode,x.how,x.ls.map(s=>s.name).join(" / "),x.ls.length?(x.ls.every(s=>s.ok)?"통과":"실패 있음"):"",x.due,x.verify])).concat([[],["운영 시나리오 전체"],["시나리오","분류","FMEA","단계 수","결과(재시험)"]]).concat((DATA.scn||[]).map(s=>[s.name,s.cat,s.ref,s.steps,s.ok?"통과":"실패"])),[8,22,36,16,60,10,16,70]);
+  if(DATA.site){ const s=DATA.site;
+    aoa("21_현장구성FMEA",[["만든 때",s.when]].concat(s.summary).concat([[],s.fm_head]).concat(s.fmea),[12,34,34,70,44,9]);
+    aoa("22_FAT점검표",[s.fat_head].concat(s.fat),[8,8,26,30,36,60,16,10,18]); }
   aoa("19_변경이력",log.length>1?log:[["편집값 없음 — 기준값 그대로"]],[12,10,40,40]);
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
   saveFile("IFPS_EMS_FMEA_FTA_통합분석서_"+DATA.meta.rev+"_"+stamp()+".xlsx", new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
@@ -457,7 +460,23 @@ function vScn(){
    ${tbl(["번호","고장모드","FAT 에서 확인할 것","미리 돌려 볼 시나리오"],fat.map(x=>[x.id,x.mode,x.verify,x.ls.map(s=>s.name).join(" / ")||"없음(실장비에서만 확인)"]),[1,2,3])}
    <p class="small">FAT 확인 항목은 FMEA 의 '검증 방법' 가운데 시험 시기가 실장비 연동시험(FAT) 전인 것이다. 별도의 FAT 절차서가 정해지면 그 항목 번호를 여기에 잇는다.</p></div>`);
 }
-const VIEWS={dashboard:vDashboard, fmea:vFmea, rpn:vRpn, fta:vFta, mcs:vMcs, comm:vComm, design:vDesign, qa:vQa, scn:vScn, tools:vTools};
+/* 현장 구성 · FAT 점검표: EMS 가 인식한 구성(장비 대수 · 모선 · 환망 · 부하)에서 펼친 줄. EMS 화면의 [FMEA · FAT 내보내기]는 그때의 구성으로, 문서 묶음의 것은 가상 장치의 기본 구성으로 채운다 */
+function vSite(){
+  const s=DATA.site; if(!s){ setMain(head("현장 구성 · FAT 점검표","이 파일에는 현장 구성 자료가 없다")+`<div class="card"><p>EMS 화면의 [기록 · 보고서] → [FMEA · FAT 내보내기]로 만들면 그때의 장비 대수 · 모선 구성 · 환망 · 부하 목록으로 이 화면이 채워진다.</p></div>`); return; }
+  const rv=s.fmea.filter(r=>r[5]).length, by={}; s.fat.forEach(r=>{ by[r[1]]=(by[r[1]]||0)+1; });
+  setMain(head("현장 구성 · FAT 점검표","EMS 가 인식한 구성에서 펼친 FMEA 줄 "+s.fmea.length+"건 · FAT 점검 항목 "+s.fat.length+"건 — 만든 때 "+esc(s.when)) + `
+  <div class="grid kpis" style="margin-bottom:12px">
+    <div class="kpi"><div class="l">현장 구성 FMEA 줄</div><div class="v">${s.fmea.length}건</div><div class="d">기존 번호(FM · C) 아래에 실제 이름으로 펼침</div></div>
+    <div class="kpi ${rv?"warn":"good"}"><div class="l">재검토 표시</div><div class="v">${rv}건</div><div class="d">구성 때문에 영향이 달라지는 줄 — 점수는 사람이 정한다</div></div>
+    <div class="kpi"><div class="l">FAT 점검 항목</div><div class="v">${s.fat.length}건</div><div class="d">${Object.entries(by).map(([k,v])=>esc(k)+" "+v).join(" · ")}</div></div>
+  </div>
+  <div class="card"><h2>21-1. 구성 요약</h2>${tbl(["항목","내용"],s.summary,[0,1])}</div>
+  <div class="card" style="margin-top:12px"><h2>21-2. 현장 구성으로 펼친 FMEA</h2>${tbl(s.fm_head,s.fmea,[1,2,3,4])}
+   <p class="small">심각도 · 발생도 · 검출도는 원래 항목(05 FMEA 워크시트)의 값을 따른다 — 여기서 새로 매기지 않는다. '재검토'는 이 구성에서 영향이 달라질 수 있다는 표시다.</p></div>
+  <div class="card" style="margin-top:12px"><h2>21-3. FAT 점검표</h2>${tbl(s.fat_head,s.fat,[2,3,4,5])}
+   <p class="small">번호 · 결과 · 비고 칸은 비워 두었다 — 번호는 정한 체계를 적는다(지어내지 않는다). 합격 기준의 시간은 설정값이며 현장 보호 설정값이 아니다. [저장·내보내기]의 Excel 에 21 · 22 시트로 함께 나간다.</p></div>`);
+}
+const VIEWS={site:vSite, dashboard:vDashboard, fmea:vFmea, rpn:vRpn, fta:vFta, mcs:vMcs, comm:vComm, design:vDesign, qa:vQa, scn:vScn, tools:vTools};
 function route(){ const h=(location.hash||"#dashboard").slice(1); const v=VIEWS[h]||vDashboard; document.querySelectorAll("#nav a").forEach(a=>a.classList.toggle("on", a.getAttribute("href")==="#"+(VIEWS[h]?h:"dashboard"))); v(); window.scrollTo(0,0); }
 loadLocal(); route(); window.addEventListener("hashchange", route); initCaps();
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>route());

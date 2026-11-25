@@ -25,6 +25,16 @@ class TestHmi(unittest.TestCase):
     def tearDownClass(cls):
         cls.httpd.shutdown(); cls.eng.stop(); shutil.rmtree(cls.td, ignore_errors=True)
 
+    def test_fm_export(self):
+        """화면의 FMEA · FAT 내보내기: 운용자만, 지금 구성으로 네 가지 자료가 나온다."""
+        import io, zipfile                                                        # pylint: disable=import-outside-toplevel
+        u = self.base + "/api/archive/fmexport?doc={}&fmt={}"; self.assertEqual(self.req("/api/archive/fmexport?doc=site&fmt=json")[0], 403)
+        tok = self.login("4321"); get = lambda d, f: urllib.request.urlopen(urllib.request.Request(u.format(d, f), headers={"X-EMS-Token": tok}), timeout=20)
+        d = json.loads(get("site", "json").read()); self.assertTrue(d["fmea"] and d["fat"]); self.assertIn("지휘통제(C2)", json.dumps(d, ensure_ascii=False))
+        r = get("site", "xlsx"); self.assertIn(".xlsx", r.headers["Content-Disposition"]); self.assertEqual(len(zipfile.ZipFile(io.BytesIO(r.read())).namelist()), 8)
+        self.assertIn("FAT 점검표", get("fat", "html").read().decode("utf-8")); self.assertIn("const DATA", get("fmea", "html").read().decode("utf-8"))
+        self.assertEqual(self.req("/api/archive/fmexport?doc=x&fmt=y", tok=tok)[0], 400)
+
     def req(self, path, body=None, tok=None):
         r = urllib.request.Request(self.base + path, data=None if body is None else json.dumps(body).encode(), method="GET" if body is None else "POST")
         if tok: r.add_header("X-EMS-Token", tok)

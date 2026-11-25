@@ -16,7 +16,7 @@ OSCALE = [[1, "매우 낮음 (10년 1회 미만)", 0.03, "자동 감시·즉시 
           [7, "높음 (분기 1회)", 2.0, "정기 점검·시험 때 검출", 2160.0], [8, "높음", 4.0, "정기 점검·시험 때 검출", 4380.0],
           [9, "매우 높음 (월 1회 이상)", 8.0, "상시 감시 불가(고장 후 인지)", 8760.0], [10, "매우 높음", 12.0, "상시 감시 불가(고장 후 인지)", 17520.0]]
 NAV = [("dashboard", "01", "대시보드"), ("fmea", "05", "FMEA 워크시트"), ("rpn", "06", "RPN·위험매트릭스"), ("fta", "08", "FTA 고장수목"), ("mcs", "11", "MCS·중요도"),
-       ("comm", "12", "연동·CCF·리스크"), ("design", "14", "보완설계·조치계획"), ("qa", "15", "정합성·무결성"), ("scn", "20", "시나리오·FAT 연결"), ("tools", "⚙", "저장·내보내기")]
+       ("comm", "12", "연동·CCF·리스크"), ("design", "14", "보완설계·조치계획"), ("qa", "15", "정합성·무결성"), ("scn", "20", "시나리오·FAT 연결"), ("site", "21", "현장 구성·FAT 점검표"), ("tools", "⚙", "저장·내보내기")]
 
 
 def scenario_links():
@@ -27,7 +27,14 @@ def scenario_links():
     return [{"name": r["name"], "cat": r.get("cat", ""), "ref": r.get("ref", ""), "ok": bool(t["ok"]), "first": bool(r["ok"]), "steps": r["steps"]} for r, t in zip(sc["results"], sc["retest"])]
 
 
-def build_data(rev, date):
+def site_default():
+    """빌드 때의 현장 구성 자료(docs/fmea_site.json — 가상 장치의 기본 구성에서 받아 둔 것). 없으면 None."""
+    path = os.path.join(HERE, "..", "fmea_site.json")
+    if not os.path.exists(path): return None
+    with open(path, encoding="utf-8") as f: return json.load(f)
+
+
+def build_data(rev, date, site=None):
     rows = FM.fmea(); ids = {r["id"] for r in rows}
     gates = {g[0]: g for g in FT.GATES}; be = {b[0]: b for b in FT.BE}
     parent = {}
@@ -53,7 +60,7 @@ def build_data(rev, date):
             for i, k in enumerate(kids): walk(k, "" if depth == 0 else prefix + ("    " if last else "│   "), i == len(kids) - 1, depth + 1)
     walk("TOP", "", True, 0)
     order = ["G1", "G2", "G2.1", "G2.2", "G2.3", "G3", "G3.1", "G3.2", "G3.3", "G4", "G4.1", "G5", "TOP"]
-    return {"fmea": rows, "oscale": OSCALE, "scn": scenario_links(),
+    return {"fmea": rows, "oscale": OSCALE, "scn": scenario_links(), "site": site,
             "be": [{"id": b[0], "type": b[1], "fm": b[2], "desc": b[3], "gate": parent[b[0]], "note": b[4]} for b in FT.BE],
             "gates": [{"id": gates[i][0], "logic": gates[i][1], "desc": gates[i][2], "inputs": gates[i][3], "cls": gates[i][4]} for i in order],
             "tree": tree, "s07_1": FT.S07_1, "s07_2": FT.S07_2, "s07_note": FT.S07_NOTE, "s07_3": FT.S07_3, "s07_4": FT.S07_4, "s08_1": FT.S08_1, "s08_h2": FT.S08_H2, "s08_2": FT.S08_2,
@@ -63,12 +70,10 @@ def build_data(rev, date):
                      "nOrg": sum(r["grp"] == "본체" for r in rows), "nSup": sum(r["grp"] == "연동" for r in rows)}}
 
 
-def main(argv=None):
-    a = argv or sys.argv[1:]
-    with open(os.path.join(HERE, "..", "..", "VERSION"), encoding="utf-8") as f: rev = a[0] if a else f.read().strip()
-    date = a[1] if len(a) > 1 else ""
+def render(rev, date, site=None):
+    """워크벤치 HTML 한 파일. site: 현장 구성 자료(ifps_ems_rt/fmsite.build) — EMS 화면의 내보내기는 지금 구성을, 빌드는 받아 둔 기본 구성을 넣는다."""
     rd = lambda *p: open(os.path.join(HERE, *p), encoding="utf-8").read()
-    data = build_data(rev, date)
+    data = build_data(rev, date, site)
     js = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     nav = "\n".join(f'      <a href="#{h}"><span class="k">{k}</span>{t}</a>' for h, k, t in NAV)
     html = f"""<!doctype html>
@@ -99,6 +104,14 @@ const DATA = {js};
 {rd("app.js")}
 </script></body></html>
 """
+    return html, data
+
+
+def main(argv=None):
+    a = argv or sys.argv[1:]
+    with open(os.path.join(HERE, "..", "..", "VERSION"), encoding="utf-8") as f: rev = a[0] if a else f.read().strip()
+    date = a[1] if len(a) > 1 else ""
+    html, data = render(rev, date, site_default())
     out = os.path.join(HERE, "..", "out"); os.makedirs(out, exist_ok=True)
     path = os.path.abspath(os.path.join(out, f"IFPS_EMS_FMEA_FTA_통합분석_{rev}.html"))
     with open(path, "w", encoding="utf-8") as f: f.write(html)

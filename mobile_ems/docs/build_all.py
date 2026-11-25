@@ -43,7 +43,7 @@ LAYOUT = [("01_제안발표", "제안 발표 자료에 EMS 하드웨어·소프�
           ("04_AI예측", "예측 수식·학습된 모델의 입체 그림·독립 검증(기술자료)과 같은 내용의 논문 초안", ("AI예측_기술자료", "AI예측_논문")),
           ("05_통신연동", "실장치 통신 연동 방안서(Modbus TCP 규약·설정·시운전 절차)", ("실장치통신연동방안서",)),
           ("06_장치별연동", "장치 제작사에 보내는 연동·디버깅 안내서 7종", ("EMS연동디버깅안내서",)),
-          ("07_시험과신뢰성", "FMEA·FTA 워크벤치, 시험 결과 보고서, 신뢰성 시험 결과서, 보안성 검토, C++ 이식 사전 점검", ("FMEA_FTA", "SW시험결과보고서", "SW신뢰성시험결과서", "보안성검토결과", "Cpp이식"))]
+          ("07_시험과신뢰성", "FMEA·FTA 워크벤치, 시험 결과 보고서, 신뢰성 시험 결과서, 보안성 검토, C++ 이식 사전 점검", ("FMEA_FTA", "FAT점검표", "현장구성_FMEA_FAT", "SW시험결과보고서", "SW신뢰성시험결과서", "보안성검토결과", "Cpp이식"))]
 EVIDENCE = [("scenario_results.json", "운영 시나리오 20건 실행 결과(운전 모드 12종 포함)"), ("forecast_benchmark.json", "예측 독립 시험 6세트 — 매일 구간 보정 + 변동 여유"),
             ("forecast_benchmark_static.json", "같은 시험 — 구간을 학습 때 한 번만 보정(개선 전 비교 기준)"), ("ppt/ai_paper_eval.json", "AI 기술자료·논문의 모든 수치와 그림용 값"),
             ("test_results.json", "동적 시험 측정값"), ("static_results.json", "정적 시험·실행률·메트릭 측정값"),
@@ -131,6 +131,7 @@ def main(argv=None):
     run(["node", os.path.join(DOCS, "ppt", "build_pd_deck.js"), rev, ym], env=env)            # 이동형 배전체계 무정전 구성 기술자료
     run([sys.executable, os.path.join(DOCS, "..", "tools", "build_workbooks.py"), rev])       # 배전체계 계산서 · 개발비 보완본(원본이 docs/xlsx_base 에 있을 때만)
     run([sys.executable, os.path.join(DOCS, "fmea", "build_fmea.py"), rev, date])
+    run([sys.executable, os.path.join(DOCS, "..", "tools", "build_fmsite.py"), rev])          # 현장 구성 FMEA 펼침 · FAT 점검표(HTML · Excel)
     run([sys.executable, "-m", "tools.sample_report", os.path.join(OUT, f"이동형전력체계EMS_운영보고서_예시_{rev}.docx"), os.path.join(OUT, f"IFPS_EMS_운영시나리오_시퀀스문서_{rev}.pptx")])   # 화면의 [보고서 출력]으로 나오는 문서의 견본(가상 장치 값)
     run([sys.executable, os.path.join(DOCS, "ppt", "add_ems_to_proposal.py"), rev])                 # 제안 발표 자료 EMS 보완본(원본이 있을 때만)          # FMEA·FTA 통합 분석 워크벤치(HTML)
     with tempfile.TemporaryDirectory() as td:                    # 교육용 가상 화면: 실제 화면 파일 + 가상 장치에서 녹화한 값 + 교육 창(설치 없이 index.html 로 연다)

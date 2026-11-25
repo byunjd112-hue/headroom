@@ -101,6 +101,9 @@ def demo_inspects(arch):
 
 def http_get(hd, eng, st, p, q):
     """조회·보고서 GET. hd: 요청 처리기(_send·_err·_sess 사용). eng 가 없으면(별도 뷰어) 현재 현황 없이 기록만으로 보고서를 만든다."""
+    if p == "/api/archive/fmexport":
+        from . import fmexport                                                       # pylint: disable=import-outside-toplevel — 내보낼 때만 읽는다
+        return fmexport.http_get(hd, eng, q)
     if st is None: return hd._err(503, "기록 보관소를 쓰지 않거나 열지 못했습니다(runtime.json 의 archive)")     # pylint: disable=protected-access
     if p in ("/api/report.docx", "/api/archive/bundle"):
         if eng is not None and hd._sess("operator") is None: return None           # pylint: disable=protected-access — 보고서는 시나리오 검증까지 도는 무거운 작업, 묶음은 전체 기록
