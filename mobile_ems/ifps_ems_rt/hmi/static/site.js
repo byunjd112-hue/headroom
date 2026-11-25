@@ -205,6 +205,7 @@ function siteMapSvg(s) {
   });
   if (ems && !L.edit) g += `<text x="${Math.min(MAP_W - 190, Math.max(190, ems.x))}" y="${ems.y + 58}" text-anchor="middle" class="mfsu sec">EMS 전원: 배전 모선(주) · 차량 28 V(예비) · 내장 무정전 전원</text><text x="${Math.min(MAP_W - 190, Math.max(190, ems.x))}" y="${ems.y + 72}" text-anchor="middle" class="mfsu sec">통신: 전력 케이블과 같은 경로 · 구간분전함은 환형</text>`;      // 하드웨어 설계의 전원 이중화
   const rg = !L.edit && s.ring ? s.ring : null;                                    // 구간분전함 이름표(환망 화면의 이름과 같다)
+  if (rg && !MK.fsuOn()) items.filter(i => i.kind === "FSU").forEach(it => { const f = rg.fsu.find(x => x.id === _fsuNo(it)); if (f) g += `<text x="${it.x}" y="${it.y + 34}" text-anchor="middle" class="mfsu ${f.live === false || f.comm === false ? "bad" : ""}">${esc(f.name)}${f.comm === false ? " · 통신 고립" : ""}</text>`; });      // 글상자를 숨겼을 때는 그림 아래에 이름을 쓴다
   const dst = rg && items.find(i => i.kind === "DIST");                            // 고리가 닫히는 곳: 첫 · 마지막 구간분전함은 배전 · 변압 안의 모선에서 만난다
   if (dst && rg.fsu.length > 1) g += `<text x="${dst.x}" y="${dst.y + 96}" text-anchor="middle" class="mfsu sec open">${esc(rg.fsu[0].name)} ↔ ${esc(rg.fsu[rg.fsu.length - 1].name)} 은 이 안의 모선 A · B 로 이어져 고리가 닫힘</text>`;
   if (rg) cab.forEach(([a, b, f]) => { const sec = /^RS\d+$/.test(f) ? rg.sections[+f.slice(2)] : null; if (!sec) return; const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 + Math.abs(b[0] - a[0]) * .03;      // 구간 이름표
@@ -219,17 +220,22 @@ function _mkPos(it) {      // 표지의 자리 = 그림의 윗변. 그림은 아
 }
 /* 표지가 서로 겹치면 위쪽 표지를 더 위로 올려 떼어 놓는다(부하 · 장비가 늘어 표지가 포개져 읽히지 않는 일을 막는다). 아래 것부터 자리를 정한다 */
 function layUnstack() {
-  const cs = $$("#siteMk .spt:not(.moved) .scard").filter(c => c.getClientRects().length);      // 손으로 옮긴 글상자는 그대로 둔다 cs.forEach(c => { c.style.top = ""; });
+  const all = $$("#siteMk .spt .scard"); all.forEach(c => { c.style.top = ""; c.style.bottom = ""; });
+  const cs = all.filter(c => c.getClientRects().length && !c.closest(".moved, .mini"));      // 손으로 옮긴 글상자 · 숨긴 글상자는 그대로 둔다
+  const bx = $("#siteMk"), z = bx && bx.offsetWidth ? bx.getBoundingClientRect().width / bx.offsetWidth : 1;
   const R = cs.map(c => ({ c, r: c.getBoundingClientRect(), dy: 0 })).sort((a, b) => b.r.top - a.r.top);
   for (let pass = 0, hit = true; hit && pass < 8; pass++) { hit = false;      // 올린 표지가 다른 표지와 다시 겹칠 수 있어 겹침이 없어질 때까지 되풀이한다
     for (let i = 1; i < R.length; i++) for (let j = 0; j < i; j++) { const a = R[i], q = R[j], ab = a.r.bottom + a.dy, qt = q.r.top + q.dy;
       if (a.r.left < q.r.right + 6 && a.r.right > q.r.left - 6 && ab > qt - 4 && a.r.top + a.dy < q.r.bottom + q.dy + 4) { a.dy -= ab - qt + 6; hit = true; } }
     R.sort((a, b) => (b.r.top + b.dy) - (a.r.top + a.dy)); }
-  R.forEach(x => { if (x.dy) x.c.style.top = `${-18 + x.dy}px`; });
+  R.forEach(x => { if (x.dy) x.c.style.bottom = `${14 - x.dy / z}px`; });      // 아랫변을 올린다(윗변을 정하면 글상자가 세로로 늘어난다)
 }
 /* 표지의 자리를 그림의 실제 자리에서 잰다(주기마다): 점 = 그 그림의 윗변 가운데. 화면 비율이 달라 배치도가 잘려 보이거나, 그림이 줄거나(여러 대) 옮겨져도 점이 그림을 따라간다.
    글상자는 끌어서 옮긴다(겹침을 피하게). 옮긴 자리는 이 브라우저에 기억하고, 운용자 이상이면 배치에도 같이 저장한다. 오른쪽 버튼 = 제자리 */
 const MK = { drag: null, t: 0,
+  fsuOn() { try { return localStorage.getItem("ems.fsuLbl") === "1"; } catch (e) { return false; } },      // 구간분전함 글상자: 기본은 숨김(점만 — 마우스를 올리면 나타난다)
+  fsuToggle() { try { localStorage.setItem("ems.fsuLbl", this.fsuOn() ? "0" : "1"); } catch (e) { /* 저장소를 못 쓰면 바꾸지 못한다 */ } siteRebuild(); },
+  fsuBtn() { const b = $("#fsuLblBtn"); if (b) { b.textContent = this.fsuOn() ? "분전함 글상자 숨기기" : "분전함 글상자 보이기"; b.classList.toggle("pri", this.fsuOn()); } },
   all() { try { return JSON.parse(localStorage.getItem("ems.lbl") || "{}"); } catch (e) { return {}; } },
   of(uid) { const a = this.all()[uid], it = (L.items || []).find(i => i.uid === uid); return a || (it && it.lb) || null; },
   put(uid, v) { const a = this.all(); if (v) a[uid] = v; else delete a[uid]; try { localStorage.setItem("ems.lbl", JSON.stringify(a)); } catch (e) { /* 저장소를 못 쓰면 이번 화면에서만 */ }
@@ -260,11 +266,11 @@ const MK = { drag: null, t: 0,
   },
 };
 function siteMarkers() {
-  const box = $("#siteMk"); if (!box || !L.items) return; MK.init(box);
+  const box = $("#siteMk"); if (!box || !L.items) return; MK.init(box); MK.fsuBtn();
   if (L.edit) { box.innerHTML = ""; return; }
   const seen = {};
   const rg = S.snap && S.snap.ring, pp = !rg ? "" : rg.fsu.map(f => { const it = (L.view || L.items).find(i => i.kind === "FSU" && _fsuNo(i) === f.id); if (!it) return "";      // 구간분전함마다 표지 하나(이름 · 그 아래 배전체계 묶음의 전력 · 상태)
-    return `<div class="spt ppdu" data-at="${esc(f.id)}" data-uid="${it.uid}" style="left:${it.x / MAP_W * 100}%;top:${it.y / MAP_H * 100}%"><i class="lead"></i><i class="core"></i><div class="scard" title="끌어서 글상자를 옮긴다 · 오른쪽 버튼 = 제자리"><div class="sh">${esc(f.name)}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`; }).join("");
+    return `<div class="spt ppdu ${MK.fsuOn() ? "" : "mini"}" data-at="${esc(f.id)}" data-uid="${it.uid}" style="left:${it.x / MAP_W * 100}%;top:${it.y / MAP_H * 100}%"><i class="lead"></i><i class="core"></i><div class="scard" title="끌어서 글상자를 옮긴다 · 오른쪽 버튼 = 제자리"><div class="sh">${esc(f.name)}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`; }).join("");
   box.dataset.n = (L.view || L.items).length + (rg ? rg.fsu.length * 100 : 0); box.dataset.ids = (L.view || L.items).map(i => i.uid).join(); box.innerHTML = pp + (L.view || L.items).filter(i => i.kind !== "FSU").map(it => {
     const key = it.load ? "ld:" + it.load : it.bind, [x, y] = _mkPos(it), mini = it.load ? !!seen[key] : it.kind === "BARRACK" || seen[key]; seen[key] = 1;      // 부하는 목록의 한 줄마다 첫 그림에 표지를 단다
     return `<div class="spt ${mini ? "mini" : ""}" data-act="goctl" data-uid="${it.uid}" style="left:${x}%;top:${y}%"><i class="lead"></i><i class="pulse"></i><i class="core"></i>
@@ -281,7 +287,7 @@ function siteUpdate(s, force) {
   if (!L.items) { if (!L.loading) layoutLoad(); return; }
   const st = siteState(s), box = $("#siteMap"); L.view = layAuto(L.items);
   if (box && !L.drag) {
-    const sig = JSON.stringify([L.edit, L.sel, L.view, L.view.map(i => mapEqSt(s, i)), s.ring ? s.ring.sections.map(x => x.state) : 0]);
+    const sig = JSON.stringify([L.edit, L.sel, MK.fsuOn(), L.view, L.view.map(i => mapEqSt(s, i)), s.ring ? s.ring.sections.map(x => x.state) : 0]);
     if (force || box.dataset.sig !== sig) { box.dataset.sig = sig; box.innerHTML = siteMapSvg(s); layBindDrag(); }
     const D = s.devices, gw = D.MTR && D.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? 1) : 1, k = s.kpi;
     const busLive = (val("BUS.a_v") ?? 440) > 300 || (val("BUS.b_v") ?? 440) > 300;
@@ -297,7 +303,7 @@ function siteUpdate(s, force) {
   }
   const mk = $("#siteMk"); if (mk && !L.edit && (!mk.children.length || +mk.dataset.n !== L.view.length + (s.ring ? s.ring.fsu.length * 100 : 0) || mk.dataset.ids !== L.view.map(i => i.uid).join())) siteMarkers();            // 대수가 바뀌면 표지도 다시 만든다
   $$("#siteMk .spt.ppdu").forEach(e => { const f = s.ring && s.ring.fsu.find(q => q.id === e.dataset.at); if (!f) return; const p = RingView.group(s.ring.ppdu.filter(q => q.at === f.id)), dead = f.live === false, bad = dead || (p.n && p.bad), tr = p.trip;
-    e.className = `spt ppdu ${e.classList.contains("moved") ? "moved" : ""} ${bad ? "bad" : p.warn || f.comm === false ? "idle" : "ok"}`; e.querySelector(".sh").textContent = f.name + (p.vital || f.vital ? " ★" : "");
+    e.className = `spt ppdu ${e.classList.contains("mini") ? "mini" : ""} ${e.classList.contains("moved") ? "moved" : ""} ${bad ? "bad" : p.warn || f.comm === false ? "idle" : "ok"}`; e.querySelector(".sh").textContent = f.name + (p.vital || f.vital ? " ★" : "");
     e.querySelector(".sv .mono").textContent = p.n ? (p.kw == null ? "—" : F.kw(p.kw) + " kW") : "";
     e.querySelector(".ss").textContent = dead ? "정전" : f.comm === false ? "통신 고립" : !p.n ? "부하 없음" : `${p.n > 1 ? "배전체계 ×" + p.n + " · " : ""}${p.bad ? (p.mccb === 2 ? "주 차단기 트립" : "정전") : tr ? `회로 트립 ${tr}` : p.over ? "과부하" : "공급"}`; });
   $$("#siteMk .spt:not(.ppdu)").forEach(e => { const it = L.view.find(i => i.uid === e.dataset.uid); if (!it) return; let x = st[it.bind] || { st: "ok", v: "", t: "" };

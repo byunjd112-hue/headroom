@@ -84,7 +84,7 @@ const P_OV = {
     <div class="pg" style="grid-template-rows:118px 1fr">
       <div class="tiles6">${TILE("tLoad", "load", "총 부하")}${TILE("tPv", "pv", "태양광 발전")}${TILE("tSoc", "ess", "ESS 충전율")}${TILE("tFuel", "dg", "연료 · 수소")}${TILE("tRes", "g1", "N-1 순동 예비력")}${TILE("tAuto", "accent", "자동 제어")}</div>
       <div class="pg" style="grid-template-columns:1fr 440px">
-        <div class="panel"><div class="hd"><h3>작전지 전개 현황</h3><span class="sub" id="layCnt"></span><div class="spacer"></div><span class="pill" id="siteSum">—</span><button class="btn sm" data-act="busplan">모선 구성</button><button class="btn sm" id="layEditBtn" data-act="layedit">배치 편집</button></div>
+        <div class="panel"><div class="hd"><h3>작전지 전개 현황</h3><span class="sub" id="layCnt"></span><div class="spacer"></div><span class="pill" id="siteSum">—</span><button class="btn sm" id="fsuLblBtn" data-act="fsulbl" title="구간분전함의 이름 · 전력 · 상태 글상자를 켜고 끈다(끄면 점만 보이고 마우스를 올리면 나타난다)">분전함 글상자 보이기</button><button class="btn sm" data-act="busplan">모선 구성</button><button class="btn sm" id="layEditBtn" data-act="layedit">배치 편집</button></div>
           <div class="bd sitebd">${siteHtml()}</div></div>
         <div class="col" style="grid-template-rows:auto auto 1fr">
           <div class="panel"><div class="hd"><h3>발전원 구성</h3><div class="spacer"></div><span class="sub" id="mixSub"></span></div><div class="bd mixbd"><div id="mixDn"></div><div class="mixleg" id="mixLeg"></div></div></div>

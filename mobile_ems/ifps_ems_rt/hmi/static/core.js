@@ -199,5 +199,5 @@ document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el) return;
   const a = el.dataset.act;
   if (a === "login") loginDialog(); else if (a === "logout") logout(); else if (a === "close") closeModal();
-  else if (a === "goalm") location.hash = "#alarms"; else if (a === "goctl") location.hash = "#control"; else if (a === "layedit") layToggleEdit();
+  else if (a === "goalm") location.hash = "#alarms"; else if (a === "goctl") location.hash = "#control"; else if (a === "layedit") layToggleEdit(); else if (a === "fsulbl") MK.fsuToggle();
 });
