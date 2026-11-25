@@ -56,6 +56,9 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   bad += bm.length; console.log(`${bm.length ? "✕" : "○"} 모선 구성 자동 보완: ${fix.msg || fix.why}` + (bm.length ? "\n    " + bm.join("\n    ") : "")); await post("/api/bus", { op: "reset" });
   // ── 하나씩 고르기: 추가한 장비의 모선, 나눈 부하, 결선도에서 마우스로 끌어 옮기기
   const chk = (ok, what) => { n++; if (!ok) { bad++; console.log("✕ " + what); } return ok; };
+  const ic = await p.evaluate(async tok => (await (await fetch("/api/archive/initcheck?run=1", { headers: { "X-EMS-Token": tok } })).json()), tok);      // 설치 점검: 기본 구성에서 이상 0 · 개요의 단추가 완료를 보인다
+  chk(ic.ok && ic.last.bad === 0 && ic.last.items.length > 15, "설치 점검(기본 구성): 이상 0 — " + JSON.stringify(ic.ok ? ic.last.items.filter(i => i.level === "bad").map(i => i.name) : ic.why));
+  await p.goto(B + "#overview"); await p.waitForTimeout(3500); chk(await p.evaluate(() => /설치 점검 완료/.test(document.querySelector("#initBtn").textContent)), "개요의 [설치 점검] 단추가 완료를 보인다");
   const toClient = (x, y) => p.evaluate(([x, y]) => { const m = document.getElementById("sldRingG").ownerSVGElement.getScreenCTM(); return [m.a * x + m.e, m.d * y + m.f]; }, [x, y]);
   const drag = async (from, to) => { await p.mouse.move(from[0], from[1]); await p.mouse.down(); await p.mouse.move((from[0] + to[0]) / 2, (from[1] + to[1]) / 2, { steps: 6 }); await p.mouse.move(to[0], to[1], { steps: 6 }); await p.mouse.up(); await p.waitForTimeout(4500); };
   const center = sel => p.evaluate(s => { const r = document.querySelector(s).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }, sel);

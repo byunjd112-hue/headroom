@@ -61,6 +61,17 @@ def _current(doc, s):
     _ring(doc, s.get("ring"), s.get("loads")); _fleet(doc, s.get("fleet")); _loads(doc, s.get("loads"))
 
 
+def _init(doc, eng):
+    """설치 점검(초기화) 결과: 마지막 검사의 요약과 정상이 아닌 줄, 검사 이력."""
+    w = getattr(eng, "initw", None); la = w.last if w is not None else None
+    doc.h2("설치 점검(초기화) 결과")
+    if not la: doc.p("아직 설치 점검을 하지 않았다(개요 화면의 [설치 점검])."); return
+    doc.p(f"{la['n']}차 검사 {la['t']} · {la.get('by') or ''} — 이상 {la['bad']}건 · 주의 {la['warn']}건 · {'설치 점검 완료' if la['done'] else '미완료(이상이 남아 있다)'}")
+    rows = [[i["area"], i["name"], {"bad": "이상", "warn": "주의"}[i["level"]], i["text"]] for i in la["items"] if i["level"] != "ok"]
+    if rows: doc.table(["구분", "대상", "판정", "내용"], rows[:40], [14, 26, 8, 52])
+    if len(w.runs) > 1: doc.table(["검사 시각", "검사자", "이상", "주의", "해결된 것"], [[r["t"], r.get("by") or "", r["bad"], r["warn"], ", ".join(r.get("fixed") or []) or "—"] for r in w.runs[-10:]], [22, 14, 8, 8, 48])
+
+
 def _fleet(doc, fl):
     """1.5 장치 구성(자동 인식) — 설비 제어 화면의 대수와 같은 자료."""
     if not fl: return
@@ -227,7 +238,7 @@ def build(eng, st, q):
     doc.table(["항목", "내용"], [["현장", s["site"]], ["보고 구간", f"{a:%Y-%m-%d} ~ {b - timedelta(days=1):%Y-%m-%d}"], ["작성 시각", now], ["소프트웨어", f"패키지 {s['version']['pkg']} · 실행기 {s['version']['rt']} · 핵심 {s['version']['core']}" if s["version"] else "기록 조회기(보관소 파일만 읽음)"],
                                ["자료 출처", ("가상 장치(시연) — 실제 설비의 값이 아니다" if s["sim"] else "실장비 계측값" if eng is not None else "보관된 기록(현재 현황 없음)") + " · 기록 보관소 archive.db"]], [24, 76])
     doc.p("차례: 1 현재 현황 · 2 최근 운영 현황 · 3 상황 기록 · 4 운전 시퀀스 · 5 전기안전 점검 기록 · 6 ESS 안전 운영정보 · 7 장치별 자료 · 8 자료 보관 · 서버 전달", size=18, color="595959")
-    if eng is not None: _current(doc, s)
+    if eng is not None: _current(doc, s); _init(doc, eng)
     else: doc.h1("1. 현재 현황"); doc.p("기록 조회기에서 만든 보고서라 현재 현황은 없다. EMS 화면의 [보고서 출력]을 쓰면 들어간다.")
     _recent(doc, arch, a, b); _events(doc, arch, a, b); _sequences(doc, eng, arch, a, b); _safety(doc, arch, a, b); _ess(doc, st, a, b); _devices(doc, st, a, b); _storage(doc, st)
     site = "".join(c for c in s["site"] if c.isascii() and (c.isalnum() or c in "-_")) or "archive"       # 파일 이름은 영문·숫자만(브라우저·압축 도구에 따라 한글 이름이 깨진다)

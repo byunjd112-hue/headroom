@@ -35,6 +35,33 @@ class TestHmi(unittest.TestCase):
         self.assertIn("FAT 점검표", get("fat", "html").read().decode("utf-8")); self.assertIn("const DATA", get("fmea", "html").read().decode("utf-8"))
         self.assertEqual(self.req("/api/archive/fmexport?doc=x&fmt=y", tok=tok)[0], 400)
 
+    def test_init_check(self):
+        """설치 점검: 검사(운용자) → 무응답 장비는 '이상'과 고치는 방법 → 고친 뒤 그 줄만 다시 검사하면 '해결됨', 이상 0 이면 완료. 스냅샷에 상태가 실린다."""
+        e = self.eng; u = "/api/archive/initcheck"; op = self.login("4321"); self.assertEqual(self.req(u + "?run=1")[0], 403); self.assertTrue(self.req(u)[1]["ok"])
+        d = self.req(u + "?run=1", tok=op)[1]; la = d["last"]; ids = {i["id"]: i for i in la["items"]}
+        self.assertTrue(d["ok"] and la["done"] and la["bad"] == 0, [i for i in la["items"] if i["level"] == "bad"])
+        for k in ("comm.ESS", "comm.MTR", "count.ESS", "ring.order", "ring.feedA", "ring.feedB", "ring.nop", "ring.fed", "bus.ok", "load.c2"): self.assertEqual(ids[k]["level"], "ok", ids[k])
+        self.assertIn("127.0.0.1", ids["comm.ESS"]["text"]); self.assertNotIn("comm.DG2", ids)                                            # 설정된 주소를 보이고, 빈 자리는 검사하지 않는다
+        self.assertTrue(e.snapshot()["init"]["done"])
+        e.sim_action({"action": "mute", "target": "ESS", "on": True}, "시험"); self.assertTrue(self._until(lambda: e.snapshot()["devices"]["ESS"]["link"] == "두절", 15.0))
+        la = self.req(u + "?run=1", tok=op)[1]["last"]; it = next(i for i in la["items"] if i["id"] == "comm.ESS")
+        self.assertEqual((it["level"], la["done"]), ("bad", False)); self.assertGreaterEqual(len(it["guide"]), 3); self.assertEqual(e.snapshot()["init"]["bad"], la["bad"])
+        e.sim_action({"action": "mute", "target": "ESS", "on": False}, "시험"); self.assertTrue(self._until(lambda: e.snapshot()["devices"]["ESS"]["link"] == "정상", 15.0))
+        d = self.req(u + "?run=1&only=comm.ESS", tok=op)[1]; it = next(i for i in d["last"]["items"] if i["id"] == "comm.ESS")
+        self.assertEqual((it["level"], it["was"]), ("ok", "bad")); self.assertIn(it["name"], d["runs"][0]["fixed"]); self.assertGreaterEqual(len(d["runs"]), 3)
+        with e.lock: e.busw.change({"op": "set", "node": "G1", "bus": "B"}, "시험")                                                             # 모선 약점 → 주의 + [자동 보완]
+        la = self.req(u + "?run=1", tok=op)[1]["last"]; b = [i for i in la["items"] if i["id"].startswith("bus.") and i["level"] != "ok"]; self.assertTrue(b and b[0]["fix"]["act"] == "bus_auto", b)
+        with e.lock: e.busw.change({"op": "reset"}, "시험")
+        d = self.req(u + "?run=1&only=" + b[0]["id"], tok=op)[1]; self.assertEqual(next(i for i in d["last"]["items"] if i["id"] == b[0]["id"])["was"], b[0]["level"])     # 약점이 사라지면 그 줄은 해결됨
+
+    @staticmethod
+    def _until(cond, t=10.0):
+        end = time.time() + t
+        while time.time() < end:
+            if cond(): return True
+            time.sleep(0.2)
+        return bool(cond())
+
     def req(self, path, body=None, tok=None):
         r = urllib.request.Request(self.base + path, data=None if body is None else json.dumps(body).encode(), method="GET" if body is None else "POST")
         if tok: r.add_header("X-EMS-Token", tok)

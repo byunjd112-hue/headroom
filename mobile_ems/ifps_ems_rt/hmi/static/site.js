@@ -317,7 +317,7 @@ function siteUpdate(s, force) {
     if (bs && x.t && !/모선/.test(x.t)) x = Object.assign({}, x, { t: `${x.t} · 모선 ${bs}` });      // 그 전원(여러 대면 그 한 대)이 물린 모선(모선 구성)
     const hd = `${it.name || LAY_KINDS[it.kind].nm}${it.spare ? " · 예비 자리" : ""}`, sh = e.querySelector(".sh"); if (sh.textContent !== hd) sh.textContent = hd;      // 이름 · 예비 자리 표시도 부하 목록이 바뀌면 따라간다
     e.className = `spt ${e.classList.contains("mini") ? "mini" : ""} ${x.st}`; e.querySelector(".sv .mono").textContent = x.v; e.querySelector(".ss").textContent = x.t; });
-  MK.place(); layUnstack();      // 점 = 그림 바로 위, 옮긴 글상자는 그 자리(상태 글을 채운 뒤에 — 상태가 표지의 class 를 다시 쓴다)
+  InitCheck.button(); MK.place(); layUnstack();      // 점 = 그림 바로 위, 옮긴 글상자는 그 자리(상태 글을 채운 뒤에 — 상태가 표지의 class 를 다시 쓴다)
   const sum = $("#layCnt"); if (sum) { const A = L.edit ? L.items : layAuto(L.items).filter(i => !i.spare), c = k => A.filter(i => i.kind === k).length, ld = LD.s().grades.reduce((a, g) => a + g.n, 0);      // 화면에 놓인 것(자동으로 놓인 장치 · 부하 포함)
     sum.textContent = `장비 ${A.filter(i => !["FSU", "BARRACK", "L1", "L2", "L3"].includes(i.kind)).length} · 부하 ${L.edit ? c("BARRACK") + c("L1") + c("L2") + c("L3") : ld} · FSU ${c("FSU")}`; }
 }

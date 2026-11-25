@@ -16,7 +16,7 @@ STATIC = os.path.join(ROOT, "ifps_ems_rt", "hmi", "static")
 FRAMES, GAP_S, SETTLE_S = 6, 1.2, 9.0
 SCENE_GET = ["/api/trend?since=0", "/api/forecast", "/api/energy", "/api/journal?n=300", "/api/points", "/api/archive/info", "/api/archive/devices", "/api/archive/events?unit=day", "/api/archive/inspect?unit=year", "/api/archive/xfer"] \
     + [f"/api/archive/{k}?unit={u}" for k in ("series", "ess") for u in ("hour", "day", "month", "year")] + ["/api/archive/ess?unit=raw"]
-GLOBAL_GET = ["/api/layout", "/api/photos", "/api/info", "/api/ai", "/api/audit?n=200", "/api/audit/verify", "/api/config", "/api/scenarios/catalog", "/api/archive/collect", "/api/archive/ring", "/api/archive/weather"]
+GLOBAL_GET = ["/api/layout", "/api/photos", "/api/info", "/api/ai", "/api/audit?n=200", "/api/audit/verify", "/api/config", "/api/scenarios/catalog", "/api/archive/collect", "/api/archive/ring", "/api/archive/weather", "/api/archive/initcheck"]
 
 
 class Client:

@@ -101,6 +101,9 @@ def demo_inspects(arch):
 
 def http_get(hd, eng, st, p, q):
     """조회·보고서 GET. hd: 요청 처리기(_send·_err·_sess 사용). eng 가 없으면(별도 뷰어) 현재 현황 없이 기록만으로 보고서를 만든다."""
+    if p == "/api/archive/initcheck":
+        from . import initcheck                                                      # pylint: disable=import-outside-toplevel — 엔진이 만든 것을 쓴다
+        return initcheck.http_get(hd, eng, q)
     if p == "/api/archive/fmexport":
         from . import fmexport                                                       # pylint: disable=import-outside-toplevel — 내보낼 때만 읽는다
         return fmexport.http_get(hd, eng, q)

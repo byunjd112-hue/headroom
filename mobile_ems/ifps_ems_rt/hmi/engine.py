@@ -20,7 +20,7 @@ from .. import pointmap as pm
 from ..runtime import Runtime
 from ..simplant import Plant
 from .cfgedit import ConfigEditor
-from . import archwatch, ringwatch, autodev, weatherwatch, loadctl, busctl
+from . import archwatch, ringwatch, autodev, weatherwatch, loadctl, busctl, initcheck
 from .skywatch import SkyWatch
 from .eng_forecast import ForecastMixin
 from .eng_alarms import AlarmsMixin
@@ -65,7 +65,7 @@ class Engine(ForecastMixin, AlarmsMixin, CommandMixin, AuthMixin, ViewMixin, Too
         self.fuel_cfg = dict({"dg_tank_l": 1000.0, "warn_pct": 50.0, "warn_h": 8.0, "repeat_min": 30.0}, **(self.cfg.get("fuel") or {})); self._fuel_t = {}
         self.ai_cfg = dict({"enabled": True, "retrain_h": 24.0, "sim_retrain_h": 2.0, "first_min": 3.0}, **(self.cfg.get("ai") or {}))
         self.skyw = SkyWatch(self)                                                      # 하늘 카메라(구름량 → 태양광 예측 입력)
-        self.archw = archwatch.ArchWatch(self); self.ringw = ringwatch.RingWatch(self); self.loadw = loadctl.LoadBook(self); self.busw = busctl.BusBook(self); self.wxw = weatherwatch.WeatherWatch(self); self.rt.policy and setattr(self.rt.policy, "pv_adjust", self.wxw.adjust)       # 기록 보관소(검침 누적값·상황 기록·점검 기록) · 환망 감시(구간분전함·분전반)
+        self.archw = archwatch.ArchWatch(self); self.ringw = ringwatch.RingWatch(self); self.loadw = loadctl.LoadBook(self); self.busw = busctl.BusBook(self); self.initw = initcheck.InitCheck(self); self.wxw = weatherwatch.WeatherWatch(self); self.rt.policy and setattr(self.rt.policy, "pv_adjust", self.wxw.adjust)       # 기록 보관소(검침 누적값·상황 기록·점검 기록) · 환망 감시(구간분전함·분전반)
         self.ai_busy = False; self.ai_last = None; self.ai_next = time.time() + 60.0 * float(self.ai_cfg["first_min"])
         self._tag_dev = {p["tag"]: p["device"] for p in self.rt.pts}
         self.cfged = ConfigEditor(self.cfg_path, note=self.rt.note)                      # 설정 편집기(원본 설정 파일 대상, 재기동 후 적용)
