@@ -85,6 +85,15 @@ class Fleet:
     def n(self, k):
         return len(self.live(k))
 
+    def own_kw(self, n):
+        """그 장치가 제 통신점으로 내주는 출력(인버터의 out_kw). 없으면 None."""
+        return self.raw.get(n, {}).get(f"{n}.out_kw")
+
+    def unit_kw(self, n, val):
+        """장치 한 대의 출력: 제 통신점의 값이 있으면 그 값, 없으면 kw(태양광 첫 장비의 kw 는 게이트웨이가 잰 합계다)."""
+        own = self.own_kw(n)
+        return own if own is not None else self.unit(n, "kw", val)
+
     def unit(self, n, suffix, val):
         """장치 하나의 값(합산 전). 없으면 val 의 값."""
         return self.raw.get(n, {}).get(f"{n}.{suffix}", val.get(f"{n}.{suffix}"))
@@ -142,6 +151,6 @@ class Fleet:
         out = {}
         for k, names in self.slots.items():
             us = [{"id": n, "link": state.get(n), "seen": n in self.ever, "live": n in self.live_now[k], "on": bool(self.unit(n, "status", val) or 0) if n in self.live_now[k] else False,
-                   "manual": bool(dev[n].manual) if n in dev else False, "kw": self.unit(n, "kw", val), "soc": self.unit(n, "soc", val)} for n in names]
+                   "manual": bool(dev[n].manual) if n in dev else False, "kw": self.unit_kw(n, val), "own": self.own_kw(n) is not None, "soc": self.unit(n, "soc", val)} for n in names]
             out[k] = {"n": len(self.live_now[k]), "seen": sum(1 for u in us if u["seen"]), "slots": len(names), "on": any(u["on"] for u in us), "units": [u for u in us if u["seen"]]}
         return out

@@ -43,9 +43,15 @@ class SimDriver:
         for k, v in vals.items():
             if k in self.hold: v = self.hold[k]
             if k in self.p.by_tag: self.p.set(k, v)
+        self._pv_units()
         tot = sum(vals[k] if not cbo(f) else self.hold.get(k, vals[k]) for k, f in (("LOAD.p1_kw", "L1"), ("LOAD.p2_kw", "L2"), ("LOAD.p3_kw", "L3")))
         self.p.set("LOAD.kw", self.hold.get("LOAD.kw", tot))
         self._consume()
+
+    def _pv_units(self):
+        """인버터 한 대의 출력(out_kw): 합계(PV.kw — 구름 · 야간 모의, 차단기까지 반영된 값)를 붙어 있는 인버터끼리 출력 제한의 비율로 나눈다."""
+        p = self.p; us = p.us("PV"); w = {u: (p.get(f"{u}.lim_set") or 400.0) if p.get(f"{u}.status") > .5 and p._cbu(u) else 0.0 for u in us}; tot = sum(w.values())      # pylint: disable=protected-access
+        p._put([(f"{u}.out_kw", (p.get("PV.kw") * w[u] / tot) if tot > 0 else 0.0) for u in us])                                                                    # pylint: disable=protected-access
 
     def _consume(self):
         """연료·수소 소비와 생산."""

@@ -17,9 +17,9 @@ const val = tag => kv(S.snap && S.snap.values[tag], "v");
 /* 같은 종류 주 장치 묶음(자동 인식): 대수 · 하나라도 운전 · 한 대도 없음(미설치) · 모두 두절. 묶음 정보가 없으면 장치 하나의 상태로 본다 */
 const KF = k => (S.snap && S.snap.fleet && S.snap.fleet[k]) || null, _kd = k => (S.snap && S.snap.devices[k]) || null;
 const kN = k => { const f = KF(k); return f ? f.n : 1; };
-/* 장비 한 대의 출력. 태양광은 인버터가 출력을 내주지 않고 계측 게이트웨이가 합계(PV.kw)만 재므로, 여러 대면 연결된 대수로 똑같이 나눈 값을 쓴다(추정 — 화면에 ≈ 로 표시) */
-const unitKw = (kind, u) => { const f = KF(kind); if (!u || kind !== "PV" || !f || f.units.length < 2) return u ? u.kw : null; const shut = (x, i) => { const c = val("CB." + (i ? x.id : kind)); return c != null && Math.round(c) !== 1; }, on = f.units.filter((x, i) => x.live && x.on && !shut(x, i)); return on.some(x => x.id === u.id) ? (val("PV.kw") || 0) / on.length : 0; };
-const unitEst = kind => kind === "PV" && KF("PV") && KF("PV").units.length > 1;
+/* 장비 한 대의 출력. 태양광 인버터가 제 통신점(out_kw)으로 출력을 내주면 그 값(own), 못 읽으면 계측 게이트웨이의 합계(PV.kw)를 연결된 대수로 나눈 값을 쓴다(추정 — 화면에 ≈ 로 표시) */
+const unitKw = (kind, u) => { const f = KF(kind); if (!u || kind !== "PV" || u.own || !f || f.units.length < 2) return u ? u.kw : null; const shut = (x, i) => { const c = val("CB." + (i ? x.id : kind)); return c != null && Math.round(c) !== 1; }, on = f.units.filter((x, i) => x.live && x.on && !shut(x, i)); return on.some(x => x.id === u.id) ? (val("PV.kw") || 0) / on.length : 0; };
+const unitEst = kind => kind === "PV" && KF("PV") && KF("PV").units.length > 1 && !KF("PV").units.some(u => u.own);
 const kOn = k => { const f = KF(k), d = _kd(k); return f ? f.on : !!(d && d.on); };
 const kAbsent = k => { const f = KF(k), d = _kd(k); return f ? f.seen === 0 && !!d && d.link === "두절" : !!(d && d.absent); };
 const kLost = k => { const f = KF(k), d = _kd(k); return f ? f.n === 0 && !!d && d.link === "두절" : !!(d && d.link === "두절"); };
