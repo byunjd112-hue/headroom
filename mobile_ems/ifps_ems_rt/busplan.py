@@ -74,33 +74,34 @@ def _no_forming(assign, bus, present, src, lds, units=None):
     return {"level": "bad" if lds and not gen else "warn", "bus": bus, "fix": fix, "text": f"모선 {bus} 에 늘 전압을 세우는 전원(이동형 ESS · 복합전력 ESS)이 없다 — {why}." + tail}
 
 
-def _bus_issues(assign, bus, present, rated, units=None):
-    """모선 하나의 약점(①②③)."""
-    out = []
-    if not _on(assign, bus, present, NODES, units): return out
-    src = _on(assign, bus, present, SOURCES, units); lds = _on(assign, bus, present, LOADS, units)
+def _bus_issues(assign, bus, present, rated, units=None, load_kw=None):
+    """모선 하나의 약점(①②③). load_kw 가 있으면 부하는 그것(부하 하나하나가 물린 모선의 등급별 정격 합)으로 본다."""
+    out = []; src = _on(assign, bus, present, SOURCES, units)
+    lds = _on(assign, bus, present, LOADS, units) if load_kw is None else [f"L{g}" for g in (1, 2, 3) if load_kw[bus].get(g, 0.0) > 0]
+    if not src and not lds: return out
     if not _on(assign, bus, present, FORMING, units): out.append(_no_forming(assign, bus, present, src, lds, units))
     if "L1" in lds and not src: out.append({"level": "bad", "bus": bus, "fix": None, "text": f"1등급 부하가 물린 모선 {bus} 에 전원이 하나도 없다 — 연계 차단기에만 기댄다."})
-    need = _kw(assign, bus, rated, [n for n in lds], units); have = _kw(assign, bus, rated, [n for n in src if n != "GRID"], units)
+    need = _kw(assign, bus, rated, [n for n in lds], units) if load_kw is None else sum(load_kw[bus].values()); have = _kw(assign, bus, rated, [n for n in src if n != "GRID"], units)
     if lds and src and rated and need > have + 0.5: out.append({"level": "warn", "bus": bus, "fix": None, "text": f"모선 {bus}: 부하 정격 {need:.0f} kW 가 전원 정격 {have:.0f} kW 보다 크다 — 연계 차단기가 열리면 부하를 다 감당하지 못한다(자동 절감 · 차단이 동작한다)."})
     return out
 
 
-def check(assign, present, rated=None, units=None):
+def check(assign, present, rated=None, units=None, load_kw=None):
     """구성의 약점. present: 지금 있는 전원 · 부하의 종류 이름 모음, rated: {종류: 정격 kW 합}(없으면 정격 비교를 건너뛴다), units: {종류: [장치 이름 …]}(여러 대인 종류 — 호기마다 모선이 다를 수 있다).
     반환: [{"level": "bad" | "warn", "bus", "text", "fix": {이름: 모선} 또는 None}] — bad 는 정전으로 이어질 수 있는 것."""
-    rated = rated or {}; out = _bus_issues(assign, "A", present, rated, units) + _bus_issues(assign, "B", present, rated, units)
+    rated = rated or {}; out = _bus_issues(assign, "A", present, rated, units, load_kw) + _bus_issues(assign, "B", present, rated, units, load_kw)      # load_kw: {"A": {등급: kW}, "B": {…}} — 부하 하나하나가 물린 모선(구간분전함의 급전 쪽)으로 센 값
     used = {bus_of(assign, u) for n in SOURCES if n in present and n != "GRID" for u in _each(n, units)}
-    if len(used) == 1 and any(assign[n] not in used for n in LOADS if n in present):
+    far = any(assign[n] not in used for n in LOADS if n in present) if load_kw is None else any(sum(load_kw[b].values()) > 0 for b in ("A", "B") if b not in used)
+    if len(used) == 1 and far:
         out.append({"level": "warn", "bus": OTHER[next(iter(used))], "fix": None, "text": f"전원이 모두 모선 {next(iter(used))} 에 있다 — 반대쪽 모선의 부하는 연계 차단기 하나에 기댄다."})
     return out
 
 
-def auto(assign, present, rated=None, units=None):
+def auto(assign, present, rated=None, units=None, load_kw=None):
     """고칠 수 있는 약점을 차례로 고친다. 반환: (새 구성, 한 일 목록)"""
     a = dict(assign); done = []
     for _ in range(4):
-        fix = next((i["fix"] for i in check(a, present, rated, units) if i["fix"]), None)
+        fix = next((i["fix"] for i in check(a, present, rated, units, load_kw) if i["fix"]), None)
         if not fix: break
         for n, bus in fix.items(): a[n] = bus; done.append(f"{unit_name(n)} → 모선 {bus}")
     return a, done

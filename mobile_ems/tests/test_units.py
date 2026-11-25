@@ -65,6 +65,8 @@ class FleetUnitTest(unittest.TestCase):
         self.assertEqual(bp.bus_of(two, "ESS2"), "B"); i2 = bp.check(two, P, R, U); self.assertEqual(i2[0]["fix"], {"G1": "A"}); self.assertEqual(bp.check(dict(two, ESS2="A"), P, R, U), [])      # 2호기만 모선 A 로 옮겨도 풀린다
         self.assertEqual(bp.auto(dict(a0, G1="B", ESS="B"), P - {"G1"}, R, U)[1], ["이동형 ESS 2호기 → 모선 A"]); self.assertEqual(bp.settings({"ESS2": "A", "ESS9x": "A", "L9": "B"}).get("ESS2"), "A"); self.assertNotIn("ESS9x", bp.settings({"ESS9x": "A"}))
         self.assertEqual(bp.live(dict(a0, G1="B", ESS2="A"), {"ESS2"}, False), (True, False)); self.assertEqual(bp.unit_name("ESS2"), "이동형 ESS 2호기")
+        kw = {"A": {}, "B": {1: 30.0, 2: 40.0}}; lone = bp.check(dict(a0, ESS="A"), P, R, None, kw)             # 부하 하나하나의 모선으로 볼 때: 1 · 2등급이 모선 B 에만 있고 전원은 모두 A
+        self.assertTrue(any("전원이 모두 모선 A" in i["text"] for i in lone)); self.assertTrue(any(i["level"] == "bad" and i["bus"] == "B" for i in lone)); self.assertEqual(bp.check(a0, P, R, None, {"A": {1: 30.0}, "B": {3: 20.0}}), [])
         over = bp.check(dict(a, L2="A", L3="A"), P, dict(R, L2=900)); self.assertTrue(any("부하 정격" in i["text"] for i in over))
         self.assertEqual(bp.live(d, {"ESS"}, True), (True, True)); self.assertEqual(bp.live(d, {"ESS"}, False), (False, True)); self.assertEqual(bp.live(a, {"G1", "ESS"}, False), (True, True)); self.assertEqual(bp.live(d, set(), True), (False, False))
 

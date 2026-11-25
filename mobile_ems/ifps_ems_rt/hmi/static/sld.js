@@ -42,7 +42,7 @@ function faultMark(id, x, y) {
 const SLD_HOME = Object.fromEntries(SRC.concat(LOADS).map(n => [n.id, n.bus]));
 function sldArrange() {
   if (!BusPlan.s()) return "";
-  const cnt = b => SRC.filter(n => BusPlan.of(n.id, SLD_HOME[n.id]) === b).length, reg = { A: cnt("A") > 4 ? [58, 462] : [70, 440], B: cnt("B") > 3 ? [538, 942] : [590, 880] };      // 몰리면 모선 길이를 다 쓴다
+  const cnt = b => SRC.filter(n => BusPlan.of(n.id, SLD_HOME[n.id]) === b).length, reg = { A: cnt("A") > 3 ? [58, 421] : [70, 421], B: cnt("B") > 3 ? [579, 942] : [590, 880] };      // 몰리면 모선 길이를 다 쓴다. 연계 차단기(x 500) 양옆은 그림 반 폭만큼 비운다(그림이 겹치지 않게)
   for (const b of ["A", "B"]) { BusPlan.place(SRC, SLD_HOME, b, reg[b][0], reg[b][1]); const n = cnt(b), step = n > 1 ? (reg[b][1] - reg[b][0]) / (n - 1) : 999; SRC.filter(q => q.bus === b).forEach(q => { q.k = Math.min(1, step / 118); }); }
   const lx = id => ({ L1: 1, L2: 2, L3: 3 }[id]); BusPlan.place(LOADS, SLD_HOME, "A", 220, 420, lx); BusPlan.place(LOADS, SLD_HOME, "B", 665, 865, lx);
   return BusPlan.sig();

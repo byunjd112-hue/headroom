@@ -46,13 +46,52 @@ class BusBook:
             if len(us) > 1: out[k] = us
         return out
 
+    def sides(self):
+        """구간분전함마다 평소에 받는 모선: 상시 개방점 앞쪽은 모선 A(급전 A), 뒤쪽은 모선 B(급전 B). 반환: ({구간분전함: 모선}, 환망 순서의 이름들)"""
+        rg = self.eng.ringw.status() if getattr(self.eng, "ringw", None) is not None else None
+        order = [f["id"] for f in (rg or {}).get("fsu", [])]; op = (rg or {}).get("open", len(order))
+        return {f: ("A" if k < op else "B") for k, f in enumerate(order)}, order
+
+    def loads(self):
+        """부하 하나하나와 물린 모선(그 구간분전함이 평소에 받는 쪽)."""
+        lw = getattr(self.eng, "loadw", None); side = self.sides()[0]
+        if lw is None: return []
+        return [{"id": i["id"], "name": i["name"] + (f" ×{i['n']}" if i["n"] > 1 else ""), "grade": i["grade"], "rated": i["rated"], "fsu": i["fsu"], "fsu_name": i["fsu_name"], "bus": side.get(i["fsu"], "")} for i in lw.view()["items"] if i["n"] > 0 and i["fsu"]]
+
+    def sources(self, p):
+        """전원 한 대 한 대: [{id, name, bus, present}] — 같은 종류가 여러 대면 호기로 나눈다."""
+        us = self.units(); out = []
+        for k in busplan.SOURCES:
+            names = us.get(k, [k])
+            for n, u in enumerate(names, 1): out.append({"id": u, "kind": k, "name": busplan.NAME[k] + (f" {n}호기" if len(names) > 1 else ""), "bus": busplan.bus_of(self.assign, u), "present": k in p})
+        return out
+
     def view(self):
-        p = self.present(); us = self.units(); extra = [{"id": u, "kind": k, "name": busplan.unit_name(u), "bus": busplan.bus_of(self.assign, u), "own": u in self.assign} for k, v in us.items() for u in v[1:]]
-        return {"assign": dict(self.assign), "issues": busplan.check(self.assign, p, self.rated(), us), "present": sorted(p), "names": busplan.NAME, "default": busplan.DEFAULT, "units": extra, "by": self.by, "t": self.t}
+        p = self.present(); us = self.units(); ld = self.loads(); kw = {b: {} for b in ("A", "B")}; a = dict(self.assign)
+        for x in ld:
+            if x["bus"]: kw[x["bus"]][x["grade"]] = kw[x["bus"]].get(x["grade"], 0.0) + x["rated"]
+        for g in (1, 2, 3):                                               # 등급 급전선의 모선(결선도 · 시나리오 구성도용)은 그 등급 부하가 더 많이 물린 쪽
+            if kw["A"].get(g, 0.0) or kw["B"].get(g, 0.0): a[f"L{g}"] = "A" if kw["A"].get(g, 0.0) >= kw["B"].get(g, 0.0) else "B"
+        self.load_kw = kw if ld else None
+        extra = [{"id": u, "kind": k, "name": busplan.unit_name(u), "bus": busplan.bus_of(self.assign, u), "own": u in self.assign} for k, v in us.items() for u in v[1:]]
+        return {"assign": a, "issues": busplan.check(self.assign, p, self.rated(), us, self.load_kw), "present": sorted(p), "names": busplan.NAME, "default": busplan.DEFAULT, "units": extra, "sources": self.sources(p), "loads": ld, "by": self.by, "t": self.t}
+
+    def move_load(self, b, who):
+        """부하 하나를 다른 모선으로: 그 모선 쪽 구간분전함 가운데 출력 회로가 가장 많이 남고 상시 개방점에 가까운 곳으로 옮긴다(부하 관리의 구간분전함 선택과 같은 일)."""
+        side, order = self.sides(); lw = self.eng.loadw; it = next((i for i in self.loads() if i["id"] == b.get("id")), None)
+        if it is None or b.get("bus") not in ("A", "B"): return {"ok": False, "why": "부하 또는 모선 오류"}
+        if it["bus"] == b["bus"]: return {"ok": False, "why": "이미 그 모선에 있습니다"}
+        cand = [f for f in order if side[f] == b["bus"]]
+        if not cand: return {"ok": False, "why": f"모선 {b['bus']} 쪽에 구간분전함이 없습니다(상시 개방점 위치를 확인)"}
+        used = {f: sum(i["need"] for i in lw.view()["items"] if i["fsu"] == f) for f in cand}; op = next((k for k, f in enumerate(order) if side[f] == "B"), len(order))
+        f = min(cand, key=lambda f: (used[f], abs(order.index(f) - op + (0.5 if b["bus"] == "A" else -0.5))))
+        r = lw.change({"op": "set", "id": it["id"], "fsu": f}, who)
+        return {"ok": True, "msg": f"{it['name']} → 모선 {b['bus']}(구간분전함 {f[3:]})", "bus": self.view()} if r["ok"] else r
 
     def change(self, b, who):
-        """op: set(node, bus) · auto(고칠 수 있는 약점을 고친다) · reset(기본 구성). 반환: {ok, msg, bus}"""
+        """op: set(node, bus — 전원 한 대) · load(id, bus — 부하 하나) · follow(node) · auto(고칠 수 있는 약점을 고친다) · reset(기본 구성). 반환: {ok, msg, bus}"""
         op = b.get("op"); a = dict(self.assign)
+        if op == "load": return self.move_load(b, who)
         if op == "set":
             n = b.get("node"); known = n in busplan.NODES or (isinstance(n, str) and busplan.UNIT.match(n) and n in self.eng.rt.fleet.slots.get(busplan.kind_of(n), []))
             if not known or b.get("bus") not in ("A", "B"): return {"ok": False, "why": "이름 또는 모선 오류"}
@@ -61,7 +100,7 @@ class BusBook:
             if b.get("node") not in a or b.get("node") in busplan.NODES: return {"ok": False, "why": "따로 정한 값이 없습니다"}
             del a[b["node"]]; msg = f"모선 구성: {busplan.unit_name(b['node'])} → 종류의 모선을 따름"
         elif op == "auto":
-            a, done = busplan.auto(a, self.present(), self.rated(), self.units())
+            a, done = busplan.auto(a, self.present(), self.rated(), self.units(), getattr(self, "load_kw", None))
             if not done: return {"ok": False, "why": "자동으로 고칠 것이 없습니다"}
             msg = "모선 구성 자동 보완: " + ", ".join(done)
         elif op == "reset": a = dict(busplan.DEFAULT); msg = "모선 구성을 기본으로 되돌림"

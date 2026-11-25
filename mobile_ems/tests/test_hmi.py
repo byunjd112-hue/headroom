@@ -106,6 +106,12 @@ class TestHmi(unittest.TestCase):
             self.assertEqual(json.load(open(e.busw.path, encoding="utf-8"))["assign"]["ESS"], "A"); self.assertTrue(any(x["kind"] == "모선" for x in e.rt.events))
         finally:
             self.assertTrue(self.req("/api/bus", {"op": "reset"}, en)[1]["ok"]); self.assertEqual(e.plant.bus, e.snapshot()["bus"]["default"])
+        b = e.snapshot()["bus"]; self.assertEqual([s["id"] for s in b["sources"]], ["GRID", "PV", "DG", "FC", "GDG", "ESS", "G1"])                      # 창에는 전원 한 대 한 대, 부하 하나하나가 줄로 나온다
+        self.assertEqual({x["id"]: (x["bus"], x["fsu"]) for x in b["loads"]}, {"c2": ("A", "FSU2"), "med": ("A", "FSU4"), "brk": ("A", "FSU4"), "ammo": ("B", "FSU6")})   # 부하의 모선 = 물린 구간분전함이 평소에 받는 쪽(상시 개방점 앞 = A)
+        try:
+            r = self.req("/api/bus", {"op": "load", "id": "med", "bus": "B"}, en)[1]; self.assertTrue(r["ok"], r); m = next(x for x in r["bus"]["loads"] if x["id"] == "med"); self.assertEqual((m["bus"], m["fsu"]), ("B", "FSU5"))   # 부하 하나의 모선을 바꾸면 그쪽 구간분전함으로 옮겨진다
+            self.assertEqual(next(i for i in e.snapshot()["loads"]["items"] if i["id"] == "med")["fsu"], "FSU5"); self.assertFalse(self.req("/api/bus", {"op": "load", "id": "med", "bus": "B"}, en)[1]["ok"]); self.assertFalse(self.req("/api/bus", {"op": "load", "id": "nope", "bus": "A"}, en)[1]["ok"])
+        finally: self.assertTrue(self.req("/api/loads", {"op": "reset"}, op)[1]["ok"])
         lay = e.layout(); items = lay.get("items") or [{"uid": "a", "kind": "DG", "bind": "G1", "name": "발전", "x": 300.4, "y": 400.26}]
         items = [dict(i) for i in items]; items[0]["s"] = 0.55; items[0]["x"] = 301.23; r = self.req("/api/layout", {"items": items}, op)[1]; self.assertTrue(r["ok"], r)
         try:
