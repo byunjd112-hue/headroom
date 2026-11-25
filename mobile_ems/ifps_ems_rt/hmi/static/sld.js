@@ -93,9 +93,10 @@ function setFlow(id, kw, cap, on = true) {
 
 /* 같은 종류 장치가 여러 대면 그림 위에 장치 칩을 대수만큼 그린다(자동 인식 — 놓거나 빼면 스스로 바뀐다). 초록 운전 · 회색 정지 · 빨강 두절 */
 function sldUnits(id) {
-  const g = document.getElementById("un-" + id); if (!g) return; const f = KF(id === "G1" ? "DG" : id),      /* 복합전력 G1 은 디젤과 같은 차량이라 디젤 대수를 따른다 */ us = f && f.units.length > 1 ? f.units : [], sig = JSON.stringify(us.map(u => [u.id, u.live, u.on])); if (g.dataset.sig === sig) return; g.dataset.sig = sig;
-  const x0 = +g.dataset.x - us.length * 17 + 1, y = +g.dataset.y;
-  g.innerHTML = us.map((u, i) => `<g class="uchip ${u.live ? (u.on ? "on" : "off") : "lost"}"><title>${u.id} · ${u.live ? (u.on ? "운전" : "정지") : "통신 두절"}</title><rect x="${x0 + i * 34}" y="${y - 8}" width="32" height="15" rx="4"/><text x="${x0 + i * 34 + 16}" y="${y + 3.5}" text-anchor="middle">${u.id}</text></g>`).join("");
+  const g = document.getElementById("un-" + id); if (!g) return; const f = KF(id === "G1" ? "DG" : id),      /* 복합전력 G1 은 디젤과 같은 차량이라 디젤 대수를 따른다 */ us = f && f.units.length > 1 ? f.units : [], bs = BusPlan.s(), src = (bs && bs.sources) || [], own = u => { const q = id === "G1" ? null : src.find(z => z.id === u.id); return q ? q.bus : ""; }, home = BusPlan.of(id, ""),
+    sig = JSON.stringify(us.map(u => [u.id, u.live, u.on, own(u)])); if (g.dataset.sig === sig) return; g.dataset.sig = sig;
+  const W = 40, x0 = +g.dataset.x - us.length * (W + 2) / 2 + 1, y = +g.dataset.y;      // 칩 하나 = 장비 한 대. 그림(첫 장비)과 다른 모선에 물린 호기는 모선 글자를 붙인다. 칩을 끌면 그 한 대의 모선이 바뀐다
+  g.innerHTML = us.map((u, i) => { const b = own(u), far = b && b !== home; return `<g class="uchip ${u.live ? (u.on ? "on" : "off") : "lost"}" ${id === "G1" ? "" : `data-unit="${u.id}" style="cursor:grab"`}><title>${u.id} · ${u.live ? (u.on ? "운전" : "정지") : "통신 두절"}${b ? " · 모선 " + b + " — 끌어서 다른 모선으로" : ""}</title><rect x="${x0 + i * (W + 2)}" y="${y - 8}" width="${W}" height="15" rx="4" ${far ? 'style="stroke:var(--warn)"' : ""}/><text x="${x0 + i * (W + 2) + W / 2}" y="${y + 3.5}" text-anchor="middle">${u.id}${far ? "·" + b : ""}</text></g>`; }).join("");
 }
 /* 환망(구간분전함 · 휴대용 배전체계)을 결선도 안에 그린다 — 모선과 부하 사이에: 모선 A ─(구간 0)─ 구간분전함 1 … n ─(구간 n)─ 모선 B.
    등급별 부하는 이 고리 아래에 등급별 차단기를 거쳐 달린다(모선 → 환망 → 차단기 → 부하). 자동 인식한 대수가 바뀌면 스스로 다시 그린다 */
@@ -107,9 +108,53 @@ function sldDirect(f, x, YR) {
     <text x="${x}" y="${ty + 103}" text-anchor="middle"><tspan class="kw" style="font-size:19px">${fed ? F.kw(lds.reduce((a, q) => a + (q.est_kw || 0), 0)) : "0.0"}</tspan><tspan class="u" dx="4">kW</tspan></text>
     <text class="st" x="${x}" y="${ty + 119}" text-anchor="middle" fill="${fed ? "var(--ok)" : "var(--warn)"}">${fed ? "급전 중 · 직결" : "무전압"}</text>`;
 }
+/* 결선도에서 부하 그림을 끌어 옮긴다: 구간분전함 근처에 놓으면 그 구간분전함으로(운용자), 모선 A · B 근처에 놓으면 그 모선 쪽 구간분전함으로(엔지니어). 한 그림에 부하가 여럿이면 함께 옮긴다 */
+const SLD_DRAG = {
+  fx: [], cur: null, t: 0, IDS: ["GRID", "PV", "DG", "FC", "GDG", "ESS", "G1"],
+  pt(g, e) { const m = g.ownerSVGElement.getScreenCTM(); return m ? { x: (e.clientX - m.e) / m.a, y: (e.clientY - m.f) / m.d } : { x: 0, y: 0 }; },
+  /* 누른 것: 부하 그림(환망 아래) · 호기 칩(장비 한 대) · 전원 그림(그 종류의 첫 장비) */
+  pick(e) {
+    const ld = e.target.closest(".sld-ld-drag"); if (ld) return { fsu: ld.dataset.fsu };
+    const ch = e.target.closest(".uchip[data-unit]"); if (ch) return { node: ch.dataset.unit };
+    const nd = e.target.closest(".node"), id = nd && nd.id.slice(2); return id && this.IDS.includes(id) ? { node: id } : null;
+  },
+  init(g) {
+    g.onclick = () => { if (Date.now() - this.t > 500) location.hash = "#ring"; };
+    const svg = g.ownerSVGElement; svg.onpointerdown = e => { const c = this.pick(e); if (!c) return; this.cur = Object.assign(c, { p0: this.pt(g, e), moved: false }); e.preventDefault(); };
+    svg.querySelectorAll(".node").forEach(n => { if (this.IDS.includes(n.id.slice(2))) n.style.cursor = "grab"; });
+    if (this.bound) return; this.bound = true;
+    window.addEventListener("pointermove", e => { const c = this.cur, g2 = document.getElementById("sldRingG"); if (!c || !g2) return; const p = this.pt(g2, e);
+      if (!c.moved && Math.hypot(p.x - c.p0.x, p.y - c.p0.y) < 8) return; c.moved = true; let m = document.getElementById("sldGhost");
+      if (!m) { m = document.createElementNS("http://www.w3.org/2000/svg", "g"); m.id = "sldGhost"; m.setAttribute("pointer-events", "none"); g2.appendChild(m); }
+      const to = this.target(p, c); m.innerHTML = `<circle cx="${p.x}" cy="${p.y}" r="16" fill="rgba(160,220,90,.25)" stroke="var(--accent)" stroke-dasharray="4 3"/><text x="${p.x}" y="${p.y - 24}" text-anchor="middle" class="sring-s" style="fill:var(--accent);font-weight:700">${to ? esc(to.text) : "여기에는 놓을 수 없음"}</text>`; });
+    window.addEventListener("pointerup", e => { const c = this.cur, g2 = document.getElementById("sldRingG"); this.cur = null; const m = document.getElementById("sldGhost"); if (m) m.remove();
+      if (!c || !c.moved || !g2) return; this.t = Date.now(); const to = this.target(this.pt(g2, e), c); if (to) (c.node ? this.dropSrc(c.node, to) : this.drop(c.fsu, to)); });
+  },
+  /* 놓을 곳: 부하는 환망 아래쪽이면 가장 가까운 구간분전함, 모선 높이면 모선 A · B. 전원은 모선 위쪽 어디든 왼쪽 = 모선 A, 오른쪽 = 모선 B */
+  target(p, c) {
+    const bus = { bus: p.x < 500 ? "A" : "B", text: "모선 " + (p.x < 500 ? "A" : "B") + " 쪽으로" };
+    if (c && c.node) return p.y < RG.YR - 34 ? bus : null;
+    if (p.y > RG.YR - 34) { const f = this.fx.slice().sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x))[0]; return f && Math.abs(f.x - p.x) < 70 ? { fsu: f.id, text: f.name + " 로" } : null; }
+    return p.y > BUS_Y - 60 ? bus : null;
+  },
+  /* 전원 한 대의 모선을 바꾼다(그림 = 그 종류의 첫 장비, 칩 = 그 호기) */
+  async dropSrc(node, to) {
+    const b = BusPlan.s(), cur = b && ((b.sources || []).find(q => q.id === node) || {}).bus; if (!to.bus || cur === to.bus) return;
+    if (!can("engineer")) { toast("모선을 바꾸는 것은 엔지니어 권한", "bad"); return loginDialog(); }
+    const r = await api("/api/bus", { op: "set", node, bus: to.bus }); toast(r.ok ? r.msg : r.why, r.ok ? "ok" : "bad"); if (r.ok) S.snap.bus = r.bus;
+  },
+  async drop(from, to) {
+    const lds = LD.atFsu(from); if (!lds.length || to.fsu === from) return;
+    if (to.bus ? !can("engineer") : !can("operator")) { toast(to.bus ? "모선을 바꾸는 것은 엔지니어 권한" : "운용자 권한 필요", "bad"); return loginDialog(); }
+    if (lds.length > 1 && !confirm(`${lds.map(q => LD.label(q)).join(", ")} 을(를) 함께 ${to.text} 옮깁니다. 하나씩 옮기려면 부하 관리나 [모선 구성]에서 고르십시오. 계속합니까?`)) return;
+    let last = null; for (const q of lds) { last = to.bus ? await api("/api/bus", { op: "load", id: q.id, bus: to.bus }) : await api("/api/loads", { op: "set", id: q.id, fsu: to.fsu }); if (!last.ok) break; }
+    toast(last.ok ? `${lds.map(q => LD.label(q)).join(", ")} → ${to.text.replace(/ (로|쪽으로)$/, "")}` : last.why, last.ok ? "ok" : "bad");
+    if (last.ok) { if (last.loads) S.snap.loads = last.loads; if (last.bus) S.snap.bus = last.bus; const g = document.getElementById("sldRingG"); if (g) g.dataset.sig = ""; }
+  },
+};
 function sldRing(s, live) {
   const g = document.getElementById("sldRingG"); if (!g) return; const r = s.ring;
-  const sig = r ? JSON.stringify([live, S.lang, [1, 2, 3].map(c => [Math.round(val("CB.L" + c) ?? 1), Math.round((val("LOAD.p" + c + "_kw") || 0) * 2)]), !!(S.sprites && S.sprites.l1), r.ppdu.map(p => p.ch.map(q => Math.round((q.kw || 0) * 5))), r.sections.map(x => x.state), r.fsu.map(f => [f.id, f.name, f.live]), r.ppdu.map(p => [p.id, p.name, p.at, p.live, p.mccb, p.vital, Math.round((p.kw || 0) * 2), p.ch.filter(c => c.cb === 2 && c.cls > 0).length])]) : "";
+  const sig = r ? JSON.stringify([live, S.lang, [1, 2, 3].map(c => [Math.round(val("CB.L" + c) ?? 1), Math.round((val("LOAD.p" + c + "_kw") || 0) * 2)]), !!(S.sprites && S.sprites.l1), r.ppdu.map(p => p.ch.map(q => Math.round((q.kw || 0) * 5))), r.sections.map(x => x.state), r.fsu.map(f => [f.id, f.name, f.live]), r.ppdu.map(p => [p.id, p.name, p.at, p.live, p.mccb, p.vital, Math.round((p.kw || 0) * 2), p.ch.filter(c => c.cb === 2 && c.cls > 0).length]), LD.s().items.map(i => [i.id, i.name, i.n, i.fsu])]) : "";
   if (g.dataset.sig === sig) return; g.dataset.sig = sig; if (!r) { g.innerHTML = ""; return; }
   const { YR, X0, X1 } = RG, n = r.fsu.length, xs = k => X0 + (X1 - X0) * (k + 1) / (n + 1), ym = (BUS_Y + YR) / 2, sm = RingView.sum(s);
   const liveAt = k => k < 0 ? live.A : k >= n ? live.B : r.fsu[k].live === true;                                             // 구간 양 끝 가운데 한쪽이라도 살아 있으면 그 구간에 전압이 있다
@@ -136,7 +181,8 @@ function sldRing(s, live) {
             <text class="st" x="${x}" y="${ty + 119}" text-anchor="middle" fill="${bad ? "var(--alarm)" : fed ? "var(--ok)" : "var(--warn)"}">${bad ? (p.mccb === 2 ? "주 차단기 트립 · 정전" : "정전") : fed ? (lds.length ? "급전 중" : "대기") : "무전압"}</text>`); }).join(""); });
   const tot = [["1", "LOAD.p1_kw"], ["2", "LOAD.p2_kw"], ["3", "LOAD.p3_kw"]].map(([cl, t], q) => `<tspan style="fill:${CLS[q][1]}" dx="${q ? 16 : 8}">${cl}등급 ${F.kw(val(t))} kW</tspan><tspan class="${cbl(cl) === 2 ? "t" : cbl(cl) === 0 ? "o" : ""}" dx="5">CB-L${cl} ${cbl(cl) == null ? "미상" : ["개방", "투입", "트립"][cbl(cl)]}${LD.stage("L" + cl) === "save" ? " · 절감 공급" : ""}</tspan><tspan dx="5" style="fill:var(--muted)">(${LD.g("L" + cl) ? LD.g("L" + cl).n + "개 · 정격 " + F.n(LD.g("L" + cl).rated, 0) : "—"})</tspan>`).join("");
   h += `<text class="sring-s" x="${X0}" y="${RG.H - 12}">구간분전함 → 배전체계(부하 앞) → 부하 · 값 = 부하 목록의 추정 전력${tot}</text>`;
-  g.innerHTML = h; g.onclick = () => { location.hash = "#ring"; };
+  r.fsu.forEach((f, k) => { if (LD.atFsu(f.id).length) h += `<rect class="sld-ld-drag" data-fsu="${esc(f.id)}" x="${xs(k) - 52}" y="${YR + 76}" width="104" height="68" rx="9" fill="transparent" style="cursor:grab"><title>끌어서 옮긴다 — 다른 구간분전함 위에 놓으면 그 구간분전함으로, 모선 A · B 위에 놓으면 그 모선 쪽으로</title></rect>`; });
+  SLD_DRAG.fx = r.fsu.map((f, k) => ({ id: f.id, name: f.name, x: xs(k) })); g.innerHTML = h; SLD_DRAG.init(g);
 }
 /* 상태 갱신 */
 function sldArt(id, st) {

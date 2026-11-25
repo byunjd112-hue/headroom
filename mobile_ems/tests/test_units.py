@@ -156,6 +156,9 @@ class FleetLiveTest(unittest.TestCase):
             r = unitctl.change(e, "PV", 1, "시험"); self.assertTrue(r["ok"]); self.assertEqual(r["unit"], f"PV{want}")
             self.assertTrue(self._wait(lambda: pv()["n"] == want and len(pv()["units"]) == want), f"PV {want}대 인식")
         b = e.busw.view(); self.assertEqual([u["id"] for u in b["units"]], ["PV2", "PV3"]); self.assertTrue(all(u["bus"] == b["assign"]["PV"] and not u["own"] for u in b["units"]))      # 추가 장비는 처음에 1호기의 모선을 따른다
+        with e.lock: r0 = e.busw.change({"op": "set", "node": "PV", "bus": "B"}, "시험")                                                          # 첫 장비(1호기)만 바꾼다 → 다른 호기는 지금 모선에 그대로(한 대씩 고른다)
+        self.assertEqual({u["id"]: u["bus"] for u in r0["bus"]["sources"] if u["kind"] == "PV"}, {"PV": "B", "PV2": "A", "PV3": "A"}); self.assertIn("1호기", r0["msg"])
+        with e.lock: e.busw.change({"op": "set", "node": "PV", "bus": "A"}, "시험"); e.busw.change({"op": "follow", "node": "PV2"}, "시험"); e.busw.change({"op": "follow", "node": "PV3"}, "시험")
         with e.lock: r = e.busw.change({"op": "set", "node": "PV3", "bus": "B"}, "시험")
         self.assertTrue(r["ok"], r); u3 = next(u for u in r["bus"]["units"] if u["id"] == "PV3"); self.assertEqual((u3["bus"], u3["own"], e.plant.bus["PV3"]), ("B", True, "B"))                 # 호기마다 따로 고른다 → 가상 장치의 모선 계산에도 간다
         with e.lock: self.assertFalse(e.busw.change({"op": "set", "node": "PV9", "bus": "B"}, "시험")["ok"]); self.assertTrue(e.busw.change({"op": "follow", "node": "PV3"}, "시험")["ok"]); self.assertNotIn("PV3", e.busw.assign)

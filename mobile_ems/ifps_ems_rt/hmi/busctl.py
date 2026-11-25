@@ -56,7 +56,12 @@ class BusBook:
         """부하 하나하나와 물린 모선(그 구간분전함이 평소에 받는 쪽)."""
         lw = getattr(self.eng, "loadw", None); side = self.sides()[0]
         if lw is None: return []
-        return [{"id": i["id"], "name": i["name"] + (f" ×{i['n']}" if i["n"] > 1 else ""), "grade": i["grade"], "rated": i["rated"], "fsu": i["fsu"], "fsu_name": i["fsu_name"], "bus": side.get(i["fsu"], "")} for i in lw.view()["items"] if i["n"] > 0 and i["fsu"]]
+        return [{"id": i["id"], "name": i["name"] + (f" ×{i['n']}" if i["n"] > 1 else ""), "n": i["n"], "grade": i["grade"], "rated": i["rated"], "fsu": i["fsu"], "fsu_name": i["fsu_name"], "bus": side.get(i["fsu"], "")} for i in lw.view()["items"] if i["n"] > 0 and i["fsu"]]
+
+    def label(self, n):
+        """기록 · 안내에 쓰는 이름: 같은 종류가 여러 대면 호기를 붙인다."""
+        k = busplan.kind_of(n); us = self.units().get(k, [])
+        return f"{busplan.NAME[k]} {us.index(n) + 1}호기" if n in us else busplan.unit_name(n)
 
     def sources(self, p):
         """전원 한 대 한 대: [{id, name, bus, present}] — 같은 종류가 여러 대면 호기로 나눈다."""
@@ -95,7 +100,8 @@ class BusBook:
         if op == "set":
             n = b.get("node"); known = n in busplan.NODES or (isinstance(n, str) and busplan.UNIT.match(n) and n in self.eng.rt.fleet.slots.get(busplan.kind_of(n), []))
             if not known or b.get("bus") not in ("A", "B"): return {"ok": False, "why": "이름 또는 모선 오류"}
-            a[n] = b["bus"]; msg = f"모선 구성: {busplan.unit_name(n)} → 모선 {b['bus']}"
+            for u in self.units().get(n, [])[1:]: a.setdefault(u, busplan.bus_of(a, u))      # 한 대씩 고른다: 첫 장비를 바꿔도 같은 종류의 다른 호기는 지금 모선에 그대로
+            a[n] = b["bus"]; msg = f"모선 구성: {self.label(n)} → 모선 {b['bus']}"
         elif op == "follow":                                              # 추가 장비를 다시 종류의 모선을 따르게
             if b.get("node") not in a or b.get("node") in busplan.NODES: return {"ok": False, "why": "따로 정한 값이 없습니다"}
             del a[b["node"]]; msg = f"모선 구성: {busplan.unit_name(b['node'])} → 종류의 모선을 따름"

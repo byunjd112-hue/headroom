@@ -123,7 +123,7 @@ const P_OV = {
 /* ════════════════ 1-2. 단선결선도 */
 const P_SLD = {
   mount(m) {
-    m.innerHTML = `<div class="pagehd"><h2>단선결선도</h2><span class="sub">모선 A/B · 연계 차단기 · 급전선별 통전·무전압·고장 · 전력 흐름 — 전원 · 부하의 자리는 개요 배치와 모선 구성을 따른다</span><div class="spacer"></div><button class="btn" data-act="busplan">모선 구성</button></div><div id="sldBus"></div>
+    m.innerHTML = `<div class="pagehd"><h2>단선결선도</h2><span class="sub">모선 A/B · 연계 차단기 · 급전선별 통전·무전압·고장 · 전력 흐름 — 전원 그림 · 호기 칩 · 부하 그림을 끌어 모선 · 구간분전함을 바꾼다. 전원 · 부하의 자리는 개요 배치와 모선 구성을 따른다</span><div class="spacer"></div><button class="btn" data-act="busplan">모선 구성</button></div><div id="sldBus"></div>
     <div class="pg" style="grid-template-columns:1fr 420px">
       <div class="panel"><div class="hd"><h3>${t("ov.sld", "단선 결선도 · 실시간 전력 흐름")}</h3><span class="sub mono" id="busbal"></span><div class="spacer"></div><div class="legend sldleg"><span><i class="l on"></i>통전</span><span><i class="l off"></i>무전압</span><span><i class="l flt"></i>고장</span><span><i class="c closed"></i>투입</span><span><i class="c open"></i>개방</span><span><i class="c trip"></i>트립</span></div></div>
         <div class="bd sldbox">${sldSvg()}</div></div>

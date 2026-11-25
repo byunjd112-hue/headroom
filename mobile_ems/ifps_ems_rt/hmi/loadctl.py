@@ -50,7 +50,7 @@ class LoadBook:
         if eng.plant is not None: eng.plant.save_frac = dict(fr); eng.plant.load_scale = loads.scale(self.items)
 
     def change(self, b, who):
-        """op: add(kind) · count(id, delta) · set(id, name · grade · kw · save_pct) · del(id) · reset. 반환: {ok, why | msg}"""
+        """op: add(kind) · count(id, delta) · set(id, name · grade · kw · save_pct · fsu) · split(id — 하나씩 나눔) · place · del(id) · reset. 반환: {ok, why | msg}"""
         items = [dict(i) for i in self.items]
         try: items, msg = _edit(items, b)
         except ValueError as e: return {"ok": False, "why": str(e)}
@@ -88,6 +88,13 @@ def _add(items, k):
     return items + [it], f"부하 추가: {it['name']}({g}등급 · {kw:.0f} kW)"
 
 
+def _split(items, it):
+    """수량이 여럿인 부하 한 줄을 하나씩의 줄로 나눈다(막사 ×3 → 막사 #1 · #2 · #3) — 하나마다 구간분전함 · 모선을 따로 고를 수 있게."""
+    if it["n"] < 2: raise ValueError("수량이 2 이상일 때만 나눈다")
+    k = items.index(it); new = [dict(it, id=it["id"] if j == 0 else "l" + secrets.token_hex(3), name=f"{it['name']} #{j + 1}"[:24], n=1) for j in range(it["n"])]
+    return items[:k] + new + items[k + 1:], f"{it['name']} ×{it['n']} 을(를) 하나씩 나눔"
+
+
 def _place(items, b):
     """개요 배치도를 저장할 때: 그림을 옮긴 자리에서 가장 가까운 구간분전함(at: {부하: 구간분전함})과 고친 이름(names: {부하: 이름})을 부하 목록에 반영한다."""
     at, names = b.get("at") or {}, b.get("names") or {}; done = []
@@ -99,6 +106,14 @@ def _place(items, b):
     return items, "개요 배치 반영: " + ", ".join(done[:6]) + (" …" if len(done) > 6 else "")
 
 
+def _set(items, it, b):
+    """부하 한 줄의 이름 · 등급 · 정격 · 절감 비율 · 물릴 구간분전함을 고친다."""
+    for k in ("name", "grade", "kw", "save_pct", "fsu"):
+        if k in b: it[k] = b[k].strip() if k == "name" and isinstance(b[k], str) else b[k]
+    if it["grade"] == 1 and "grade" in b and "save_pct" not in b: it["save_pct"] = 0
+    return items, f"{it['name']} 변경: {it['grade']}등급 · 대당 {it['kw']:g} kW · 절감 {it['save_pct']:g}%" + (f" · 구간분전함 {it['fsu'] or '자동'}" if "fsu" in b else "")
+
+
 def _edit(items, b):
     """목록에 한 가지 변경을 한다. 반환: (새 목록, 기록할 글). 할 수 없으면 ValueError."""
     op = b.get("op"); it = next((i for i in items if i["id"] == b.get("id")), None)
@@ -107,12 +122,10 @@ def _edit(items, b):
     if op == "place": return _place(items, b)
     if it is None: raise ValueError("없는 부하")
     if op == "count": it["n"] = it["n"] + int(b.get("delta", 0)); return items, f"{it['name']} 수량 {it['n']}"
+    if op == "split": return _split(items, it)
     if op == "del": items.remove(it); return items, f"부하 삭제: {it['name']}"
     if op != "set": raise ValueError(f"동작 없음: {op}")
-    for k in ("name", "grade", "kw", "save_pct", "fsu"):
-        if k in b: it[k] = b[k].strip() if k == "name" and isinstance(b[k], str) else b[k]
-    if it["grade"] == 1 and "grade" in b and "save_pct" not in b: it["save_pct"] = 0
-    return items, f"{it['name']} 변경: {it['grade']}등급 · 대당 {it['kw']:g} kW · 절감 {it['save_pct']:g}%" + (f" · 구간분전함 {it['fsu'] or '자동'}" if "fsu" in b else "")
+    return _set(items, it, b)
 
 
 def http_post(eng, b, sess):

@@ -111,6 +111,9 @@ class TestHmi(unittest.TestCase):
         try:
             r = self.req("/api/bus", {"op": "load", "id": "med", "bus": "B"}, en)[1]; self.assertTrue(r["ok"], r); m = next(x for x in r["bus"]["loads"] if x["id"] == "med"); self.assertEqual((m["bus"], m["fsu"]), ("B", "FSU5"))   # 부하 하나의 모선을 바꾸면 그쪽 구간분전함으로 옮겨진다
             self.assertEqual(next(i for i in e.snapshot()["loads"]["items"] if i["id"] == "med")["fsu"], "FSU5"); self.assertFalse(self.req("/api/bus", {"op": "load", "id": "med", "bus": "B"}, en)[1]["ok"]); self.assertFalse(self.req("/api/bus", {"op": "load", "id": "nope", "bus": "A"}, en)[1]["ok"])
+            r = self.req("/api/loads", {"op": "split", "id": "brk"}, op)[1]; self.assertTrue(r["ok"], r); bk = [i for i in r["loads"]["items"] if i["kind"] == "barrack"]                # 막사 ×2 를 하나씩 나눈다 → 하나마다 구간분전함 · 모선을 따로
+            self.assertEqual([(i["name"], i["n"]) for i in bk], [("막사 #1", 1), ("막사 #2", 1)]); self.assertFalse(self.req("/api/loads", {"op": "split", "id": bk[0]["id"]}, op)[1]["ok"])
+            r = self.req("/api/bus", {"op": "load", "id": bk[1]["id"], "bus": "B"}, en)[1]; self.assertTrue(r["ok"], r); self.assertEqual({x["name"]: x["bus"] for x in r["bus"]["loads"] if x["name"].startswith("막사")}, {"막사 #1": "A", "막사 #2": "B"})
         finally: self.assertTrue(self.req("/api/loads", {"op": "reset"}, op)[1]["ok"])
         lay = e.layout(); items = lay.get("items") or [{"uid": "a", "kind": "DG", "bind": "G1", "name": "발전", "x": 300.4, "y": 400.26}]
         items = [dict(i) for i in items]; items[0]["s"] = 0.55; items[0]["x"] = 301.23; r = self.req("/api/layout", {"items": items}, op)[1]; self.assertTrue(r["ok"], r)

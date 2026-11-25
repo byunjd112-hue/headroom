@@ -27,7 +27,7 @@ const BusPlan = {
     const b = this.s(); if (!b) return; const fixable = b.issues.some(i => i.fix);
     const pick = (name, cur) => ["A", "B"].map(x => `<label style="margin:0 10px;white-space:nowrap"><input type="radio" name="${name}" value="${x}" ${cur === x ? "checked" : ""}> 모선 ${x}</label>`).join("");
     const srow = u => `<tr class="${u.present ? "" : "muted"}"><td><b>${esc(u.name)}</b>${u.present ? "" : ' <span class="muted">(지금 없음)</span>'}</td><td style="text-align:center">${pick("bs-" + u.id, u.bus)}</td><td class="muted"></td></tr>`;
-    const lrow = u => `<tr><td><b>${esc(u.name)}</b> <span class="pill ${u.grade === 1 ? "bad" : u.grade === 2 ? "warn" : "info"}">${u.grade}등급</span></td><td style="text-align:center">${pick("bl-" + u.id, u.bus)}</td><td class="muted">${esc(u.fsu_name)}</td></tr>`;
+    const lrow = u => `<tr><td><b>${esc(u.name)}</b> <span class="pill ${u.grade === 1 ? "bad" : u.grade === 2 ? "warn" : "info"}">${u.grade}등급</span></td><td style="text-align:center">${pick("bl-" + u.id, u.bus)}</td><td class="muted">${esc(u.fsu_name)}${u.n > 1 ? ` <a href="#" data-split="${u.id}" style="color:var(--accent)" title="하나씩의 줄로 나눠 하나마다 모선 · 구간분전함을 따로 고른다">[하나씩 나누기]</a>` : ""}</td></tr>`;
     modal(`<h3>모선 구성 — 장비 · 부하 하나하나가 물린 모선</h3><p class="sub">전원은 한 대씩, 부하는 하나씩 모선 A · B 를 고른다. 실제 결선을 EMS 에 알려 주는 값이다 — 여기서 바꾼다고 케이블이 옮겨지지 않는다(결선을 바꾼 뒤, 또는 바꾸기 전에 검토하려고 맞춘다). 바꾸면 결선도 · 운영 시나리오 구성도 · 가상 장치의 모선 전압 계산 · 환망이 함께 바뀐다.</p>
       <div class="scroll" style="max-height:52vh"><table class="t"><thead><tr><th>전원(한 대씩)</th><th style="text-align:center">물린 모선</th><th></th></tr></thead><tbody>${(b.sources || []).map(srow).join("")}</tbody>
       <thead><tr><th>부하(하나씩)</th><th style="text-align:center">받는 모선</th><th>물린 구간분전함</th></tr></thead><tbody>${(b.loads || []).map(lrow).join("") || '<tr><td colspan="3" class="muted">부하 목록이 비어 있다</td></tr>'}</tbody></table></div>
@@ -36,6 +36,7 @@ const BusPlan = {
       <p class="muted" style="font-size:12px;margin:10px 0 0">점검: ① 모선마다 전압을 세울 전원(이동형 ESS · 복합전력 ESS)이 있는가 ② 1등급 부하의 모선에 전원이 있는가 ③ 연계 차단기가 열려도 모선별 전원 정격이 부하 정격을 감당하는가 ④ 전원이 한 모선에 몰리지 않았는가.${b.by ? ` 마지막 변경: ${esc(b.by)} · ${esc(b.t)}` : ""}</p>
       <div class="acts" style="margin-top:14px"><button class="btn go" id="bpAuto" ${fixable ? "" : "disabled"}>자동 보완</button><button class="btn" id="bpReset">기본 구성으로</button><div class="spacer"></div><button class="btn" data-act="close">닫기</button></div>`, box => {
       box.querySelectorAll('input[type="radio"]').forEach(r => r.onchange = () => this.post(r.name.startsWith("bl-") ? { op: "load", id: r.name.slice(3), bus: r.value } : { op: "set", node: r.name.slice(3), bus: r.value }));
+      box.querySelectorAll("[data-split]").forEach(a => a.onclick = async e => { e.preventDefault(); const r = await api("/api/loads", { op: "split", id: a.dataset.split }); toast(r.ok ? r.msg : r.why, r.ok ? "ok" : "bad"); if (r.ok) { S.snap.loads = r.loads; const s = await api("/api/snapshot"); if (s && s.bus) S.snap.bus = s.bus; this.dialog(); } });
       box.querySelector("#bpAuto").onclick = () => this.post({ op: "auto" }); box.querySelector("#bpReset").onclick = () => { if (confirm("전원의 모선 구성을 기본으로 되돌립니다(부하의 자리는 그대로). 계속합니까?")) this.post({ op: "reset" }); };
     });
   },
