@@ -1,6 +1,6 @@
 {
- "date": "2026-11-25 12:02",
- "unittest_s": 632.0,
+ "date": "2026-11-25 12:32",
+ "unittest_s": 622.4,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -126,7 +126,7 @@
   "test_ppdu_circuits_overload_ground_and_trip | ok",
   "test_settings_and_check | ok",
   "test_status_normal_cut_and_isolated | ok",
-  "분기 전력계: 부하 앞에 배전체계가 필요한 대수만큼(정격이 모자라면 병렬) 붙고, 구간분전함 전력 = 아래 배전체계의 합 = 물린 부하의 합, 전력량이 쌓이고, 환망 화면에 분기별 전력 · 전력량 · 예측이 나온다. 전력계가 어긋나면 알린다. | ok",
+  "분기 전력계: 부하 앞에 배전체계가 필요한 대수만큼(정격이 모자라면 병렬) 붙고, 구간분전함 전력 = 아래 배전체계의 합 = 물린 부하의 합, 전력량이 쌓이고, 환망 화면에 분기별 전력 · 전력량 · 예측이 나온다. 전력계가 어긋나면 알린다. | FAIL",
   "test_monitor_break_discover_and_configure | ok",
   "정격 · 가정값(ring.spec)은 엔지니어가 고친다: 고치면 배전체계 대수 · 용량 점검이 따라가고, 틀린 값은 막는다. 기본값은 문서의 값이다. | ok",
   "무정전 원칙(원본 자료의 기준): 한 구간이 끊겨도 환망이 반대쪽에서 보낸다 — 1등급 부하는 STS 절체로 끊기지 않고, 나머지는 3초 안에 복구된다. 환망 전체가 간선 정격을 넘으면 알린다. | ok",
@@ -215,13 +215,13 @@
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
  "n_tests": 211,
- "tests_ok": true,
+ "tests_ok": false,
  "retried": [],
- "coverage_pct": 92.7,
+ "coverage_pct": 92.8,
  "stmt": {
   "n": 7194,
-  "hit": 6873,
-  "pct": 95.5
+  "hit": 6876,
+  "pct": 95.6
  },
  "branch": {
   "n": 2540,
@@ -273,7 +273,7 @@
    "ifps_ems_rt/hmi/archwatch.py",
    79.4,
    102,
-   59.1,
+   56.8,
    44,
    "29-30, 43, 56, 59-63, 67-68, 108-110, 114-116, 126-128, 131"
   ],
@@ -430,14 +430,6 @@
    "70-72"
   ],
   [
-   "ifps_ems_rt/archive.py",
-   96.6,
-   148,
-   83.3,
-   30,
-   "95-96, 110, 128-129"
-  ],
-  [
    "ifps_ems_rt/hmi/eng_command.py",
    96.6,
    118,
@@ -510,20 +502,20 @@
    "93-94, 110"
   ],
   [
+   "ifps_ems_rt/archive.py",
+   98.0,
+   148,
+   83.3,
+   30,
+   "95-96, 110"
+  ],
+  [
    "ifps_ems_rt/hmi/docx.py",
    98.1,
    53,
    100.0,
    4,
    "65"
-  ],
-  [
-   "ifps_ems_rt/simplant.py",
-   98.3,
-   177,
-   92.4,
-   66,
-   "175, 187-188"
   ],
   [
    "ifps_ems_rt/modbus.py",
@@ -572,6 +564,14 @@
    87.5,
    32,
    "120"
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   98.9,
+   177,
+   92.4,
+   66,
+   "187-188"
   ],
   [
    "ifps_ems_rt/mbtool.py",
@@ -761,7 +761,7 @@
    "ifps_ems_rt/hmi/fuelwatch.py",
    100.0,
    17,
-   90.0,
+   100.0,
    10,
    ""
   ],
