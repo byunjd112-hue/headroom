@@ -207,7 +207,6 @@ function siteMapSvg(s) {
   const rg = !L.edit && s.ring ? s.ring : null;                                    // 구간분전함 이름표(환망 화면의 이름과 같다)
   const dst = rg && items.find(i => i.kind === "DIST");                            // 고리가 닫히는 곳: 첫 · 마지막 구간분전함은 배전 · 변압 안의 모선에서 만난다
   if (dst && rg.fsu.length > 1) g += `<text x="${dst.x}" y="${dst.y + 96}" text-anchor="middle" class="mfsu sec open">${esc(rg.fsu[0].name)} ↔ ${esc(rg.fsu[rg.fsu.length - 1].name)} 은 이 안의 모선 A · B 로 이어져 고리가 닫힘</text>`;
-  if (rg) items.filter(i => i.kind === "FSU").forEach(it => { const f = rg.fsu.find(x => x.id === _fsuNo(it)); if (f) g += `<text x="${it.x}" y="${it.y + 34}" text-anchor="middle" class="mfsu ${f.live === false || f.comm === false ? "bad" : ""}">${esc(f.name)}${f.comm === false ? " · 통신 고립" : ""}</text>`; });
   if (rg) cab.forEach(([a, b, f]) => { const sec = /^RS\d+$/.test(f) ? rg.sections[+f.slice(2)] : null; if (!sec) return; const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 + Math.abs(b[0] - a[0]) * .03;      // 구간 이름표
     const t = sec.state === 2 ? `구간 ${sec.i} 차단` : sec.open ? (sec.state === 1 ? "상시 개방점(닫힘 · 우회 중)" : "상시 개방점(열림)") : sec.i === 0 ? "환망 급전 A(모선 A)" : sec.i === rg.fsu.length ? "환망 급전 B(모선 B)" : "";      // 고리의 양 끝은 배전반의 두 모선에 물려 닫힌다
     if (t) g += `<text x="${mx}" y="${my - 16}" text-anchor="middle" class="mfsu sec ${sec.state === 2 ? "bad" : sec.open ? "open" : ""}">${t}</text>`; });
@@ -243,14 +242,13 @@ const MK = { drag: null, t: 0,
     const box = $("#siteMk"), svg = $("#siteMap svg"); if (!box || !svg || L.edit || !L.view) return; const b = box.getBoundingClientRect(), m = svg.getScreenCTM(); if (!m || !b.width || !box.offsetWidth) return;
     const z = b.width / box.offsetWidth; this.k = m.a / z;                                   // z: 화면 맞춤 배율, k: 배치도 1칸 = 몇 px
     $$("#siteMk .spt").forEach(e => { let x, y;
-      if (e.dataset.at) { const it = L.view.find(i => i.kind === "FSU" && _fsuNo(i) === e.dataset.at); if (!it) return; x = m.a * it.x + m.e; y = m.d * (it.y + 50) + m.f; }
-      else { const g = svg.querySelector(`.meq[data-uid="${CSS.escape(e.dataset.uid)}"]`); if (!g) return; const r = g.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height * .1; }
+      { const g = svg.querySelector(`.meq[data-uid="${CSS.escape(e.dataset.uid)}"]`); if (!g) return; const r = g.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height * .1; }
       e.style.left = (x - b.left) / z + "px"; e.style.top = Math.max(10, (y - b.top) / z) + "px";
-      if (!e.dataset.at && !(this.drag && this.drag.e === e)) this.show(e, this.of(e.dataset.uid), this.k); });
+      if (!(this.drag && this.drag.e === e)) this.show(e, this.of(e.dataset.uid), this.k); });
   },
   init(box) {
     if (box.dataset.mk) return; box.dataset.mk = 1;
-    box.addEventListener("pointerdown", e => { const c = e.target.closest(".scard"), sp = c && c.closest(".spt"); if (!sp || sp.dataset.at || e.button) return;
+    box.addEventListener("pointerdown", e => { const c = e.target.closest(".scard"), sp = c && c.closest(".spt"); if (!sp || e.button) return;
       const v = this.of(sp.dataset.uid) || [0, 0]; this.drag = { e: sp, x0: e.clientX, y0: e.clientY, v0: v, v: v, moved: false }; });
     addEventListener("pointermove", e => { const d = this.drag; if (!d) return; const b = box.getBoundingClientRect(), z = b.width / box.offsetWidth || 1, k = this.k || 1;
       if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 5) return; d.moved = true; d.e.classList.add("dragging");
@@ -265,9 +263,9 @@ function siteMarkers() {
   const box = $("#siteMk"); if (!box || !L.items) return; MK.init(box);
   if (L.edit) { box.innerHTML = ""; return; }
   const seen = {};
-  const rg = S.snap && S.snap.ring, pp = !rg ? "" : rg.ppdu.map((p, j) => { const it = (L.view || L.items).find(i => i.kind === "FSU" && _fsuNo(i) === p.at); if (!it || rg.ppdu.findIndex(q => q.at === p.at) !== j) return "";      // 구간분전함마다 표지 하나(그 아래 배전체계 묶음)
-    return `<div class="spt mini ppdu" data-at="${esc(p.at)}" style="left:${it.x / MAP_W * 100}%;top:${(it.y + 50) / MAP_H * 100}%"><i class="core"></i><div class="scard"><div class="sh">—</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`; }).join("");
-  box.dataset.n = (L.view || L.items).length + (rg ? rg.ppdu.length * 100 : 0); box.dataset.ids = (L.view || L.items).map(i => i.uid).join(); box.innerHTML = pp + (L.view || L.items).filter(i => i.kind !== "FSU").map(it => {
+  const rg = S.snap && S.snap.ring, pp = !rg ? "" : rg.fsu.map(f => { const it = (L.view || L.items).find(i => i.kind === "FSU" && _fsuNo(i) === f.id); if (!it) return "";      // 구간분전함마다 표지 하나(이름 · 그 아래 배전체계 묶음의 전력 · 상태)
+    return `<div class="spt ppdu" data-at="${esc(f.id)}" data-uid="${it.uid}" style="left:${it.x / MAP_W * 100}%;top:${it.y / MAP_H * 100}%"><i class="lead"></i><i class="core"></i><div class="scard" title="끌어서 글상자를 옮긴다 · 오른쪽 버튼 = 제자리"><div class="sh">${esc(f.name)}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`; }).join("");
+  box.dataset.n = (L.view || L.items).length + (rg ? rg.fsu.length * 100 : 0); box.dataset.ids = (L.view || L.items).map(i => i.uid).join(); box.innerHTML = pp + (L.view || L.items).filter(i => i.kind !== "FSU").map(it => {
     const key = it.load ? "ld:" + it.load : it.bind, [x, y] = _mkPos(it), mini = it.load ? !!seen[key] : it.kind === "BARRACK" || seen[key]; seen[key] = 1;      // 부하는 목록의 한 줄마다 첫 그림에 표지를 단다
     return `<div class="spt ${mini ? "mini" : ""}" data-act="goctl" data-uid="${it.uid}" style="left:${x}%;top:${y}%"><i class="lead"></i><i class="pulse"></i><i class="core"></i>
       <div class="scard" title="끌어서 글상자를 옮긴다 · 오른쪽 버튼 = 제자리"><div class="sh">${esc(it.name || LAY_KINDS[it.kind].nm)}${it.spare ? " · 예비 자리" : ""}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`;
@@ -297,9 +295,11 @@ function siteUpdate(s, force) {
       const x = document.getElementById("mx-" + i); if (x) x.style.display = c === 2 ? "" : "none";
     });
   }
-  const mk = $("#siteMk"); if (mk && !L.edit && (!mk.children.length || +mk.dataset.n !== L.view.length + (s.ring ? s.ring.ppdu.length * 100 : 0) || mk.dataset.ids !== L.view.map(i => i.uid).join())) siteMarkers();            // 대수가 바뀌면 표지도 다시 만든다
-  $$("#siteMk .spt.ppdu").forEach(e => { const p = RingView.group(s.ring ? s.ring.ppdu.filter(q => q.at === e.dataset.at) : []); if (!p.n) return; const bad = p.bad, tr = p.trip;
-    e.className = `spt mini ppdu ${bad ? "bad" : p.warn ? "idle" : "ok"}`; e.querySelector(".sh").textContent = p.name + (p.vital ? " ★" : ""); e.querySelector(".sv .mono").textContent = p.kw == null ? "—" : F.kw(p.kw) + " kW"; e.querySelector(".ss").textContent = bad ? (p.mccb === 2 ? "주 차단기 트립" : "정전") : tr ? `회로 트립 ${tr}` : p.over ? "과부하" : "공급"; });
+  const mk = $("#siteMk"); if (mk && !L.edit && (!mk.children.length || +mk.dataset.n !== L.view.length + (s.ring ? s.ring.fsu.length * 100 : 0) || mk.dataset.ids !== L.view.map(i => i.uid).join())) siteMarkers();            // 대수가 바뀌면 표지도 다시 만든다
+  $$("#siteMk .spt.ppdu").forEach(e => { const f = s.ring && s.ring.fsu.find(q => q.id === e.dataset.at); if (!f) return; const p = RingView.group(s.ring.ppdu.filter(q => q.at === f.id)), dead = f.live === false, bad = dead || (p.n && p.bad), tr = p.trip;
+    e.className = `spt ppdu ${e.classList.contains("moved") ? "moved" : ""} ${bad ? "bad" : p.warn || f.comm === false ? "idle" : "ok"}`; e.querySelector(".sh").textContent = f.name + (p.vital || f.vital ? " ★" : "");
+    e.querySelector(".sv .mono").textContent = p.n ? (p.kw == null ? "—" : F.kw(p.kw) + " kW") : "";
+    e.querySelector(".ss").textContent = dead ? "정전" : f.comm === false ? "통신 고립" : !p.n ? "부하 없음" : `${p.n > 1 ? "배전체계 ×" + p.n + " · " : ""}${p.bad ? (p.mccb === 2 ? "주 차단기 트립" : "정전") : tr ? `회로 트립 ${tr}` : p.over ? "과부하" : "공급"}`; });
   $$("#siteMk .spt:not(.ppdu)").forEach(e => { const it = L.view.find(i => i.uid === e.dataset.uid); if (!it) return; let x = st[it.bind] || { st: "ok", v: "", t: "" };
     const kf = KF(LAY_FLEET[it.kind]), u = kf && kf.units.length > 1 && kf.units.find(q => q.id === it.unit);
     const ld = it.load && LD.s().items.find(q => q.id === it.load);
