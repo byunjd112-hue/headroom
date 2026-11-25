@@ -155,9 +155,9 @@ const SLD_DRAG = {
   },
   /* 전원 한 대의 모선을 바꾼다(그림 하나 = 장비 한 대) */
   async dropSrc(node, to) {
-    const b = BusPlan.s(), cur = b && ((b.sources || []).find(q => q.id === (/^G1_/.test(node) ? "G1" : node)) || {}).bus; if (!to.bus || cur === to.bus) return;
+    const b = BusPlan.s(), cur = b && ((b.sources || []).find(q => q.id === node) || {}).bus; if (!to.bus || cur === to.bus) return;
     if (!can("engineer")) { toast("모선을 바꾸는 것은 엔지니어 권한", "bad"); return loginDialog(); }
-    const r = await api("/api/bus", { op: "set", node: /^G1_/.test(node) ? "G1" : node, bus: to.bus });      // 복합전력 ESS 의 모선은 차량 구분 없이 하나로 정한다 toast(r.ok ? r.msg : r.why, r.ok ? "ok" : "bad"); if (r.ok) S.snap.bus = r.bus;
+    const r = await api("/api/bus", { op: "set", node, bus: to.bus }); toast(r.ok ? r.msg : r.why, r.ok ? "ok" : "bad"); if (r.ok) S.snap.bus = r.bus;
   },
   async drop(from, to, one) {
     const lds = LD.atFsu(from).filter(q => !one || q.id === one); if (!lds.length || to.fsu === from) return;

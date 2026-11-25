@@ -238,6 +238,9 @@ class FleetLiveTest(unittest.TestCase):
         self.assertTrue(self._wait(lambda: rt._g1_avail() == 100.0 and any(a["key"] == "cb.open.G1_2" and a["state"] == "ACT" for a in e.snapshot()["alarms"])))
         e.sim_action({"action": "cb", "target": "G1_2", "on": True}, "시험"); self.assertTrue(self._wait(lambda: rt._g1_avail() == 200.0))
         self.assertEqual({u["id"]: "ess_kw" in u for u in fl()["DG"]["units"]}, {"DG": True, "DG2": True})
+        with e.lock: r = e.busw.change({"op": "set", "node": "G1_2", "bus": "B"}, "시험")                                                                    # 복합전력 ESS 도 차량마다 모선을 고른다
+        self.assertTrue(r["ok"], r); self.assertEqual({u["id"]: u["bus"] for u in r["bus"]["sources"] if u["kind"] == "G1"}, {"G1": "A", "G1_2": "B"}); self.assertIn("복합전력 ESS 2호기", r["msg"])
+        with e.lock: self.assertFalse(e.busw.change({"op": "set", "node": "G1_9", "bus": "B"}, "시험")["ok"]); e.busw.change({"op": "reset"}, "시험")
         for n in ("ESS2", "PV2"): e.sim_action({"action": "cb", "target": n, "on": True}, "시험")
         self.assertTrue(self._wait(lambda: rt.val.get("CB.ESS2") == 1 and rt.val.get("CB.PV2") == 1 and abs(rt.fleet.unit("ESS", "kw", rt.val) - rt.fleet.unit("ESS2", "kw", rt.val)) < 0.5))
         with e.lock: rt.t_ctl = -1e9; e.sim_action({"action": "set", "tag": "ESS.soc", "value": 22.0, "hold": False}, "시험"); e.plant.set("ESS2.soc", 22.0)

@@ -181,7 +181,7 @@ class Plant:
         g, cb = self._g, self._cb
         on = lambda k: any(g(f"{u}.status") > 0.5 for u in self.us(k))
         up = {u for n in ("DG", "FC", "ESS") for u in self.us(n) if self._cbu(u) and g(f"{u}.status") > 0.5} | {n for n in ("GDG", "GRID") if f"CB.{n}" in self.by_tag and int(round(self.get(f"CB.{n}"))) == 1}      # 운전 중인 장치 하나하나(호기마다 물린 모선이 다를 수 있다)
-        if any(self._cbg(u) for u in self.us("DG")) if self.us("DG") else cb("G1"): up.add("G1")      # 복합전력 ESS: 어느 차량이든 제 차단기가 닫혀 있으면 모선을 세운다
+        up |= {fleet.g1_cb(u) for u in self.us("DG") if self._cbg(u)} if self.us("DG") else ({"G1"} if cb("G1") else set())      # 복합전력 ESS: 차량마다 제 차단기가 닫혀 있으면 제 모선을 세운다
         a_live, b_live = busplan.live(self.bus, up, cb("TIE"))            # 모선 구성(어느 전원이 어느 모선에 물렸는지)대로
         self.set("BUS.a_v", 440.0 + (abs(math.sin(now)) * 1.5) if a_live else 0.0); self.set("BUS.b_v", 440.0 + abs(math.cos(now)) * 1.5 if b_live else 0.0)
         self.set("BUS.hz", 60.0 + math.sin(now / 7) * 0.03 if (a_live or b_live) else 0.0)

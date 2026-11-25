@@ -2,7 +2,7 @@
 """모선 구성 — 화면부 연결. 구성을 상태 폴더(bus.json)에 두고, 바뀌면 가상 장치(모선 전압 계산)에 알린다. 스냅샷의 bus 로 나가 결선도 · 시나리오 구성도 · 개요가 같이 쓴다.
 계산과 점검은 ifps_ems_rt/busplan.py. 바꾸는 것은 엔지니어 권한이다(전기 구성)."""
 import json, os
-from .. import busplan, fsio
+from .. import busplan, fleet, fsio
 from .engdefs import wall_iso
 
 
@@ -44,6 +44,7 @@ class BusBook:
         for k in ("PV", "DG", "FC", "ESS"):
             us = [n for n in fl.slots.get(k, []) if n in fl.live_now.get(k, [])]
             if len(us) > 1: out[k] = us
+        if "DG" in out: out["G1"] = [fleet.g1_cb(n) for n in out["DG"]]      # 복합전력 차량마다 ESS 가 따로다(G1 · G1_2 …) — 차량마다 모선을 고른다
         return out
 
     def sides(self):
@@ -98,7 +99,7 @@ class BusBook:
         op = b.get("op"); a = dict(self.assign)
         if op == "load": return self.move_load(b, who)
         if op == "set":
-            n = b.get("node"); known = n in busplan.NODES or (isinstance(n, str) and busplan.UNIT.match(n) and n in self.eng.rt.fleet.slots.get(busplan.kind_of(n), []))
+            n = b.get("node"); sl = self.eng.rt.fleet.slots; known = n in busplan.NODES or (isinstance(n, str) and busplan.UNIT.match(n) and (n in sl.get(busplan.kind_of(n), []) or n in [fleet.g1_cb(d) for d in sl.get("DG", [])]))
             if not known or b.get("bus") not in ("A", "B"): return {"ok": False, "why": "이름 또는 모선 오류"}
             for u in self.units().get(n, [])[1:]: a.setdefault(u, busplan.bus_of(a, u))      # 한 대씩 고른다: 첫 장비를 바꿔도 같은 종류의 다른 호기는 지금 모선에 그대로
             a[n] = b["bus"]; msg = f"모선 구성: {self.label(n)} → 모선 {b['bus']}"

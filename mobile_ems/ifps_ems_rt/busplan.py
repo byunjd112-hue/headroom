@@ -21,16 +21,16 @@ STARTING = ("DG", "GDG", "GRID")  # 돌거나 붙어 있을 때만 전압을 주
 OTHER = {"A": "B", "B": "A"}
 
 
-UNIT = re.compile(r"^(PV|DG|FC|ESS)([2-9])$")      # 같은 종류의 추가 장비(2호기 …) — 호기마다 모선을 따로 정할 수 있다
+UNIT = re.compile(r"^(PV|DG|FC|ESS|G1_)([2-9])$")      # 같은 종류의 추가 장비(2호기 …) — 호기마다 모선을 따로 정할 수 있다. 복합전력 ESS 는 차량마다 G1 · G1_2 · G1_3 …
 
 
 def kind_of(n):
     """장치 이름 → 종류(ESS2 → ESS). 종류 이름은 그대로."""
-    m = UNIT.match(n); return m.group(1) if m else n
+    m = UNIT.match(n); return m.group(1).rstrip("_") if m else n
 
 
 def unit_name(n):
-    m = UNIT.match(n); return f"{NAME[m.group(1)]} {m.group(2)}호기" if m else NAME.get(n, n)
+    m = UNIT.match(n); return f"{NAME[m.group(1).rstrip('_')]} {m.group(2)}호기" if m else NAME.get(n, n)
 
 
 def bus_of(assign, n):
