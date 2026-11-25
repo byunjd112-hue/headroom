@@ -169,7 +169,8 @@ const CTL_UNITS = [
 ];
 /* 차단기 줄의 이름: 부하 급전선은 부하 목록(부하 관리)의 이름을 붙인다 */
 /* 추가 자리 장비의 차단기(CB.DG2 …): 인식한 장비 가운데 대응표에 차단기 신호가 있는 것 */
-const cbUnits = () => ["DG", "FC", "ESS", "PV"].flatMap(k => { const f = KF(k); return f ? f.units.slice(1).filter(u => val("CB." + u.id) != null).map((u, i) => [u.id, `${{ DG: "① 디젤", FC: "④ 연료전지", ESS: "② ESS", PV: "③ PV" }[k]} ${i + 2}호기 인입`]) : []; });
+const cbUnits = () => ["DG", "FC", "ESS", "PV"].flatMap(k => { const f = KF(k); return f ? f.units.slice(1).filter(u => val("CB." + u.id) != null).map((u, i) => [u.id, `${{ DG: "① 디젤", FC: "④ 연료전지", ESS: "② ESS", PV: "③ PV" }[k]} ${i + 2}호기 인입`]) : []; })
+  .concat(KF("DG") ? KF("DG").units.slice(1).map((u, i) => ["G1_" + u.id.replace(/\D/g, ""), `① 복합전력 ESS ${i + 2}호 차량 인입`]).filter(q => val("CB." + q[0]) != null) : []);
 const cbRows = () => CB_ROWS.slice(0, 5).concat(cbUnits(), CB_ROWS.slice(5)).map(([f, nm]) => /^L[123]$/.test(f) && LD.names(f).length ? [f, `${f[1]}등급 부하 (${LD.names(f).slice(0, 3).join(" · ")}${LD.names(f).length > 3 ? " …" : ""})`] : [f, nm]);
 const CB_ROWS = [["PV", "③ PV 인입"], ["DG", "① 디젤 인입"], ["FC", "④ 연료전지 인입"], ["ESS", "② ESS 인입"], ["G1", "① 복합전력 인입"], ["TIE", "모선 A·B 연계"], ["L1", "1등급 부하"], ["L2", "2등급 부하"], ["L3", "3등급 부하"]];
 /* 복합전력 PCS 의 운전 모드: 값과 이름은 설정(runtime.json 의 hybrid — 관리자 화면에서 고친다)에서 온다. 스냅샷 kpi.hy = {code: {stop, gen, charge, ess}, label: {...}} */

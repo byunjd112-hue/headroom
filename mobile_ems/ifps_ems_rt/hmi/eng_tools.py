@@ -61,7 +61,7 @@ class ToolsMixin:
 
     def _sim_feeder(self, q):
         f = q["target"]
-        if f not in FEEDERS and not (fleet.is_slot(f) and f"CB.{f}" in self.plant.by_tag): raise ValueError(f"급전선 없음: {f}")      # 추가 자리 장비의 차단기(CB.DG2 …)도 받는다
+        if f not in FEEDERS and not ((fleet.is_slot(f) or f.startswith("G1_")) and f"CB.{f}" in self.plant.by_tag): raise ValueError(f"급전선 없음: {f}")      # 추가 자리 장비의 차단기(CB.DG2 …)도 받는다
         if q["action"] == "fault": self.simdrv.trip(f, int(q.get("code", 51))); return
         self.plant.set(f"CB.{f}", 1 if q.get("on", True) else 0)
         if f"FLT.{f}" in self.plant.by_tag: self.plant.set(f"FLT.{f}", 0)

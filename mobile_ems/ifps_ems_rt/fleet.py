@@ -28,6 +28,11 @@ def is_slot(name):
     return name not in KINDS and kind(name) is not None
 
 
+def g1_cb(n):
+    """복합전력 차량의 ESS 차단기 이름: 첫 차량(DG)은 G1, 추가 차량(DG2 …)은 G1_2 …"""
+    return "G1" if n == "DG" else "G1_" + n[2:]
+
+
 def expand(pts, devices):
     """대응표에 줄이 없는 추가 자리에 같은 종류 첫 장치의 줄을 본떠 넣는다. 종류 이름으로 시작하지 않는 점(공용 계측)은 본뜨지 않는다."""
     have = {p["device"] for p in pts}; out = list(pts)
@@ -84,6 +89,11 @@ class Fleet:
 
     def n(self, k):
         return len(self.live(k))
+
+    def _hybrid(self, n):
+        """복합전력 PCS 한 대의 ESS 쪽 값(그 차량의 ESS 그림에 쓴다): ess_kw · ess_soc · mode. 그런 신호가 없는 장치는 빈 값."""
+        r = self.raw.get(n, {})
+        return {k: r[f"{n}.{s}"] for k, s in (("ess_kw", "ess_kw"), ("ess_soc", "ess_soc"), ("mode", "pcs_mode")) if f"{n}.{s}" in r}
 
     def own_kw(self, n):
         """그 장치가 제 통신점으로 내주는 출력(인버터의 out_kw). 없으면 None."""
@@ -151,6 +161,6 @@ class Fleet:
         out = {}
         for k, names in self.slots.items():
             us = [{"id": n, "link": state.get(n), "seen": n in self.ever, "live": n in self.live_now[k], "on": bool(self.unit(n, "status", val) or 0) if n in self.live_now[k] else False,
-                   "manual": bool(dev[n].manual) if n in dev else False, "kw": self.unit_kw(n, val), "own": self.own_kw(n) is not None, "soc": self.unit(n, "soc", val)} for n in names]
+                   "manual": bool(dev[n].manual) if n in dev else False, "kw": self.unit_kw(n, val), "own": self.own_kw(n) is not None, "soc": self.unit(n, "soc", val), **self._hybrid(n)} for n in names]
             out[k] = {"n": len(self.live_now[k]), "seen": sum(1 for u in us if u["seen"]), "slots": len(names), "on": any(u["on"] for u in us), "units": [u for u in us if u["seen"]]}
         return out

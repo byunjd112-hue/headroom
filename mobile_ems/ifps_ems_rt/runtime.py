@@ -304,8 +304,8 @@ class Runtime:
     def _shed_want(self, t, soc):
         """자립 운전 중 부하 차단 필요 여부. 공급 능력 = 지금 붙어 있는 전원의 합."""
         g = lambda k, d=0.0: self.val.get(k, d); s = self.site
-        ess_ok = g("ESS.status", 1) > 0.5 and soc > s.soc_min + 0.02
-        avail = (s.ess_kw if ess_ok else 0.0) + self.g1_kw() * (g("CB.G1", 1) == 1) + s.dg_kw * (g("DG.status") > 0.5) + s.fc_kw * (g("FC.status") > 0.5) + max(0.0, g("PV.kw"))
+        ess_ok = self._fed("ESS", 1) and soc > s.soc_min + 0.02
+        avail = (s.ess_kw if ess_ok else 0.0) + self._g1_avail() + s.dg_kw * self._fed("DG") + s.fc_kw * self._fed("FC") + max(0.0, g("PV.kw"))
         avail += sum(self.gar.gdg_kw for n in self.gdgs if g(f"{n}.status") > 0.5 and g(f"CB.{n}", 1) == 1)
         target = max(0.0, self.auto_target_h - (t - self.t_posture) / 3600.0) if self.posture == "자립" else self.auto_target_h
         sh = self.shedder; h2, h3 = sh.held.get("L2", 0.0), sh.held.get("L3", 0.0); a = (s, self.posture, soc, avail)
@@ -433,6 +433,24 @@ class Runtime:
     def g1_n(self):
         """복합전력 차량의 대수 = 인식한 복합전력 PCS 의 수(한 PCS 가 발전기와 ESS 를 함께 맡는다 — 장치 이름 DG, DG2 …)."""
         return max(1, sum(1 for u in self.fleet.slots.get("DG", ()) if u in self.seen))
+
+    def cb_closed(self, name):
+        """차단기 name(CB.<name>)이 닫혔는가. 신호가 없으면 닫힌 것으로 본다(차단기 신호가 없는 구성은 예전처럼 운전 상태만 본다)."""
+        v = self.val.get(f"CB.{name}")
+        return v is None or int(round(v)) == 1
+
+    def _fed(self, k, dflt=0):
+        """그 종류에서 운전 중이고 제 차단기가 닫힌 장치가 있는가(장비 한 대마다 차단기 — 첫 장비는 CB.<종류>, 추가 장비는 CB.<장치>).
+        차단기가 열린 장치는 모선에 힘을 보태지 못하므로 공급 능력에서 뺀다. 인식한 장치가 없으면 종류 이름의 상태만 본다."""
+        us = [n for n in self.fleet.slots.get(k, ()) if n in self.seen]
+        if not us: return self.val.get(f"{k}.status", dflt) > 0.5
+        return any((self.fleet.unit(n, "status", self.val) or 0) > 0.5 and self.cb_closed(n) for n in us)
+
+    def _g1_avail(self):
+        """복합전력 ESS 의 계통 형성 용량: 차량마다 제 ESS 차단기(CB.G1 · CB.G1_2 …)가 닫힌 것만 센다."""
+        us = [n for n in self.fleet.slots.get("DG", ()) if n in self.seen]
+        if not us: return self.g1_kw() * self.cb_closed("G1")
+        return float(self.cfg.get("g1_kw", 100.0)) * sum(1 for n in us if self.cb_closed(fleet.g1_cb(n)))
 
     def g1_kw(self):
         return float(self.cfg.get("g1_kw", 100.0)) * self.g1_n()

@@ -3,6 +3,7 @@
 """
 import time
 from ifps_ems.config import SUP
+from .. import fleet
 from . import fuelwatch, autodev
 from .engdefs import FEEDERS, FEEDER_TXT, ANSI
 
@@ -55,6 +56,16 @@ class AlarmsMixin:
             A.set(f"man.{n}", d.manual, 4, n, f"{n} 현장 수동 모드 — EMS 지령 차단")
         A.set("auto.off", not self.auto, 4, "EMS", "자동 제어 해제 — 운용자 수동 지령 운전")
 
+    def _alarms_unit_cb(self, v):
+        """장비 한 대마다의 차단기 경보: 추가 자리 장비(CB.DG2 …)와 추가 복합전력 차량의 ESS(CB.G1_2 …) — 인식한 장치만(빈 자리의 신호로 경보를 내지 않는다)."""
+        A = self.alarms
+        for n in sorted(self.rt.seen):                                             # 추가 자리 장비의 차단기(CB.DG2 …)와 추가 복합전력 차량의 ESS 차단기(CB.G1_2 …) — 인식한 장치만
+            for f in ([n] if fleet.is_slot(n) else []) + ([fleet.g1_cb(n)] if fleet.is_slot(n) and fleet.kind(n) == "DG" else []):
+                c = v.get(f"CB.{f}")
+                if c is None: continue
+                code = int(round(v.get(f"FLT.{f}", 0)))
+                A.set(f"cb.trip.{f}", c > 1.5, 2, f"CB-{f}", f"CB-{f} 차단기 트립 — {ANSI.get(code, f'보호요소 {code}')}"); A.set(f"cb.open.{f}", c < 0.5, 4, f"CB-{f}", f"CB-{f} 차단기 개방")
+
     def _alarms_grid(self):
         """차단기·모선 경보(보호 IED 게이트웨이)."""
         v = self.rt.val; A = self.alarms
@@ -64,6 +75,7 @@ class AlarmsMixin:
             code = int(round(v.get(f"FLT.{f}", 0)))
             A.set(f"cb.trip.{f}", c > 1.5, 1 if f in ("L1", "DG", "ESS", "G1", "TIE") else 2, f"CB-{f}", f"CB-{f} {FEEDER_TXT[f]} 차단기 트립 — {ANSI.get(code, f'보호요소 {code}')}")
             A.set(f"cb.open.{f}", c < 0.5, 3 if f == "TIE" else 4, f"CB-{f}", f"CB-{f} {FEEDER_TXT[f]} 차단기 개방")
+        self._alarms_unit_cb(v)
         rt = self.rt; gc = v.get("CB.GRID")                                    # 주둔지: 수전 차단기·정전
         if gc is not None:
             code = int(round(v.get("FLT.GRID", 0))); grid = rt.mode == "grid"

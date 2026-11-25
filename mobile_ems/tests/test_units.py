@@ -232,6 +232,12 @@ class FleetLiveTest(unittest.TestCase):
         self.assertTrue(self._wait(lambda: rt.val.get("CB.ESS2") == 0 and abs(rt.fleet.unit("ESS2", "kw", rt.val)) < 0.05 and abs(rt.val["ESS.kw"] - rt.fleet.unit("ESS", "kw", rt.val)) < 0.5 and rt.val.get("CB.ESS") == 1))
         e.sim_action({"action": "fault", "target": "PV2", "code": 51}, "시험"); self.assertTrue(self._wait(lambda: rt.val.get("CB.PV2") == 2 and rt.val.get("FLT.PV2") == 51 and rt.val.get("CB.PV") == 1))
         self.assertRaises(ValueError, e.sim_action, {"action": "cb", "target": "ESS9", "on": False}, "시험")
+        self.assertTrue(rt._fed("ESS", 1)); e.sim_action({"action": "cb", "target": "ESS", "on": False}, "시험")                                          # EMS 판단: 차단기가 닫힌 ESS 가 하나라도 있어야 공급 능력에 넣는다
+        self.assertTrue(self._wait(lambda: rt.val.get("CB.ESS") == 0 and not rt._fed("ESS", 1))); e.sim_action({"action": "cb", "target": "ESS", "on": True}, "시험"); self.assertTrue(self._wait(lambda: rt._fed("ESS", 1)))
+        self.assertEqual(rt.val.get("CB.G1_2"), 1); self.assertEqual(rt._g1_avail(), 200.0); e.sim_action({"action": "cb", "target": "G1_2", "on": False}, "시험")       # 복합전력 차량마다 ESS 차단기: 2호 차량 것만 열면 한 대분만 남는다
+        self.assertTrue(self._wait(lambda: rt._g1_avail() == 100.0 and any(a["key"] == "cb.open.G1_2" and a["state"] == "ACT" for a in e.snapshot()["alarms"])))
+        e.sim_action({"action": "cb", "target": "G1_2", "on": True}, "시험"); self.assertTrue(self._wait(lambda: rt._g1_avail() == 200.0))
+        self.assertEqual({u["id"]: "ess_kw" in u for u in fl()["DG"]["units"]}, {"DG": True, "DG2": True})
         for n in ("ESS2", "PV2"): e.sim_action({"action": "cb", "target": n, "on": True}, "시험")
         self.assertTrue(self._wait(lambda: rt.val.get("CB.ESS2") == 1 and rt.val.get("CB.PV2") == 1 and abs(rt.fleet.unit("ESS", "kw", rt.val) - rt.fleet.unit("ESS2", "kw", rt.val)) < 0.5))
         with e.lock: rt.t_ctl = -1e9; e.sim_action({"action": "set", "tag": "ESS.soc", "value": 22.0, "hold": False}, "시험"); e.plant.set("ESS2.soc", 22.0)

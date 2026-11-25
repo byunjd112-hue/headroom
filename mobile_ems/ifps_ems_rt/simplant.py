@@ -91,9 +91,14 @@ class Plant:
 
     def _g(self, t): return self.get(t) if t in self.by_tag else 0.0
     def _cb(self, f): return (int(round(self.get(f"CB.{f}"))) == 1) if f"CB.{f}" in self.by_tag else True     # 차단기 투입(1)일 때만 모선과 연결
+    def _cbg(self, u):
+        """복합전력 차량 u 의 ESS 차단기(CB.G1 · CB.G1_2 …). 추가 차량의 신호가 없으면 CB.G1 을 같이 쓴다."""
+        t = fleet.g1_cb(u)
+        return self._cb(t) if f"CB.{t}" in self.by_tag else self._cb("G1")
+
     def _close_units(self, units):
         """추가 자리 장비의 차단기(CB.<장치>)도 처음에는 투입."""
-        self._put([(f"CB.{d}", 1) for d in units if fleet.is_slot(d)])
+        self._put([(f"CB.{d}", 1) for d in units if fleet.is_slot(d)] + [(f"CB.{fleet.g1_cb(d)}", 1) for d in units if fleet.kind(d) == "DG"])
 
     def _cbu(self, u):
         """그 장비 한 대의 차단기(CB.<장치>)가 대응표에 있으면 그 값, 없으면 종류의 차단기 — 첫 장비는 종류 이름의 차단기(CB.DG)가 제 차단기다."""
@@ -133,7 +138,7 @@ class Plant:
     def _hybrid_cover(self, short, dt):
         """자립 운전에서 이동형 ESS(②)가 맡지 못한 부족분을 'ESS 방전' 모드의 복합전력 ESS 가 방전해 메운다(대마다 100 kW 까지, 충전율 5% 위에서).
         이동형 ESS 가 있으면 그쪽이 먼저 부담하는 것으로 단순화했다(실제 분담은 두 PCS 의 수하 특성에 따른다 — 가정)."""
-        g = self._g; us = [u for u in self.us("DG") if f"{u}.pcs_mode" in self.by_tag and int(round(g(f"{u}.pcs_mode"))) == self.hy["ess"] and g(f"{u}.ess_soc") > 5.0 and self._cb("G1")]
+        g = self._g; us = [u for u in self.us("DG") if f"{u}.pcs_mode" in self.by_tag and int(round(g(f"{u}.pcs_mode"))) == self.hy["ess"] and g(f"{u}.ess_soc") > 5.0 and self._cbg(u)]
         for u in us:
             x = min(100.0, max(0.0, short) / len(us)); self._put(((f"{u}.ess_kw", x), (f"{u}.ess_soc", max(0.0, g(f"{u}.ess_soc") - x * dt / 3600.0 / 200.0 * 100.0))))
 
@@ -176,7 +181,7 @@ class Plant:
         g, cb = self._g, self._cb
         on = lambda k: any(g(f"{u}.status") > 0.5 for u in self.us(k))
         up = {u for n in ("DG", "FC", "ESS") for u in self.us(n) if self._cbu(u) and g(f"{u}.status") > 0.5} | {n for n in ("GDG", "GRID") if f"CB.{n}" in self.by_tag and int(round(self.get(f"CB.{n}"))) == 1}      # 운전 중인 장치 하나하나(호기마다 물린 모선이 다를 수 있다)
-        if cb("G1"): up.add("G1")
+        if any(self._cbg(u) for u in self.us("DG")) if self.us("DG") else cb("G1"): up.add("G1")      # 복합전력 ESS: 어느 차량이든 제 차단기가 닫혀 있으면 모선을 세운다
         a_live, b_live = busplan.live(self.bus, up, cb("TIE"))            # 모선 구성(어느 전원이 어느 모선에 물렸는지)대로
         self.set("BUS.a_v", 440.0 + (abs(math.sin(now)) * 1.5) if a_live else 0.0); self.set("BUS.b_v", 440.0 + abs(math.cos(now)) * 1.5 if b_live else 0.0)
         self.set("BUS.hz", 60.0 + math.sin(now / 7) * 0.03 if (a_live or b_live) else 0.0)
