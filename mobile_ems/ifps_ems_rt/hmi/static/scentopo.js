@@ -37,6 +37,10 @@ const ScTopo = (() => {
     for (const k of MULTI) { const f = LIVE && typeof KF === "function" ? KF(k) : null, b = NODES[k]; NAME0[k] = NAME0[k] || b.name; b.name = NAME0[k] + (f && f.units.length > 1 ? " 1" : "");
       (f && f.units.length > 1 ? f.units.slice(1) : []).forEach((u, n) => { const q = src.find(z => z.id === u.id);
         NODES[u.id] = {name: `${NAME0[k]} ${n + 2}`, kind: "src", bus: (q && q.bus) || HOME[k].bus, at: b.at.slice(), cb: b.cb, kw: u.id + ".kw", st: u.id + ".status", soc: b.soc ? u.id + ".soc" : undefined, c: b.c, photo: b.photo, icon: b.icon, unit: k}; out.push(u.id); }); }
+    const dg = LIVE && typeof KF === "function" ? KF("DG") : null, g = NODES.G1, many = !!(dg && dg.units.length > 1);      // 복합전력 ESS: 차량(디젤 PCS)마다 한 블록 — 차단기 CB.G1 · CB.G1_2 …, 모선도 차량마다
+    NAME0.G1 = NAME0.G1 || g.name; g.name = NAME0.G1 + (many ? " 1" : ""); g.kw = many ? "G1.kw" : undefined; g.st = many ? "G1.status" : undefined;
+    (many ? dg.units.slice(1) : []).forEach((u, n) => { const id = "G1_" + u.id.replace(/\D/g, ""), q = src.find(z => z.id === id);
+      NODES[id] = {name: `${NAME0.G1} ${n + 2}`, kind: "src", bus: (q && q.bus) || HOME.G1.bus, at: g.at.slice(), cb: id, kw: id + ".kw", st: id + ".status", c: g.c, photo: g.photo, unit: "G1"}; out.push(id); });
     return out;
   }
   function arrange() {
@@ -124,6 +128,8 @@ const ScTopo = (() => {
     const o = {};
     for (const k of MULTI) { const f = fleet && fleet[k]; if (!f || f.units.length < 2) continue;
       f.units.forEach(u => { o[u.id + ".kw"] = typeof unitKw === "function" ? unitKw(k, u) : u.kw; o[u.id + ".status"] = u.live === false ? 0 : u.on ? 1 : 0; if (u.soc != null) o[u.id + ".soc"] = u.soc; }); }
+    const dg = fleet && fleet.DG;                                    // 복합전력 ESS: 그 차량 PCS 의 ESS 쪽 전력
+    if (dg && dg.units.length > 1) dg.units.forEach((u, i) => { const id = i ? "G1_" + u.id.replace(/\D/g, "") : "G1"; o[id + ".kw"] = u.ess_kw == null ? null : u.ess_kw; o[id + ".status"] = u.live === false ? 0 : 1; });
     return o;
   }
   function html(ctx) {
