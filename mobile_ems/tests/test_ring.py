@@ -123,7 +123,8 @@ class RingWatchTest(unittest.TestCase):
         e = self.eng; w = e.ringw; self.assertTrue(self._wait(lambda: (e.snapshot()["ring"] or {}).get("ok")))
         used = lambda: {x["fsu"] for x in w.status().get("w", [])}
         full = lambda: all(len(i["ppdus"]) == i["need"] for i in e.snapshot()["loads"]["items"])
-        self.assertTrue(self._wait(lambda: used() and full() and all(f.get("kwh") for f in w.status()["fsu"] if f["id"] in used()), 15.0)); s = w.status(); self.assertEqual(s["meters_missing"], [])
+        fed = lambda: {x for q in w.status().get("w", []) for x in q["ppdus"]}                # 부하 앞에 붙은 배전체계
+        self.assertTrue(self._wait(lambda: used() and full() and all(f.get("kwh") for f in w.status()["fsu"] if f["id"] in used()) and all(p.get("kwh") for p in w.status()["ppdu"] if p["id"] in fed()), 25.0))   # 전력량계가 0.01 kWh 단위라, 작은 배전체계는 몇 초 지나야 값이 오른다; s = w.status(); self.assertEqual(s["meters_missing"], [])
         with e.lock: snap = e.snapshot()
         s = snap["ring"]; items = snap["loads"]["items"]; self.assertEqual({i["id"]: (i["fsu"], i["ppdus"]) for i in items}, {"c2": ("FSU2", ["PPDU1", "PPDU2", "PPDU3", "PPDU4"]), "med": ("FSU4", ["PPDU5"]), "brk": ("FSU4", ["PPDU6", "PPDU7"]), "ammo": ("FSU6", ["PPDU8"])})      # 30 kW 1등급: 정격으로는 2대, N+1 로 3대, 우회 결선 한 줄(16 A · 약 9.5 kW)에 맞추면 4대. 막사는 동마다 1대
         self.assertEqual([p["name"] for p in s["ppdu"]][:3], ["지휘통제(C2) 배전 1", "지휘통제(C2) 배전 2", "지휘통제(C2) 배전 3"]); self.assertFalse(any(p["over"] for p in s["ppdu"])); self.assertFalse(any(f["over"] for f in s["fsu"]))
