@@ -155,8 +155,7 @@ class Plant:
     def _tick_bus(self, now):
         g, cb = self._g, self._cb
         on = lambda k: any(g(f"{u}.status") > 0.5 for u in self.us(k))
-        up = {n for n in ("DG", "FC") if cb(n) and on(n)} | {n for n in ("GDG", "GRID") if f"CB.{n}" in self.by_tag and int(round(self.get(f"CB.{n}"))) == 1}
-        if cb("ESS") and on("ESS"): up.add("ESS")
+        up = {u for n in ("DG", "FC", "ESS") if cb(n) for u in self.us(n) if g(f"{u}.status") > 0.5} | {n for n in ("GDG", "GRID") if f"CB.{n}" in self.by_tag and int(round(self.get(f"CB.{n}"))) == 1}      # 운전 중인 장치 하나하나(호기마다 물린 모선이 다를 수 있다)
         if cb("G1"): up.add("G1")
         a_live, b_live = busplan.live(self.bus, up, cb("TIE"))            # 모선 구성(어느 전원이 어느 모선에 물렸는지)대로
         self.set("BUS.a_v", 440.0 + (abs(math.sin(now)) * 1.5) if a_live else 0.0); self.set("BUS.b_v", 440.0 + abs(math.cos(now)) * 1.5 if b_live else 0.0)

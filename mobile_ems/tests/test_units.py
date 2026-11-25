@@ -61,6 +61,10 @@ class FleetUnitTest(unittest.TestCase):
         b = dict(d, DG="B"); i1 = bp.check(b, P, R); self.assertEqual(i1[0]["level"], "bad"); self.assertIn("정전", i1[0]["text"])                  # 모선 A 에 1등급 부하와 연료전지 · 태양광뿐: 정전 위험
         c = dict(d, ESS="A", G1="A", DG="A", FC="A"); t = " ".join(i["text"] for i in bp.check(c, P, R)); self.assertIn("전원이 모두 모선 A", t); self.assertIn("모선 B 에 늘 전압을 세우는 전원", t)
         self.assertEqual(bp.check(c, P, R)[0]["fix"], {"G1": "B"}); one = P - {"G1", "DG"}; self.assertIsNone(bp.check(dict(d, ESS="B"), one, R)[0]["fix"])  # 계통 형성 전원이 하나뿐이면 옮길 수 없다
+        U = {"ESS": ["ESS", "ESS2"]}; two = dict(a0, G1="B")                                       # 추가 장비(2호기)는 호기마다 모선을 따로 정할 수 있다: 이동형 ESS 2대가 모선 B, 복합전력 ESS 도 B → 모선 A 가 약하다
+        self.assertEqual(bp.bus_of(two, "ESS2"), "B"); i2 = bp.check(two, P, R, U); self.assertEqual(i2[0]["fix"], {"G1": "A"}); self.assertEqual(bp.check(dict(two, ESS2="A"), P, R, U), [])      # 2호기만 모선 A 로 옮겨도 풀린다
+        self.assertEqual(bp.auto(dict(a0, G1="B", ESS="B"), P - {"G1"}, R, U)[1], ["이동형 ESS 2호기 → 모선 A"]); self.assertEqual(bp.settings({"ESS2": "A", "ESS9x": "A", "L9": "B"}).get("ESS2"), "A"); self.assertNotIn("ESS9x", bp.settings({"ESS9x": "A"}))
+        self.assertEqual(bp.live(dict(a0, G1="B", ESS2="A"), {"ESS2"}, False), (True, False)); self.assertEqual(bp.unit_name("ESS2"), "이동형 ESS 2호기")
         over = bp.check(dict(a, L2="A", L3="A"), P, dict(R, L2=900)); self.assertTrue(any("부하 정격" in i["text"] for i in over))
         self.assertEqual(bp.live(d, {"ESS"}, True), (True, True)); self.assertEqual(bp.live(d, {"ESS"}, False), (False, True)); self.assertEqual(bp.live(a, {"G1", "ESS"}, False), (True, True)); self.assertEqual(bp.live(d, set(), True), (False, False))
 
@@ -149,6 +153,10 @@ class FleetLiveTest(unittest.TestCase):
         for want in (2, 3):
             r = unitctl.change(e, "PV", 1, "시험"); self.assertTrue(r["ok"]); self.assertEqual(r["unit"], f"PV{want}")
             self.assertTrue(self._wait(lambda: pv()["n"] == want and len(pv()["units"]) == want), f"PV {want}대 인식")
+        b = e.busw.view(); self.assertEqual([u["id"] for u in b["units"]], ["PV2", "PV3"]); self.assertTrue(all(u["bus"] == b["assign"]["PV"] and not u["own"] for u in b["units"]))      # 추가 장비는 처음에 1호기의 모선을 따른다
+        with e.lock: r = e.busw.change({"op": "set", "node": "PV3", "bus": "B"}, "시험")
+        self.assertTrue(r["ok"], r); u3 = next(u for u in r["bus"]["units"] if u["id"] == "PV3"); self.assertEqual((u3["bus"], u3["own"], e.plant.bus["PV3"]), ("B", True, "B"))                 # 호기마다 따로 고른다 → 가상 장치의 모선 계산에도 간다
+        with e.lock: self.assertFalse(e.busw.change({"op": "set", "node": "PV9", "bus": "B"}, "시험")["ok"]); self.assertTrue(e.busw.change({"op": "follow", "node": "PV3"}, "시험")["ok"]); self.assertNotIn("PV3", e.busw.assign)
         r = unitctl.change(e, "PV", -1, "시험"); self.assertEqual((r["ok"], r["unit"]), (True, "PV3"))
         self.assertTrue(self._wait(lambda: [u["id"] for u in pv()["units"]] == ["PV", "PV2"] and "PV3" not in e.rt.seen), "뺀 장치는 목록에서 사라진다")
         self.assertFalse([k for k in act() if k in ("link.PV3", "absent.PV3")], {"link": {n: (e.rt.lm.state.get(n), e.rt.links[n].err) for n in ("PV", "PV2", "PV3", "DG")}, "scan": (round(e.rt.max_scan_s, 2), e.rt.n_over, e.rt.n_scan), "events": [x["text"][:40] for x in e.rt.events[-14:]]})      # 일부러 뺀 장치는 두절 경보가 아니다(다른 장치의 경보는 여기서 보지 않는다 — 시험 장비가 느리면 흔들린다)

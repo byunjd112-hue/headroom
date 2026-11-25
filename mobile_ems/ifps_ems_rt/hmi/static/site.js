@@ -268,7 +268,7 @@ function siteUpdate(s, force) {
     const kf = KF(LAY_FLEET[it.kind]), u = kf && kf.units.length > 1 && kf.units.find(q => q.id === it.unit);
     const ld = it.load && LD.s().items.find(q => q.id === it.load);
     if (ld && !it.spare && /kW$/.test(x.v) && x.v !== "0 kW") x = Object.assign({}, x, { v: `${F.kw(ld.est_kw)} kW`, t: `${x.t} · ${ld.grade}등급${ld.fsu ? " · " + ld.fsu_name : ""}` });      // 그 부하의 추정 전력(부하 관리 화면과 같은 값) · 등급 · 물린 배전체계
-    const bn = !it.spare && !ld && { DG: ["DG", "G1"], ESS: ["ESS"], PV: ["PV"], FC: ["FC"] }[it.kind], bs = bn && BusPlan.s() && [...new Set(bn.map(q => BusPlan.of(q, "")))].filter(Boolean).join("·");
+    const bn = !it.spare && !ld && { DG: ["DG", "G1"], ESS: ["ESS"], PV: ["PV"], FC: ["FC"] }[it.kind], bs = bn && BusPlan.s() && [...new Set(bn.flatMap(q => BusPlan.all(q).split("·")))].filter(Boolean).sort().join("·");
     if (bs && x.t && !/모선/.test(x.t)) x = Object.assign({}, x, { t: `${x.t} · 모선 ${bs}` });      // 그 전원이 물린 모선(모선 구성)
     if (it.spare) x = { st: "idle", v: "—", t: LOAD_SPR.includes(it.kind) ? "부하 없음(예비 자리)" : "장치 없음(예비 자리)" };      // 부하 목록에 없는 그림: 급전선이 살아 있어도 '급전 중'이라고 쓰지 않는다
     if (u) x = { st: !u.live ? "bad" : u.on || it.kind === "ESS" || it.kind === "PV" ? "ok" : "idle", v: `${u.id}${u.kw == null ? "" : " · " + F.kw(u.kw) + " kW"}${it.kind === "ESS" && u.soc != null ? " · " + F.n(u.soc, 0) + "%" : ""}`, t: !u.live ? "통신 두절" : it.kind === "ESS" || it.kind === "PV" ? "연결" : u.on ? "운전" : "정지" };

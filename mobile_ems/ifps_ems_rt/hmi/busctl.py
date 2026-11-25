@@ -38,17 +38,30 @@ class BusBook:
         if ld is not None: r.update({f: sum(i["kw"] * i["n"] for i in ld.items if i["grade"] == g) for g, f in ((1, "L1"), (2, "L2"), (3, "L3"))})
         return r
 
+    def units(self):
+        """여러 대인 종류의 장치 이름들: {종류: [ESS, ESS2 …]} — 인식한(가져온) 장치만. 호기마다 모선을 따로 정할 수 있다."""
+        fl = self.eng.rt.fleet; out = {}
+        for k in ("PV", "DG", "FC", "ESS"):
+            us = [n for n in fl.slots.get(k, []) if n in fl.live_now.get(k, [])]
+            if len(us) > 1: out[k] = us
+        return out
+
     def view(self):
-        p = self.present(); return {"assign": dict(self.assign), "issues": busplan.check(self.assign, p, self.rated()), "present": sorted(p), "names": busplan.NAME, "default": busplan.DEFAULT, "by": self.by, "t": self.t}
+        p = self.present(); us = self.units(); extra = [{"id": u, "kind": k, "name": busplan.unit_name(u), "bus": busplan.bus_of(self.assign, u), "own": u in self.assign} for k, v in us.items() for u in v[1:]]
+        return {"assign": dict(self.assign), "issues": busplan.check(self.assign, p, self.rated(), us), "present": sorted(p), "names": busplan.NAME, "default": busplan.DEFAULT, "units": extra, "by": self.by, "t": self.t}
 
     def change(self, b, who):
         """op: set(node, bus) · auto(고칠 수 있는 약점을 고친다) · reset(기본 구성). 반환: {ok, msg, bus}"""
         op = b.get("op"); a = dict(self.assign)
         if op == "set":
-            if b.get("node") not in busplan.NODES or b.get("bus") not in ("A", "B"): return {"ok": False, "why": "이름 또는 모선 오류"}
-            a[b["node"]] = b["bus"]; msg = f"모선 구성: {busplan.NAME[b['node']]} → 모선 {b['bus']}"
+            n = b.get("node"); known = n in busplan.NODES or (isinstance(n, str) and busplan.UNIT.match(n) and n in self.eng.rt.fleet.slots.get(busplan.kind_of(n), []))
+            if not known or b.get("bus") not in ("A", "B"): return {"ok": False, "why": "이름 또는 모선 오류"}
+            a[n] = b["bus"]; msg = f"모선 구성: {busplan.unit_name(n)} → 모선 {b['bus']}"
+        elif op == "follow":                                              # 추가 장비를 다시 종류의 모선을 따르게
+            if b.get("node") not in a or b.get("node") in busplan.NODES: return {"ok": False, "why": "따로 정한 값이 없습니다"}
+            del a[b["node"]]; msg = f"모선 구성: {busplan.unit_name(b['node'])} → 종류의 모선을 따름"
         elif op == "auto":
-            a, done = busplan.auto(a, self.present(), self.rated())
+            a, done = busplan.auto(a, self.present(), self.rated(), self.units())
             if not done: return {"ok": False, "why": "자동으로 고칠 것이 없습니다"}
             msg = "모선 구성 자동 보완: " + ", ".join(done)
         elif op == "reset": a = dict(busplan.DEFAULT); msg = "모선 구성을 기본으로 되돌림"

@@ -137,7 +137,7 @@ const P_SLD = {
   },
   update(s) {
     if (typeof L !== "undefined" && !L.items && !L.loading) layoutLoad();                                // 개요 배치(좌우 순서)를 아직 읽지 않았으면 읽는다
-    const sig = sldArrange(), bn = BusPlan.banner(), bx = $("#sldBus"); if (bx && bx.dataset.h !== bn) { bx.dataset.h = bn; bx.innerHTML = bn; }
+    const sig = sldArrange(), bn = BusPlan.banner() + BusPlan.split(), bx = $("#sldBus"); if (bx && bx.dataset.h !== bn) { bx.dataset.h = bn; bx.innerHTML = bn; }
     if (!!s.ring !== this.ring || sig !== this.sig) { this.ring = !!s.ring; this.sig = sig; $(".sldbox").innerHTML = sldSvg(); }       // 환망이 생기거나 없어지면, 모선 구성 · 개요의 순서가 바뀌면 그림 틀을 다시 짠다
     sldUpdate(s);
     const k = s.kpi, gw = s.devices.MTR && s.devices.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? -1) : -1;
