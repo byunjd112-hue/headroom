@@ -93,7 +93,7 @@ class WeatherLiveTest(unittest.TestCase):
     def test_manual_input_changes_forecast_and_network_fetch(self):
         e = self.eng; w = e.wxw; f = self._fc(lambda f: f["weather"].get("on")); self.assertEqual((f["weather"]["cover"], f["weather"]["w"]), (0, 0.3)); self.assertEqual(f["weather"]["kwh"]["ai"], f["weather"]["kwh"]["final"])   # 기록이 없으면 AI 그대로
         self.assertRaises(ValueError, w.manual, {"hours": 6}, "시험"); self.assertTrue(w.manual({"sky": "흐림", "hours": 24, "note": "비 올 듯"}, "김상사")["ok"])
-        f2 = self._fc(lambda f: f["weather"].get("cover", 0) >= 90); k = f2["weather"]["kwh"]; self.assertTrue(k["wx"] < k["final"] < k["ai"] or k["ai"] == k["wx"] == 0, k)            # 흐림 → 날씨 기반이 낮고 반영값은 그 사이
+        f2 = self._fc(lambda f: f["weather"].get("cover", 0) >= 90); k = f2["weather"]["kwh"]; self.assertTrue(min(k["wx"], k["ai"]) < k["final"] < max(k["wx"], k["ai"]) or k["ai"] == k["wx"] == 0, k)            # 반영값은 날씨 기반과 AI 예측 사이(보통은 흐림 → 날씨 기반이 낮다. 그날의 AI 예측이 이미 더 낮으면 날씨 기반이 높을 수도 있다 — 날짜에 따라 달라지던 판정을 고침)
         self.assertEqual(len(f2["pv"]), 96); self.assertTrue(all(lo <= p + 1e-6 for lo, p in zip(f2["pv_lo"], f2["pv"])))
         v = w.view(); self.assertEqual((v["rows"][0]["src"], v["rows"][0]["who"], v["rows"][0]["use"], v["rows"][0]["cloud"]), ("수기", "김상사", True, 9.0)); self.assertEqual(v["sky"], list(wx.PHONE))
         self.assertTrue(w.manual({"sky": "비", "pop": 80, "temp": 9, "day": 1}, "김상사")["ok"]); r = [x for x in w.view()["rows"] if x["pop"] == 80.0][0]                       # 내일 하루치(날씨 앱의 일별 예보)
