@@ -106,9 +106,19 @@ def spots(items, order, unit=20.0, outs=None, spare=False):
     return out
 
 
-def attach(items, ppdus, fsus=(), unit=20.0, cap=None, outs=None, spare=False):
+def alt_fsu(f, order, open_i):
+    """우회 결선을 받을 구간분전함: 상시 개방점 건너편(반대쪽 급전)에서 가장 가까운 것 — 환망의 한 구간이 끊기거나 제 구간분전함이 고장 나도 그쪽은 살아 있다.
+    order: 환망 순서의 구간분전함 이름, open_i: 상시 개방점인 구간 번호(구간 i 는 i번째와 i+1번째 구간분전함 사이). 건너편이 비어 있으면 바로 옆 구간분전함."""
+    if f not in order or len(order) < 2: return ""
+    k = order.index(f); n = len(order)
+    if open_i is not None and 0 < open_i < n: return order[open_i] if k < open_i else order[open_i - 1]
+    return order[k + 1] if k + 1 < n else order[k - 1]
+
+
+def attach(items, ppdus, fsus=(), unit=20.0, cap=None, outs=None, spare=False, alt=None):
     """부하마다의 공급 경로를 정한다: 구간분전함(FSU)의 출력 회로 → 배전체계(PPDU, 부하 바로 앞 · 정격이 모자라면 여러 대를 병렬로) → 부하.
     ppdus: 지금 있는 배전체계 [{id, name, at}], fsus: 지금 있는 구간분전함 [{id, name}] (환망 순서), unit: 배전체계 한 대의 정격(kW), cap: 구간분전함의 용량(kW), outs: 구간분전함의 출력 회로 수.
+    alt: 구간분전함 이름 → 우회 결선을 받을 구간분전함(함수, 없으면 우회 결선 없음) — 1등급 부하에만 둔다.
     그 구간분전함에 물린 배전체계를 부하 순서대로 필요한 대수(need)만큼 나눠 준다 — 모자라면 있는 만큼만(ppdus 가 need 보다 짧다), 하나도 없으면 구간분전함 직결.
     반환: {부하 id: {"fsu", "fsu_name", "ppdus", "need", "ppdu", "ppdu_name", "auto", "over", "out_over"}} — over: 그 구간분전함의 정격 합이 cap 을 넘음, out_over: 필요한 배전체계가 출력 회로 수를 넘음. 환망이 없으면 빈 값."""
     out = {}; fn = {f["id"]: f["name"] for f in fsus}; order = [f["id"] for f in fsus]; pool = {}; kw = {}; cnt = {}; pn = {p["id"]: p["name"] for p in ppdus}; sp = spots(items, order, unit, outs, spare)
@@ -116,6 +126,7 @@ def attach(items, ppdus, fsus=(), unit=20.0, cap=None, outs=None, spare=False):
     for it in items:
         f, auto = sp[it["id"]]; nd = need(it, unit, spare); take = pool.get(f, [])[:nd]; pool[f] = pool.get(f, [])[nd:]; kw[f] = kw.get(f, 0.0) + it["kw"] * it["n"]; cnt[f] = cnt.get(f, 0) + nd
         out[it["id"]] = {"fsu": f, "fsu_name": fn.get(f, f), "ppdus": take, "need": nd, "base": need(it, unit), "ppdu": take[0] if take else "", "ppdu_name": pn.get(take[0], "") if take else "", "auto": auto}
+        a = alt(f) if alt and it["grade"] == 1 and it["n"] > 0 else ""; out[it["id"]].update(alt=a, alt_name=fn.get(a, a))
     for v in out.values():
         v["over"] = bool(cap is not None and v["fsu"] and kw.get(v["fsu"], 0.0) > cap + 1e-9); v["out_over"] = bool(outs is not None and v["fsu"] and cnt.get(v["fsu"], 0) > outs)
     return out
@@ -133,7 +144,7 @@ def plan(items, fsus, unit=20.0, outs=None, spare=False):
 def weights(items, at, stage):
     """분기별 몫: 부하마다 (물린 구간분전함 · 앞에 붙은 배전체계들 · 등급 · 그 급전선 전력에서 차지하는 비율). 가상 장치의 분기 전력계와 전력계 대조 · 중요 부하 표시가 쓴다."""
     fr = share(items, {f: 1.0 for f in FEEDER.values()}, stage)
-    return [{"id": it["id"], "name": it["name"], "fsu": at[it["id"]]["fsu"], "ppdus": at[it["id"]]["ppdus"], "grade": it["grade"], "frac": fr[it["id"]] or 0.0} for it in items if it["n"] > 0 and at.get(it["id"], {}).get("fsu")]
+    return [{"id": it["id"], "name": it["name"], "fsu": at[it["id"]]["fsu"], "ppdus": at[it["id"]]["ppdus"], "alt": at[it["id"]].get("alt", ""), "grade": it["grade"], "frac": fr[it["id"]] or 0.0} for it in items if it["n"] > 0 and at.get(it["id"], {}).get("fsu")]
 
 
 def share(items, feeder_kw, stage):

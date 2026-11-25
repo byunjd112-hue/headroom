@@ -162,6 +162,11 @@ class RingWatchTest(unittest.TestCase):
         w.sim({"action": "ppdu", "id": "PPDU1", "what": "mccb", "value": 2})                                                                 # 1등급 부하 앞의 배전체계 한 대가 트립해도 남은 두 대가 떠안는다(N+1) — 과부하 없이
         self.assertTrue(self._wait(lambda: pp("PPDU1")["kw"] == 0 and pp("PPDU2")["kw"] > 10 and not pp("PPDU2")["over"] and abs(pp("PPDU2")["kw"] + pp("PPDU3")["kw"] - e.rt.val["LOAD.p1_kw"]) < 2.0, 10.0))
         n1 = w.status()["n1"]; self.assertTrue(n1["ok"]); self.assertEqual({x["level"] for x in n1["items"]} - {"info", "warn"}, set()); w.sim({"action": "ppdu", "id": "PPDU1", "what": "mccb", "value": 1})
+        it = next(i for i in e.snapshot()["loads"]["items"] if i["id"] == "c2"); self.assertEqual((it["fsu"], it["alt"]), ("FSU2", "FSU5"))        # 우회 결선: 상시 개방점 건너편(반대쪽 급전)에서 받는다 — 평소 열림
+        self.assertFalse(any(p["bypass"] for p in w.status()["ppdu"])); w.sim({"action": "break", "section": 1}); w.sim({"action": "break", "section": 2}); ok = []; t0 = time.monotonic()      # 구간분전함 2 를 양쪽에서 끊어 고립시킨다(구간분전함 자체 고장과 같은 상황)
+        while time.monotonic() - t0 < 7.0: ok.append(all(pp(x)["live"] for x in ("PPDU1", "PPDU2", "PPDU3"))); time.sleep(0.1)
+        self.assertTrue(all(ok), "구간분전함이 고립된 동안 1등급 부하가 끊겼다"); s = w.status(); self.assertEqual(s["isolated"], ["FSU2"]); self.assertTrue(all(pp(x)["bypass"] and pp(x)["kw"] > 5 for x in ("PPDU1", "PPDU2", "PPDU3")))
+        self.assertTrue(any(x["area"] == "우회 결선" and x["level"] == "info" for x in s["n1"]["items"])); w.sim({"action": "restore"}); self.assertTrue(self._wait(lambda: w.status()["ok"] and not any(p["bypass"] for p in w.status()["ppdu"]), 12.0))   # 돌아오면 우회 결선을 다시 연다
         with e.lock:                                                                                                                         # 환망 전체 부하가 간선 정격(630 A)을 넘으면 경보
             w.last = copy.deepcopy(w.status()); [f.update(kw=80.0) for f in w.last["fsu"]]; tot = sum(f["kw"] for f in w.last["fsu"])
             e.alarms.set("ring.over.total", tot > ring.FSU_KW, 2, "환망", "시험"); self.assertGreater(tot, ring.FSU_KW); self.assertEqual((ring.FSU_A, ring.FSU_OUT, ring.FSU_KVA), (630.0, 4, 415))

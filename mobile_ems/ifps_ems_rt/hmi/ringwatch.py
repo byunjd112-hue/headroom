@@ -56,7 +56,8 @@ class RingWatch:
         if w:
             f1 = {x["fsu"] for x in w if x["grade"] == 1}
             for p in st["ppdu"]:
-                x = next((x for x in w if p["id"] in x["ppdus"]), None); p["vital"] = bool(x and x["grade"] == 1); p["serves"] = x["id"] if x else ""
+                x = next((x for x in w if p["id"] in x["ppdus"]), None); p["vital"] = bool(x and x["grade"] == 1); p["serves"] = x["id"] if x else ""; p["alt"] = x.get("alt", "") if x else ""
+                p["bypass"] = bool(p["alt"] and p["live"] and p.get("at_live") is False)      # 제 구간분전함은 죽었는데 살아 있다 = 우회 결선으로 받는 중
                 if x and ring.PLAIN.match(p["name"]): p["name"] = x["name"] + " 배전" + (f" {x['ppdus'].index(p['id']) + 1}" if len(x["ppdus"]) > 1 else "")      # 부하 바로 앞에 붙은 배전체계는 그 부하의 이름으로 부른다
             for f in st["fsu"]: f["vital"] = f["id"] in f1
         return st

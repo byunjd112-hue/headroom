@@ -33,10 +33,21 @@ def _paths(on, sp):
         elif i["grade"] != 1 and have < base + 1: lone += 1
         if i.get("out_over"): out.append(_item("공급 경로", "warn", f"{nm}: 물린 구간분전함의 출력 회로({sp['fsu_out']}개)보다 배전체계가 많다.", "일부를 다른 구간분전함으로 옮긴다"))
     if lone: out.append(_item("공급 경로", "info", f"2 · 3등급 부하 {lone}건은 배전체계 한 대가 고장 나면 그 부하만 정전된다(예비 배전체계로 바꿔 복구).", ""))
-    if any(i["grade"] == 1 for i in on):
-        if not sp["sts"]: out.append(_item("공급 경로", "warn", "1등급 부하에 STS 절체가 없는 것으로 설정되어 있다 — 환망 구간이 끊기면 절체가 끝날 때까지 1등급도 끊긴다.", "1등급 부하의 배전체계에 반대쪽 급전을 받는 STS 를 둔다"))
-        f1 = sorted({i["fsu_name"] for i in on if i["grade"] == 1})
-        out.append(_item("공급 경로", "info", f"1등급 부하가 물린 구간분전함({', '.join(f1)}) 자체가 고장 나면 환망으로는 메우지 못한다 — 그 부하의 둘째 입력을 이웃 구간분전함에서 받아야 끊기지 않는다(결선 확인).", ""))
+    return out + _bypass([i for i in on if i["grade"] == 1], sp)
+
+
+def _bypass(g1, sp):
+    """1등급 부하의 우회 결선(둘째 입력 — 반대쪽 급전의 구간분전함에서, 평소 열림 · 우회 때만 닫힘): 있는가, 용량이 되는가, 끊김 없이 넘어가는가."""
+    out = []
+    if not g1: return out
+    for i in g1:
+        if not i.get("alt") or i["alt"] == i["fsu"]:
+            out.append(_item("우회 결선", "warn", f"{i['name']}(1등급): 우회 결선이 없다 — 물린 {i['fsu_name']} 자체가 고장 나거나 환망 구간이 끊긴 동안 이 부하가 끊긴다.", "배전체계의 둘째 입력을 반대쪽 급전의 구간분전함에 잇는다([정격 · 가정값]의 우회 결선)")); continue
+        each = i["rated"] / max(1, len(i["ppdus"]))
+        if i["ppdus"] and each > sp["bypass_kw"] + 1e-9: out.append(_item("우회 결선", "warn", f"{i['name']}(1등급): 배전체계 한 대가 맡는 몫 {each:.1f} kW 가 우회 결선 한 줄의 용량 {sp['bypass_kw']:g} kW 보다 크다 — 우회 중에 과부하가 된다.", "배전체계를 한 대 더 놓아 몫을 줄이거나 우회 결선을 굵게 한다"))
+    ok = [i for i in g1 if i.get("alt") and i["alt"] != i["fsu"]]
+    if ok and not sp["sts"]: out.append(_item("우회 결선", "warn", "우회 결선을 STS 없이 넘기는 것으로 설정되어 있다 — 우회가 닫힐 때까지(5초 이내) 1등급 부하가 끊긴다.", "1등급 부하의 배전체계에 STS(10 ms)를 둔다"))
+    if ok: out.append(_item("우회 결선", "info", "1등급 부하 " + ", ".join(f"{i['name']}({i['fsu_name']} → 우회 {i['alt_name']})" for i in ok) + " — 물린 구간분전함이 고장 나거나 환망 구간이 끊겨도 우회 결선으로 받는다. 우회 결선은 평소 열어 두고 우회 때만 닫는다(순환 전류 방지).", ""))
     return out
 
 

@@ -34,14 +34,17 @@ SPEC = {"fsu_a": (FSU_A, 50.0, 2000.0, "문서", "구간분전함 · 환망 간�
         "ppdu_kw": (RATED_KW, 5.0, 100.0, "문서", "배전체계 한 대의 정격(kW)"), "pf": (FSU_PF, 0.7, 1.0, "가정", "전류 정격을 kW 로 견줄 때의 역률"),
         "ppdu_use": (1.0, 0.5, 1.0, "가정", "배전체계를 여러 대 나란히 쓸 때 한 대에 싣는 몫(1 = 정격까지, 0.8 = 정격의 80%까지 — 전류 분담이 고르지 않을 것에 대비한 여유)"),
         "n1": (1, 0, 1, "설계", "1등급 부하 앞에 배전체계를 한 대 더 둔다(N+1: 한 대가 고장 나도 남은 것으로 정격을 감당. 1 = 둔다)"),
-        "sts": (1, 0, 1, "가정", "1등급 부하의 배전체계가 반대쪽 급전을 STS 로 바로 넘겨받는가(1 = 받는다, 0 = 다른 부하처럼 절체를 기다린다)")}
+        "bypass": (1, 0, 1, "설계", "1등급 부하의 배전체계에 우회 결선(둘째 입력 — 반대쪽 급전의 구간분전함에서, 평소 열림 · 우회 때만 닫힘)을 둔다(1 = 둔다)"),
+        "bypass_kw": (10.5, 1.0, 100.0, "문서", "우회 결선 한 줄의 용량(kW) — PPDU-20 의 환상 연결 회로 CH-2(3상 16 A)"),
+        "sts": (1, 0, 1, "가정", "우회 결선을 STS(10 ms)로 넘기는가(1 = 끊김 없이 넘긴다, 0 = 5초 이내 우회 — 그동안 끊긴다)")}
+BYPASS_S = 5.0                   # STS 가 없을 때 우회 결선이 닫히기까지(PPDU-20 자료의 '5초 이내 우회')
 
 
 def spec(r):
     """환망의 정격 · 가정값(설정의 spec 으로 덮어쓴 것)과 거기서 나온 값: fsu_kva · fsu_kw(환망 간선의 한계), ppdu_ok(배전체계 한 대에 싣는 한계 kW)."""
     o = (r or {}).get("spec") if isinstance((r or {}).get("spec"), dict) else {}
     s = {k: (o[k] if _int_in(o.get(k), v[1], v[2]) else v[0]) for k, v in SPEC.items()}
-    s["fsu_out"] = int(s["fsu_out"]); s["sts"] = int(s["sts"]); s["n1"] = int(s["n1"]); s["fsu_kva"] = round(3 ** 0.5 * s["fsu_v"] * s["fsu_a"] / 1000.0); s["fsu_kw"] = round(s["fsu_kva"] * s["pf"]); s["ppdu_ok"] = round(s["ppdu_kw"] * s["ppdu_use"], 2)
+    s["fsu_out"] = int(s["fsu_out"]); s["sts"] = int(s["sts"]); s["n1"] = int(s["n1"]); s["bypass"] = int(s["bypass"]); s["fsu_kva"] = round(3 ** 0.5 * s["fsu_v"] * s["fsu_a"] / 1000.0); s["fsu_kw"] = round(s["fsu_kva"] * s["pf"]); s["ppdu_ok"] = round(s["ppdu_kw"] * s["ppdu_use"], 2)
     return s
 LOAD_REF = 60.0                  # 가상 장치: 등급별 부하가 이 값(kW)일 때 회로가 정격의 90% 를 쓴다고 본다
 GND_LIMIT = 100.0                # 접지저항이 이 값(Ω)을 넘으면 주회로 투입 금지(인터록 IL-1)
@@ -260,8 +263,8 @@ def _vital(s, f):
 def _fsu_alarms(s, f):
     """구간분전함 한 대의 경보."""
     out = []
-    vital = _vital(s, f); sts = f["live"] is False and any(p["vital"] and p["live"] for p in s["ppdu"] if p["at"] == f["id"])      # 1등급 부하의 배전체계가 STS 절체로 살아 있는가
-    out.append((f"ring.dead.{f['id']}", f["live"] is False, 1 if vital else 2, f["id"], f"{f['name']}({f['id']}) 무전압 — 이 마디의 부하 정전" + (" [중요 부하]" if vital else "") + (" — 1등급 부하는 STS 절체로 공급 중" if sts else "")))
+    vital = _vital(s, f); sts = f["live"] is False and any(p["vital"] and p["live"] for p in s["ppdu"] if p["at"] == f["id"])      # 1등급 부하의 배전체계가 우회 결선으로 살아 있는가
+    out.append((f"ring.dead.{f['id']}", f["live"] is False, 1 if vital else 2, f["id"], f"{f['name']}({f['id']}) 무전압 — 이 마디의 부하 정전" + (" [중요 부하]" if vital else "") + (" — 1등급 부하는 우회 결선으로 공급 중" if sts else "")))
     out.append((f"ring.comm.{f['id']}", f.get("comm") is False, 2, f["id"], f"{f['name']}({f['id']}) 통신 고립 — 양쪽 구간이 모두 끊겨 환형 통신으로도 닿지 않음(값은 마지막 값). 끊긴 구간 가운데 하나를 먼저 복구"))
     out.append((f"ring.id.{f['id']}", f["id_ok"] is False and f["id_read"] not in (None, 0), 3, f["id"], _id_text(f)))
     out.append((f"ring.over.{f['id']}", bool(f.get("over")), 2, f["id"], f"{f['name']}({f['id']}) 과부하 {f.get('kw') or 0:.1f} kW — 정격 {spec(s.get('eff'))['fsu_a']:.0f} A(약 {spec(s.get('eff'))['fsu_kw']:.0f} kW) 초과. 부하 일부를 다른 구간분전함으로 옮기십시오"))
@@ -295,7 +298,7 @@ class Model:
     def __init__(self, r, plant, kw=None):
         self.r = r if r and "RING.sw0" in plant.by_tag else None; self.p = plant; self.kw = kw or {"L1": "LOAD.p1_kw", "L2": "LOAD.p2_kw", "L3": "LOAD.p3_kw"}
         self.e = {}; self.dt = 0.0; self.t_last = None                 # 분기 전력량계의 누적값 · 걸음 길이
-        self.branch = None; self.w = None; self.live = {}; self.want = None; self.want_sig = None; self.alive = {}              # 부하 목록의 분기별 몫(화면부가 넣는다) — 있으면 분기 전력계가 '그 자리에 물린 부하'를 따른다
+        self.branch = None; self.w = None; self.live = {}; self.want = None; self.want_sig = None; self.alive = {}; self.t_by = {}; self.by = set()      # by: 지금 우회 결선으로 받는 배전체계              # 부하 목록의 분기별 몫(화면부가 넣는다) — 있으면 분기 전력계가 '그 자리에 물린 부하'를 따른다
         self.brk = set(); self.t_brk = {}; self.t_trip = None; self.init = set(); self.armed = False; self.swap = None; self.place = {}; self.zero = set(); self.t_fix = {}
         if self.r is None: return
         self._place0(); self._ids(); e = self.eff()
@@ -335,12 +338,14 @@ class Model:
             if f"FSU{k}.v" in self.p.by_tag: self.p.set(f"FSU{k}.v", 380.0 if live.get(f"FSU{k}") else 0.0)
         return live
 
-    def _alt(self, e):
-        """STS 가 넘겨받을 수 있는지: 상시 개방점을 건너 반대쪽에서 닿는 구간분전함(끊기거나 차단된 구간은 못 건넌다). 반환: {FSU: 닿는지}
-        1등급 부하의 배전체계는 양쪽 급전을 다 받아 STS(10 ms)로 넘긴다는 원본 자료의 전제를 따른 모형이다(둘째 입력의 결선은 가정)."""
-        sw = sw_tags(e); bus = lambda t: t not in self.p.by_tag or self.p.get(t) > V_LIVE; a, b = bus("BUS.a_v"), bus("BUS.b_v")
-        ok = [not self._broken(i) and (int(round(self.p.get(t))) == 1 or (i == e["open"] and int(round(self.p.get(t))) == 0)) for i, t in enumerate(sw)]
-        return {f["id"]: (a and all(ok[:k + 1])) or (b and all(ok[k + 1:])) for k, f in enumerate(e["fsu"])}
+    def _bypass(self, live, here):
+        """우회 결선이 닫혀 있어야 하는 배전체계(self.by)를 정한다: 제 구간분전함은 죽었고 우회 쪽 구간분전함은 살아 있을 때만. 제 쪽이 돌아오면 다시 연다(두 급전을 함께 잇지 않는다).
+        STS 가 있으면 바로, 없으면 BYPASS_S 뒤에 닫힌다."""
+        sp = spec(self.r); alt = {x: w["alt"] for w in (self.w or []) if w.get("alt") for x in w["ppdus"]} if sp["bypass"] else {}; now = self.t_last or 0.0; on = set()
+        for i, a in alt.items():
+            if i not in here or live.get(here[i]["at"], False) or not live.get(a, False): self.t_by.pop(i, None); continue
+            if sp["sts"] or now - self.t_by.setdefault(i, now) >= BYPASS_S: on.add(i)
+        self.by = on
 
     def _clear(self, i):
         """빈 자리의 배전체계 신호를 0 으로."""
@@ -393,8 +398,8 @@ class Model:
     def _update(self, e):
         """구간분전함 전압 → 배전체계(PPDU) 전압·주 차단기·회로별 전력. 회로 전력은 그 등급 부하(LOAD.pN_kw)의 크기에 비례하는 것으로 본다(가상 장치의 가정)."""
         live = self._fsu_live(e); here = {p["id"]: p for p in e["ppdu"]}; self.live = live; self.w = self.branch() if self.branch else None
-        sts = {x for w in (self.w or []) if w["grade"] == 1 for x in w["ppdus"]} if spec(self.r)["sts"] else set(); alt = self._alt(e) if sts else {}      # 1등급 부하 앞의 배전체계: STS 로 반대쪽 급전을 바로 받는다
-        fed = {i: bool(live.get(p["at"], False) or (i in sts and alt.get(p["at"], False))) for i, p in here.items()}
+        self._bypass(live, here)                                         # 1등급 부하 앞의 배전체계: 제 구간분전함이 죽으면 우회 결선(평소 열림)을 닫아 반대쪽에서 받는다
+        fed = {i: bool(live.get(p["at"], False) or i in self.by) for i, p in here.items()}
         self.alive = {i: fed[i] and (i not in self.init or int(round(self.p.get(f"{i}.mccb"))) == 1) for i in here if f"{i}.mccb" in self.p.by_tag}      # 전기가 들어오고 주 차단기가 투입된 배전체계
         for k in range(1, self._n("ppdu") + 1):
             i = f"PPDU{k}"
