@@ -1,6 +1,6 @@
 {
- "date": "2026-11-25 10:47",
- "unittest_s": 615.6,
+ "date": "2026-11-25 12:02",
+ "unittest_s": 632.0,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -217,16 +217,16 @@
  "n_tests": 211,
  "tests_ok": true,
  "retried": [],
- "coverage_pct": 92.8,
+ "coverage_pct": 92.7,
  "stmt": {
-  "n": 7162,
-  "hit": 6849,
-  "pct": 95.6
+  "n": 7194,
+  "hit": 6873,
+  "pct": 95.5
  },
  "branch": {
-  "n": 2524,
-  "hit": 2142,
-  "pct": 84.9
+  "n": 2540,
+  "hit": 2154,
+  "pct": 84.8
  },
  "coverage_files": [
   [
@@ -318,20 +318,20 @@
    "70-75, 84-86, 116-117"
   ],
   [
+   "ifps_ems_rt/hmi/eng_forecast.py",
+   90.7,
+   118,
+   90.6,
+   32,
+   "30, 46-47, 61-64, 67-69, 123"
+  ],
+  [
    "ifps_ems_rt/hmi/weatherwatch.py",
    90.9,
    99,
    50.0,
    22,
    "57-58, 66, 132-137"
-  ],
-  [
-   "ifps_ems_rt/hmi/eng_forecast.py",
-   92.4,
-   118,
-   90.6,
-   32,
-   "30, 61-64, 67-69, 123"
   ],
   [
    "ifps_ems_rt/hmi/ringwatch.py",
@@ -374,14 +374,6 @@
    "116, 161-164, 169-172"
   ],
   [
-   "ifps_ems_rt/hmi/busctl.py",
-   95.1,
-   61,
-   90.9,
-   22,
-   "14, 68, 71"
-  ],
-  [
    "ifps_ems_rt/archxfer.py",
    95.5,
    110,
@@ -422,6 +414,14 @@
    "104, 108-110"
   ],
   [
+   "ifps_ems/nowcast.py",
+   96.4,
+   84,
+   81.2,
+   32,
+   "32, 57, 60"
+  ],
+  [
    "ifps_ems/skycam.py",
    96.4,
    84,
@@ -430,12 +430,28 @@
    "70-72"
   ],
   [
+   "ifps_ems_rt/archive.py",
+   96.6,
+   148,
+   83.3,
+   30,
+   "95-96, 110, 128-129"
+  ],
+  [
    "ifps_ems_rt/hmi/eng_command.py",
    96.6,
    118,
    88.0,
    50,
    "25-26, 43, 148"
+  ],
+  [
+   "ifps_ems_rt/hmi/busctl.py",
+   96.7,
+   92,
+   89.5,
+   38,
+   "14, 107, 110"
   ],
   [
    "ifps_ems_rt/hmi/pptx.py",
@@ -470,14 +486,6 @@
    "53"
   ],
   [
-   "ifps_ems/nowcast.py",
-   97.6,
-   84,
-   84.4,
-   32,
-   "32, 57"
-  ],
-  [
    "ifps_ems/learner.py",
    97.7,
    173,
@@ -494,12 +502,12 @@
    "51-52"
   ],
   [
-   "ifps_ems_rt/archive.py",
-   98.0,
-   148,
-   83.3,
-   30,
-   "95-96, 110"
+   "ifps_ems_rt/archdev.py",
+   97.9,
+   141,
+   88.3,
+   60,
+   "93-94, 110"
   ],
   [
    "ifps_ems_rt/hmi/docx.py",
@@ -508,6 +516,14 @@
    100.0,
    4,
    "65"
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   98.3,
+   177,
+   92.4,
+   66,
+   "175, 187-188"
   ],
   [
    "ifps_ems_rt/modbus.py",
@@ -558,28 +574,12 @@
    "120"
   ],
   [
-   "ifps_ems_rt/simplant.py",
-   98.9,
-   177,
-   92.4,
-   66,
-   "187-188"
-  ],
-  [
    "ifps_ems_rt/mbtool.py",
    99.0,
    96,
    86.8,
    38,
    "134"
-  ],
-  [
-   "ifps_ems_rt/archdev.py",
-   99.3,
-   141,
-   88.3,
-   60,
-   "110"
   ],
   [
    "ifps_ems_rt/weather.py",
@@ -696,7 +696,7 @@
   [
    "ifps_ems_rt/busplan.py",
    100.0,
-   61,
+   62,
    83.3,
    12,
    ""
@@ -761,7 +761,7 @@
    "ifps_ems_rt/hmi/fuelwatch.py",
    100.0,
    17,
-   100.0,
+   90.0,
    10,
    ""
   ],
@@ -840,7 +840,7 @@
  ],
  "pylint": {
   "E": 4,
-  "W": 56,
+  "W": 57,
   "by_id": [
    [
     "W0718 broad-exception-caught",
@@ -855,15 +855,15 @@
     6
    ],
    [
+    "W0201 attribute-defined-outside-init",
+    5
+   ],
+   [
     "W0212 protected-access",
     5
    ],
    [
     "W0707 raise-missing-from",
-    4
-   ],
-   [
-    "W0201 attribute-defined-outside-init",
     4
    ],
    [
@@ -1149,6 +1149,14 @@
     "Catching too general exception Exception"
    ],
    [
+    "W0201",
+    "attribute-defined-outside-init",
+    "ifps_ems_rt/hmi/busctl.py",
+    75,
+    "BusBook.view",
+    "Attribute 'load_kw' defined outside __init__"
+   ],
+   [
     "W0012",
     "unknown-option-value",
     "ifps_ems_rt/hmi/report.py",
@@ -1391,7 +1399,7 @@
   ]
  },
  "metrics": {
-  "n_func": 928,
+  "n_func": 932,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1853,6 +1861,10 @@
     119
    ],
    [
+    "ifps_ems_rt/hmi/busctl.py",
+    118
+   ],
+   [
     "ifps_ems_rt/hmi/simreplay.py",
     116
    ],
@@ -1862,7 +1874,7 @@
    ],
    [
     "ifps_ems_rt/busplan.py",
-    113
+    114
    ],
    [
     "ifps_ems_rt/hmi/eng_view.py",
@@ -1906,10 +1918,6 @@
    ],
    [
     "ifps_ems_rt/pointmap.py",
-    79
-   ],
-   [
-    "ifps_ems_rt/hmi/busctl.py",
     79
    ],
    [
@@ -2029,7 +2037,7 @@
    "SEVERITY.LOW": 0,
    "SEVERITY.MEDIUM": 0,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 9303,
+   "loc": 9339,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -2213,12 +2221,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 6.01,
- "cc_n": 953,
+ "cc_avg": 6.04,
+ "cc_n": 957,
  "cc_rank": {
   "A": 550,
-  "B": 241,
-  "C": 162,
+  "B": 242,
+  "C": 165,
   "D": 0,
   "E": 0,
   "F": 0
@@ -2367,6 +2375,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/busctl.py",
+   31.6,
+   "A"
+  ],
+  [
    "ifps_ems_rt/hmi/eng_tools.py",
    31.7,
    "A"
@@ -2482,11 +2495,6 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/busctl.py",
-   44.7,
-   "A"
-  ],
-  [
    "ifps_ems_rt/mbtool.py",
    45.0,
    "A"
@@ -2517,13 +2525,13 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/eng_auth.py",
-   51.8,
+   "ifps_ems_rt/busplan.py",
+   51.4,
    "A"
   ],
   [
-   "ifps_ems_rt/busplan.py",
-   52.8,
+   "ifps_ems_rt/hmi/eng_auth.py",
+   51.8,
    "A"
   ],
   [
@@ -2669,8 +2677,8 @@
  ],
  "loc_py": {
   "files": 76,
-  "sloc": 7452,
-  "comments": 1091
+  "sloc": 7484,
+  "comments": 1093
  },
  "js": [
   [

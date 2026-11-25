@@ -90,7 +90,7 @@ function loginDialog() {
       S.token = r.token; S.me = { role: r.role, name: r.name }; try { sessionStorage.setItem("ems.token", r.token); } catch (e) { }
       closeModal(); toast(`${r.name} — ${r.role === "engineer" ? "엔지니어" : "운용자"} 권한`, "ok"); renderUser(); render();
     };
-    $("#lgGo", box).onclick = go; $("#lgPin", box).onkeydown = e => { if (e.key === "Enter") go(); }; setTimeout(() => ($("#lgName", box).value ? $("#lgPin", box) : $("#lgName", box)).focus(), 30);
+    $("#lgGo", box).onclick = go; $("#lgPin", box).onkeydown = e => { if (e.key === "Enter") go(); }; setTimeout(() => { const n = $("#lgName", box), q = $("#lgPin", box); if (n && q) (n.value ? q : n).focus(); }, 30);      // 창이 바로 닫혔으면 건드리지 않는다
   });
 }
 async function logout() { await api("/api/logout", {}); S.token = null; S.me = { role: "viewer", name: "조회" }; try { sessionStorage.removeItem("ems.token"); } catch (e) { } renderUser(); render(); }
