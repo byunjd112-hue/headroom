@@ -1,6 +1,6 @@
 {
- "date": "2026-11-26 03:06",
- "unittest_s": 612.8,
+ "date": "2026-11-26 08:22",
+ "unittest_s": 709.6,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -77,6 +77,8 @@
   "부하 관리: 종류 · 수량을 바꾸면 스냅샷(모든 화면의 자료) · 가상 부하 배율 · 절감 가능 비율 · 저장 파일이 함께 바뀐다. 틀린 입력은 막는다. | ok",
   "절감 공급 지령(LDS = 3): 가상 부하가 절감 비율만큼 줄고 차단기는 그대로다. 복구(1)하면 돌아온다. 화면 상태도 따라간다. | ok",
   "가상 자료 가져오기 · 재생: CSV 의 값을 시간 순서대로 가상 장치에 넣고, 멈추면 가상 장치가 다시 스스로 값을 만든다. | ok",
+  "기본 구성 파일(config/site_default.json): 부하 목록 · 모선 구성 · 배치가 검사를 통과하는 값이고, 파일이 없으면 아무것도 하지 않는다. | ok",
+  "구성 저장 · 불러오기: 장비 대수 · 모선 구성 · 부하 목록 · 상시 개방점을 바꾼 뒤 저장한 구성을 불러오면 그 구성으로 돌아간다(불러오기는 엔지니어). | ok",
   "test_calibration_keeps_scale_in_model_file_and_old_files_still_load | ok",
   "test_scale_grows_only_when_recent_errors_escape_the_interval | ok",
   "test_bad_or_short_data_is_not_learned | ok",
@@ -166,7 +168,7 @@
   "test_scan_reads_values_within_period | ok",
   "test_unverified_crypto_refused_in_operation_mode | ok",
   "test_branch_and_generated_source | ok",
-  "test_built_in_cases_and_expected_fault | ok",
+  "test_built_in_cases_and_expected_fault | FAIL",
   "test_malformed_threshold_is_rejected | ok",
   "test_no_ack_blocks_candidate_and_reports_injected_failure | ok",
   "test_parallel_runs_are_isolated_and_improvement_retests_batch | ok",
@@ -219,19 +221,19 @@
   "test_parse_json_and_csv | ok",
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 216,
- "tests_ok": true,
+ "n_tests": 218,
+ "tests_ok": false,
  "retried": [],
- "coverage_pct": 92.9,
+ "coverage_pct": 92.6,
  "stmt": {
-  "n": 7619,
-  "hit": 7288,
-  "pct": 95.7
+  "n": 7758,
+  "hit": 7403,
+  "pct": 95.4
  },
  "branch": {
-  "n": 2716,
-  "hit": 2309,
-  "pct": 85.0
+  "n": 2756,
+  "hit": 2333,
+  "pct": 84.7
  },
  "coverage_files": [
   [
@@ -278,9 +280,17 @@
    "ifps_ems_rt/hmi/archwatch.py",
    80.6,
    108,
-   60.4,
+   62.5,
    48,
    "29-30, 43, 56, 59-63, 67-68, 114-116, 120-122, 132-134, 137"
+  ],
+  [
+   "ifps_ems_rt/hmi/siteprofile.py",
+   81.8,
+   121,
+   60.5,
+   38,
+   "30, 38, 69, 77, 87-88, 98, 104, 110-111, 115, 140, 142-150, 168"
   ],
   [
    "ifps_ems_rt/archrecv.py",
@@ -300,11 +310,11 @@
   ],
   [
    "ifps_ems_rt/hmi/__main__.py",
-   88.6,
-   44,
+   89.6,
+   48,
    50.0,
-   4,
-   "28-29, 33-34, 56"
+   6,
+   "29-30, 37-38, 60"
   ],
   [
    "ifps_ems_rt/hmi/seqppt.py",
@@ -366,17 +376,17 @@
    "ifps_ems_rt/hmi/ringwatch.py",
    93.4,
    182,
-   74.0,
+   75.0,
    104,
    "80, 188-193, 230-234"
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
-   94.6,
+   93.8,
    259,
    84.8,
    112,
-   "60, 68, 71, 81, 91, 93, 95, 107, 111, 125, 134, 139, 229, 276"
+   "44-45, 60, 68, 71, 81, 91, 93, 95, 107, 111, 125, 134, 139, 229, 276"
   ],
   [
    "ifps_ems_rt/hmi/scenextra.py",
@@ -393,14 +403,6 @@
    70.6,
    34,
    "139-143"
-  ],
-  [
-   "ifps_ems_rt/hmi/unitctl.py",
-   95.6,
-   45,
-   83.3,
-   18,
-   "52, 72"
   ],
   [
    "ifps_ems_rt/hmi/eng_auth.py",
@@ -425,6 +427,14 @@
    92.1,
    38,
    "104, 108-110"
+  ],
+  [
+   "ifps_ems/nowcast.py",
+   96.4,
+   84,
+   81.2,
+   32,
+   "32, 57, 60"
   ],
   [
    "ifps_ems/skycam.py",
@@ -464,7 +474,7 @@
    145,
    82.9,
    76,
-   "63-64, 121, 152, 192"
+   "64-65, 122, 153, 193"
   ],
   [
    "ifps_ems_rt/hmi/busctl.py",
@@ -507,14 +517,6 @@
    "53"
   ],
   [
-   "ifps_ems/nowcast.py",
-   97.6,
-   84,
-   84.4,
-   32,
-   "32, 57"
-  ],
-  [
    "ifps_ems/learner.py",
    97.7,
    173,
@@ -529,6 +531,14 @@
    93.3,
    30,
    "51-52"
+  ],
+  [
+   "ifps_ems_rt/hmi/unitctl.py",
+   97.8,
+   45,
+   83.3,
+   18,
+   "52"
   ],
   [
    "ifps_ems_rt/archdev.py",
@@ -557,10 +567,10 @@
   [
    "ifps_ems_rt/runtime.py",
    98.6,
-   424,
+   438,
    94.9,
    138,
-   "116, 275, 378, 556-558"
+   "116, 275, 396, 574-576"
   ],
   [
    "ifps_ems_rt/hmi/loadctl.py",
@@ -598,7 +608,7 @@
    "ifps_ems_rt/simplant.py",
    99.0,
    192,
-   94.1,
+   92.6,
    68,
    "212-213"
   ],
@@ -877,7 +887,7 @@
  ],
  "pylint": {
   "E": 4,
-  "W": 59,
+  "W": 60,
   "by_id": [
    [
     "W0718 broad-exception-caught",
@@ -888,16 +898,16 @@
     6
    ],
    [
+    "W0201 attribute-defined-outside-init",
+    6
+   ],
+   [
     "W0212 protected-access",
     6
    ],
    [
     "W0012 unknown-option-value",
     6
-   ],
-   [
-    "W0201 attribute-defined-outside-init",
-    5
    ],
    [
     "W0707 raise-missing-from",
@@ -1088,6 +1098,14 @@
     116,
     "Runtime._probe_slot",
     "Catching too general exception Exception"
+   ],
+   [
+    "W0201",
+    "attribute-defined-outside-init",
+    "ifps_ems_rt/runtime.py",
+    331,
+    "Runtime._quiet_want",
+    "Attribute 'quiet_h' defined outside __init__"
    ],
    [
     "W0612",
@@ -1452,7 +1470,7 @@
   ]
  },
  "metrics": {
-  "n_func": 1001,
+  "n_func": 1021,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1462,13 +1480,23 @@
   },
   "cc_max": 20,
   "len_max": 199,
-  "arg_max": 8,
+  "arg_max": 9,
   "depth_max": 5,
-  "file_max": 559,
+  "file_max": 577,
   "over": {
    "cc": [],
    "len": [],
-   "arg": [],
+   "arg": [
+    [
+     "ifps_ems_rt/hmi/initcheck.py",
+     "_it",
+     23,
+     2,
+     4,
+     9,
+     0
+    ]
+   ],
    "depth": [],
    "file": []
   },
@@ -1530,7 +1558,7 @@
    [
     "ifps_ems_rt/runtime.py",
     "decide",
-    398,
+    416,
     20,
     21,
     0,
@@ -1584,6 +1612,15 @@
     2
    ],
    [
+    "ifps_ems_rt/hmi/__main__.py",
+    "main",
+    11,
+    13,
+    46,
+    1,
+    2
+   ],
+   [
     "ifps_ems_rt/hmi/server.py",
     "do_GET",
     68,
@@ -1591,15 +1628,6 @@
     46,
     0,
     3
-   ],
-   [
-    "ifps_ems_rt/hmi/__main__.py",
-    "main",
-    11,
-    12,
-    42,
-    1,
-    2
    ],
    [
     "ifps_ems/nowcast.py",
@@ -1621,6 +1649,15 @@
    ]
   ],
   "top_arg": [
+   [
+    "ifps_ems_rt/hmi/initcheck.py",
+    "_it",
+    23,
+    2,
+    4,
+    9,
+    0
+   ],
    [
     "ifps_ems/dispatch.py",
     "rule_action",
@@ -1681,15 +1718,6 @@
     123,
     16,
     15,
-    8,
-    1
-   ],
-   [
-    "ifps_ems_rt/opsmode.py",
-    "garrison_step",
-    76,
-    10,
-    25,
     8,
     1
    ]
@@ -1771,7 +1799,7 @@
   "files": [
    [
     "ifps_ems_rt/runtime.py",
-    559
+    577
    ],
    [
     "ifps_ems_rt/ring.py",
@@ -1827,7 +1855,7 @@
    ],
    [
     "ifps_ems_rt/hmi/initcheck.py",
-    218
+    219
    ],
    [
     "ifps_ems_rt/opsmode.py",
@@ -1851,6 +1879,10 @@
    ],
    [
     "ifps_ems_rt/fmsite.py",
+    169
+   ],
+   [
+    "ifps_ems_rt/hmi/siteprofile.py",
     169
    ],
    [
@@ -1943,7 +1975,7 @@
    ],
    [
     "ifps_ems_rt/hmi/eng_view.py",
-    107
+    108
    ],
    [
     "ifps_ems/nowcast.py",
@@ -2023,7 +2055,7 @@
    ],
    [
     "ifps_ems_rt/hmi/__main__.py",
-    57
+    61
    ],
    [
     "ifps_ems/config.py",
@@ -2107,7 +2139,7 @@
    "SEVERITY.LOW": 1,
    "SEVERITY.MEDIUM": 2,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 9908,
+   "loc": 10069,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -2188,7 +2220,7 @@
    "B104",
    "MEDIUM",
    "ifps_ems_rt/hmi/__main__.py",
-   35,
+   39,
    "Possible binding to all interfaces.",
    "CWE-605"
   ],
@@ -2337,12 +2369,12 @@
    "CWE-78"
   ]
  ],
- "cc_avg": 6.06,
- "cc_n": 1027,
+ "cc_avg": 6.05,
+ "cc_n": 1047,
  "cc_rank": {
-  "A": 582,
-  "B": 265,
-  "C": 180,
+  "A": 593,
+  "B": 273,
+  "C": 181,
   "D": 0,
   "E": 0,
   "F": 0
@@ -2457,7 +2489,7 @@
   ],
   [
    "ifps_ems_rt/hmi/initcheck.py",
-   22.7,
+   23.2,
    "A"
   ],
   [
@@ -2521,6 +2553,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/siteprofile.py",
+   36.3,
+   "A"
+  ],
+  [
    "ifps_ems/nowcast.py",
    36.8,
    "A"
@@ -2572,7 +2609,7 @@
   ],
   [
    "ifps_ems_rt/hmi/eng_view.py",
-   40.4,
+   40.3,
    "A"
   ],
   [
@@ -2751,13 +2788,13 @@
    "A"
   ],
   [
-   "ifps_ems_rt/archrecv.py",
-   66.8,
+   "ifps_ems_rt/hmi/__main__.py",
+   66.5,
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/__main__.py",
-   68.4,
+   "ifps_ems_rt/archrecv.py",
+   66.8,
    "A"
   ],
   [
@@ -2812,14 +2849,14 @@
   ]
  ],
  "loc_py": {
-  "files": 80,
-  "sloc": 7940,
-  "comments": 1152
+  "files": 81,
+  "sloc": 8082,
+  "comments": 1176
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   594,
+   598,
    true
   ],
   [
@@ -2849,7 +2886,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/initcheck.js",
-   84,
+   127,
    true
   ],
   [
@@ -2859,12 +2896,17 @@
   ],
   [
    "ifps_ems_rt/hmi/static/loads.js",
-   94,
+   99,
    true
   ],
   [
    "ifps_ems_rt/hmi/static/manual.js",
    34,
+   true
+  ],
+  [
+   "ifps_ems_rt/hmi/static/profile.js",
+   30,
    true
   ],
   [
@@ -2899,7 +2941,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/train.js",
-   176,
+   178,
    true
   ],
   [

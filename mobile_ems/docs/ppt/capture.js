@@ -83,7 +83,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   // 4-2) 장비 한 대 = 그림 하나 · 장비마다 차단기(ESS 2호기 → 모선 A, 태양광 2호기 · 복합전력 2호 차량의 ESS → 모선 B, 태양광 2호기 차단기 개방) · 설치 점검(ESS 2호기 무응답)
   for (const [node, bus] of [["ESS2", "A"], ["PV2", "B"], ["G1_2", "B"]]) await post("/api/bus", { op: "set", node, bus });
   await sim({ action: "cb", target: "PV2", on: false }); await go("sld", "sld_units", 6000); await go("control", "ctl_units", 3500);
-  await sim({ action: "mute", target: "ESS2", on: true }); await p.waitForTimeout(6500); await go("overview", null, 3000); await p.click("#initBtn"); await p.waitForTimeout(1200); await p.click("#icRun"); await p.waitForTimeout(3500); await p.screenshot({ path: D + "init_map.png" }); await p.click("#icClose");
+  await sim({ action: "mute", target: "ESS2", on: true }); await p.waitForTimeout(6500); await go("overview", null, 3000); await p.click("#initBtn"); await p.waitForTimeout(1200); await p.click("#icRun"); await p.waitForTimeout(8000); await p.screenshot({ path: D + "init_map.png" }); await p.click("#icClose");
   await sim({ action: "mute", target: "ESS2", on: false }); await sim({ action: "cb", target: "PV2", on: true }); await post("/api/bus", { op: "reset" }); await p.waitForTimeout(3000); await post("/api/ack", { ids: "all" });
   // 5) 로그인 창
   await p.evaluate(() => { sessionStorage.removeItem("ems.token"); }); await p.goto(B + "#overview"); await p.reload(); await p.waitForTimeout(1500); await p.evaluate(() => loginDialog()); await p.waitForTimeout(500); await p.screenshot({ path: D + "login.png" });

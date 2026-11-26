@@ -1,0 +1,319 @@
+{
+ "note": "기본 구성(사용자 지정, Rev66): 복합전력 2 · 이동형 ESS 2 · 태양광 2 · 수소 1, 부하 8개를 구간분전함 1~7 에 나눠 물림. 실행 스크립트로 켤 때 처음 한 번 적용된다(--plain 으로 켜면 적용하지 않는다).",
+ "units": {
+  "DG": 2,
+  "ESS": 2,
+  "PV": 2,
+  "FC": 1
+ },
+ "bus": {
+  "GRID": "A",
+  "PV": "A",
+  "DG": "A",
+  "FC": "A",
+  "GDG": "B",
+  "ESS": "B",
+  "G1": "A",
+  "L1": "A",
+  "L2": "A",
+  "L3": "B",
+  "DG2": "B",
+  "G1_2": "B",
+  "ESS2": "B",
+  "PV2": "B"
+ },
+ "loads": [
+  {
+   "id": "c2",
+   "kind": "c2",
+   "name": "지휘통제(C2)",
+   "grade": 1,
+   "kw": 30.0,
+   "n": 1,
+   "save_pct": 0,
+   "fsu": "FSU1"
+  },
+  {
+   "id": "med",
+   "kind": "medical",
+   "name": "의무시설",
+   "grade": 2,
+   "kw": 16.0,
+   "n": 1,
+   "save_pct": 10,
+   "fsu": "FSU6"
+  },
+  {
+   "id": "brk1",
+   "kind": "barrack",
+   "name": "막사 #1",
+   "grade": 3,
+   "kw": 10.0,
+   "n": 1,
+   "save_pct": 30,
+   "fsu": "FSU2"
+  },
+  {
+   "id": "brk2",
+   "kind": "barrack",
+   "name": "막사 #2",
+   "grade": 3,
+   "kw": 10.0,
+   "n": 1,
+   "save_pct": 30,
+   "fsu": "FSU3"
+  },
+  {
+   "id": "brk3",
+   "kind": "barrack",
+   "name": "막사 #3",
+   "grade": 3,
+   "kw": 10.0,
+   "n": 1,
+   "save_pct": 30,
+   "fsu": "FSU4"
+  },
+  {
+   "id": "brk4",
+   "kind": "barrack",
+   "name": "막사 #4",
+   "grade": 3,
+   "kw": 10.0,
+   "n": 1,
+   "save_pct": 30,
+   "fsu": "FSU5"
+  },
+  {
+   "id": "brk5",
+   "kind": "barrack",
+   "name": "막사 #5",
+   "grade": 2,
+   "kw": 15.0,
+   "n": 1,
+   "save_pct": 30,
+   "fsu": "FSU5"
+  },
+  {
+   "id": "ammo",
+   "kind": "ammo",
+   "name": "탄약저장",
+   "grade": 2,
+   "kw": 15.0,
+   "n": 1,
+   "save_pct": 0,
+   "fsu": "FSU7"
+  }
+ ],
+ "layout": [
+  {
+   "uid": "d0",
+   "kind": "DG",
+   "bind": "G1",
+   "name": "① 기동형 복합전력",
+   "x": 205,
+   "y": 265,
+   "s": 0.62
+  },
+  {
+   "uid": "d1",
+   "kind": "ESS",
+   "bind": "ESS",
+   "name": "② 이동형 ESS(GFM)",
+   "x": 430,
+   "y": 200,
+   "s": 0.62
+  },
+  {
+   "uid": "d2",
+   "kind": "PV",
+   "bind": "PV",
+   "name": "③ 이동형 PV",
+   "x": 660,
+   "y": 160,
+   "s": 0.62
+  },
+  {
+   "uid": "d3",
+   "kind": "FC",
+   "bind": "FC",
+   "name": "④ 수소생성·발전",
+   "x": 1470,
+   "y": 365,
+   "s": 0.62
+  },
+  {
+   "uid": "d4",
+   "kind": "DIST",
+   "bind": "DIST",
+   "name": "⑥ 배전·변압",
+   "x": 810,
+   "y": 500,
+   "s": 0.62
+  },
+  {
+   "uid": "d5",
+   "kind": "EMS",
+   "bind": "EMS",
+   "name": "⑤ EMS 중앙제어",
+   "x": 1400,
+   "y": 580,
+   "s": 0.95
+  },
+  {
+   "uid": "p2",
+   "kind": "PV",
+   "bind": "PV",
+   "name": "③ 이동형 PV #2",
+   "x": 900,
+   "y": 160,
+   "s": 0.62
+  },
+  {
+   "uid": "e2",
+   "kind": "ESS",
+   "bind": "ESS",
+   "name": "② 이동형 ESS(GFM) #2",
+   "x": 1160,
+   "y": 195,
+   "s": 0.62
+  },
+  {
+   "uid": "g2",
+   "kind": "DG",
+   "bind": "G1",
+   "name": "① 기동형 복합전력 #2",
+   "x": 1365,
+   "y": 265,
+   "s": 0.62
+  },
+  {
+   "uid": "l1",
+   "kind": "L1",
+   "bind": "L1",
+   "name": "지휘통제(C2)",
+   "x": 150,
+   "y": 500,
+   "s": 0.62
+  },
+  {
+   "uid": "l2",
+   "kind": "L2",
+   "bind": "L2",
+   "name": "의무시설",
+   "x": 560,
+   "y": 800,
+   "s": 0.62
+  },
+  {
+   "uid": "l3",
+   "kind": "L3",
+   "bind": "L2",
+   "name": "탄약저장",
+   "x": 1370,
+   "y": 755,
+   "s": 0.62
+  },
+  {
+   "uid": "b1",
+   "kind": "BARRACK",
+   "bind": "L3",
+   "name": "막사 #1",
+   "x": 1085,
+   "y": 775,
+   "s": 0.62
+  },
+  {
+   "uid": "b2",
+   "kind": "BARRACK",
+   "bind": "L3",
+   "name": "막사 #2",
+   "x": 175,
+   "y": 780,
+   "s": 0.62
+  },
+  {
+   "uid": "b3",
+   "kind": "BARRACK",
+   "bind": "L3",
+   "name": "막사 #3",
+   "x": 1000,
+   "y": 315,
+   "s": 0.62
+  },
+  {
+   "uid": "b4",
+   "kind": "BARRACK",
+   "bind": "L3",
+   "name": "막사 #4",
+   "x": 860,
+   "y": 810,
+   "s": 0.62
+  },
+  {
+   "uid": "b5",
+   "kind": "BARRACK",
+   "bind": "L2",
+   "name": "막사 #5",
+   "x": 255,
+   "y": 655,
+   "s": 0.62
+  },
+  {
+   "uid": "f1",
+   "kind": "FSU",
+   "bind": "",
+   "name": "FSU-1",
+   "x": 400,
+   "y": 450
+  },
+  {
+   "uid": "f2",
+   "kind": "FSU",
+   "bind": "",
+   "name": "FSU-2",
+   "x": 630,
+   "y": 420
+  },
+  {
+   "uid": "f3",
+   "kind": "FSU",
+   "bind": "",
+   "name": "FSU-3",
+   "x": 1020,
+   "y": 410
+  },
+  {
+   "uid": "f4",
+   "kind": "FSU",
+   "bind": "",
+   "name": "FSU-4",
+   "x": 1180,
+   "y": 460
+  },
+  {
+   "uid": "f5",
+   "kind": "FSU",
+   "bind": "",
+   "name": "FSU-5",
+   "x": 1130,
+   "y": 640
+  },
+  {
+   "uid": "f6",
+   "kind": "FSU",
+   "bind": "",
+   "name": "FSU-6",
+   "x": 800,
+   "y": 670
+  },
+  {
+   "uid": "f7",
+   "kind": "FSU",
+   "bind": "",
+   "name": "FSU-7",
+   "x": 500,
+   "y": 630
+  }
+ ],
+ "open": 4
+}

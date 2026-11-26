@@ -5,7 +5,7 @@
   python -m ifps_ems_rt.hmi config/runtime.json                실장치 연동(runtime.json의 devices 주소로 접속)
   python -m ifps_ems_rt.hmi config/runtime.json --plan results 예측 기반 운전계획 사용(모델 폴더)
 """
-import argparse, signal, sys, threading, webbrowser
+import argparse, os, signal, sys, threading, webbrowser
 
 
 def main(argv=None):
@@ -14,6 +14,7 @@ def main(argv=None):
     ap.add_argument("--plan", metavar="모델폴더", help="예측·운전계획 연결(model_load.npz, model_pv.npz 폴더)")
     ap.add_argument("--days", type=int, default=30, help="전개 후 경과 일수(보수 계수)")
     ap.add_argument("--bind"); ap.add_argument("--port", type=int); ap.add_argument("--open", action="store_true", help="기동 후 브라우저 열기")
+    ap.add_argument("--plain", action="store_true", help="기본 구성(설정 폴더의 site_default.json)을 적용하지 않는다(점검 도구 · 시험용)")
     a = ap.parse_args(argv)
     from .engine import Engine
     from ..modbus import ModbusError
@@ -28,6 +29,9 @@ def main(argv=None):
         for b in bad: print(f"[보안 기동 거부] {b}", file=sys.stderr)
         eng.stop(); return 4
     eng.start()
+    if not a.plain:
+        from . import siteprofile
+        siteprofile.preset(eng, os.path.join(os.path.dirname(os.path.abspath(a.config)), "site_default.json"))
     try:
         httpd = serve(eng, a.bind, a.port)
     except OSError as e:

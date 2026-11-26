@@ -59,6 +59,35 @@ class TestHmi(unittest.TestCase):
         with e.lock: e.busw.change({"op": "reset"}, "시험")
         d = self.req(u + "?run=1&only=" + b[0]["id"], tok=op)[1]; self.assertEqual(next(i for i in d["last"]["items"] if i["id"] == b[0]["id"])["was"], b[0]["level"])     # 약점이 사라지면 그 줄은 해결됨
 
+    def test_site_profile_save_and_load(self):
+        """구성 저장 · 불러오기: 장비 대수 · 모선 구성 · 부하 목록 · 상시 개방점을 바꾼 뒤 저장한 구성을 불러오면 그 구성으로 돌아간다(불러오기는 엔지니어)."""
+        e = self.eng; op = self.login("4321"); en = self.login("8765"); P = lambda b, t: self.req("/api/profile", b, t)[1]
+        self.assertEqual(self.req("/api/profile", {"op": "list"})[0], 403); n0 = lambda: e.profw.count("ESS"); s0 = e.snapshot(); o0 = s0["ring"]["open"]
+        try:
+            r = P({"op": "save", "name": "처음"}, op); self.assertTrue(r["ok"] and r["items"][0]["same"], r); self.assertFalse(P({"op": "save", "name": " "}, op)["ok"])
+            self.assertTrue(self.req("/api/units", {"kind": "ESS", "delta": 1}, op)[1]["ok"]); self.assertTrue(self._until(lambda: len(e.snapshot()["fleet"]["ESS"]["units"]) == 2 and e.snapshot()["fleet"]["ESS"]["n"] == 2, 20.0))
+            self.assertTrue(self.req("/api/bus", {"op": "set", "node": "ESS2", "bus": "A"}, en)[1]["ok"]); self.assertTrue(self.req("/api/loads", {"op": "count", "id": "brk", "delta": 1}, op)[1]["ok"])
+            self.assertTrue(self.req("/api/ring", {"do": "config", "open": o0 - 1}, op)[1]["ok"]); self.assertTrue(self._until(lambda: e.snapshot()["ring"]["open"] == o0 - 1))
+            r = P({"op": "save", "name": "둘째 차량"}, op); it = {i["name"]: i for i in r["items"]}; self.assertTrue(it["둘째 차량"]["same"] and not it["처음"]["same"]); self.assertIn("ESS×2", it["둘째 차량"]["brief"])
+            self.assertFalse(P({"op": "load", "name": "처음"}, op)["ok"])                                                              # 운용자는 불러오지 못한다
+            r = P({"op": "load", "name": "처음"}, en); self.assertTrue(r["ok"] and r["notes"] == [], r); self.assertEqual(n0(), 1)
+            self.assertTrue(self._until(lambda: e.snapshot()["ring"]["open"] == o0)); s = e.snapshot(); self.assertEqual([i["n"] for i in s["loads"]["items"]], [i["n"] for i in s0["loads"]["items"]]); self.assertNotIn("ESS2", s["bus"]["assign"])
+            self.assertTrue({i["name"]: i for i in P({"op": "list"}, op)["items"]}["처음"]["same"])
+            r = P({"op": "load", "name": "둘째 차량"}, en); self.assertTrue(r["ok"] and r["notes"] == [], r); self.assertEqual(n0(), 2); self.assertTrue(self._until(lambda: e.snapshot()["ring"]["open"] == o0 - 1)); s = e.snapshot()
+            self.assertEqual(s["bus"]["assign"].get("ESS2"), "A"); self.assertEqual(next(i["n"] for i in s["loads"]["items"] if i["id"] == "brk"), 3)
+            self.assertTrue(P({"op": "del", "name": "둘째 차량"}, op)["ok"]); self.assertFalse(P({"op": "load", "name": "둘째 차량"}, en)["ok"])
+        finally:
+            P({"op": "load", "name": "처음"}, en); P({"op": "del", "name": "처음"}, op); P({"op": "del", "name": "둘째 차량"}, op); self._until(lambda: len(e.snapshot()["fleet"]["ESS"]["units"]) == 1, 20.0)
+
+    def test_site_default_preset_is_valid(self):
+        """기본 구성 파일(config/site_default.json): 부하 목록 · 모선 구성 · 배치가 검사를 통과하는 값이고, 파일이 없으면 아무것도 하지 않는다."""
+        from ifps_ems_rt import loads, busplan
+        from ifps_ems_rt.hmi import siteprofile
+        e = self.eng; p = json.load(open(os.path.join(os.path.dirname(__file__), "..", "config", "site_default.json"), encoding="utf-8"))
+        self.assertFalse(loads.check(p["loads"], e.loadw.limit())); self.assertEqual(busplan.settings(p["bus"]), p["bus"]); self.assertEqual(p["units"], {"DG": 2, "ESS": 2, "PV": 2, "FC": 1})
+        self.assertTrue(all(i["kind"] in e.LAYOUT_KINDS and i["bind"] in e.LAYOUT_BINDS and 0 <= i["x"] <= 1600 and 0 <= i["y"] <= 900 for i in p["layout"])); self.assertEqual(len({i["uid"] for i in p["layout"]}), len(p["layout"]))
+        self.assertEqual(sorted(i["fsu"] for i in p["loads"]), ["FSU1", "FSU2", "FSU3", "FSU4", "FSU5", "FSU5", "FSU6", "FSU7"]); self.assertIsNone(siteprofile.preset(e, os.path.join(self.td, "없는파일.json")))
+
     @staticmethod
     def _until(cond, t=10.0):
         end = time.time() + t

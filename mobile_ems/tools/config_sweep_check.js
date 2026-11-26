@@ -30,6 +30,13 @@ const KN = { PV: "태양광", DG: "디젤 발전기", FC: "연료전지", ESS: "
     chk(same(items.filter(i => i.id.startsWith("load.")).map(i => i.id.slice(5)), loads.map(i => i.id)), "설치 점검: 부하 줄 = 부하 목록");
     ["ring.order", "ring.feedA", "ring.feedB", "ring.nop", "ring.fed"].forEach(k => chk(id[k] && id[k].level === "ok", `설치 점검: ${k} — ${id[k] ? id[k].text : "없음"}`));
     chk(id["ring.nop"] && id["ring.nop"].text.includes("구간 " + s.ring.open + " "), `설치 점검: 상시 개방점 구간 ${s.ring.open} — ${id["ring.nop"] ? id["ring.nop"].text : ""}`);
+    // ①-2 설치 점검 창의 그림(결선도 + 검사 표): 전원 한 대 · 부하 하나마다 그림과 표가 있어야 한다
+    await go("overview", 4500); await p.click("#initBtn"); await p.waitForTimeout(1800);
+    const pic = await p.evaluate(() => ({ src: SRC.filter(q => !["GRID", "GDG"].includes(q.kind)).map(q => q.id + q.bus + !!document.querySelector("#icSld #n-" + q.id)), ld: [...document.querySelectorAll("#icSld .sld-ld-drag")].map(e => e.dataset.load + "@" + e.dataset.fsu), hot: [...document.querySelectorAll("#icSld [data-ics]")].flatMap(e => e.dataset.ics.split(" ")) }));
+    chk(same(pic.src, src.map(q => q.id + q.bus + true)), "설치 점검 그림 전원 = 모선 구성 — " + JSON.stringify(pic.src));
+    chk(same(pic.ld, loads.map(i => i.id + "@" + i.fsu)), "설치 점검 그림 부하 = 부하 목록 — " + JSON.stringify(pic.ld));
+    seen.filter(d => !/^(ELZ|MTR|GDG)/.test(d)).forEach(d => chk(pic.hot.includes("comm." + d), `설치 점검 그림: ${d} 의 검사 표`)); loads.forEach(i => chk(pic.hot.includes("load." + i.id), `설치 점검 그림: 부하 ${i.name} 의 검사 표`));
+    await p.click("#icClose");
     // ② 결선도: 전원 한 대 = 그림 하나, 그 한 대의 모선. 부하 하나 = 그림 하나, 그 구간분전함 아래
     await go("sld", 4500);
     const sl = await p.evaluate(() => ({ src: SRC.filter(q => !["GRID", "GDG"].includes(q.kind)).map(q => [q.id, q.bus, !!document.querySelector("#n-" + q.id)]), ld: [...document.querySelectorAll(".sld-ld-drag")].map(e => [e.dataset.load, e.dataset.fsu]) }));
