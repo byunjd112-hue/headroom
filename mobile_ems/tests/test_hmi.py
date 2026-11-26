@@ -334,6 +334,11 @@ class TestHmi(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/", timeout=5) as f: self.assertIn("camera=()", f.headers["Permissions-Policy"])
 
     def test_11_all_units_load_shed_elz_pv(self):
+        self.eng.set_auto(False, "시험")      # 운용자 지령만 본다: 자동 제어 주기(60초)가 시험 도중에 걸리면 EMS 가 수전해를 도로 세워(잉여 없음) 기다리는 조건이 어긋난다 — 간헐 실패의 원인
+        try: self._units_by_operator()
+        finally: self.eng.set_auto(True, "시험")
+
+    def _units_by_operator(self):
         op = self.login("4321"); s = self.req("/api/snapshot")[1]
         self.assertTrue(s["devices"]["ELZ"]["ctl"]); self.assertTrue(s["devices"]["PV"]["ctl"])               # 수전해·PV 인버터도 지령 대상
         def run(body):
@@ -348,6 +353,7 @@ class TestHmi(unittest.TestCase):
         run({"dev": "ELZ", "cmd": "stop"}); self.wait(lambda s: not s["devices"]["ELZ"]["on"])
         run({"dev": "PV", "cmd": "stop"}); self.wait(lambda s: not s["devices"]["PV"]["on"])
         run({"dev": "PV", "cmd": "start"}); self.wait(lambda s: s["devices"]["PV"]["on"])
+
 
 
 if __name__ == "__main__":

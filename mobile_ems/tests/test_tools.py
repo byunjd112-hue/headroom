@@ -74,7 +74,7 @@ class TestMbtool(Base):
             if n[0] >= 2: raise KeyboardInterrupt
             real(0.01)
         mbtool.time.sleep = fake
-        try: r, txt = self.run_tool("watch", *a, "-a", "4", "-n", "1", "-t", "i16", "-s", "0.1", "-i", "0.05"); self.assertEqual(r, 0); self.assertIn("40", txt)
+        try: r, txt = self.run_tool("watch", *a, "-a", "4", "-n", "1", "-t", "i16", "-s", "0.1", "-i", "0.05"); self.assertEqual(r, 0); self.assertIn("33.3", txt)      # 부족분 40 kW 가운데 이동형 ESS 의 몫(복합전력 ESS 200 kWh 와 용량 비율로 나눔: 40 × 1000 / 1200)
         finally: mbtool.time.sleep = real
 
 
