@@ -194,7 +194,7 @@ class TestOpsRuntime(Base):
         self.assertAlmostEqual(p.get("GRID.kw"), rt.gar.import_min_kw, delta=1.5)                                                                                        # 태세가 자립이므로 복전 뒤에도 수전 최소화
 
     def test_quiet_posture_forbids_diesel_and_sheds_class3_then_restores(self):
-        clk = [1000.0]; self.rt.now = lambda: clk[0]; self.plant.set("ESS.soc", 27.0); self.rt.scan()      # 방전 하한 20 %(기본 운용 범위) 보다 7 %p 위
+        clk = [1000.0]; self.rt.now = lambda: clk[0]; self.plant.set("ESS.soc", 27.0); self.plant.set("DG.ess_soc", 20.0); self.rt.scan()      # 방전 하한 20 %(기본 운용 범위) 보다 7 %p 위. 복합전력 ESS 도 바닥(쓸 에너지 0) — 같이 쓰는 ESS 가 넉넉하면 버틸 시간이 목표를 넘어 3등급을 끊지 않는다
         self.assertTrue(self.rt.decide()["DG"])                                                                # 평시: 충전율이 낮으면 디젤
         self.rt.set_ops(posture="저소음", who="시험"); d = self.rt.decide(); self.assertFalse(d["DG"]); self.assertTrue(d["FC"]); self.assertTrue(d["_quiet"])
         self.loop(6, clk); self.assertEqual(int(self.plant.get("CB.L3")), 0); self.assertEqual(int(self.plant.get("CB.L2")), 1); self.assertIn("L3", self.rt.shedder.mine)
