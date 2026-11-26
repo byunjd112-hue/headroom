@@ -29,18 +29,19 @@ const InitCheck = {
   worst(items) { return items.some(i => i.level === "bad") ? "bad" : items.some(i => i.level === "warn") ? "warn" : "ok"; },
   /* 생각그물: 가운데(전체) → 가지(구분) → 마디(장비 · 부하). 마디가 많으면 두 줄로 늘어놓고 그림 높이가 따라 늘어난다 */
   map(la) {
-    const W = 1330, CX = W / 2, BX = 205, LW = 168, LH = 34, items = la.items, col = l => this.LV[l][2];
+    const W = 1410, CX = W / 2, BX = 205, LW = 190, LH = 36, items = la.items, col = l => this.LV[l][2];
     const grp = this.AREAS.map(([a, side, sub]) => { const it = items.filter(i => i.area === a), cols = it.length > 5 ? 2 : 1, rows = Math.ceil(it.length / cols); return { a, side, sub, it, cols, rows, h: Math.max(64, rows * (LH + 6) + 10) }; });
     const yy = { "-1": 16, 1: 16 }; grp.forEach(g => { g.y = yy[g.side]; yy[g.side] += g.h + 18; }); const H = Math.max(yy[-1], yy[1], 330) + 4, CY = H / 2;
     let h = `<defs>${typeof SPRITE_FILTERS === "string" ? SPRITE_FILTERS.replace(/id="sp/g, 'id="spIC') : ""}</defs>`;
     grp.forEach(g => { const bx = CX + g.side * BX, by = g.y + g.h / 2, w = this.worst(g.it), nok = g.it.filter(i => i.level === "ok").length;
       h += `<path class="ic-ln ${w}" d="M${CX + g.side * 84} ${CY} C${CX + g.side * 150} ${CY}, ${bx - g.side * 130} ${by}, ${bx - g.side * 74} ${by}"/>`;
       g.it.forEach((i, k) => { const c = Math.floor(k / g.rows), r = k % g.rows, lx = bx + g.side * (74 + 26 + c * (LW + 8)) + (g.side < 0 ? -LW : 0), ly = g.y + (g.h - g.rows * (LH + 6) + 6) / 2 + r * (LH + 6), jx = g.side < 0 ? lx + LW : lx;
-        const pic = typeof spriteSvg === "function" ? spriteSvg({ ELZ: "FC" }[i.pic] || i.pic, { on: i.level === "ok", fault: i.level === "bad" }, lx + 20, ly + LH - 3, 32) : null, nm = i.name.replace(/^기동형 복합전력\(디젤 · PCS\)/, "복합전력").replace(/^계측 · 보호 게이트웨이\(배전 · 변압\)/, "게이트웨이").replace(/ 차단기\(CB-.*\)$/, " 차단기");
+        const pk = { ELZ: "FC" }[i.pic] || i.pic, sm = typeof SPR_KEY !== "undefined" && S.sprites && S.sprites[SPR_KEY[pk]], pw = sm ? Math.min(32, (LH - 8) * sm.w / sm.h) : 32;      // 그림은 마디 상자 안에 들어가게(세로로 긴 그림은 폭을 줄인다)
+        const pic = typeof spriteSvg === "function" ? spriteSvg(pk, { on: i.level === "ok", fault: i.level === "bad" }, lx + 21, ly + LH - 4, pw) : null, nm = i.name.replace(/^기동형 복합전력\(디젤 · PCS\)/, "복합전력").replace(/^계측 · 보호 게이트웨이\(배전 · 변압\)/, "게이트웨이").replace(/ 차단기\(CB-.*\)$/, " 차단기").replace(/^(급전 [AB])\(.*\)$/, "$1").replace("구간분전함 · 배전체계 ID", "분전함 · 배전체계 ID");
         h += `<path class="ic-ln ${i.level}" d="M${bx + g.side * 74} ${by} C${bx + g.side * 92} ${by}, ${jx - g.side * 14} ${ly + LH / 2}, ${jx} ${ly + LH / 2}"/>
           <g class="ic-leaf ${i.level} ${this.sel === i.id ? "sel" : ""}" data-ic="${esc(i.id)}"><title>${esc(i.name)} — ${this.LV[i.level][0]}: ${esc(i.text)}</title><rect x="${lx}" y="${ly}" width="${LW}" height="${LH}" rx="9"/>
           ${pic ? pic.replace(/url\(#sp/g, "url(#spIC") : `<circle cx="${lx + 20}" cy="${ly + LH / 2}" r="9" fill="none" stroke="${col(i.level)}"/>`}
-          <text x="${lx + 42}" y="${ly + 14}" class="ic-nm">${esc(nm.length > 13 ? nm.slice(0, 12) + "…" : nm)}</text><text x="${lx + 42}" y="${ly + 27}" class="ic-st" fill="${col(i.level)}">${i.was ? "해결됨" : i.acked ? "확인함" : this.LV[i.level][0]}</text>
+          <text x="${lx + 44}" y="${ly + 15}" class="ic-nm">${esc(nm.length > 15 ? nm.slice(0, 14) + "…" : nm)}</text><text x="${lx + 44}" y="${ly + 28}" class="ic-st" fill="${col(i.level)}">${i.was ? "해결됨" : i.acked ? "확인함" : this.LV[i.level][0]}</text>
           <circle cx="${lx + LW - 12}" cy="${ly + LH / 2}" r="5" fill="${col(i.level)}" class="ic-dot"/></g>`; });
       h += `<g class="ic-br ${w}"><rect x="${bx - 74}" y="${by - 25}" width="148" height="50" rx="14"/><text x="${bx}" y="${by - 5}" text-anchor="middle" class="ic-bn">${esc(g.a)}</text>
         <text x="${bx}" y="${by + 12}" text-anchor="middle" class="ic-bs">${g.it.length ? (w === "ok" ? `정상 ${nok}` : [g.it.filter(i => i.level === "bad").length ? "이상 " + g.it.filter(i => i.level === "bad").length : "", g.it.filter(i => i.level === "warn").length ? "주의 " + g.it.filter(i => i.level === "warn").length : "", nok ? "정상 " + nok : ""].filter(Boolean).join(" · ")) : "해당 없음"}</text></g>`; });
