@@ -162,7 +162,7 @@ const P_SLD = {
 /* 설비 목록: IFPS 체계 구성(①~⑥) 기준. dev = 통신 장치(runtime.json devices), 없으면 감시 전용 */
 const CTL_UNITS = [
   { id: "DG", no: "①", nm: "기동형 복합전력공급체계 · 디젤발전기", en: "Hybrid power unit · diesel generator (via PCS)", col: "dg", dev: "DG", kw: "DG.kw", ctl: true },
-  { id: "G1", no: "①", nm: "기동형 복합전력공급체계 · ESS 60kWh (계통 형성 · 이동형 ESS 와 함께 충 · 방전)", en: "Grid-forming hybrid ESS · 100kW (via PCS)", col: "g1", dev: null, uq: "DG", kw: "DG.ess_kw" },      // 발전기와 한 제품: 같은 PCS 로 감시 · 제어하고 대수가 함께 바뀐다
+  { id: "G1", no: "①", nm: "기동형 복합전력공급체계 · ESS 200kWh (계통 형성 · 이동형 ESS 와 함께 충 · 방전)", en: "Grid-forming hybrid ESS · 100kW (via PCS)", col: "g1", dev: null, uq: "DG", kw: "DG.ess_kw" },      // 발전기와 한 제품: 같은 PCS 로 감시 · 제어하고 대수가 함께 바뀐다
   { id: "ESS", no: "②", nm: "이동형 ESS(GFM) · 1.0MWh / PCS 500kW", en: "Mobile grid-forming BESS", col: "ess", dev: "ESS", kw: "ESS.kw" },
   { id: "PV", no: "③", nm: "이동형 PV 발전체계 · 400kW급 (80kWp × 5식)", en: "Rollable thin-film PV · inverter", col: "pv", dev: "PV", kw: "PV.kw", ctl: true, on: "계통 연결", off: "분리", sp: ["PV.lim_set", "출력 제한", 400, 10] },
   { id: "FC", no: "④", nm: "수소생성·발전체계 · 연료전지 100kW", en: "PEM fuel cell", col: "fc", dev: "FC", kw: "FC.kw", ctl: true, sp: ["FC.kw_set", "출력 설정", 100, 5] },

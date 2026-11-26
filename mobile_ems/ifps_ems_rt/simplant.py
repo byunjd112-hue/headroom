@@ -32,7 +32,7 @@ class Plant:
             for suf, v in (("ess_soc", 70.0), ("mode_set", 3)):               # 복합전력 PCS: 처음에는 ESS 방전 모드(계통 형성), 충전율 70%
                 if fleet.kind(d) == "DG" and f"{d}.{suf}" in self.by_tag: self.set(f"{d}.{suf}", v)
 
-    hy_kwh = 60.0                                                     # 복합전력 차량 한 대의 ESS 용량(kWh, 설정의 hybrid.ess_kwh)
+    hy_kwh = 200.0                                                    # 복합전력 차량 한 대의 ESS 용량(kWh, 설정의 hybrid.ess_kwh)
     hy = {"stop": 0, "gen": 1, "charge": 2, "ess": 3}                 # 복합전력 PCS 의 모드 값(hybrid.CODE 와 같다). 설정에서 바꾸면 set_hybrid 로 맞춘다
 
     def set_hybrid(self, code):
@@ -126,7 +126,7 @@ class Plant:
         return dg, fc, elz
 
     def _tick_hybrid(self, u, closed):
-        """복합전력 PCS 한 대: 발전기 90 kW, ESS hy_kwh(기본 60 kWh). 모드 2 는 발전기가 20 kW 로 ESS 를 충전한다. 모드 3(ESS 방전)의 충 · 방전 전력은 _hybrid_share 가 정한다. 반환: 모선으로 나가는 전력(kW)"""
+        """복합전력 PCS 한 대: 발전기 90 kW, ESS hy_kwh(기본 200 kWh). 모드 2 는 발전기가 20 kW 로 ESS 를 충전한다. 모드 3(ESS 방전)의 충 · 방전 전력은 _hybrid_share 가 정한다. 반환: 모선으로 나가는 전력(kW)"""
         g = self._g; on = g(f"{u}.status") > 0.5; gen = 90.0 * on * closed
         if f"{u}.mode_set" not in self.by_tag: self._put(((f"{u}.kw", gen),)); return gen
         want = int(round(g(f"{u}.mode_set"))); soc = g(f"{u}.ess_soc"); c = self.hy

@@ -1041,7 +1041,7 @@
    {
     "type": "expect",
     "tag": "ESS.kw",
-    "value": 37.7,
+    "value": 33.3,
     "op": "eq",
     "ms": 0,
     "limit": 0
@@ -1104,7 +1104,7 @@
    {
     "type": "expect",
     "tag": "ESS.kw",
-    "value": 84.9,
+    "value": 75.0,
     "op": "eq",
     "ms": 0,
     "limit": 0
@@ -1245,7 +1245,7 @@
    {
     "type": "expect",
     "tag": "ESS.kw",
-    "value": 14.2,
+    "value": 12.5,
     "op": "eq",
     "ms": 0,
     "limit": 0
@@ -1276,7 +1276,7 @@
    {
     "type": "expect",
     "tag": "ESS.kw",
-    "value": -160.4,
+    "value": -141.7,
     "op": "eq",
     "ms": 0,
     "limit": 0
@@ -1313,7 +1313,7 @@
    {
     "type": "expect",
     "tag": "ESS.kw",
-    "value": -18.9,
+    "value": -16.7,
     "op": "eq",
     "ms": 0,
     "limit": 0
@@ -1488,7 +1488,7 @@
    {
     "type": "expect",
     "tag": "ESS.kw",
-    "value": 75.5,
+    "value": 66.7,
     "op": "eq",
     "ms": 0,
     "limit": 0
@@ -2526,7 +2526,7 @@
    {
     "type": "expect",
     "tag": "ESS.kw",
-    "value": 75.5,
+    "value": 66.7,
     "op": "eq",
     "ms": 0,
     "limit": 0
@@ -2637,7 +2637,7 @@
    {
     "type": "expect",
     "tag": "ESS.kw",
-    "value": 75.5,
+    "value": 66.7,
     "op": "eq",
     "ms": 0,
     "limit": 0
@@ -3360,7 +3360,7 @@
    {
     "type": "expect",
     "tag": "ESS.kw",
-    "value": 75.5,
+    "value": 66.7,
     "op": "eq",
     "ms": 0,
     "limit": 0

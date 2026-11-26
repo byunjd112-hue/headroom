@@ -10,7 +10,7 @@ const SRC = [
   { id: "FC", name: "수소 연료전지", en: "FUEL CELL", x: 440, col: "fc", kw: "FC.kw", sub: "100kW", bus: "A" },
   { id: "GDG", name: "주둔지 발전기", en: "GARRISON GEN", x: 590, col: "dg", kw: "GDG.kw", sub: "1MW 디젤", bus: "B" },
   { id: "ESS", name: "ESS (PCS)", en: "ESS (PCS)", x: 730, col: "ess", kw: "ESS.kw", sub: "1MWh / 500kW", bus: "B" },
-  { id: "G1", name: "복합전력 ESS", en: "HYBRID ESS", x: 880, col: "g1", kw: "DG.ess_kw", sub: "60kWh · PCS 경유", bus: "B" },
+  { id: "G1", name: "복합전력 ESS", en: "HYBRID ESS", x: 880, col: "g1", kw: "DG.ess_kw", sub: "200kWh · PCS 경유", bus: "B" },
 ];
 const LOADS = [
   { id: "L1", name: "1등급 필수 부하", en: "CLASS 1 · CRITICAL", x: 220, kw: "LOAD.p1_kw", bus: "A", col: "#ff6b8a" },

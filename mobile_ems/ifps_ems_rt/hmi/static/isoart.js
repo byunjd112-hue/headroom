@@ -131,7 +131,7 @@ const ISO_MODELS = {
   },
   DG(I, st) {
     return isoTruck(I, 0, 0, 9.4, (I, x, z, len) => {
-      let s = isoContainer(I, x, .1, z, len - 2.6, 2.3, 2.5, { label: "HYBRID POWER", sub: "ESS 60kWh + DG 60/30kW" });
+      let s = isoContainer(I, x, .1, z, len - 2.6, 2.3, 2.5, { label: "HYBRID POWER", sub: "ESS 200kWh + DG 60/30kW" });
       const gx = x + len - 2.4; s += I.box(gx, .25, z, 2.1, 2.0, 1.9, { t: "#6d7550", l: "#4c5336", r: "#3a402a" });
       s += I.faceL(gx, 2.25, z, 1.9, [0, 1, 2, 3, 4, 5, 6].map(i => `<rect x="${.2 + i * .26}" y=".3" width=".14" height="1.2" fill="#1d2016"/>`).join(""));
       s += I.box(gx + .7, .8, z + 1.9, .32, .32, 1.0, { t: "#3a3f30", l: "#5d6152", r: "#43473a" });

@@ -16,7 +16,7 @@ EMS 는 자립 지속시간에 이 ESS 의 에너지(soc_low 위의 양 × ess_k
 모드의 값 · 이름과 한계값은 제작사 PCS 사양에 맞춰 고친다 — runtime.json 의 hybrid(관리자 화면의 설정 편집 → '복합전력 PCS' 탭). 신호 주소는 대응표(pointmap.csv)의 DG.* 줄이다.
 """
 KEYS = ("stop", "gen", "charge", "ess")
-DEFAULT = {"soc_low": 20.0, "soc_ok": 50.0, "soc_full": 90.0, "ess_kwh": 60.0}      # ess_kwh: 차량 한 대의 ESS 용량(사용자 확인: 60 kWh 제품)
+DEFAULT = {"soc_low": 20.0, "soc_ok": 50.0, "soc_full": 90.0, "ess_kwh": 200.0}      # ess_kwh: 차량 한 대의 ESS 용량(사용자 확인: 200 kWh)
 CODE = {"stop": 0, "gen": 1, "charge": 2, "ess": 3}
 LABEL = {"stop": "정지", "gen": "발전기 단독", "charge": "발전기 + ESS 충전", "ess": "ESS 방전"}
 

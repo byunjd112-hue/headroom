@@ -587,7 +587,7 @@
     "soc_low": 20,
     "soc_ok": 50,
     "soc_full": 90,
-    "ess_kwh": 60,
+    "ess_kwh": 200,
     "modes": {
       "stop": 0,
       "gen": 1,
