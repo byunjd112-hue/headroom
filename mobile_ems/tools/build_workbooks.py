@@ -19,7 +19,8 @@ SAND = PatternFill("solid", fgColor="F3E9D2"); NOTE = Font(color="8A6D3B", itali
 PRICE = {"ppdu": (3.6, "63 A 3상 IP67 휴대용 분전함(상용품) £432~2,045/대의 상단, £1 ≈ 1,750원 — 군용화 · 시제 개발 가산 없음", "rubberbox.co.uk"),
          "cable_m": (0.025, "고무 유연 케이블 H07RN-F 5심 6 ㎟ £12.5~14.4/m", "farnell.com · rs-online.com"),
          "conn": (0.10, "IEC 60309 16 A 5극 IP67 플러그 약 54~116달러(호주 · 뉴질랜드)/개", "schnap.com.au · rs-online.com"),
-         "ats": (1.0, "16 A급 자동 절체기(단상) 약 NZ$1,236/대 — 3상 정지형(STS)의 공개 가격은 찾지 못함", "pbtech.co.nz")}
+         "ats": (1.0, "16 A급 자동 절체기(단상) 약 NZ$1,236/대 — 3상 정지형(STS)의 공개 가격은 찾지 못함", "pbtech.co.nz"),
+         "dio": (0.6, "16점 디지털 입력 원격 I/O(Modbus TCP, 상용품) 약 US$414/대, 달러 ≈ 1,400원 어림 — 군용화 · 배선 공사비 없음", "newegg.com")}
 
 
 def _find(folder, *keys):
@@ -133,11 +134,12 @@ def calc_book(src, dst, rev, ems_rev):
 
 # ───────────────────────── 개발비
 def cost_book(src, dst, rev, ems_rev):
-    wb = openpyxl.load_workbook(src); m = wb["시제작비"]; n_ppdu, n_by, l_by = 18, 8, 90
-    p_ppdu = round(n_ppdu * PRICE["ppdu"][0]); p_by = round(n_by * l_by * PRICE["cable_m"][0] + 2 * n_by * PRICE["conn"][0]); p_ats = round(n_by * PRICE["ats"][0])
+    wb = openpyxl.load_workbook(src); m = wb["시제작비"]; n_ppdu, n_by, l_by, n_dio = 18, 8, 90, 3      # 원격 I/O 3대 = 48점: 추가 장비 차단기 16개(추가 자리 13 + 복합전력 차량별 ESS 3)의 개폐 · 트립 접점 32점 + 여유
+    p_ppdu = round(n_ppdu * PRICE["ppdu"][0]); p_by = round(n_by * l_by * PRICE["cable_m"][0] + 2 * n_by * PRICE["conn"][0]); p_ats = round(n_by * PRICE["ats"][0]); p_dio = round(n_dio * PRICE["dio"][0], 1)
     add = [("완제 시제", f"⑥-2 PPDU-20 휴대용 배전체계 {n_ppdu}대(20 kW · IP67 · 6회로) — 임시 단가", 2, p_ppdu, (0, p_ppdu, p_ppdu), "P-1, P-2"),
            ("완제 시제", f"우회 결선 케이블(5심 6 ㎟ {l_by} m × {n_by}줄)·IP67 커넥터 — 임시 단가", 2, p_by, (0, 0, 2 * p_by), "P-1, P-2"),
-           ("완제 시제", f"PPDU 우회 절체 스위치 {n_by}대(16 A급) — 임시 단가", 2, p_ats, (0, 0, 2 * p_ats), "P-1, P-2")]
+           ("완제 시제", f"PPDU 우회 절체 스위치 {n_by}대(16 A급) — 임시 단가", 2, p_ats, (0, 0, 2 * p_ats), "P-1, P-2"),
+           ("완제 시제", f"장비별 차단기 상태 신호 연동 — 원격 I/O 16점 {n_dio}대(추가 장비 차단기 16개의 개폐 · 트립 접점) — 임시 단가", 2, p_dio, (0, 0, 2 * p_dio), "P-1, P-2")]
     k = len(add); _move_down(m, 23, 25, k)                                   # 공통 · 합계 · 정합성 줄을 아래로
     for i, (a, b, q, d, yrs, use) in enumerate(add):
         r = 23 + i; _style(m, 22, r)
@@ -147,9 +149,10 @@ def cost_book(src, dst, rev, ems_rev):
     m[f"E{rc}"] = f"=C{rc}*D{rc}"
     for col in "EFGH": m[f"{col}{rt}"] = f"=SUM({col}5:{col}{rc})"
     m[f"E{rv}"] = f"=SUM(F{rt}:H{rt})-E{rt}"
-    m["A2"] = str(m["A2"].value) + f" / {rev}: PPDU-20 · 우회 결선 · 절체 스위치 추가(임시 단가 — 「보완내역」 참조)"
+    m["A2"] = str(m["A2"].value) + f" / {rev}: PPDU-20 · 우회 결선 · 절체 스위치 · 장비별 차단기 신호 연동 추가(임시 단가 — 「보완내역」 참조)"
     t = wb["시험평가비"]; tests = [("보호시험", "우회 결선 절체(평소 열림 → 제 구간분전함 무전압 때 닫힘, 10 ms 이내 · 복귀 때 재개방)", "자체 시험기준(ATP)", "P-1", 1, 70, 3),
-                                   ("보호시험", "배전체계 병렬 · N+1 — 한 대 탈락 때 부하 넘겨받기, 구간분전함 고립 때 1등급 무정전", "자체 시험기준(ATP)", "P-1, P-2", 2, 55, 3)]
+                                   ("보호시험", "배전체계 병렬 · N+1 — 한 대 탈락 때 부하 넘겨받기, 구간분전함 고립 때 1등급 무정전", "자체 시험기준(ATP)", "P-1, P-2", 2, 55, 3),
+                                   ("보호시험", "장비별 차단기 상태 · 보호 코드 신호 연동 — 장비마다 차단기를 열고 닫아 화면 · 경보 · 공급 능력 판단 확인(EMS 설치 점검 포함)", "자체 시험기준(ATP)", "P-1, P-2", 1, 55, 3)]
     k2 = len(tests); _move_down(t, 27, t.max_row, k2)
     for i, (a, b, c, dd, e, f, hh) in enumerate(tests):
         r = 27 + i; _style(t, 26, r)
@@ -161,7 +164,7 @@ def cost_book(src, dst, rev, ems_rev):
     for col, c in zip("BCD", "FGH"): s[f"{col}6"] = f"=시제작비!{c}{rt}"
     for col, y in zip("BCD", (1, 2, 3)): s[f"{col}7"] = f"=시험평가비!D{tt + 1 + y}"
     s["A2"] = str(s["A2"].value) + " / PPDU-20 18대 · 1등급 부하 우회 결선 포함"
-    u = wb["시제운용·활용계획"]; per = p_ppdu + p_by + p_ats
+    u = wb["시제운용·활용계획"]; per = p_ppdu + p_by + p_ats + p_dio
     for r in (6, 7): u[f"I{r}"] = u[f"I{r}"].value + per
     u["F6"] = u["F6"].value + 2; u["F7"] = u["F7"].value + 1; u["I15"] = f"=I14-시제작비!E{rt}"
     u["G6"] = str(u["G6"].value) + "·우회 절체·N+1"; u["G7"] = str(u["G7"].value) + "·N+1"
@@ -171,17 +174,20 @@ def cost_book(src, dst, rev, ems_rev):
             (f"PPDU-20 {n_ppdu}대 / 식", p_ppdu, f"{n_ppdu}대 × {PRICE['ppdu'][0]} 백만원", f"{PRICE['ppdu'][1]} — {PRICE['ppdu'][2]}"),
             (f"우회 결선 케이블 · 커넥터 / 식", p_by, f"{n_by}줄 × {l_by} m × {PRICE['cable_m'][0]} + 커넥터 {2 * n_by}개 × {PRICE['conn'][0]}", f"{PRICE['cable_m'][1]} — {PRICE['cable_m'][2]} / {PRICE['conn'][1]} — {PRICE['conn'][2]}"),
             (f"PPDU 우회 절체 스위치 {n_by}대 / 식", p_ats, f"{n_by}대 × {PRICE['ats'][0]} 백만원", f"{PRICE['ats'][1]} — {PRICE['ats'][2]}"),
+            (f"장비별 차단기 상태 신호 연동(원격 I/O {n_dio}대) / 식", p_dio, f"{n_dio}대 × {PRICE['dio'][0]} 백만원", f"{PRICE['dio'][1]} — {PRICE['dio'][2]}"),
             ("시험: 우회 결선 절체", 70, "1회 × 70", "기존 'STS 무정전 절체' 항목의 단가를 준용"),
-            ("시험: 병렬 · N+1 · 구간분전함 고립", 110, "2회 × 55", "기존 'FDIR 고장 격리 · 우회 급전 복구' 항목의 단가를 준용"), (),
+            ("시험: 병렬 · N+1 · 구간분전함 고립", 110, "2회 × 55", "기존 'FDIR 고장 격리 · 우회 급전 복구' 항목의 단가를 준용"),
+            ("시험: 장비별 차단기 신호 연동", 55, "1회 × 55", "기존 'FDIR 고장 격리 · 우회 급전 복구' 항목의 단가를 준용"), (),
             ("한계",), ("· 새 품목의 단가는 공개된 상용품 시세를 어림 환율(£1 ≈ 1,750원, 호주 · 뉴질랜드달러 ≈ 800~900원)로 바꾼 임시값이다. 군용화 · 시제 개발 · 인증 비용이 들어 있지 않아 실제 시제 단가는 더 클 수 있다 — 견적으로 바꿔야 한다.",),
             ("· 우회 결선의 줄 수(8) · 길이(90 m)는 1등급 부하 두 곳에 배전체계 4대씩을 가정한 값이다. 계산서 07A_우회결선·N+1 의 권장 굵기 · 대수가 정해지면 다시 계산한다.",),
             ("· 3상 정지형 절체 스위치(STS)의 공개 가격을 찾지 못해 단상 자동 절체기 시세를 넣었다.",),
+            ("· 장비별 차단기 상태 신호는 차단기 보조 접점을 원격 I/O 로 받는다고 가정했다(차단기 16개 × 개폐 · 트립 2점). 보호 계전기가 통신으로 상태를 내주면 이 품목은 줄거나 없어진다. 배선 · 단자 · 공사비는 넣지 않았다.",),
             ("· 인건비 · 기타직접비는 바꾸지 않았다. 간접비 · 재원 분담은 수식으로 따라 바뀐다.",)]
     for i, r in enumerate(rows, 1):
         for j, v in enumerate(r): n.cell(row=i, column=1 + j, value=v)
     n["A1"].font = BOLD
     for c in n[3]: c.font = BOLD
-    for r in (4, 5, 6): n[f"B{r}"].fill = SAND
+    for r in (4, 5, 6, 7): n[f"B{r}"].fill = SAND
     wb.save(dst)
 
 

@@ -133,6 +133,8 @@ B_DESIGN = [  # FM, 보완설계 반영 내용, 반영 대상, 검증 방법, �
  ["FM-72", "부하 목록 관리 화면과 범위 검사(Rev55 반영), 부하 반입 · 철수 점검표", "loads.py(check), hmi/loadctl.py", "test_load_book_changes_follow_everywhere", "운용", "운용부대"],
  ["FM-73", "분기 전력계 대조 경보와 전력량 이상 처리(Rev56 반영), 전력계 사양 확정", "ring.py(meter_tags), hmi/ringwatch.py(_meters), branchfc.py", "test_branch_meters_and_forecast_view, test_meter_reset_falls_back_to_power_samples, 실장비 전력계 대조", "FAT", "체계통합(SI)"],
  ["FM-75", "부하별 배전체계 대수(병렬) · 공급 경로 계산과 부족 · 초과 안내, 구간분전함 과부하 경보(Rev60 반영)", "loads.py(need·spots·attach·plan), ring.py(spec·_alt), contingency.py, hmi/loadctl.py · ringwatch.py", "test_ring_keeps_supplying_through_a_break, test_ratings_and_assumptions_are_settings, test_branch_meters_and_forecast_view, 병렬 배전체계 한 대 제거 시험", "SAT", "운용부대"],
+ ["FM-76", "장비마다의 차단기 · 출력 신호 읽기와 공급 능력 반영(Rev64 반영), 게이트웨이 사양 확정 뒤 주소 갱신", "simplant.py(_cbu·_cbg), runtime.py(_fed·_g1_avail), fleet.py(unit_kw), static/sld.js(cbn)", "test_extra_units_are_recognized_summed_and_commanded, 장비별 차단기 개폐 시험", "FAT", "체계통합(SI)"],
+ ["FM-77", "설치 점검(검사 · 고치는 방법 안내 · 다시 검사 · 이력)(Rev64 반영), 전개 점검표", "hmi/initcheck.py, static/initcheck.js, hmi/report.py(_init)", "test_init_check, test_open_point_must_match_the_setting, tools/config_sweep_check.js", "SAT", "운용부대"],
  ["FM-74", "모선 구성의 점검 · 자동 보완 · 경보(Rev59 반영), 결선 점검표", "busplan.py(check·auto), hmi/busctl.py, static/busplan.js", "test_bus_plan_check_and_auto_fix, test_bus_plan_and_layout_scale, 연계 차단기 개방 시험", "SAT", "운용부대"],
 ]
 B_DESIGN_NOTE = "※ [신규] 표기는 현 리비전 소프트웨어에 없는 기능으로, 다음 리비전 설계 반영이 필요한 제안 사항이다. 구현·검증 전에는 해당 고장모드의 개선 후 RPN 을 인정하지 않는다."
@@ -182,6 +184,8 @@ S09 = [  # No, FM, 현 예방대책, 구현 위치, 검증 시험, 판정
  [18, "FM-10·28", "없음(현 리비전 미구현)", "—", "—", "미구현 — 보완설계 대상"],
  [19, "FM-05·49", "설정 편집기: 저장 전 검사·백업·되돌리기·비밀 값 가림", "ifps_ems_rt/hmi/cfgedit.py", "test_pointmap_errors_block_save, test_pointmap_save_backup_pending_and_restore, test_runtime_validation_and_secret_kept, test_backups_are_pruned_and_broken_backup_refused", "시험 확인"],
  [20, "FM-49", "기동 전 점검·기동 거부", "runtime.py(--check), engine.py(security_check)", "test_check_scans_and_module_entry, test_start_failures_return_codes, test_unverified_crypto_refused_in_operation_mode", "시험 확인"],
+ [21, "FM-76", "장비마다의 차단기 · 출력 신호와 공급 능력 판단", "simplant.py(_cbu), runtime.py(_fed · _g1_avail), fleet.py(unit_kw), hmi/eng_alarms.py(_alarms_unit_cb)", "test_extra_units_are_recognized_summed_and_commanded", "시험 확인(가상 장치 — 주소는 가정값)"],
+ [22, "FM-77", "설치 점검: 검사 · 안내 · 다시 검사 · 완료 조건", "hmi/initcheck.py, static/initcheck.js", "test_init_check, test_open_point_must_match_the_setting", "시험 확인(가상 장치)"],
 ]
 B_CRIT = [["점수", "심각도 S (임무 영향)", "발생도 O (예상 빈도)", "검출도 D (사전 검출 가능성)"],
  ["9~10", "1등급(임무 필수) 부하 급전 상실 또는 인명·설비 위험", "매우 높음 (월 1회 이상)", "상시 감시 불가 — 고장 후 인지"],
