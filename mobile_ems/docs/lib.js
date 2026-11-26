@@ -42,7 +42,7 @@ function nodash(t) {
   return t.replace(/\s*[—–]\s*/g, rep).replace(/([가-힣)]) - (?=[가-힣(])/g, (m, a, off, all) => a + rep(m, off + 1, all));
 }
 const run = (t, o = {}) => { const mono = o.font === "Consolas" || o.font === "Cambria Math";
-  return new TextRun(Object.assign({ text: TN.fx && !mono && typeof t === "string" ? TN.fx(t) : t, font: F, size: S.body, color: "000000" }, TN.scale && !mono ? { scale: TN.scale, characterSpacing: TN.cs } : {}, o)); };
+  return new TextRun(Object.assign({ text: typeof t !== "string" || !TN.fx ? t : !mono ? TN.fx(t) : o.font === "Cambria Math" ? t.replace(/ ?· ?/g, " × ") : /[가-힣]/.test(t) ? nodot(nodash(t)) : t, font: F, size: S.body, color: "000000" }, TN.scale && !mono ? { scale: TN.scale, characterSpacing: TN.cs } : {}, o)); };
 const P = (t, o = {}) => new Paragraph(Object.assign({ spacing: SP.body, children: Array.isArray(t) ? t : [run(t)] }, TN.just ? { alignment: AlignmentType.BOTH } : {}, o));
 const head = (lv, k) => t => (NI++, Object.assign(new Paragraph({ heading: lv, spacing: SP[k], children: [run(t, { size: S[k], bold: true })] }), { __h: true }));
 const H1 = head(HeadingLevel.HEADING_1, "h1"), H2 = head(HeadingLevel.HEADING_2, "h2"), H3 = head(HeadingLevel.HEADING_3, "h3");

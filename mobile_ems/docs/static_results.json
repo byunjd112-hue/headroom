@@ -1,6 +1,6 @@
 {
- "date": "2026-11-26 14:13",
- "unittest_s": 725.3,
+ "date": "2026-11-26 23:07",
+ "unittest_s": 603.3,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -225,15 +225,15 @@
  "n_tests": 219,
  "tests_ok": true,
  "retried": [],
- "coverage_pct": 92.6,
+ "coverage_pct": 92.7,
  "stmt": {
   "n": 7811,
-  "hit": 7457,
+  "hit": 7461,
   "pct": 95.5
  },
  "branch": {
   "n": 2774,
-  "hit": 2349,
+  "hit": 2350,
   "pct": 84.7
  },
  "coverage_files": [
@@ -281,7 +281,7 @@
    "ifps_ems_rt/hmi/archwatch.py",
    80.6,
    108,
-   62.5,
+   60.4,
    48,
    "29-30, 43, 56, 59-63, 67-68, 114-116, 120-122, 132-134, 137"
   ],
@@ -430,14 +430,6 @@
    "104, 108-110"
   ],
   [
-   "ifps_ems/nowcast.py",
-   96.4,
-   84,
-   81.2,
-   32,
-   "32, 57, 60"
-  ],
-  [
    "ifps_ems/skycam.py",
    96.4,
    84,
@@ -452,14 +444,6 @@
    86.4,
    44,
    "69-72, 161, 165"
-  ],
-  [
-   "ifps_ems_rt/archive.py",
-   96.6,
-   148,
-   83.3,
-   30,
-   "95-96, 110, 128-129"
   ],
   [
    "ifps_ems_rt/hmi/eng_command.py",
@@ -518,6 +502,14 @@
    "53"
   ],
   [
+   "ifps_ems/nowcast.py",
+   97.6,
+   84,
+   84.4,
+   32,
+   "32, 57"
+  ],
+  [
    "ifps_ems/learner.py",
    97.7,
    173,
@@ -542,12 +534,12 @@
    "52"
   ],
   [
-   "ifps_ems_rt/archdev.py",
-   97.9,
-   141,
-   88.3,
-   60,
-   "93-94, 110"
+   "ifps_ems_rt/archive.py",
+   98.0,
+   148,
+   83.3,
+   30,
+   "95-96, 110"
   ],
   [
    "ifps_ems_rt/hmi/docx.py",
@@ -564,6 +556,14 @@
    78.8,
    52,
    "117-118"
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   98.5,
+   196,
+   94.1,
+   68,
+   "205, 217-218"
   ],
   [
    "ifps_ems_rt/runtime.py",
@@ -606,20 +606,20 @@
    "134"
   ],
   [
-   "ifps_ems_rt/simplant.py",
-   99.0,
-   196,
-   94.1,
-   68,
-   "217-218"
-  ],
-  [
    "ifps_ems_rt/fmsite.py",
    99.2,
    118,
    90.7,
    54,
    "67"
+  ],
+  [
+   "ifps_ems_rt/archdev.py",
+   99.3,
+   141,
+   88.3,
+   60,
+   "110"
   ],
   [
    "ifps_ems_rt/weather.py",
@@ -801,7 +801,7 @@
    "ifps_ems_rt/hmi/fcstats.py",
    100.0,
    29,
-   87.5,
+   100.0,
    8,
    ""
   ],
@@ -2130,7 +2130,7 @@
   "ifps_ems_rt/simplant.py:121:12: local variable 'cb' is assigned to but never used",
   "ifps_ems_rt/simplant.py:187:9: local variable 'on' is assigned to but never used",
   "tools/build_workbooks.py:15:1: 'openpyxl.styles.Alignment' imported but unused",
-  "tools/build_workbooks.py:175:14: f-string is missing placeholders"
+  "tools/build_workbooks.py:186:14: f-string is missing placeholders"
  ],
  "bandit": {
   "totals": {
@@ -2142,7 +2142,7 @@
    "SEVERITY.LOW": 1,
    "SEVERITY.MEDIUM": 2,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 10133,
+   "loc": 10203,
    "nosec": 0,
    "skipped_tests": 22
   },
