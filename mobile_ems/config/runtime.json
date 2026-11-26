@@ -11,6 +11,7 @@
   "plan": 1,
   "g1_kw": 100.0,
   "autonomy_target_h": 72,
+  "quiet_target_h": 12,
   "garrison": {
     "peak_kw": 150,
     "import_min_kw": 5,
@@ -383,7 +384,9 @@
     "lon": 127.0,
     "dg_kw": 90.0,
     "elz_kw": 150.0,
-    "h2_min": 0.3
+    "h2_min": 0.3,
+    "soc_min": 0.2,
+    "soc_max": 0.8
   },
   "fuel": {
     "dg_tank_l": 1000,

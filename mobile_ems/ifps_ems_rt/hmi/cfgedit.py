@@ -95,8 +95,15 @@ def _check_top(cfg, bad):
     for k, (lo, hi) in RANGE.items():
         if k in cfg and not _in(cfg[k], lo, hi): bad.append(f"{k}: {lo}~{hi} 범위의 숫자")
     if cfg.get("run_mode", "개발") not in ("개발", "운용"): bad.append("run_mode: '개발' 또는 '운용'")
-    for k, v in (cfg.get("site") or {}).items():
+    _check_site(cfg.get("site") or {}, bad)
+
+
+def _check_site(st, bad):
+    """설비 정격(site): 0 이상 숫자, ESS 충전율 운용 범위(방전 하한 · 충전 상한)."""
+    for k, v in st.items():
         if not isinstance(v, (str, list, dict)) and (not _num(v) or v < 0): bad.append(f"site.{k}: 0 이상 숫자")
+    lo, hi = st.get("soc_min", 0.2), st.get("soc_max", 0.8)
+    if _num(lo) and _num(hi) and not (0.05 <= lo <= 0.5 and 0.5 <= hi <= 1.0 and hi - lo >= 0.2): bad.append("site: ESS 충전율 범위 — 방전 하한(soc_min) 0.05~0.5, 충전 상한(soc_max) 0.5~1.0, 차이 0.2 이상")
 
 
 def _check_garrison(g, bad):

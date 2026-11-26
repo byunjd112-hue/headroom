@@ -28,3 +28,14 @@ const Profile = {
   },
 };
 document.addEventListener("click", e => { const a = e.target.closest('[data-act="profile"]'); if (a) { e.preventDefault(); Profile.open(); } });
+
+/* ESS 충전율 운용 범위(방전 하한 · 충전 상한) 입력 — 개요의 'ESS 충전율' 칸을 누르면 연다. 서버: hmi/esslimit.py */
+const EssLimit = {
+  async open() { if (!can("operator")) { toast("운용자 로그인이 필요합니다", "bad"); return loginDialog(); } const d = await api("/api/esslimit", { op: "get" }); if (!d.ok) return toast(d.why || "읽지 못했습니다", "bad");
+    const box = modal(`<h3>ESS 충전율 운용 범위</h3><p class="sub">EMS 는 이 범위 안에서 ESS 를 쓴다 — 하한 아래로 방전하지 않게, 상한 위로 충전하지 않게 운전한다. 기본 20 ~ 80 %. 배터리 자체의 보호 한계는 장비(BMS · PCS)가 지킨다.</p>
+      <div class="row" style="gap:18px;margin:14px 0;align-items:flex-end"><label>방전 하한(%)<br><input class="in" id="elLo" type="number" min="${d.lo_range[0]}" max="${d.lo_range[1]}" step="1" value="${d.lo}" style="width:110px"></label><label>충전 상한(%)<br><input class="in" id="elHi" type="number" min="${d.hi_range[0]}" max="${d.hi_range[1]}" step="1" value="${d.hi}" style="width:110px"></label><span class="muted" style="font-size:12px">하한 ${d.lo_range[0]}~${d.lo_range[1]} · 상한 ${d.hi_range[0]}~${d.hi_range[1]} · 차이 ${d.gap} %p 이상</span></div>
+      <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn pri" id="elSave">저장(엔지니어)</button><button class="btn" id="elClose">닫기</button></div>`);
+    box.querySelector("#elClose").onclick = closeModal;
+    box.querySelector("#elSave").onclick = async () => { if (!can("engineer")) { toast("엔지니어 권한 필요", "bad"); return loginDialog(); } const r = await api("/api/esslimit", { op: "set", lo: +box.querySelector("#elLo").value, hi: +box.querySelector("#elHi").value }); toast(r.ok ? r.msg : r.why, r.ok ? "ok" : "bad"); if (r.ok) { closeModal(); poll(); } }; },
+};
+document.addEventListener("click", e => { const a = e.target.closest('[data-act="esslimit"]'); if (a) { e.preventDefault(); EssLimit.open(); } });

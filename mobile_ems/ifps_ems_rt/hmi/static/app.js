@@ -105,7 +105,8 @@ const P_OV = {
     set("tRe", `${F.n(k.renew, 0)}<small>%</small>`, `태양광 ${F.kw(k.pv)}kW`, reDay == null ? "오늘 —" : `오늘 ${F.n(reDay, 0)}%`, bad("PV.kw") ? "stale" : "okc");
     set("tDg", k.dg_run ? `${F.kw(k.dg)}<small>kW</small>` : quiet ? "금지" : "정지", k.dg_run ? `운전 ${k.dg_run}/${k.dg_n}대 · ≈${F.n(k.fuel_lph || 0, 1)}L/h` : quiet ? "저소음 태세" : `대기 ${k.dg_n || 1}대`, `오늘 ${F.n(en.fuel_l || 0, en.fuel_l >= 10 ? 0 : 1)}L`, bad("DG.kw") ? "stale" : k.dg_run ? "warnc" : "");
     { const e = $("#tDg").closest(".tile"); if (e) e.title = `디젤 발전기: 지금 출력 · 운전 대수 · 지금 소모량(≈ 출력 × 설정 소비율, 추정) · 오늘 쓴 연료(적산 추정). 남은 연료 ${F.n(k.fuel, 0)} L 는 '연료 · 수소' 칸`; const r = $("#tRe").closest(".tile"); if (r) r.title = "재생에너지 활용률: 부하 가운데 태양광이 맡은 비율. 왼쪽 = 지금, 오른쪽 = 오늘 0시부터의 누적(태양광 발전량 ÷ 부하 사용량)"; }
-    set("tSoc", `${F.n(k.soc)}<small>%</small>`, k.ess >= 0 ? `방전 ${F.kw(k.ess)}kW` : `충전 ${F.kw(-k.ess)}kW`, k.ess_h ? `자립 ${F.hrs(k.ess_h)}h` : "충전 중", bad("ESS.soc") ? "stale" : k.soc < 19 ? "badc" : k.soc < 25 ? "warnc" : "");
+    set("tSoc", `${F.n(k.soc)}<small>%</small>`, k.ess >= 0 ? `방전 ${F.kw(k.ess)}kW` : `충전 ${F.kw(-k.ess)}kW`, `범위 ${F.n(k.soc_lo ?? 20, 0)}~${F.n(k.soc_hi ?? 80, 0)}%`, bad("ESS.soc") ? "stale" : k.soc < (k.soc_lo ?? 20) - 1 ? "badc" : k.soc < (k.soc_lo ?? 20) + 5 ? "warnc" : "");
+    { const e = $("#tSoc").closest(".tile"); if (e && !e.dataset.act) { e.dataset.act = "esslimit"; e.style.cursor = "pointer"; e.title = "ESS 충전율 운용 범위(방전 하한 · 충전 상한) — 누르면 고친다(엔지니어)"; } }
     set("tFuel", `${F.n(k.fuel, 0)}<small>L</small> <span style="font-size:20px">${F.n(k.h2, 0)}<small>Nm³</small></span>`, `디젤 ${F.hrs(k.fuel_h)}h`, `연료전지 ${F.hrs(k.h2_h)}h`, k.h2 < 150 || k.fuel < 300 ? "warnc" : "");
     const o = s.ops || {}, au = o.autonomy, hh = x => x >= 999 ? "∞" : F.n(x, 0), tied = o.mode === "grid" && !o.outage;
     const lab = $("#tResLab"); if (lab) lab.textContent = tied ? "상전 수전" : "N-1 순동 예비력";

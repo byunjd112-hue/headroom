@@ -25,7 +25,7 @@ class ViewMixin:
         return {"load": load, "pv": pv, "dg": dg, "fc": fc, "ess": ess, "soc": soc, "h2": h2, "fuel": fuel, "l1": g("LOAD.p1_kw"), "l2": g("LOAD.p2_kw"), "l3": g("LOAD.p3_kw"),
                 "gen": pv + dg + fc + max(ess, 0.0) + max(g("GRID.kw"), 0.0) + max(g("GDG.kw"), 0.0), "renew": (min(pv, load) / load * 100) if load > 1 else 0.0, "reserve_margin": margin, "reserve_need": margin < 0,
                 "online_kw": online, "ess_h": ess_h, "h2_h": h2 / (s.fc_kw * n("FC") * s.fc_nm3_per_kwh) if s.fc_kw else None, "fuel_h": fuel / (s.dg_kw * n("DG") * s.dg_l_per_kwh) if s.dg_kw else None,
-                "dg_run": run("DG"), "dg_n": n("DG"), "fuel_lph": max(dg, 0.0) * s.dg_l_per_kwh,
+                "soc_lo": s.soc_min * 100, "soc_hi": s.soc_max * 100, "dg_run": run("DG"), "dg_n": n("DG"), "fuel_lph": max(dg, 0.0) * s.dg_l_per_kwh,
                 "grid": g("GRID.kw"), "gdg": sum(g(f"{n}.kw") for n in rt.gdgs), "temp": g("ENV.temp"), "press": g("ENV.press"), "rh": g("ENV.rh"), "elz": elz, "g1_kw": rt.g1_kw(), "g1_n": rt.g1_n(), "hy": hybrid.view(rt.cfg.get("hybrid"))}
 
     def _snap_values(self, now):

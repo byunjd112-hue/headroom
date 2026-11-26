@@ -250,3 +250,8 @@ python -m ifps_ems_rt.hmi.pin                               # PIN 해시 생성(
 - **개요 맨 위 칸 8개**: 디젤 가동(출력 · 운전 대수 · 소모량 추정 · 오늘 쓴 연료), 재생에너지 활용률(지금 · 오늘 누적)을 더했다.
 - **구성 저장 · 불러오기** `hmi/siteprofile.py`(`POST /api/profile`): 장비 대수 · 모선 구성 · 부하 목록 · 배치도 · 상시 개방점.
 - **기본 구성** `config/site_default.json`: 실행 스크립트로 켜면 처음 한 번 적용된다. 점검 도구 · 화면 캡처는 `--plain`(적용 안 함)으로 켠 서버에서 돌린다 — 도구의 대조 기준이 예전 기본 목록(부하 4줄)이다.
+
+## Rev67 추가
+- **ESS 충전율 운용 범위** `hmi/esslimit.py`(`POST /api/esslimit`): 방전 하한 · 충전 상한을 화면(개요의 ESS 충전율 칸)에서 입력한다. 기본 20 ~ 80 %(`runtime.json` 의 `site.soc_min` · `soc_max`).
+- 저소음 태세의 목표 시간 `quiet_target_h` = 12시간(발주처 확인).
+- 문서의 화면 그림을 기본 구성(`config/site_default.json`)으로 다시 찍었다. 점검 도구 4종은 `--plain` 서버에서, 캡처는 기본 구성 서버에서 돈다.

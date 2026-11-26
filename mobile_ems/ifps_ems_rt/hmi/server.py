@@ -9,11 +9,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from .. import modbus as mb
 from .engdefs import ROLES
-from . import scenarios, scenextra, archwatch, archcfg, seqppt, ringwatch, weatherwatch, unitctl, loadctl, busctl, siteprofile
+from . import scenarios, scenextra, archwatch, archcfg, seqppt, ringwatch, weatherwatch, unitctl, loadctl, busctl, siteprofile, esslimit
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_BODY = 128 * 1024
-POSTS = {"/api/ring": ringwatch, "/api/weather": weatherwatch, "/api/units": unitctl, "/api/loads": loadctl, "/api/bus": busctl, "/api/profile": siteprofile}      # 운용자 이상이 쓰는 요청(모듈의 http_post 로 넘긴다. 모선 구성은 그 안에서 엔지니어인지 다시 본다)
+POSTS = {"/api/ring": ringwatch, "/api/weather": weatherwatch, "/api/units": unitctl, "/api/loads": loadctl, "/api/bus": busctl, "/api/profile": siteprofile, "/api/esslimit": esslimit}      # 운용자 이상이 쓰는 요청(모듈의 http_post 로 넘긴다. 모선 구성은 그 안에서 엔지니어인지 다시 본다)
 
 
 def _quiet_write(out, body):

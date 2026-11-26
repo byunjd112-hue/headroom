@@ -79,6 +79,17 @@ class TestHmi(unittest.TestCase):
         finally:
             P({"op": "load", "name": "처음"}, en); P({"op": "del", "name": "처음"}, op); P({"op": "del", "name": "둘째 차량"}, op); self._until(lambda: len(e.snapshot()["fleet"]["ESS"]["units"]) == 1, 20.0)
 
+    def test_ess_soc_range_input(self):
+        """ESS 충전율 운용 범위: 기본 20 ~ 80 %, 엔지니어가 고치면 실행기의 한계 · 설정 파일 · 스냅샷이 함께 바뀌고, 틀린 값은 막는다."""
+        e = self.eng; op = self.login("4321"); en = self.login("8765"); P = lambda b, t: self.req("/api/esslimit", b, t)[1]
+        v = P({"op": "get"}, op); self.assertEqual((v["lo"], v["hi"]), (20.0, 80.0)); self.assertFalse(P({"op": "set", "lo": 25, "hi": 85}, op)["ok"])
+        try:
+            for lo, hi in ((3, 80), (20, 101), (45, 60), ("a", 80)): self.assertFalse(P({"op": "set", "lo": lo, "hi": hi}, en)["ok"], (lo, hi))
+            r = P({"op": "set", "lo": 25, "hi": 85}, en); self.assertTrue(r["ok"], r); self.assertAlmostEqual(e.rt.site.soc_min, 0.25); self.assertAlmostEqual(e.rt.site.soc_max, 0.85)
+            k = e.snapshot()["kpi"]; self.assertEqual((round(k["soc_lo"]), round(k["soc_hi"])), (25, 85)); self.assertEqual(json.load(open(e.cfg_path, encoding="utf-8"))["site"]["soc_min"], 0.25)
+        finally:
+            self.assertTrue(P({"op": "set", "lo": 20, "hi": 80}, en)["ok"])
+
     def test_site_default_preset_is_valid(self):
         """기본 구성 파일(config/site_default.json): 부하 목록 · 모선 구성 · 배치가 검사를 통과하는 값이고, 파일이 없으면 아무것도 하지 않는다."""
         from ifps_ems_rt import loads, busplan

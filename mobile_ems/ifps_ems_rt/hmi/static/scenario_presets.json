@@ -845,7 +845,7 @@
    {
     "type": "set",
     "tag": "ESS.soc",
-    "value": 30
+    "value": 33
    },
    {
     "type": "policy",
