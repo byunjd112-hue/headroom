@@ -31,12 +31,14 @@ const bd = { style: BorderStyle.SINGLE, size: 4, color: "808080" }, B = { top: b
 function TBL(head, rows, widths, o = {}) {
   const sum = widths.reduce((a, b) => a + b, 0), cw = widths.map(w => Math.round(w / sum * W));
   cw[cw.length - 1] += W - cw.reduce((a, b) => a + b, 0);
-  const cell = (t, i, hd) => new TableCell({ borders: B, width: { size: cw[i], type: WidthType.DXA }, margins: { top: 50, bottom: 50, left: 90, right: 90 }, verticalAlign: VerticalAlign.CENTER,
+  const cell = (t, i, hd, kx) => new TableCell({ borders: B, width: { size: cw[i], type: WidthType.DXA }, margins: { top: 50, bottom: 50, left: 90, right: 90 }, verticalAlign: VerticalAlign.CENTER,
     shading: hd ? { type: ShadingType.CLEAR, fill: "D9D9D9" } : undefined,
-    children: [new Paragraph({ alignment: hd || (o.center || []).includes(i) ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { line: 264 },
+    children: [new Paragraph({ keepNext: !!kx, alignment: hd || (o.center || []).includes(i) ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { line: 264 },
       children: [typeof t === "object" && t !== null ? run(String(t.t), { size: S.table, bold: true, color: t.c }) : run(String(t), { size: S.table, bold: hd || (o.bold || []).includes(i), font: (o.mono || []).includes(i) && !hd ? "Consolas" : F })] })] });
+  // o.keep = { whole, head, tail }: 줄 수가 whole 이하면 표를 한 쪽에 묶고, 길면 첫 head 줄 · 끝 tail 줄만 묶는다(쪽 끝에 한두 줄만 남거나 넘어가지 않게). 안 주면 예전대로
+  const k = o.keep, N = rows.length, kn = n => !!k && n < N - 1 && (N <= k.whole || n < k.head - 1 || n >= N - k.tail);
   return new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: cw, layout: TableLayoutType.FIXED,
-    rows: [new TableRow({ tableHeader: true, cantSplit: KEEP, children: head.map((h, i) => cell(h, i, true)) })].concat(rows.map(r => new TableRow({ cantSplit: KEEP, children: r.map((c, i) => cell(c, i, false)) }))) });
+    rows: [new TableRow({ tableHeader: true, cantSplit: KEEP, children: head.map((h, i) => cell(h, i, true, !!k)) })].concat(rows.map((r, n) => new TableRow({ cantSplit: KEEP, children: r.map((c, i) => cell(c, i, false, kn(n))) }))) });
 }
 const GAP = () => new Paragraph({ spacing: { after: SP.gap }, children: [] });
 const PB = () => new Paragraph({ children: [new PageBreak()] });

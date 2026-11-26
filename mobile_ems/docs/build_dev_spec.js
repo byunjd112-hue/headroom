@@ -6,22 +6,23 @@ const { Paragraph, ShadingType, HeadingLevel } = require("docx");
 const ROOT = path.join(__dirname, ".."), J = f => JSON.parse(fs.readFileSync(path.join(__dirname, f), "utf8"));
 const ST = J("static_results.json"), TR = J("test_results.json"), BM = J("forecast_benchmark.json"), SC = J("scenario_results.json");
 const CFG = JSON.parse(fs.readFileSync(path.join(ROOT, "config/runtime.json"), "utf8"));
-const ED = "제6판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
+const ED = "제7판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
 const REV = process.argv[2] || "Rev00", DATE = process.argv[3] || "2026. 11. 26.", OUT = process.argv[4] || __dirname + `/out/이동형전력체계EMS_개발용역의뢰사양서_${REV}.docx`;
 const body = []; let chap = 0, after = false;
 // 장 · 부록은 제목 문단의 '앞에서 쪽 나눔'으로 새 쪽에서 시작한다. 표 · 코드 뒤에는 빈 문단을 두지 않고 뒤 글의 앞 간격으로 띄운다(빈 쪽 방지)
-const HP = (t, brk) => new Paragraph({ heading: HeadingLevel.HEADING_1, pageBreakBefore: brk, keepNext: true, keepLines: true, spacing: { before: 0, after: 200 }, children: [L.run(t, { size: L.S.h1, bold: true })] });
-const CH = t => { chap++; after = false; body.push(HP(`제${chap}장  ${t}`, chap > 1)); };
+const HP = (t, brk, flow) => new Paragraph({ heading: HeadingLevel.HEADING_1, pageBreakBefore: brk, keepNext: true, keepLines: true, spacing: { before: flow ? 520 : 0, after: 200 }, children: [L.run(t, { size: L.S.h1, bold: true })] });
+const CH = t => { chap++; after = false; body.push(HP(`제${chap}장  ${t}`, false, chap > 1)); };
 const gapP = () => { const o = after ? { spacing: { before: 160, after: 100, line: 300 } } : {}; after = false; return o; };
 const S2 = t => { after = false; body.push(H2(t)); }, T = (...a) => a.forEach(x => body.push(P(x, gapP())));
-const tbl = (cap, head, rows, w, o) => { body.push(CAP(cap, true)); body.push(TBL(head, rows, w, o)); after = true; };
+const KEEP = { whole: 5, head: 3, tail: 2 };            // 표: 5줄까지는 한 쪽에, 길면 첫 3줄 · 끝 2줄을 묶는다(쪽 끝에 머리줄만 남거나 한 줄만 넘어가지 않게)
+const tbl = (cap, head, rows, w, o) => { body.push(CAP(cap, true)); body.push(TBL(head, rows, w, Object.assign({ keep: KEEP }, o))); after = true; };
 const req = (cap, rows) => tbl(cap, ["번호", "요구사항", "확인 방법"], rows, [13, 67, 20], { center: [0], bold: [0] });
 const note = t => { const o = after; after = false; body.push(new Paragraph({ spacing: { before: o ? 100 : 0, after: 100, line: 280 }, children: [L.run(t, { size: L.S.note, color: "595959" })] })); };
 const nums = items => { items.forEach((t, i) => body.push(new Paragraph({ keepNext: i < items.length - 1, keepLines: true, spacing: { before: i === 0 && after ? 160 : 0, after: 60, line: 300 }, indent: { left: 420, hanging: 420 }, children: [L.run(`${i + 1})  ${t}`)] }))); after = false; };
 const eq = t => { body.push(new Paragraph({ spacing: { before: after ? 160 : 40, after: 100 }, indent: { left: 400 }, children: [L.run(t, { font: "Cambria Math" })] })); after = false; };
 // 예시 코드: 파일을 그대로 싣는다. 한 묶음이 쪽 사이에서 갈리지 않게 한다
 const code = (cap, file) => { body.push(CAP(cap, true)); const a = fs.readFileSync(path.join(__dirname, "spec_examples", file), "utf8").replace(/\s+$/, "").split("\n");
-  a.forEach((l, i) => body.push(new Paragraph({ keepNext: i < a.length - 1, keepLines: true, spacing: { after: 0, line: 236 }, shading: { type: ShadingType.CLEAR, fill: "F2F2F2" }, indent: { left: 160 }, children: [L.run(l.replace(/\t/g, "    ") || " ", { font: "Consolas", size: 17 })] }))); after = true; };
+  a.forEach((l, i) => body.push(new Paragraph({ keepNext: i < a.length - 1, keepLines: true, spacing: { after: 0, line: 218 }, shading: { type: ShadingType.CLEAR, fill: "F2F2F2" }, indent: { left: 160 }, children: [L.run(l.replace(/\t/g, "    ") || " ", { font: "Consolas", size: 17 })] }))); after = true; };
 const rng = k => `${Math.min(...TR[k]).toFixed(2)} ~ ${Math.max(...TR[k]).toFixed(2)}`;
 const mean = a => a.reduce((x, y) => x + y, 0) / a.length, bm = (tg, h, k, m) => mean(BM.runs.map(r => r.targets[tg][k][h][m])).toFixed(2);
 const pts = fs.readFileSync(path.join(ROOT, "config/pointmap.csv"), "utf8").trim().split(/\r?\n/).slice(1).map(l => l.split(","));
@@ -353,10 +354,7 @@ req("표 4-16  공통 창", [
   ["DLG-06", "지령 확인: 선택 → 확인 → 실행. 대상 · 동작 · 값을 적고, 연동 조건이 맞지 않으면 사유를 보이고 막는다. 선택 뒤 정한 시간 안에 실행하지 않으면 선택을 푼다.", "지령 시험"],
   ["DLG-07", "로그인: 사용자 이름과 암호. 연속 실패는 잠그고 남은 시간을 보인다. 30분 무활동이면 자동 로그아웃하고 그 사실을 알린다.", "권한 시험"]]);
 S2("4.5 화면 구현 예시(C#)");
-T("아래는 요구사항을 C# 으로 구현하는 모습을 보인 예시다. 설계를 강제하는 것이 아니며, 수급자는 같은 요구를 만족하는 다른 구조를 제안할 수 있다. 예시는 이 문서를 쓰는 환경에서 컴파일을 확인하지 못했다.");
-code("코드 4-1  상태 묶음과 주기 갱신(UI-01 · UI-04)", "ex5_snapshot.cs");
-code("코드 4-2  선택 후 실행 지령의 화면 흐름(DLG-06 · DEV-02)", "ex6_command.cs");
-code("코드 4-3  부하 상태를 색과 글로 보이기(UI-03 · SLD-05)", "ex7_state.cs");
+T("요구사항을 C# 으로 구현하는 모습을 보인 예시를 부록 C 에 싣는다(코드 C-1 ~ C-3). 설계를 강제하는 것이 아니며, 수급자는 같은 요구를 만족하는 다른 구조를 제안할 수 있다.");
 
 /* ───────────────────────── 5 */
 CH("필수 기능 요구사항");
@@ -489,10 +487,7 @@ note("모드 값 · 이름 · 한계값 · ESS 용량은 설정에서 고친다.
 S2("7.7 환망 급전 계산");
 T("구간분전함 k 는 급전 A 쪽에서 k 까지의 구간이 모두 닫혀 있고 모선 A 가 살아 있거나, 급전 B 쪽에서 k 까지가 모두 닫혀 있고 모선 B 가 살아 있으면 급전된다. 열린 구간이 설정한 상시 개방점 한 곳뿐이면 정상, 없으면 고리가 닫힌 이상, 둘 이상이면 차단 · 단선으로 본다. 구간 차단과 절체 시간의 합은 3초를 넘지 않게 설정을 검사한다.");
 S2("7.8 기능 구현 예시(C++)");
-T("아래는 요구사항을 C++ 로 구현하는 모습을 보인 예시다. 동적 메모리 · 예외를 쓰지 않고, 함수의 반환은 하나, 자료형은 크기가 드러나는 별칭을 쓴다(제10장). C++03 · 경고를 오류로 처리하는 조건에서 컴파일을 확인하였다. 설계를 강제하는 것은 아니다.");
-code("코드 7-1  N-1 예비력(FN-23)", "ex1_reserve.cpp");
-code("코드 7-2  저소음 태세의 3등급 부하 판단(FN-21 · FN-31)", "ex2_shed.cpp");
-code("코드 7-3  선택 후 실행 지령의 상태 기계(FN-10 ~ FN-12)", "ex3_sbo.cpp");
+T("요구사항을 C++ 로 구현하는 모습을 보인 예시를 부록 C 에 싣는다(코드 C-4 ~ C-6). 동적 메모리 · 예외를 쓰지 않고, 함수의 반환은 하나, 자료형은 크기가 드러나는 별칭을 쓴다(제10장). 설계를 강제하는 것은 아니다.");
 
 /* ───────────────────────── 8 */
 CH("AI 기능 정의");
@@ -526,7 +521,7 @@ req("표 8-2  AI 요구사항", [
   ["AI-09", "예측의 근거(어떤 입력이 얼마나 기여했는지)를 운용자가 볼 수 있게 하는 것이 좋다.", "화면 점검"],
   ["AI-10", "정확도 수치는 현장 실측 자료로 재어 보고한다. 합성 자료의 결과를 성능 보장 수치로 쓰지 않는다.", "문서 검사"]]);
 S2("8.4 추론 구현 예시(C++)");
-code("코드 8-1  예측 추론: 표준화 뒤 가중합과 구간(AI-F1 ~ F3, AI-04)", "ex4_ridge.cpp");
+T("표준화 뒤 가중합과 구간을 구하는 추론의 예시를 부록 C 에 싣는다(코드 C-7).");
 
 /* ───────────────────────── 9 */
 CH("요구 성능");
@@ -726,5 +721,15 @@ tbl("표 A-2  참조 구현의 꾸러미와 이 사양서의 구성 요소", ["�
   ["ifps_ems_rt.hmi/static(화면)", "웹 화면 12종과 창, 교육 창", "CSCI-2 전체, EDU"]], [28, 46, 26], { bold: [0] });
 after = false; body.push(HP("부록 B  참조 시나리오 목록", true));
 tbl(`표 B-1  시나리오 ${SC.total}건(시스템 시험의 출발점으로 쓴다)`, ["번호", "이름", "분류"], SC.results.map((r, i) => [i + 1, r.name, r.cat]), [8, 58, 34], { center: [0] });
+
+after = false; body.push(HP("부록 C  구현 예시 코드", true));
+T("본문의 요구사항을 구현하는 모습을 보인 예시다. 설계를 강제하는 것이 아니다. C++ 예시(코드 C-4 ~ C-7)는 C++03 · 경고를 오류로 처리하는 조건에서 컴파일을 확인하였고, C# 예시(코드 C-1 ~ C-3)는 이 문서를 쓰는 환경에서 컴파일을 확인하지 못했다.");
+code("코드 C-1  상태 묶음과 주기 갱신(UI-01 · UI-04)", "ex5_snapshot.cs");
+code("코드 C-2  선택 후 실행 지령의 화면 흐름(DLG-06 · DEV-02)", "ex6_command.cs");
+code("코드 C-3  부하 상태를 색과 글로 보이기(UI-03 · SLD-05)", "ex7_state.cs");
+code("코드 C-4  N-1 예비력(FN-23)", "ex1_reserve.cpp");
+code("코드 C-5  저소음 태세의 3등급 부하 판단(FN-21 · FN-31)", "ex2_shed.cpp");
+code("코드 C-6  선택 후 실행 지령의 상태 기계(FN-10 ~ FN-12)", "ex3_sbo.cpp");
+code("코드 C-7  예측 추론: 표준화 뒤 가중합과 구간(AI-F1 ~ F3, AI-04)", "ex4_ridge.cpp");
 
 L.save(body, OUT, `이동형 전력체계 EMS 개발 용역 의뢰 사양서 ${ED}`);
