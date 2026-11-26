@@ -6,7 +6,7 @@ const { Paragraph, ShadingType, HeadingLevel } = require("docx");
 const ROOT = path.join(__dirname, ".."), J = f => JSON.parse(fs.readFileSync(path.join(__dirname, f), "utf8"));
 const ST = J("static_results.json"), TR = J("test_results.json"), BM = J("forecast_benchmark.json"), SC = J("scenario_results.json");
 const CFG = JSON.parse(fs.readFileSync(path.join(ROOT, "config/runtime.json"), "utf8"));
-const ED = "제11판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
+const ED = "제12판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
 const REV = process.argv[2] || "Rev00", DATE = process.argv[3] || "2026. 11. 26.", OUT = process.argv[4] || __dirname + `/out/이동형전력체계EMS_개발용역의뢰사양서_${REV}.docx`;
 L.tune({ scale: 95, cs: -3, just: true, cell: { top: 60, bottom: 60, left: 100, right: 100 }, tline: 260, fx: t => L.tidy(L.nodot(t)) });   // 장평 95 % · 자간 좁힘 · 본문 양쪽 정렬 · 표 칸 여백 · 줄바꿈 규칙
 const HL = require("./codehl.js"), { AlignmentType, BorderStyle } = require("docx");
@@ -510,8 +510,8 @@ note("방법은 참조 구현에서 사용한 것임. 수급자는 더 나은 �
 S2("8.2 수식(참조 방법)");
 eq("표준화: z_j = (x_j − μ_j) ÷ σ_j,   Z = [1, z_1, …, z_p]");
 eq("릿지 해: w = (ZᵀZ + λR)⁻¹ Zᵀy,   λ = 3,  R = 단위행렬(절편 자리 0)");
-eq("부하 예측: ŷ(o, h) = base(o) × [ W × (Z·w_b) + (1 − W) × y(o + h − 96) ÷ base(o) ],  b = 시간대 묶음");
-eq("구간: [ŷ + s·q_10, ŷ + s·q_90],   q = 보정 구간 잔차의 분위수,  s = 뒤 2일을 80 % 덮게 하는 배율(1 ≤ s ≤ 2.5)");
+eq("부하 예측: ŷ(o, h) = base(o) × [ W × (Z × w_b) + (1 − W) × y(o + h − 96) ÷ base(o) ],  b = 시간대 묶음");
+eq("구간: [ŷ + s × q_10, ŷ + s × q_90],   q = 보정 구간 잔차의 분위수,  s = 뒤 2일을 80 % 덮게 하는 배율(1 ≤ s ≤ 2.5)");
 eq("오차: NMAE = 평균|ŷ − y| ÷ 기준 크기 × 100 (%),   포함률 = 구간 안에 든 비율(%)");
 S2("8.3 요구사항");
 req("표 8-2  AI 요구사항", [
