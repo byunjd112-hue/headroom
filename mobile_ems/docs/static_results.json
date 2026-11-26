@@ -1,6 +1,6 @@
 {
- "date": "2026-11-26 08:22",
- "unittest_s": 709.6,
+ "date": "2026-11-26 09:35",
+ "unittest_s": 755.6,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -60,7 +60,7 @@
   "Excel 은 열리는 꾸러미(시트 3장, XML 정상), FAT · FMEA HTML 은 구성의 이름을 담는다. | ok",
   "장비 한 대 · 구간 · 구간분전함 · 부하마다 줄이 생기고, 번호는 기존 번호만 쓰며, 구성 때문에 달라지는 줄만 재검토로 표시한다. | ok",
   "test_10_security_lockout_hash_and_gate | ok",
-  "test_11_all_units_load_shed_elz_pv | ok",
+  "test_11_all_units_load_shed_elz_pv | 재시도 통과",
   "test_1_static_and_snapshot | ok",
   "test_2_auth_and_roles | ok",
   "test_3_sbo_command_with_ack | ok",
@@ -168,7 +168,7 @@
   "test_scan_reads_values_within_period | ok",
   "test_unverified_crypto_refused_in_operation_mode | ok",
   "test_branch_and_generated_source | ok",
-  "test_built_in_cases_and_expected_fault | FAIL",
+  "test_built_in_cases_and_expected_fault | ok",
   "test_malformed_threshold_is_rejected | ok",
   "test_no_ack_blocks_candidate_and_reports_injected_failure | ok",
   "test_parallel_runs_are_isolated_and_improvement_retests_batch | ok",
@@ -222,13 +222,15 @@
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
  "n_tests": 218,
- "tests_ok": false,
- "retried": [],
+ "tests_ok": true,
+ "retried": [
+  "test_11_all_units_load_shed_elz_pv"
+ ],
  "coverage_pct": 92.6,
  "stmt": {
   "n": 7758,
-  "hit": 7403,
-  "pct": 95.4
+  "hit": 7407,
+  "pct": 95.5
  },
  "branch": {
   "n": 2756,
@@ -382,11 +384,11 @@
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
-   93.8,
+   94.6,
    259,
    84.8,
    112,
-   "44-45, 60, 68, 71, 81, 91, 93, 95, 107, 111, 125, 134, 139, 229, 276"
+   "60, 68, 71, 81, 91, 93, 95, 107, 111, 125, 134, 139, 229, 276"
   ],
   [
    "ifps_ems_rt/hmi/scenextra.py",
@@ -451,14 +453,6 @@
    86.4,
    44,
    "69-72, 161, 165"
-  ],
-  [
-   "ifps_ems_rt/archive.py",
-   96.6,
-   148,
-   83.3,
-   30,
-   "95-96, 110, 128-129"
   ],
   [
    "ifps_ems_rt/hmi/eng_command.py",
@@ -547,6 +541,14 @@
    88.3,
    60,
    "93-94, 110"
+  ],
+  [
+   "ifps_ems_rt/archive.py",
+   98.0,
+   148,
+   83.3,
+   30,
+   "95-96, 110"
   ],
   [
    "ifps_ems_rt/hmi/docx.py",
@@ -1480,23 +1482,13 @@
   },
   "cc_max": 20,
   "len_max": 199,
-  "arg_max": 9,
+  "arg_max": 8,
   "depth_max": 5,
   "file_max": 577,
   "over": {
    "cc": [],
    "len": [],
-   "arg": [
-    [
-     "ifps_ems_rt/hmi/initcheck.py",
-     "_it",
-     23,
-     2,
-     4,
-     9,
-     0
-    ]
-   ],
+   "arg": [],
    "depth": [],
    "file": []
   },
@@ -1650,15 +1642,6 @@
   ],
   "top_arg": [
    [
-    "ifps_ems_rt/hmi/initcheck.py",
-    "_it",
-    23,
-    2,
-    4,
-    9,
-    0
-   ],
-   [
     "ifps_ems/dispatch.py",
     "rule_action",
     39,
@@ -1718,6 +1701,15 @@
     123,
     16,
     15,
+    8,
+    1
+   ],
+   [
+    "ifps_ems_rt/opsmode.py",
+    "garrison_step",
+    76,
+    10,
+    25,
     8,
     1
    ]
