@@ -9,12 +9,14 @@ EMS 는 이 체계의 PCS 와만 통신한다. 발전기와 ESS 의 감시 · �
   gen    1  발전기 단독       발전기만 공급(ESS 는 가득 차 있거나 쉬게 함)
   charge 2  발전기 + ESS 충전 발전기가 공급하면서 ESS 를 충전
   ess    3  ESS 방전          발전기 정지, ESS 가 공급(계통 형성 · 저소음)
+ESS 방전 모드에서는 복합전력의 ESS 도 이동형 ESS 와 함께 쓴다(사용자 요구, Rev67): 모선의 충 · 방전을 용량 비율로 나눠 맡는다(가상 장치의 모형 — 실제 분담은 두 PCS 의 수하 특성에 따른다).
+EMS 는 자립 지속시간에 이 ESS 의 에너지(soc_low 위의 양 × ess_kwh)를 더해 셈한다.
 자동 제어의 모드 선택: 디젤이 필요하면 charge(충전율이 soc_full 이상이면 gen), 필요 없으면 ess.
 복합전력의 ESS 가 soc_low 아래로 내려가면 발전기를 돌려 충전하고(want.DG 를 켬) soc_ok 를 넘으면 그친다(저소음 태세에서는 디젤을 켜지 않는다).
 모드의 값 · 이름과 한계값은 제작사 PCS 사양에 맞춰 고친다 — runtime.json 의 hybrid(관리자 화면의 설정 편집 → '복합전력 PCS' 탭). 신호 주소는 대응표(pointmap.csv)의 DG.* 줄이다.
 """
 KEYS = ("stop", "gen", "charge", "ess")
-DEFAULT = {"soc_low": 20.0, "soc_ok": 50.0, "soc_full": 90.0}
+DEFAULT = {"soc_low": 20.0, "soc_ok": 50.0, "soc_full": 90.0, "ess_kwh": 60.0}      # ess_kwh: 차량 한 대의 ESS 용량(사용자 확인: 60 kWh 제품)
 CODE = {"stop": 0, "gen": 1, "charge": 2, "ess": 3}
 LABEL = {"stop": "정지", "gen": "발전기 단독", "charge": "발전기 + ESS 충전", "ess": "ESS 방전"}
 
@@ -29,7 +31,7 @@ def settings(cfg):
 
 def view(cfg):
     """화면용: 모드 값과 이름."""
-    c = settings(cfg); return {"code": c["code"], "label": c["label"]}
+    c = settings(cfg); return {"code": c["code"], "label": c["label"], "ess_kwh": c["ess_kwh"]}
 
 
 def check(cfg, bad):
@@ -39,6 +41,7 @@ def check(cfg, bad):
     try: c = settings(cfg)
     except (TypeError, ValueError, AttributeError): bad.append("hybrid: 한계값 · 모드 값은 숫자여야 함"); return
     if not 0 <= c["soc_low"] < c["soc_ok"] < c["soc_full"] <= 100: bad.append("hybrid: 0 ≤ soc_low < soc_ok < soc_full ≤ 100 이어야 함")
+    if not 1 <= c["ess_kwh"] <= 5000: bad.append("hybrid.ess_kwh: 복합전력 ESS 용량은 1~5000 kWh")
     codes = list(c["code"].values())
     if len(set(codes)) != len(codes) or not all(0 <= v <= 65535 for v in codes): bad.append("hybrid.modes: 모드 값 네 개는 서로 달라야 하고 0~65535 여야 함")
     if not all(0 < len(v.strip()) <= 24 for v in c["label"].values()): bad.append("hybrid.labels: 모드 이름은 1~24자")

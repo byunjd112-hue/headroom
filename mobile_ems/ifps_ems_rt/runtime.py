@@ -299,7 +299,18 @@ class Runtime:
         g = lambda k, d=0.0: self.val.get(k, d); quiet = self.posture == "저소음"; gdg_e = 0.0
         if self.mode == "grid" and not quiet:
             gdg_e = sum(g(f"{n}.fuel_pct") / 100.0 * self.gar.gdg_tank_l / self.gar.gdg_l_per_kwh for n in self.gdgs)
-        self.auto_h = om.autonomy(self.site, soc, g("H2.nm3"), g("DG.fuel_l"), (g("LOAD.p1_kw"), g("LOAD.p2_kw"), g("LOAD.p3_kw")), self._pv_day(), quiet, gdg_e)
+        g1e = self._g1_kwh()                                               # 복합전력 차량의 ESS 도 같이 쓴다(사용자 요구) — 에너지에 더하고 따로 적는다
+        self.auto_h = om.autonomy(self.site, soc, g("H2.nm3"), g("DG.fuel_l"), (g("LOAD.p1_kw"), g("LOAD.p2_kw"), g("LOAD.p3_kw")), self._pv_day(), quiet, gdg_e + g1e)
+        self.auto_h["gdg_kwh"] = round(gdg_e, 0); self.auto_h["g1_kwh"] = round(g1e, 0)
+
+    def _g1_kwh(self):
+        """복합전력 ESS 에 남은 쓸 수 있는 에너지(kWh): 차단기가 닫힌 차량마다 (충전율 − soc_low) × 용량. 충전율을 못 읽으면 0."""
+        c = hybrid.settings(self.cfg.get("hybrid")); us = [n for n in self.fleet.slots.get("DG", ()) if n in self.fleet.live_now.get("DG", ())] or (["DG"] if "DG" in self.dev else [])
+        e = 0.0
+        for n in us:
+            soc = self.fleet.unit(n, "ess_soc", self.val)
+            if soc is not None and self.cb_closed(fleet.g1_cb(n)): e += max(0.0, soc - c["soc_low"]) / 100.0 * c["ess_kwh"]
+        return e
 
     def _shed_want(self, t, soc):
         """자립 운전 중 부하 차단 필요 여부. 공급 능력 = 지금 붙어 있는 전원의 합."""
@@ -327,7 +338,7 @@ class Runtime:
         """저소음 태세(디젤 금지)의 3등급 부하: 디젤 없이 지금 부하로 버틸 수 있는 시간이 목표(quiet_target_h)에 못 미칠 때만 줄인다 — 먼저 절감 공급, 그래도 모자라면 차단.
         공급 능력(kW)이 모자라는 경우는 평시와 같은 규칙이 이미 본다. 반환: 되살리면 다시 모자랄 급전선(되살리지 않는다)."""
         g = lambda k, d=0.0: self.val.get(k, d); qt = float(self.cfg.get("quiet_target_h", 12.0)); pv = self._pv_day()
-        hours = lambda p3: om.autonomy(self.site, soc, g("H2.nm3"), g("DG.fuel_l"), (g("LOAD.p1_kw"), g("LOAD.p2_kw"), p3), pv, True, 0.0)["full"]
+        hours = lambda p3: om.autonomy(self.site, soc, g("H2.nm3"), g("DG.fuel_l"), (g("LOAD.p1_kw"), g("LOAD.p2_kw"), p3), pv, True, self._g1_kwh())["full"]
         now = hours(g("LOAD.p3_kw")); self.quiet_h = now
         if not w["L3"] and now < qt: w["L3"] = f"저소음 태세: 디젤 없이 {now:.0f}시간 < 목표 {qt:.0f}시간(부하 · 발전 · 저장량 기준)"; w["_soft"].add("L3")
         return {"L3"} if h3 and hours(g("LOAD.p3_kw") + h3) < qt * 1.15 else set()

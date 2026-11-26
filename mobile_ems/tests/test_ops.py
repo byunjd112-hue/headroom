@@ -140,7 +140,7 @@ class TestOpsRuntime(Base):
         self.rt.gar.gdg_min_run_s = 0.0
         self.assertTrue(self.rt.tied()); self.assertFalse(self.rt.decide()["GDG"]); self.assertEqual(self.rt.gdgs, ["GDG"])
         self.plant.set("CB.GRID", 0); self.loop(3, clk); d = self.rt.decide(); self.assertFalse(d["GDG"]); self.assertIn("대기", self.rt.gdg_last["why"])        # 정전 직후: 발전기 대기
-        self.assertAlmostEqual(self.plant.get("ESS.kw"), self.plant.get("LOAD.kw") - self.plant.get("PV.kw"), delta=2.0)                                       # ESS 가 부하를 받는다
+        self.assertAlmostEqual(self.plant.get("ESS.kw") + self.plant.get("DG.ess_kw"), self.plant.get("LOAD.kw") - self.plant.get("PV.kw"), delta=2.0); self.assertGreater(self.plant.get("DG.ess_kw"), 0.5)                                       # ESS 가 부하를 받는다
         self.loop(4, clk, dt=10.0); d = self.rt.decide(); self.assertTrue(d["GDG"]); self.assertFalse(d["DG"]); self.assertTrue(d["_gdg"])                      # 30초 경과: 기동 판단, 이동형 디젤은 쉼
         done = self.rt.control(force=True); self.assertIn(("GDG", True, True), [x[:3] for x in done]); self.loop(4, clk)
         self.assertEqual(int(self.plant.get("GDG.status")), 1); self.assertEqual(int(self.plant.get("CB.GDG")), 1)

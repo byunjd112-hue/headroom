@@ -45,7 +45,7 @@ class Engine(ForecastMixin, AlarmsMixin, CommandMixin, AuthMixin, ViewMixin, Too
         if sim:
             pts = pm.load(os.path.join(base, cfg["pointmap"]), cfg["devices"])
             units = {n: d["unit"] for n, d in cfg["devices"].items()}
-            self.plant = Plant(pts, units); self.plant.slow["GDG"] = 5.0; self.plant.set_hybrid(hybrid.settings(cfg.get("hybrid"))["code"]); pa, pb = self.plant.start(self.hcfg.get("sim_ports", [0, 0]))
+            self.plant = Plant(pts, units); self.plant.slow["GDG"] = 5.0; self.plant.set_hybrid(hybrid.settings(cfg.get("hybrid"))["code"]); self.plant.hy_kwh = hybrid.settings(cfg.get("hybrid"))["ess_kwh"]; pa, pb = self.plant.start(self.hcfg.get("sim_ports", [0, 0]))
             c2 = copy.deepcopy(cfg); c2["allow"] = ["127.0.0.0/8"]
             for n in c2["devices"]: c2["devices"][n]["paths"] = [["127.0.0.1", pa], ["127.0.0.1", pb]]
             c2["pointmap"] = os.path.join(base, cfg["pointmap"]); c2["state_dir"] = os.path.join(base, cfg.get("state_dir", "state") + "_sim")

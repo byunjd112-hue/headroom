@@ -32,6 +32,7 @@ class Plant:
             for suf, v in (("ess_soc", 70.0), ("mode_set", 3)):               # 복합전력 PCS: 처음에는 ESS 방전 모드(계통 형성), 충전율 70%
                 if fleet.kind(d) == "DG" and f"{d}.{suf}" in self.by_tag: self.set(f"{d}.{suf}", v)
 
+    hy_kwh = 60.0                                                     # 복합전력 차량 한 대의 ESS 용량(kWh, 설정의 hybrid.ess_kwh)
     hy = {"stop": 0, "gen": 1, "charge": 2, "ess": 3}                 # 복합전력 PCS 의 모드 값(hybrid.CODE 와 같다). 설정에서 바꾸면 set_hybrid 로 맞춘다
 
     def set_hybrid(self, code):
@@ -125,22 +126,26 @@ class Plant:
         return dg, fc, elz
 
     def _tick_hybrid(self, u, closed):
-        """복합전력 PCS 한 대: 발전기 90 kW, ESS 200 kWh. 모드 2 는 발전기가 20 kW 로 ESS 를 충전한다. 모드 3(ESS 방전)의 방전 전력은 _hybrid_cover 가 정한다. 반환: 모선으로 나가는 전력(kW)"""
+        """복합전력 PCS 한 대: 발전기 90 kW, ESS hy_kwh(기본 60 kWh). 모드 2 는 발전기가 20 kW 로 ESS 를 충전한다. 모드 3(ESS 방전)의 충 · 방전 전력은 _hybrid_share 가 정한다. 반환: 모선으로 나가는 전력(kW)"""
         g = self._g; on = g(f"{u}.status") > 0.5; gen = 90.0 * on * closed
         if f"{u}.mode_set" not in self.by_tag: self._put(((f"{u}.kw", gen),)); return gen
         want = int(round(g(f"{u}.mode_set"))); soc = g(f"{u}.ess_soc"); c = self.hy
         key = ("charge" if want == c["charge"] else "gen") if on else ("ess" if want == c["ess"] else "stop"); mode = c[key]      # 충전은 충전 모드 지령을 받았을 때만(지령 없이 발전기만 돌면 발전기 단독)
         ess = (-20.0 if soc < 100.0 else 0.0) if key == "charge" else 0.0
         ess *= closed; dt = self._dt
-        self._put(((f"{u}.kw", gen), (f"{u}.ess_kw", ess), (f"{u}.pcs_mode", mode), (f"{u}.ess_soc", min(100.0, max(0.0, soc - ess * dt / 3600.0 / 200.0 * 100.0)))))
+        self._put(((f"{u}.kw", gen), (f"{u}.ess_kw", ess), (f"{u}.pcs_mode", mode), (f"{u}.ess_soc", min(100.0, max(0.0, soc - ess * dt / 3600.0 / self.hy_kwh * 100.0)))))
         return gen + ess
 
-    def _hybrid_cover(self, short, dt):
-        """자립 운전에서 이동형 ESS(②)가 맡지 못한 부족분을 'ESS 방전' 모드의 복합전력 ESS 가 방전해 메운다(대마다 100 kW 까지, 충전율 5% 위에서).
-        이동형 ESS 가 있으면 그쪽이 먼저 부담하는 것으로 단순화했다(실제 분담은 두 PCS 의 수하 특성에 따른다 — 가정)."""
-        g = self._g; us = [u for u in self.us("DG") if f"{u}.pcs_mode" in self.by_tag and int(round(g(f"{u}.pcs_mode"))) == self.hy["ess"] and g(f"{u}.ess_soc") > 5.0 and self._cbg(u)]
-        for u in us:
-            x = min(100.0, max(0.0, short) / len(us)); self._put(((f"{u}.ess_kw", x), (f"{u}.ess_soc", max(0.0, g(f"{u}.ess_soc") - x * dt / 3600.0 / 200.0 * 100.0))))
+    def _hybrid_share(self, duty, n_ess, dt):
+        """자립 운전에서 'ESS 방전' 모드의 복합전력 ESS 가 이동형 ESS(②)와 함께 모선의 충 · 방전(duty, + 방전)을 나눠 맡는다 — 용량(kWh) 비율로(사용자 요구: 같이 사용).
+        이동형 ESS 가 붙어 있지 않으면 전부 맡는다. 대마다 100 kW 까지, 방전은 충전율 5 % 위 · 충전은 100 % 아래에서. 반환: 복합전력 ESS 들이 맡은 전력(kW).
+        실제 분담은 두 PCS 의 수하 특성에 따른다 — 용량 비율은 가정."""
+        g = self._g; us = [u for u in self.us("DG") if f"{u}.pcs_mode" in self.by_tag and int(round(g(f"{u}.pcs_mode"))) == self.hy["ess"] and self._cbg(u)]
+        us = [u for u in us if (g(f"{u}.ess_soc") > 5.0 if duty > 0 else g(f"{u}.ess_soc") < 100.0)]
+        if not us: return 0.0
+        part = duty * (self.hy_kwh * len(us)) / (self.hy_kwh * len(us) + 1000.0 * n_ess) if n_ess else duty; x = max(-100.0, min(100.0, part / len(us)))
+        for u in us: self._put(((f"{u}.ess_kw", x), (f"{u}.ess_soc", min(100.0, max(0.0, g(f"{u}.ess_soc") - x * dt / 3600.0 / self.hy_kwh * 100.0)))))
+        return x * len(us)
 
     def _ess_con(self, ess_u):
         """차단기가 닫힌 ESS 들과 '붙은 ESS 가 있는가'(0 · 1). ESS 장치가 없으면 종류의 차단기를 본다."""
@@ -172,7 +177,7 @@ class Plant:
                 self.set("CB.GDG", 2 if int(round(g("CB.GDG"))) == 2 else int(on))
                 if on: gdg = min(1000.0, max(0.0, net - max(-500.0 * n_e, min(500.0 * n_e, ess_set))))
                 self.set("GDG.kw", gdg); self.set("GDG.fuel_pct", max(0.0, g("GDG.fuel_pct") - gdg * 0.26 / 5000.0 * 100.0 * dt / 3600.0))
-            ess = (net - gdg) * ce; grid = 0.0; self._hybrid_cover((net - gdg) - (ess if ess_u else 0.0), dt); self._exp_t = now                        # 연계가 아닐 때는 역송 시간을 세지 않는다(재투입 직후 곧바로 트립하지 않게)
+            ess = ((net - gdg) - self._hybrid_share(net - gdg, len(con) if ess_u else ce, dt)) * ce; grid = 0.0; self._exp_t = now                        # 연계가 아닐 때는 역송 시간을 세지 않는다(재투입 직후 곧바로 트립하지 않게)
         if "BUS.a_v" in self.by_tag: self._tick_bus(now)
         self._put((("GRID.kw", grid),))
         self._ess_share(ess_u, con, ess, dt)     # 여러 대면 똑같이 나누어 부담
