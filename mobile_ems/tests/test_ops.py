@@ -171,7 +171,11 @@ class TestOpsRuntime(Base):
         p.set("ESS.soc", 60.0); p.set("CB.GRID", 1); rt.scan()
         # ── 작전지: 상전을 쓰지 않는다(수전 계측이 있어도 판단에 넣지 않는다)
         rt.set_ops(mode="island", posture="평시"); settle(); self.assertFalse(rt.tied()); self.assertIsNone(rt.gar_last); self.assertNotIn("GDG", rt.decide()); self.assertEqual(st()[4:], (1, 1))
-        rt.set_ops(posture="저소음"); self.loop(5, clk); settle(); self.assertEqual(st()[1], 0); self.assertEqual(st()[4], 0); self.assertTrue(rt.decide().get("_quiet"))      # 디젤 금지, 3등급 차단
+        rt.set_ops(posture="저소음"); self.loop(5, clk); settle(); self.assertEqual(st()[1], 0); self.assertEqual(st()[4], 1); self.assertTrue(rt.decide().get("_quiet"))      # 디젤 금지. 저장량이 넉넉하면 3등급을 끊지 않는다(부하 · 발전 · 저장량을 보고 판단 — Rev66)
+        self.assertGreater(rt.quiet_h, 12.0); h2 = p.get("H2.nm3"); rt.load_frac = {"L3": 0.2, "L2": 0.3}; p.set("H2.nm3", 3.0); p.set("ESS.soc", 32.0); self.loop(6, clk)                                      # 수소 · 충전율이 줄어 디젤 없이 12시간을 못 버틴다 → 먼저 절감 공급
+        self.assertLess(rt.quiet_h, 12.0); self.assertEqual((st()[4], "L3" in rt.shedder.saved), (1, True)); self.assertTrue(any("부하 자동 절감 공급: 3등급" in e["text"] for e in rt.events))
+        self.loop(14, clk); self.assertEqual(st()[4], 0); self.assertIn("저소음 태세: 디젤 없이", rt.shedder.why["L3"]); self.assertEqual(st()[5], 1)                       # 절감 뒤에도 모자라면 차단(2등급은 그대로)
+        p.set("H2.nm3", h2); p.set("ESS.soc", 60.0); rt.load_frac = {}
         rt.set_ops(posture="평시"); self.loop(3, clk); clk[0] += 70; settle(); self.assertEqual(st()[4], 1)                                                                # 태세를 풀면 60초 뒤 복구
         # ── 주둔지 · 상전 연계
         rt.set_ops(mode="grid", posture="평시"); settle(); self.assertTrue(rt.tied()); self.assertEqual(st()[1:4], (0, 0, 0)); self.assertGreater(p.get("GRID.kw"), 100); self.assertLess(p.get("ESS.kw"), -20)   # 경부하: 상전으로 충전
@@ -184,7 +188,7 @@ class TestOpsRuntime(Base):
         # ── 주둔지 · 정전
         rt.set_ops(posture="평시"); settle(); p.set("CB.GRID", 0); self.loop(3, clk); self.assertFalse(rt.tied()); clk[0] += 40; settle(4)
         self.assertEqual(int(p.get("GDG.status")), 1); self.assertEqual(st()[0:3], (0, 0, 0))                                                                           # 정전 30초 지속 → 주둔지 발전기, 이동형 전원은 쉼
-        rt.set_ops(posture="저소음"); self.loop(5, clk); clk[0] += 700; settle(4); self.assertEqual(int(p.get("GDG.status")), 0); self.assertEqual(st()[1], 0); self.assertEqual(st()[4], 0)   # 저소음: 발전기·디젤 금지, 3등급 차단
+        rt.set_ops(posture="저소음"); self.loop(5, clk); clk[0] += 700; settle(4); self.assertEqual(int(p.get("GDG.status")), 0); self.assertEqual(st()[1], 0); self.assertEqual(st()[4], 1)   # 저소음: 발전기·디젤 금지. 3등급은 저장량이 넉넉해 그대로
         rt.set_ops(posture="자립"); self.loop(3, clk); clk[0] += 70; settle(4); self.assertEqual(int(p.get("GDG.status")), 1)                                             # 자립: 주둔지 발전기를 다시 쓴다
         p.set("CB.GRID", 1); self.loop(3, clk); clk[0] += 40; settle(4); self.assertTrue(rt.tied()); self.assertEqual(int(p.get("GDG.status")), 0)                        # 복전 → 발전기 정지
         self.assertAlmostEqual(p.get("GRID.kw"), rt.gar.import_min_kw, delta=1.5)                                                                                        # 태세가 자립이므로 복전 뒤에도 수전 최소화

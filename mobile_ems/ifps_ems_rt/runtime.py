@@ -308,11 +308,29 @@ class Runtime:
         avail = (s.ess_kw if ess_ok else 0.0) + self._g1_avail() + s.dg_kw * self._fed("DG") + s.fc_kw * self._fed("FC") + max(0.0, g("PV.kw"))
         avail += sum(self.gar.gdg_kw for n in self.gdgs if g(f"{n}.status") > 0.5 and g(f"CB.{n}", 1) == 1)
         target = max(0.0, self.auto_target_h - (t - self.t_posture) / 3600.0) if self.posture == "자립" else self.auto_target_h
-        sh = self.shedder; h2, h3 = sh.held.get("L2", 0.0), sh.held.get("L3", 0.0); a = (s, self.posture, soc, avail)
-        w = om.LoadShedder.want(*a, g("LOAD.p1_kw") + g("LOAD.p2_kw"), g("LOAD.kw"), self.auto_h, target)
+        sh = self.shedder; h2, h3 = sh.held.get("L2", 0.0), sh.held.get("L3", 0.0); quiet = self.posture == "저소음"
+        a = (s, "평시" if quiet else self.posture, soc, avail)             # 저소음의 3등급은 무조건 끊지 않는다 — _quiet_want 가 부하 · 발전 · 저장량으로 정한다(사용자 지적, Rev66)
+
+        def want(l12, l):
+            w = om.LoadShedder.want(*a, l12, l, self.auto_h, target)
+            w["_soft"] |= {f for f, m in (("L3", 0.06), ("L2", 0.03)) if w[f].startswith("자립 태세") and soc >= s.soc_min + m}      # 태세 때문에 끊을 때도 절감 공급을 먼저 거친다(절감 → 차단). 충전율이 바닥에 가까우면 바로 끊는다
+            if w["L2"] and "L2" not in w["_soft"]: w["_soft"].discard("L3")                                                           # 2등급을 바로 끊을 상황이면 3등급도 바로 끊는다
+            return w
+        w = want(g("LOAD.p1_kw") + g("LOAD.p2_kw"), g("LOAD.kw")); keep = set()
+        if quiet: keep = self._quiet_want(w, soc, h3)
         if h2 or h3:                                                 # 절감 · 차단으로 덜어 낸 부하를 되살렸을 때도 모자라는가 — 모자라면 되살리지 않는다(되살렸다 다시 끊는 일을 막는다)
-            k = om.LoadShedder.want(*a, g("LOAD.p1_kw") + g("LOAD.p2_kw") + h2, g("LOAD.kw") + h2 + h3, self.auto_h, target); w["_keep"] = {f for f in ("L2", "L3") if k[f]}
+            k = want(g("LOAD.p1_kw") + g("LOAD.p2_kw") + h2, g("LOAD.kw") + h2 + h3); keep |= {f for f in ("L2", "L3") if k[f]}
+        if keep: w["_keep"] = keep
         return w
+
+    def _quiet_want(self, w, soc, h3):
+        """저소음 태세(디젤 금지)의 3등급 부하: 디젤 없이 지금 부하로 버틸 수 있는 시간이 목표(quiet_target_h)에 못 미칠 때만 줄인다 — 먼저 절감 공급, 그래도 모자라면 차단.
+        공급 능력(kW)이 모자라는 경우는 평시와 같은 규칙이 이미 본다. 반환: 되살리면 다시 모자랄 급전선(되살리지 않는다)."""
+        g = lambda k, d=0.0: self.val.get(k, d); qt = float(self.cfg.get("quiet_target_h", 12.0)); pv = self._pv_day()
+        hours = lambda p3: om.autonomy(self.site, soc, g("H2.nm3"), g("DG.fuel_l"), (g("LOAD.p1_kw"), g("LOAD.p2_kw"), p3), pv, True, 0.0)["full"]
+        now = hours(g("LOAD.p3_kw")); self.quiet_h = now
+        if not w["L3"] and now < qt: w["L3"] = f"저소음 태세: 디젤 없이 {now:.0f}시간 < 목표 {qt:.0f}시간(부하 · 발전 · 저장량 기준)"; w["_soft"].add("L3")
+        return {"L3"} if h3 and hours(g("LOAD.p3_kw") + h3) < qt * 1.15 else set()
 
     def _garrison_control(self, tied, hr, soc):
         """수전 차단기가 투입된 동안의 ESS·태양광 설정값(역송 방지·피크 억제·시간대 충방전). 반환: 한 일 목록.

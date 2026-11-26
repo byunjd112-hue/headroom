@@ -16,7 +16,7 @@ function siteState(s) {
     EMS: r(s.alarm_cnt[1].act ? "bad" : "ok", `${s.auto ? "AUTO" : "MANUAL"} · ${F.n(s.stats.last_ms, 0)} ms`, s.alarm_cnt[1].act ? `긴급 경보 ${s.alarm_cnt[1].act}` : "정상"),
   };
   [["G1", "DG"], ["ESS", "ESS"], ["PV", "PV"], ["FC", "FC"]].forEach(([b, kd]) => { if (out[b].st !== "bad" && out[b].t !== "미설치") out[b].t += kCnt(kd); });       // 같은 종류 여러 대면 대수를 붙인다
-  ["L1", "L2", "L3"].forEach((f, i) => { const kw = [k.l1, k.l2, k.l3][i], c = cb(f); out[f] = !gw ? r("bad", "####", "게이트웨이 두절") : c === 2 ? r("bad", "0 kW", "트립 · 정전") : c === 0 ? r("idle", "0 kW", "개방") : LD.stage(f) === "save" ? r("warn", `${F.kw(kw)} kW`, "절감 공급 중") : r("ok", `${F.kw(kw)} kW`, "급전 중"); });
+  ["L1", "L2", "L3"].forEach((f, i) => { const kw = [k.l1, k.l2, k.l3][i], c = cb(f); out[f] = !gw ? r("bad", "####", "게이트웨이 두절") : c === 2 ? r("bad", "0 kW", "트립 · 정전") : c === 0 ? r("warn", "0 kW", LD.cutText(i + 1)) : LD.stage(f) === "save" ? r("warn", `${F.kw(kw)} kW`, "절감 공급 중") : r("ok", `${F.kw(kw)} kW`, "급전 중"); });
   return out;
 }
 /* 장비 카드: photos/ 폴더에 실사 이미지가 있으면 사진, 없으면 자체 벡터 일러스트 + 상태 띠 */
@@ -272,7 +272,7 @@ function siteMarkers() {
   const rg = S.snap && S.snap.ring, pp = !rg ? "" : rg.fsu.map(f => { const it = (L.view || L.items).find(i => i.kind === "FSU" && _fsuNo(i) === f.id); if (!it) return "";      // 구간분전함마다 표지 하나(이름 · 그 아래 배전체계 묶음의 전력 · 상태)
     return `<div class="spt ppdu ${MK.fsuOn() ? "" : "mini"}" data-at="${esc(f.id)}" data-uid="${it.uid}" style="left:${it.x / MAP_W * 100}%;top:${it.y / MAP_H * 100}%"><i class="lead"></i><i class="core"></i><div class="scard" title="끌어서 글상자를 옮긴다 · 오른쪽 버튼 = 제자리"><div class="sh">${esc(f.name)}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`; }).join("");
   box.dataset.n = (L.view || L.items).length + (rg ? rg.fsu.length * 100 : 0); box.dataset.ids = (L.view || L.items).map(i => i.uid).join(); box.innerHTML = pp + (L.view || L.items).filter(i => i.kind !== "FSU").map(it => {
-    const key = it.load ? "ld:" + it.load : it.bind, [x, y] = _mkPos(it), mini = it.load ? !!seen[key] : it.kind === "BARRACK" || seen[key]; seen[key] = 1;      // 부하는 목록의 한 줄마다 첫 그림에 표지를 단다
+    const key = it.load ? "ld:" + it.load : it.bind, [x, y] = _mkPos(it), mini = it.load ? !!seen[key] : it.kind === "BARRACK" || !!(it.spare && seen[key]); seen[key] = 1;      // 장비는 한 대마다 글상자를 단다(추가한 장비의 글상자가 마우스를 올려야만 보였다 — 사용자 지적). 부하는 목록의 한 줄마다 첫 그림에, 예비 자리는 종류마다 하나
     return `<div class="spt ${mini ? "mini" : ""}" data-act="goctl" data-uid="${it.uid}" style="left:${x}%;top:${y}%"><i class="lead"></i><i class="pulse"></i><i class="core"></i>
       <div class="scard" title="끌어서 글상자를 옮긴다 · 오른쪽 버튼 = 제자리"><div class="sh">${esc(it.name || LAY_KINDS[it.kind].nm)}${it.spare ? " · 예비 자리" : ""}</div><div class="sv"><span class="mono">—</span><span class="ss">—</span></div></div></div>`;
   }).join("");

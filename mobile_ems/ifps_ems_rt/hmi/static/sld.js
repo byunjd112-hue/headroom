@@ -117,11 +117,11 @@ function sldTiles(lds, fsu, x, cx, ty, room, st) {
   const m = lds.length, gap = 5, w = Math.max(30, Math.min(100, (room - gap * (m - 1)) / m)), k = w / 100, kk = Math.max(.6, k), h = 64 * k, x0 = cx - (m * w + (m - 1) * gap) / 2, c = i => x0 + w / 2 + i * (w + gap);
   const cls = st.bad ? "flt" : st.fed ? "on" : "off", col = st.bad ? "var(--alarm)" : st.fed ? "var(--ok)" : "var(--warn)", fz = 13 * kk, cap = Math.max(6, Math.floor((w + gap) / (fz * .68)));
   let g = `<path class="ln ${cls}" d="M${x} ${ty - 10} H${Math.min(x, c(0))} M${x} ${ty - 10} H${Math.max(x, c(m - 1))}"/>`;
-  lds.forEach((q, i) => { const X = c(i), nm = LD.label(q), sp = spriteSvg(q.spr, { on: st.fed, fault: st.bad }, X, ty + h - 2, 92 * k);
-    g += `<path class="ln ${cls}" d="M${X} ${ty - 10} V${ty}"/><rect class="sring-ld ${st.bad ? "off" : st.fed ? "on" : ""}" x="${X - w / 2}" y="${ty}" width="${w}" height="${h}" rx="${9 * kk}"/>${sp ? sp.replace(/url\(#sp/g, "url(#spRG") : ""}
+  lds.forEach((q, i) => { const X = c(i), nm = LD.label(q), off = !st.bad && LD.cut(q.grade), sv = !st.bad && st.fed && LD.saving(q.grade), sp = spriteSvg(q.spr, { on: st.fed && !off, fault: st.bad }, X, ty + h - 2, 92 * k);      // 그 등급이 차단되면 꺼진 그림 · 주황 점선 · '차단', 절감 공급이면 주황 테
+    g += `<path class="ln ${off ? "off" : cls}" d="M${X} ${ty - 10} V${ty}"/><rect class="sring-ld ${st.bad ? "off" : off ? "cut" : sv ? "save" : st.fed ? "on" : ""}" x="${X - w / 2}" y="${ty}" width="${w}" height="${h}" rx="${9 * kk}"/>${sp ? sp.replace(/url\(#sp/g, "url(#spRG") : ""}
       <text class="nm" x="${X}" y="${ty + h + 18 * kk}" text-anchor="middle" style="font-size:${fz.toFixed(1)}px">${esc(nm.length > cap ? nm.slice(0, cap - 1) + "…" : nm)}</text>
-      <text x="${X}" y="${ty + h + 39 * kk}" text-anchor="middle"><tspan class="kw" style="font-size:${(19 * kk).toFixed(1)}px">${st.bad ? "0.0" : q.est_kw == null ? "—" : F.kw(q.est_kw)}</tspan><tspan class="u" dx="3" style="font-size:${(10 * kk).toFixed(1)}px">kW</tspan></text>
-      <text class="st" x="${X}" y="${ty + h + 55 * kk}" text-anchor="middle" fill="${col}" style="font-size:${(10.5 * kk).toFixed(1)}px">${k < .5 ? st.txt.split(" · ")[0] : st.txt}</text>
+      <text x="${X}" y="${ty + h + 39 * kk}" text-anchor="middle"><tspan class="kw" style="font-size:${(19 * kk).toFixed(1)}px">${st.bad || off ? "0.0" : q.est_kw == null ? "—" : F.kw(q.est_kw)}</tspan><tspan class="u" dx="3" style="font-size:${(10 * kk).toFixed(1)}px">kW</tspan></text>
+      <text class="st" x="${X}" y="${ty + h + 55 * kk}" text-anchor="middle" fill="${off || sv ? "var(--warn)" : col}" style="font-size:${(10.5 * kk).toFixed(1)}px">${off ? (k < .5 ? "차단" : `${q.grade}등급 ${LD.cutText(q.grade)}`) : sv ? "절감 공급" : k < .5 ? st.txt.split(" · ")[0] : st.txt}</text>
       <rect class="sld-ld-drag" data-fsu="${esc(fsu)}" data-load="${esc(q.id)}" x="${X - w / 2}" y="${ty}" width="${w}" height="${h}" rx="9" fill="transparent" style="cursor:grab"><title>${esc(nm)} — 끌어서 옮긴다: 다른 구간분전함 위에 놓으면 그 구간분전함으로, 모선 A · B 위에 놓으면 그 모선 쪽으로</title></rect>`; });
   return g;
 }
@@ -169,7 +169,7 @@ const SLD_DRAG = {
 };
 function sldRing(s, live) {
   const g = document.getElementById("sldRingG"); if (!g) return; const r = s.ring;
-  const sig = r ? JSON.stringify([live, S.lang, [1, 2, 3].map(c => [Math.round(val("CB.L" + c) ?? 1), Math.round((val("LOAD.p" + c + "_kw") || 0) * 2)]), !!(S.sprites && S.sprites.l1), r.ppdu.map(p => p.ch.map(q => Math.round((q.kw || 0) * 5))), r.sections.map(x => x.state), r.fsu.map(f => [f.id, f.name, f.live]), r.ppdu.map(p => [p.id, p.name, p.at, p.live, p.mccb, p.vital, Math.round((p.kw || 0) * 2), p.ch.filter(c => c.cb === 2 && c.cls > 0).length]), LD.s().items.map(i => [i.id, i.name, i.n, i.fsu, i.spr, Math.round((i.est_kw || 0) * 5)])]) : "";
+  const sig = r ? JSON.stringify([live, S.lang, [1, 2, 3].map(c => [Math.round(val("CB.L" + c) ?? 1), Math.round((val("LOAD.p" + c + "_kw") || 0) * 2)]), !!(S.sprites && S.sprites.l1), r.ppdu.map(p => p.ch.map(q => Math.round((q.kw || 0) * 5))), r.sections.map(x => x.state), r.fsu.map(f => [f.id, f.name, f.live]), r.ppdu.map(p => [p.id, p.name, p.at, p.live, p.mccb, p.vital, Math.round((p.kw || 0) * 2), p.ch.filter(c => c.cb === 2 && c.cls > 0).length]), LD.s().items.map(i => [i.id, i.name, i.n, i.fsu, i.spr, Math.round((i.est_kw || 0) * 5)]), [1, 2, 3].map(c => [LD.stage("L" + c), LD.auto(c)])]) : "";
   if (g.dataset.sig === sig) return; g.dataset.sig = sig; if (!r) { g.innerHTML = ""; return; }
   const { YR, X0, X1 } = RG, n = r.fsu.length, xs = k => X0 + (X1 - X0) * (k + 1) / (n + 1), ym = (BUS_Y + YR) / 2, sm = RingView.sum(s);
   const liveAt = k => k < 0 ? live.A : k >= n ? live.B : r.fsu[k].live === true;                                             // 구간 양 끝 가운데 한쪽이라도 살아 있으면 그 구간에 전압이 있다

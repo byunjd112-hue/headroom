@@ -5,6 +5,11 @@ const LD = {
   s() { return (S.snap && S.snap.loads) || { items: [], grades: [], kinds: [] }; },
   g(f) { return this.s().grades.find(x => x.feeder === f) || null; },
   stage(f) { const g = this.g(f); return g ? g.stage : null; },
+  /* 그 등급의 급전 차단기가 열려(차단 · 트립) 그 등급 부하가 끊겼는가 / 절감 공급 중인가 — 부하 그림을 보이는 화면이 모두 같이 쓴다 */
+  cut(grade) { const v = val("CB.L" + grade); return v != null && Math.round(v) !== 1; },
+  saving(grade) { return !this.cut(grade) && this.stage("L" + grade) === "save"; },
+  auto(grade) { return ((S.snap && S.snap.ops && S.snap.ops.shed) || []).includes("L" + grade); },
+  cutText(grade) { return Math.round(val("CB.L" + grade)) === 2 ? "트립 · 정전" : this.auto(grade) ? "자동 차단 · 정전" : "차단 · 정전"; },
   pill(st) { const x = this.STAGE[st]; return x ? `<span class="pill ${x[0]}">${x[1]}</span>` : '<span class="pill">값 없음</span>'; },
   /* 급전선 한 줄 요약: "3종 4개 · 정격 56 kW" */
   sum(f) { const it = this.s().items.filter(i => i.feeder === f && i.n > 0), g = this.g(f); return g ? `${it.length}종 ${g.n}개 · 정격 ${F.n(g.rated, 0)} kW` : ""; },

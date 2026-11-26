@@ -19,7 +19,7 @@ MASK = "********"; SECRET = re.compile(r"^(pin_|audit_key)"); KEEP = 20
 COLS = ["tag", "device", "fc", "addr", "type", "scale", "unit", "lo", "hi", "rw", "order"]
 BAK = re.compile(r"^(runtime|pointmap)\.\d{8}-\d{6}(-\d+)?\.bak$")
 # 운전 설정 값 범위(없는 키는 검사하지 않는다)
-RANGE = {"scan_s": (0.2, 1.5), "ctrl_s": (1, 3600), "timeout_s": (0.05, 1.0), "sup_s": (0.1, 2), "done_s": (0, 600), "autonomy_target_h": (1, 720), "g1_kw": (0, 10000)}      # 수집 주기 · 응답 한도는 통신 두절 판정 시간(2초)보다 짧아야 한다
+RANGE = {"scan_s": (0.2, 1.5), "ctrl_s": (1, 3600), "timeout_s": (0.05, 1.0), "sup_s": (0.1, 2), "done_s": (0, 600), "autonomy_target_h": (1, 720), "quiet_target_h": (0.5, 720), "g1_kw": (0, 10000)}      # 수집 주기 · 응답 한도는 통신 두절 판정 시간(2초)보다 짧아야 한다
 AI_RANGE = {"retrain_h": (0.5, 720), "sim_retrain_h": (0.1, 720), "first_min": (0, 1440), "holdout_days": (1, 14), "min_gain": (0, 50), "keep": (2, 100), "max_days": (20, 720),
             "max_gap": (0, 1), "bias_slots": (3, 96), "bias_tau": (1, 96), "nmae_limit": (1, 100)}
 SKY_RANGE = {"max_age_s": (10, 3600), "period_s": (2, 600)}

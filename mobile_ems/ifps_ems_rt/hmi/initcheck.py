@@ -20,9 +20,10 @@ KEEP = 20                                                      # 남겨 두는 �
 G_COMM = ["장비의 전원이 켜져 있는지 본다.", "통신선(경로 A · B)이 장비와 스위치에 꽂혀 있는지 본다.", "장비에 정한 주소가 아래 '설정된 주소'와 같은지 본다 — 다르면 장비의 주소를 맞추거나 설정 편집(엔지니어)에서 주소를 고친다.", "고친 뒤 [이 항목만 다시 검사]를 누른다."]
 
 
-def _it(iid, area, name, level, text, guide=(), fix=None, ack=""):
-    """검사 한 줄. ack: 일부러 그런 것이면 사람이 확인해 닫을 수 있는 줄 — 확인 단추에 쓸 글(없으면 고쳐야만 닫힌다)."""
-    return {"id": iid, "area": area, "name": name, "level": level, "text": text, "guide": list(guide), "fix": fix, "ack": ack}
+def _it(iid, area, name, level, text, guide=(), fix=None, ack="", short=""):
+    """검사 한 줄. ack: 일부러 그런 것이면 사람이 확인해 닫을 수 있는 줄 — 확인 단추에 쓸 글(없으면 고쳐야만 닫힌다).
+    short: 요약에 적는 '확인한 사실' 한마디(없으면 text 의 앞부분) — 그냥 '정상'이 아니라 무엇을 보고 정상인지 보이게."""
+    return {"id": iid, "area": area, "name": name, "level": level, "text": text, "guide": list(guide), "fix": fix, "ack": ack, "short": short or text.split(" — ")[0].split("(")[0].strip()}
 
 
 def _addr(cfg, n):
@@ -59,7 +60,7 @@ def _ring_order(disc):
     """③ 환망 순서: 구간분전함 · 배전체계의 ID."""
     if not disc: return []
     bad = [r for r in disc.get("rows", []) if r.get("state") not in ("인식", "정상", "") and r.get("hint")]
-    if disc.get("ok"): return [_it("ring.order", "환망 순서", "구간분전함 · 배전체계 ID", "ok", f"구간분전함 {disc.get('fsu', 0)}대 · 배전체계 {disc.get('ppdu', 0)}대를 자리 순서대로 인식")]
+    if disc.get("ok"): return [_it("ring.order", "환망 순서", "구간분전함 · 배전체계 ID", "ok", f"구간분전함 {disc.get('fsu', 0)}대 · 배전체계 {disc.get('ppdu', 0)}대를 자리 순서대로 인식", short="ID 가 자리 순서대로")]
     txt = "; ".join(f"{r['name']}: {r['state']}{' — ' + r['hint'] if r.get('hint') else ''}" for r in bad[:4]) or f"{disc.get('bad', 0)}대가 제자리가 아니거나 응답이 없다"
     return [_it("ring.order", "환망 순서", "구간분전함 · 배전체계 ID", "bad", txt, ["환망 화면의 [초기 기동 점검]에서 어느 자리의 ID 가 다른지 본다.", "케이블이 바뀌어 꽂혔으면 바로 꽂는다. 같은 ID 가 둘이면 장치의 ID 설정을 고친다.", "응답이 없는 장치는 전원 · 통신선을 본다.", "고친 뒤 [이 항목만 다시 검사]를 누른다."], {"label": "환망 화면 열기", "act": "goto", "to": "#ring"})]
 
@@ -101,7 +102,7 @@ def _bus(snap, v):
     for k, it in enumerate(iss):
         out.append(_it(f"bus.{it.get('bus', '')}{k}", "모선 구성", f"모선 {it.get('bus', '')}", "bad" if it.get("level") == "bad" else "warn", it.get("text", ""),
                        ["모선 구성 창에서 장비 한 대 한 대가 물린 모선을 실제 결선과 맞춘다.", "고칠 수 있는 약점은 [자동 보완]으로 고친다(실제 결선도 같이 바꿔야 한다)."], {"label": "자동 보완", "act": "bus_auto"} if it.get("fix") else {"label": "모선 구성 열기", "act": "busplan"}))
-    if not iss: out.append(_it("bus.ok", "모선 구성", "모선 A · B", "ok", "두 모선 모두 전압을 세울 전원이 있다"))
+    if not iss: out.append(_it("bus.ok", "모선 구성", "모선 A · B", "ok", "두 모선 모두 전압을 세울 전원이 있다", short="두 모선에 전원 있음"))
     for s in b.get("sources", []):
         if not s.get("present") or s["kind"] in ("GRID", "GDG"): continue
         c = v.get(f"CB.{s['id']}")
@@ -120,7 +121,7 @@ def _loads(snap):
         elif have < i.get("need", 0) or i.get("fsu_over") or i.get("out_over"):
             out.append(_it(f"load.{i['id']}", "부하 경로", nm, "warn", f"{i.get('fsu_name')} · 배전체계 {have}대(필요 {i.get('need', 0)}대)" + (" · 구간분전함 정격 또는 출력 회로 초과" if i.get("fsu_over") or i.get("out_over") else ""),
                            ["배전체계를 더 놓거나(자리 18개), 부하를 다른 구간분전함으로 옮긴다."], go))
-        else: out.append(_it(f"load.{i['id']}", "부하 경로", nm, "ok", f"{i.get('fsu_name')} → 배전체계 {have}대 · {i['grade']}등급"))
+        else: out.append(_it(f"load.{i['id']}", "부하 경로", nm, "ok", f"{i.get('fsu_name')} → 배전체계 {have}대 · {i['grade']}등급", short=f"{i.get('fsu_name')} · 배전체계 {have}대"))
     for k, it in enumerate(((snap.get("ring") or {}).get("n1") or {}).get("items", [])):
         if it.get("level") != "info": out.append(_it(f"n1.{k}", "부하 경로", f"무정전 점검 · {it.get('area', '')}", "warn", it.get("text", ""), [it.get("fix") or "환망 화면의 무정전 점검 표를 본다."], {"label": "환망 화면 열기", "act": "goto", "to": "#ring"}))
     return out
@@ -157,7 +158,7 @@ class InitCheck:
         disc = rw.view(eng).get("discover") if rw is not None and snap.get("ring") else None
         out = inspect(snap, eng.cfg, eng.layout(), disc, dict(eng.rt.val)); self.acks &= {i["id"] for i in out if i["ack"]}      # 사정이 바뀐 줄(장비가 응답함 · 차단기를 닫음)의 확인은 지운다
         for i in out:
-            if i["id"] in self.acks: i.update(level="ok", text=i["text"] + " — 사람이 확인함", guide=[], fix=None, ack="", acked=True)
+            if i["id"] in self.acks: i.update(level="ok", text=i["text"] + " — 사람이 확인함", guide=[], fix=None, ack="", acked=True, short="사람이 확인함")
         return out
 
     def confirm(self, who, iid):
@@ -171,7 +172,7 @@ class InitCheck:
         """한 줄만 다시 검사: 직전 결과에서 그 줄만 새 결과로 바꾼다(그 줄이 직전에 없었으면 덧붙인다)."""
         if not (only and self.last): return new
         pick = {i["id"]: i for i in new}; had = {i["id"] for i in self.last["items"]}
-        gone = lambda i: dict(i, level="ok", text="지금은 이 문제가 없다", guide=[], fix=None)                 # 그 줄이 이번 검사에 없으면(약점 · 열린 차단기가 사라짐) 풀린 것이다
+        gone = lambda i: dict(i, level="ok", text="지금은 이 문제가 없다", guide=[], fix=None, short="문제 없음")                 # 그 줄이 이번 검사에 없으면(약점 · 열린 차단기가 사라짐) 풀린 것이다
         return [(pick[i["id"]] if i["id"] in pick else gone(i)) if i["id"] == only else i for i in self.last["items"]] + [i for i in new if i["id"] == only and only not in had]
 
     @staticmethod

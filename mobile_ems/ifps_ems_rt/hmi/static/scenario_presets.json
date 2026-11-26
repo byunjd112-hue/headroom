@@ -132,7 +132,7 @@
  },
  {
   "name": "AUTO · 작전지 · 저소음",
-  "note": "같은 저충전 조건에서 디젤을 억제하고 연료전지와 3등급 부하 차단으로 대응합니다.",
+  "note": "같은 저충전 조건에서 디젤을 억제하고 연료전지를 켭니다. ESS 충전율이 바닥에 가까워 3등급 부하를 바로 차단합니다(저장량이 넉넉하면 저소음 태세에서도 3등급을 끊지 않습니다 — 아래 '저소음 태세 · …' 시나리오).",
   "steps": [
    {
     "type": "set",
@@ -4559,6 +4559,196 @@
     "type": "expect",
     "tag": "CB.L3",
     "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L1",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ]
+ },
+ {
+  "name": "저소음 태세 · 저장량이 넉넉하면 3등급 유지",
+  "cat": "정상 운전 · 장비 시퀀스",
+  "ref": "",
+  "fat": "",
+  "note": "저소음 태세(디젤 금지)라도 디젤 없이 버틸 수 있는 시간이 목표(기본 12시간)를 넘으면 3등급 부하를 끊지 않습니다. ESS 70% · 수소 700 Nm³ 에서 태세를 저소음으로 바꾸고 3등급이 계속 공급되는지 봅니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 70
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 700
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "저소음",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "policy_check",
+    "metric": "DG",
+    "value": 0,
+    "op": "eq"
+   },
+   {
+    "type": "wait",
+    "ms": 3500
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "저소음",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "wait",
+    "ms": 1000
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "DG.status",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "wait",
+    "ms": 5000
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "저소음",
+    "control": "auto",
+    "hour": 11
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L2",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L1",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   }
+  ]
+ },
+ {
+  "name": "저소음 태세 · 저장량이 모자라면 3등급 절감 뒤 차단",
+  "cat": "정상 운전 · 장비 시퀀스",
+  "ref": "",
+  "fat": "",
+  "note": "저소음 태세에서 충전율과 수소가 줄어 디젤 없이 버틸 시간이 목표에 못 미치면, 3등급을 바로 끊지 않고 먼저 절감 공급으로 내린 뒤 10초 지켜보고 그래도 모자라면 차단합니다. 2등급 · 1등급은 그대로 공급합니다.",
+  "steps": [
+   {
+    "type": "set",
+    "tag": "ESS.soc",
+    "value": 32
+   },
+   {
+    "type": "set",
+    "tag": "H2.nm3",
+    "value": 3
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "저소음",
+    "control": "auto",
+    "hour": 21
+   },
+   {
+    "type": "wait",
+    "ms": 3500
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "저소음",
+    "control": "auto",
+    "hour": 21
+   },
+   {
+    "type": "wait",
+    "ms": 1000
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L3",
+    "value": 1,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "wait",
+    "ms": 6000
+   },
+   {
+    "type": "wait",
+    "ms": 5000
+   },
+   {
+    "type": "policy",
+    "mode": "island",
+    "posture": "저소음",
+    "control": "auto",
+    "hour": 21
+   },
+   {
+    "type": "wait",
+    "ms": 1000
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L3",
+    "value": 0,
+    "op": "eq",
+    "ms": 0,
+    "limit": 0
+   },
+   {
+    "type": "expect",
+    "tag": "CB.L2",
+    "value": 1,
     "op": "eq",
     "ms": 0,
     "limit": 0

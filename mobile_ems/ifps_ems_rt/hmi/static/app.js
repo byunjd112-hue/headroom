@@ -85,7 +85,7 @@ const P_OV = {
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("ov.title", "운전 개요")}</h2><span class="sub" id="ovSub"></span></div>
     <div class="pg" style="grid-template-rows:118px 1fr">
-      <div class="tiles6">${TILE("tLoad", "load", "총 부하")}${TILE("tPv", "pv", "태양광 발전")}${TILE("tSoc", "ess", "ESS 충전율")}${TILE("tFuel", "dg", "연료 · 수소")}${TILE("tRes", "g1", "N-1 순동 예비력")}${TILE("tAuto", "accent", "자동 제어")}</div>
+      <div class="tiles6 t8">${TILE("tLoad", "load", "총 부하")}${TILE("tPv", "pv", "태양광 발전")}${TILE("tRe", "ok", "재생에너지 활용률")}${TILE("tSoc", "ess", "ESS 충전율")}${TILE("tDg", "dg", "디젤 가동")}${TILE("tFuel", "fc", "연료 · 수소")}${TILE("tRes", "g1", "N-1 순동 예비력")}${TILE("tAuto", "accent", "자동 제어")}</div>
       <div class="pg" style="grid-template-columns:1fr 440px">
         <div class="panel"><div class="hd"><h3>작전지 전개 현황</h3><span class="sub" id="layCnt"></span><div class="spacer"></div><span class="pill" id="siteSum">—</span><button class="btn sm" id="initBtn" data-act="initcheck" title="장비를 설치한 뒤: 장비 통신 · 대수 · 환망 순서와 급전 A · B · 모선 구성 · 부하 경로를 한 번에 검사하고, 문제마다 고치는 방법을 안내한다. 고친 뒤 다시 검사해 해결됐는지 확인한다">설치 점검</button><button class="btn sm" id="fsuLblBtn" data-act="fsulbl" title="구간분전함의 이름 · 전력 · 상태 글상자를 켜고 끈다(끄면 점만 보이고 마우스를 올리면 나타난다)">분전함 글상자 보이기</button><button class="btn sm" data-act="busplan">모선 구성</button><button class="btn sm" id="layEditBtn" data-act="layedit">배치 편집</button></div>
           <div class="bd sitebd">${siteHtml()}</div></div>
@@ -100,7 +100,11 @@ const P_OV = {
     const set = (id, big, a, b, cls = "") => { const e = $("#" + id); e.innerHTML = big; e.className = "big " + cls; $("#" + id + "a").textContent = a; $("#" + id + "b").textContent = b; };
     $("#ovSub").textContent = `${s.policy} · ${S.lang === "ko" ? "수집" : "scan"} ${F.n(s.stats.last_ms, 0)}ms`;
     set("tLoad", `${F.kw(k.load)}<small>kW</small>`, `1+2등급 ${F.kw(k.l1 + k.l2)}kW`, `3등급 ${F.kw(k.l3)}kW`, bad("LOAD.kw") ? "stale" : "");
-    set("tPv", `${F.kw(k.pv)}<small>kW</small>`, `재생 비율 ${F.n(k.renew, 0)}%`, `${F.n(k.pv / 4 / kN("PV"), 0)}% of ${400 * kN("PV")}kWp`, bad("PV.kw") ? "stale" : "");
+    set("tPv", `${F.kw(k.pv)}<small>kW</small>`, `용량의 ${F.n(k.pv / 4 / kN("PV"), 0)}%`, `${400 * kN("PV")}kWp`, bad("PV.kw") ? "stale" : "");
+    const en = s.energy || {}, reDay = en.load > .05 ? Math.min(100, en.pv / en.load * 100) : null, quiet = (s.ops || {}).posture === "저소음";      // 재생에너지 활용률 = 부하 가운데 태양광이 맡은 비율(지금 · 오늘 누적), 디젤 소모량 = 출력 × 설정 소비율(추정 — 유량계 신호 없음)
+    set("tRe", `${F.n(k.renew, 0)}<small>%</small>`, `태양광 ${F.kw(k.pv)}kW`, reDay == null ? "오늘 —" : `오늘 ${F.n(reDay, 0)}%`, bad("PV.kw") ? "stale" : "okc");
+    set("tDg", k.dg_run ? `${F.kw(k.dg)}<small>kW</small>` : quiet ? "금지" : "정지", k.dg_run ? `운전 ${k.dg_run}/${k.dg_n}대 · ≈${F.n(k.fuel_lph || 0, 1)}L/h` : quiet ? "저소음 태세" : `대기 ${k.dg_n || 1}대`, `오늘 ${F.n(en.fuel_l || 0, en.fuel_l >= 10 ? 0 : 1)}L`, bad("DG.kw") ? "stale" : k.dg_run ? "warnc" : "");
+    { const e = $("#tDg").closest(".tile"); if (e) e.title = `디젤 발전기: 지금 출력 · 운전 대수 · 지금 소모량(≈ 출력 × 설정 소비율, 추정) · 오늘 쓴 연료(적산 추정). 남은 연료 ${F.n(k.fuel, 0)} L 는 '연료 · 수소' 칸`; const r = $("#tRe").closest(".tile"); if (r) r.title = "재생에너지 활용률: 부하 가운데 태양광이 맡은 비율. 왼쪽 = 지금, 오른쪽 = 오늘 0시부터의 누적(태양광 발전량 ÷ 부하 사용량)"; }
     set("tSoc", `${F.n(k.soc)}<small>%</small>`, k.ess >= 0 ? `방전 ${F.kw(k.ess)}kW` : `충전 ${F.kw(-k.ess)}kW`, k.ess_h ? `자립 ${F.hrs(k.ess_h)}h` : "충전 중", bad("ESS.soc") ? "stale" : k.soc < 19 ? "badc" : k.soc < 25 ? "warnc" : "");
     set("tFuel", `${F.n(k.fuel, 0)}<small>L</small> <span style="font-size:20px">${F.n(k.h2, 0)}<small>Nm³</small></span>`, `디젤 ${F.hrs(k.fuel_h)}h`, `연료전지 ${F.hrs(k.h2_h)}h`, k.h2 < 150 || k.fuel < 300 ? "warnc" : "");
     const o = s.ops || {}, au = o.autonomy, hh = x => x >= 999 ? "∞" : F.n(x, 0), tied = o.mode === "grid" && !o.outage;
@@ -110,7 +114,7 @@ const P_OV = {
     const d = s.decision;
     set("tAuto", s.auto ? "AUTO" : "MANUAL", d ? `DG ${d.want.DG ? "ON" : "OFF"} · FC ${d.want.FC ? "ON" : "OFF"} · 수전해 ${d.want.ELZ ? "ON" : "OFF"}` : "결정 대기", s.auto ? `다음 ${F.n(s.next_ctrl_s, 0)}s` : "수동", s.auto ? "okc" : "warnc");
     const tw = S.trend.slice(-600);
-    [["tLoad", 1, TV("--load")], ["tPv", 2, TV("--pv")], ["tSoc", 6, TV("--ess")], ["tFuel", 7, TV("--fc")], ["tRes", 8, TV("--g1")], ["tAuto", 3, TV("--dg")]].forEach(([id, ci, col]) => { const c = $("#tsp-" + id); if (c) spark(c, tw.map(r => r[ci]), col, 30, id === "tSoc" ? 0 : null, id === "tSoc" ? 100 : null); });
+    [["tLoad", 1, TV("--load")], ["tPv", 2, TV("--pv")], ["tRe", 2, TV("--ok")], ["tSoc", 6, TV("--ess")], ["tDg", 3, TV("--dg")], ["tFuel", 7, TV("--fc")], ["tRes", 8, TV("--g1")], ["tAuto", 3, TV("--dg")]].forEach(([id, ci, col]) => { const c = $("#tsp-" + id); if (c) spark(c, tw.map(r => r[ci]), col, 30, id === "tSoc" ? 0 : null, id === "tSoc" ? 100 : null); });
     siteUpdate(s);
     const sst = siteState(s), nbad = Object.values(sst).filter(x => x.st === "bad").length;
     const rs = RingView.sum(s), nb = nbad + (rs ? rs.n : 0);                          // 환망의 차단 구간 · 정전 마디도 이상 개소에 넣는다
@@ -130,9 +134,9 @@ const P_SLD = {
     <div class="pg" style="grid-template-columns:1fr 420px">
       <div class="panel"><div class="hd"><h3>${t("ov.sld", "단선 결선도 · 실시간 전력 흐름")}</h3><span class="sub mono" id="busbal"></span><div class="spacer"></div><div class="legend sldleg"><span><i class="l on"></i>통전</span><span><i class="l off"></i>무전압</span><span><i class="l flt"></i>고장</span><span><i class="c closed"></i>투입</span><span><i class="c open"></i>개방</span><span><i class="c trip"></i>트립</span></div></div>
         <div class="bd sldbox">${sldSvg()}</div></div>
-      <div class="col" style="grid-template-rows:auto auto 1fr">
+      <div class="col" style="grid-template-rows:auto minmax(0,1fr) 220px">
         <div class="panel"><div class="hd"><h3>모선 상태</h3></div><div class="bd"><div class="kv band" id="busKv"></div></div></div>
-        <div class="panel"><div class="hd"><h3>차단기</h3><div class="spacer"></div><a class="sub" href="#control" style="color:var(--accent);text-decoration:none">부하 관리 →</a></div><div class="bd np"><table class="t tc"><tbody id="sldCb"></tbody></table></div></div>
+        <div class="panel" style="min-height:0;display:flex;flex-direction:column"><div class="hd"><h3>차단기</h3><div class="spacer"></div><a class="sub" href="#control" style="color:var(--accent);text-decoration:none">부하 관리 →</a></div><div class="bd np" style="overflow:auto;min-height:0"><table class="t tc"><tbody id="sldCb"></tbody></table></div></div>
         <div class="panel"><div class="hd"><h3>전력 추세 · 15분</h3><div class="spacer"></div><div class="legend" id="sldLeg"></div></div><div class="bd" style="display:flex;flex-direction:column"><div class="cv"><canvas id="sldChart"></canvas></div></div></div>
       </div></div>`;
     this.chart = new Chart($("#sldChart"), { fill: true, window: 900, series: [{ key: "load", label: "부하", color: COLORS.load, w: 2.2 }, { key: "pv", label: "PV", color: COLORS.pv, fill: true }, { key: "dg", label: "DG", color: COLORS.dg, fill: true }, { key: "fc", label: "FC", color: COLORS.fc, fill: true }, { key: "ess", label: "ESS", color: COLORS.ess }] });
@@ -195,7 +199,7 @@ const P_CTL = {
           <div style="overflow:auto" class="bd np"><table class="t tc"><tbody id="cbRows"></tbody><tbody id="ringRows"></tbody></table></div></div>
         <div class="panel"><div class="hd"><h3>${t("ctl.log", "최근 지령")}</h3><div class="spacer"></div><span class="sub" id="qInfo"></span></div><div class="bd np fill-scroll"><table class="t tc"><tbody id="cmdlog"></tbody></table></div></div>
       </div></div>`;
-    const POST_MSG = { "평시": "평시 태세로 바꿉니까?", "저소음": "저소음 태세로 바꿉니까?\n· 디젤 발전기를 기동하지 않습니다(연료전지는 사용)\n· 3등급 부하를 자동으로 차단합니다", "자립": "자립 태세로 바꿉니까?\n· 외부 보급 없이 목표 시간을 버티도록 부하를 단계적으로 관리합니다" };
+    const POST_MSG = { "평시": "평시 태세로 바꿉니까?", "저소음": "저소음 태세로 바꿉니까?\n· 디젤 발전기를 기동하지 않습니다(연료전지는 사용)\n· 디젤 없이 버틸 시간이 목표에 못 미칠 때만 3등급 부하를 줄입니다(먼저 절감 공급, 모자라면 차단)", "자립": "자립 태세로 바꿉니까?\n· 외부 보급 없이 목표 시간을 버티도록 부하를 단계적으로 관리합니다" };
     $$("#postSeg button").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); if (!confirm(POST_MSG[b.dataset.v])) return; const r = await api("/api/ops", { posture: b.dataset.v }); toast(r.ok ? `운용 태세: ${b.dataset.v}` : r.why, r.ok ? "ok" : "bad"); });
     $$("#placeSeg button").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); const g = b.dataset.v === "grid";
       if (!confirm(g ? "주둔지(상전 연계) 운전으로 바꿉니까?\n· 상전과 ESS 로 운전하고 디젤·연료전지는 정지합니다\n· 역송 없음, 최대부하 시간대 ESS 방전, 정전 시 자립 전환" : "작전지(자립 운전)로 바꿉니까?\n· 상전 없이 자체 전원으로 운전합니다")) return;
