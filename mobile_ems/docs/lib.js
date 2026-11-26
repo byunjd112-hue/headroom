@@ -9,8 +9,21 @@ const S = { body: 22, h1: 28, h2: 24, h3: 22, table: 20, cap: 20, note: 18, code
 const SP = { body: { after: 100, line: 300 }, h1: { before: 280, after: 140 }, h2: { before: 200, after: 100 }, h3: { before: 160, after: 80 }, cap: { before: 60, after: 160 }, fig: { before: 120, after: 40 }, gap: 60 };
 const KEEP = true;        // 제목 · 그림 · 표 설명을 다음 문단과 한 쪽에 두고 표의 줄을 쪽 사이에서 나누지 않는다(인쇄 미리보기 기준 쪽 구성). 끄려면 false
 let NI = 0;
-const run = (t, o = {}) => new TextRun(Object.assign({ text: t, font: F, size: S.body, color: "000000" }, o));
-const P = (t, o = {}) => new Paragraph(Object.assign({ spacing: SP.body, children: Array.isArray(t) ? t : [run(t)] }, o));
+// ── 조판 다듬기(문서가 tune 으로 켠다 — 안 켜면 예전 그대로): 장평 · 자간, 본문 양쪽 정렬, 표 칸 여백, 줄바꿈 규칙
+const TN = { scale: 0, cs: 0, just: false, cell: { top: 50, bottom: 50, left: 90, right: 90 }, tline: 264, fx: null };
+const tune = o => Object.assign(TN, o);
+const NB = "\u00A0";
+/** 줄바꿈 규칙: 줄이 어절 사이에서만, 그리고 어색하지 않은 곳에서만 넘어가게 묶음 공백을 넣는다.
+    가운뎃점 · 화살표는 앞말에 붙이고, 수와 단위 · 범위(~) · 영문 뒤 조사는 떼지 않으며, 짧은 괄호는 통째로 다음 줄로 넘긴다 */
+function tidy(t) {
+  t = t.replace(/ · /g, NB + "· ").replace(/ → /g, NB + "→ ").replace(/(\S) ~ (\S)/g, "$1" + NB + "~" + NB + "$2").replace(/ — /g, NB + "— ");
+  t = t.replace(/(\d) (kWh|kWp|kW|kHz|MHz|GHz|Hz|ms|mΩ|Ω|GB|MB|KB|V|A|%|℃|pt|mm)(?![A-Za-z])/g, "$1" + NB + "$2");
+  t = t.replace(/([A-Za-z0-9)\]'%℃]) (가|이|은|는|을|를|와|과|의|에|에서|에는|에도|로|으로|도|만|까지|부터|보다|마다|이다|임)(?=[\s.,)·" + NB + "]|$)/g, "$1" + NB + "$2");
+  return t.replace(/\(([^()]*)\)/g, (m, a) => a.length <= 20 ? "(" + a.replace(/ /g, NB) + ")" : "(" + a.replace(/^(\S+) /, "$1" + NB).replace(/ (\S+)$/, NB + "$1") + ")");
+}
+const run = (t, o = {}) => { const mono = o.font === "Consolas" || o.font === "Cambria Math";
+  return new TextRun(Object.assign({ text: TN.fx && !mono && typeof t === "string" ? TN.fx(t) : t, font: F, size: S.body, color: "000000" }, TN.scale && !mono ? { scale: TN.scale, characterSpacing: TN.cs } : {}, o)); };
+const P = (t, o = {}) => new Paragraph(Object.assign({ spacing: SP.body, children: Array.isArray(t) ? t : [run(t)] }, TN.just ? { alignment: AlignmentType.BOTH } : {}, o));
 const head = (lv, k) => t => (NI++, new Paragraph({ heading: lv, keepNext: KEEP, keepLines: KEEP, spacing: SP[k], children: [run(t, { size: S[k], bold: true })] }));
 const H1 = head(HeadingLevel.HEADING_1, "h1"), H2 = head(HeadingLevel.HEADING_2, "h2"), H3 = head(HeadingLevel.HEADING_3, "h3");
 const CODE = t => new Paragraph({ spacing: { after: 40 }, shading: { type: ShadingType.CLEAR, fill: "F2F2F2" }, indent: { left: 200 }, children: [run(t, { font: "Consolas", size: S.code })] });
@@ -31,9 +44,9 @@ const bd = { style: BorderStyle.SINGLE, size: 4, color: "808080" }, B = { top: b
 function TBL(head, rows, widths, o = {}) {
   const sum = widths.reduce((a, b) => a + b, 0), cw = widths.map(w => Math.round(w / sum * W));
   cw[cw.length - 1] += W - cw.reduce((a, b) => a + b, 0);
-  const cell = (t, i, hd, kx) => new TableCell({ borders: B, width: { size: cw[i], type: WidthType.DXA }, margins: { top: 50, bottom: 50, left: 90, right: 90 }, verticalAlign: VerticalAlign.CENTER,
+  const cell = (t, i, hd, kx) => new TableCell({ borders: B, width: { size: cw[i], type: WidthType.DXA }, margins: TN.cell, verticalAlign: VerticalAlign.CENTER,
     shading: hd ? { type: ShadingType.CLEAR, fill: "D9D9D9" } : undefined,
-    children: [new Paragraph({ keepNext: !!kx, alignment: hd || (o.center || []).includes(i) ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { line: 264 },
+    children: [new Paragraph({ keepNext: !!kx, alignment: hd || (o.center || []).includes(i) ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { line: TN.tline },
       children: [typeof t === "object" && t !== null ? run(String(t.t), { size: S.table, bold: true, color: t.c }) : run(String(t), { size: S.table, bold: hd || (o.bold || []).includes(i), font: (o.mono || []).includes(i) && !hd ? "Consolas" : F })] })] });
   // o.keep = { whole, head, tail }: 줄 수가 whole 이하면 표를 한 쪽에 묶고, 길면 첫 head 줄 · 끝 tail 줄만 묶는다(쪽 끝에 한두 줄만 남거나 넘어가지 않게). 안 주면 예전대로
   const k = o.keep, N = rows.length, kn = n => !!k && n < N - 1 && (N <= k.whole || n < k.head - 1 || n >= N - k.tail);
@@ -62,4 +75,4 @@ function save(body, out, foot) {
       children: body }] });
   return Packer.toBuffer(doc).then(b => { fs.writeFileSync(out, b); console.log("saved", out); });
 }
-module.exports = { run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };
+module.exports = { tune, tidy, run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };
