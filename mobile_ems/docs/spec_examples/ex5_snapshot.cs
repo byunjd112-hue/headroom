@@ -1,5 +1,5 @@
 // 예시 5  화면이 쓰는 상태 묶음(스냅샷)과 주기 갱신 (CSC-SHELL)
-// 모든 화면은 이 한 묶음만 본다 — 화면마다 따로 계산하지 않는다.
+// 모든 화면은 이 스냅샷 하나만 사용한다. 화면마다 따로 계산하지 않는다.
 public sealed record PointValue(double? Value, int Quality, double? AgeSec);
 
 public sealed record Snapshot(
