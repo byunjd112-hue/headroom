@@ -1,6 +1,6 @@
 {
- "date": "2026-11-26 11:44",
- "unittest_s": 726.9,
+ "date": "2026-11-26 12:36",
+ "unittest_s": 737.1,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -60,8 +60,8 @@
   "Excel 은 열리는 꾸러미(시트 3장, XML 정상), FAT · FMEA HTML 은 구성의 이름을 담는다. | ok",
   "장비 한 대 · 구간 · 구간분전함 · 부하마다 줄이 생기고, 번호는 기존 번호만 쓰며, 구성 때문에 달라지는 줄만 재검토로 표시한다. | ok",
   "test_10_security_lockout_hash_and_gate | ok",
-  "test_11_all_units_load_shed_elz_pv | FAIL",
-  "test_1_static_and_snapshot | FAIL",
+  "test_11_all_units_load_shed_elz_pv | 재시도 통과",
+  "test_1_static_and_snapshot | ok",
   "test_2_auth_and_roles | ok",
   "test_3_sbo_command_with_ack | ok",
   "test_4_fault_injection_alarms_and_parallel_scan | ok",
@@ -200,7 +200,7 @@
   "test_start_failures_return_codes | ok",
   "test_start_serve_and_stop_by_signal | ok",
   "test_read_write_probe_check | ok",
-  "test_write_asks_confirmation_and_watch_stops_on_interrupt | FAIL",
+  "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
   "test_check_scans_and_module_entry | ok",
   "장치를 놓고 빼도 기록 · 보고가 사실대로 남는다: 있는 장치의 값만 저장하고, 보고서에 장치 구성 표가 들어간다. | ok",
   "test_extra_units_are_recognized_summed_and_commanded | ok",
@@ -223,20 +223,19 @@
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
  "n_tests": 219,
- "tests_ok": false,
+ "tests_ok": true,
  "retried": [
-  "test_11_all_units_load_shed_elz_pv",
-  "test_1_static_and_snapshot"
+  "test_11_all_units_load_shed_elz_pv"
  ],
  "coverage_pct": 92.6,
  "stmt": {
   "n": 7811,
-  "hit": 7457,
+  "hit": 7458,
   "pct": 95.5
  },
  "branch": {
   "n": 2774,
-  "hit": 2348,
+  "hit": 2347,
   "pct": 84.6
  },
  "coverage_files": [
@@ -457,14 +456,6 @@
    "69-72, 161, 165"
   ],
   [
-   "ifps_ems_rt/archive.py",
-   96.6,
-   148,
-   83.3,
-   30,
-   "95-96, 110, 128-129"
-  ],
-  [
    "ifps_ems_rt/hmi/eng_command.py",
    96.6,
    118,
@@ -553,6 +544,14 @@
    "93-94, 110"
   ],
   [
+   "ifps_ems_rt/archive.py",
+   98.0,
+   148,
+   83.3,
+   30,
+   "95-96, 110"
+  ],
+  [
    "ifps_ems_rt/hmi/docx.py",
    98.1,
    53,
@@ -567,6 +566,14 @@
    78.8,
    52,
    "117-118"
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   98.5,
+   196,
+   92.6,
+   68,
+   "205, 217-218"
   ],
   [
    "ifps_ems_rt/runtime.py",
@@ -607,14 +614,6 @@
    86.8,
    38,
    "134"
-  ],
-  [
-   "ifps_ems_rt/simplant.py",
-   99.0,
-   196,
-   92.6,
-   68,
-   "217-218"
   ],
   [
    "ifps_ems_rt/fmsite.py",
@@ -804,7 +803,7 @@
    "ifps_ems_rt/hmi/fcstats.py",
    100.0,
    29,
-   100.0,
+   87.5,
    8,
    ""
   ],
