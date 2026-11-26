@@ -10,7 +10,7 @@ const SP = { body: { after: 100, line: 300 }, h1: { before: 280, after: 140 }, h
 const KEEP = true;        // 제목 · 그림 · 표 설명을 다음 문단과 한 쪽에 두고 표의 줄을 쪽 사이에서 나누지 않는다(인쇄 미리보기 기준 쪽 구성). 끄려면 false
 let NI = 0;
 // ── 조판 다듬기(문서가 tune 으로 켠다 — 안 켜면 예전 그대로): 장평 · 자간, 본문 양쪽 정렬, 표 칸 여백, 줄바꿈 규칙
-const TN = { scale: 0, cs: 0, just: false, cell: { top: 50, bottom: 50, left: 90, right: 90 }, tline: 264, fx: null };
+const TN = { scale: 0, cs: 0, just: false, center: false, cell: { top: 50, bottom: 50, left: 90, right: 90 }, tline: 264, fx: null };
 const tune = o => Object.assign(TN, o);
 const NB = "\u00A0";
 /** 줄바꿈 규칙: 줄이 어절 사이에서만, 그리고 어색하지 않은 곳에서만 넘어가게 묶음 공백을 넣는다.
@@ -54,9 +54,13 @@ const bd = { style: BorderStyle.SINGLE, size: 4, color: "808080" }, B = { top: b
 function TBL(head, rows, widths, o = {}) {
   const sum = widths.reduce((a, b) => a + b, 0), cw = widths.map(w => Math.round(w / sum * W));
   cw[cw.length - 1] += W - cw.reduce((a, b) => a + b, 0);
+  // 칸 가운데 맞춤이 기본(tune 의 center): 열 단위로 정한다. 긴 문장(한 줄 반을 넘는 글)이 있는 열만 통째로 왼쪽 맞춤 — 한 열 안에서 맞춤이 섞이지 않게
+  const lines = (t, i) => { const x = String(typeof t === "object" && t !== null ? t.t : t); let w = 0; for (const ch of x) w += ch.charCodeAt(0) > 0x2E7F ? 1 : 0.56;
+    return w * (S.table * 10) * (TN.scale ? TN.scale / 100 : 1) / (cw[i] - TN.cell.left - TN.cell.right - 60); };
+  const mid = cw.map((_, i) => rows.every(r => r[i] === undefined || lines(r[i], i) <= 1.5)), one = (t, i) => mid[i];
   const cell = (t, i, hd, kx) => new TableCell({ borders: B, width: { size: cw[i], type: WidthType.DXA }, margins: TN.cell, verticalAlign: VerticalAlign.CENTER,
     shading: hd ? { type: ShadingType.CLEAR, fill: "D9D9D9" } : undefined,
-    children: [new Paragraph({ keepNext: !!kx, alignment: hd || (o.center || []).includes(i) ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { line: TN.tline },
+    children: [new Paragraph({ keepNext: !!kx, alignment: hd || (o.center || []).includes(i) || (TN.center && one(t, i)) ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { line: TN.tline },
       children: [typeof t === "object" && t !== null ? run(String(t.t), { size: S.table, bold: true, color: t.c }) : run(String(t), { size: S.table, bold: hd || (o.bold || []).includes(i), font: (o.mono || []).includes(i) && !hd ? "Consolas" : F })] })] });
   // o.keep = { whole, head, tail }: 줄 수가 whole 이하면 표를 한 쪽에 묶고, 길면 첫 head 줄 · 끝 tail 줄만 묶는다(쪽 끝에 한두 줄만 남거나 넘어가지 않게). 안 주면 예전대로
   const k = o.keep, N = rows.length, kn = n => !!k && n < N - 1 && (N <= k.whole || n < k.head - 1 || n >= N - k.tail);
