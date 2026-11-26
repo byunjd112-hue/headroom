@@ -13,7 +13,7 @@ import tempfile, shutil
 import argparse, datetime, os, re, subprocess, sys  # nosec B404 — 개발 도구 실행(고정 인자)
 
 DOCS = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(DOCS); OUT = os.path.join(DOCS, "out")
-BUILDERS = ["build_test_report.js", "build_reliability_report.js", "build_security_review.js", "build_interface_guide.js", "build_device_guides.js", "build_cpp_report.js", "build_ai_paper.js", "build_user_manual.js"]
+BUILDERS = ["build_test_report.js", "build_reliability_report.js", "build_security_review.js", "build_interface_guide.js", "build_device_guides.js", "build_cpp_report.js", "build_ai_paper.js", "build_user_manual.js", "build_dev_spec.js"]
 
 
 def run(args, cwd=ROOT, env=None):
@@ -36,7 +36,8 @@ def clean(rev):
 
 
 # 문서 묶음의 폴더 구성(읽는 순서): (폴더, 설명, 파일 이름에 들어 있는 말들)
-LAYOUT = [("01_제안발표", "제안 발표 자료에 EMS 하드웨어·소프트웨어 4장을 넣은 보완본", ("IFPS_제안발표",)),
+LAYOUT = [("10_개발용역사양", "EMS 개발 용역 의뢰 사양서 — 화면 · 기능 · 소프트웨어 · 하드웨어 · 알고리즘 · AI · 요구 성능 · 시험 규격과 합격 기준 · C++ · C# 구현 방법 · 신뢰성", ("개발용역의뢰사양서",)),
+          ("01_제안발표", "제안 발표 자료에 EMS 하드웨어·소프트웨어 4장을 넣은 보완본", ("IFPS_제안발표",)),
           ("02_화면과운용", "보고자료(화면 구성·운용 방안·사용 방법), 사용자 설명서, 교육용 가상 화면(PC: 압축을 풀어 index.html, 휴대전화·태블릿: _모바일.html 파일 하나), 화면에서 출력하는 운영 보고서와 시퀀스 문서의 견본(가상 장치 값)", ("화면구성_사용설명_보고자료", "사용자설명서", "교육용_가상화면", "운영보고서_예시", "시퀀스문서")),
           ("03_하드웨어", "쉘터 탑재형 구성, 이동·충격·진동·PLS·EMP 설계, WBS 와 시판 참조 모델. 이동형 배전체계의 무정전 구성(구간분전함 → 배전체계 → 부하, 병렬 · N+1, 우회 결선, 무정전 점검)", ("하드웨어구성_기술자료", "이동형배전체계")),
           ("09_배전체계계산과개발비", "IFPU 케이블·보호기 연동 계산서 보완본(우회 결선 · 1등급 부하 N+1 시트 추가)과 ⑥ 이동형 배전·변압체계 개발비 보완본(PPDU-20 · 우회 결선 · 시험 추가 — 새 품목 단가는 공개 시세 임시값)", ("연동계산서_보완", "개발비용_보완")),
