@@ -14,7 +14,7 @@ function tokens(line) {
   while ((m = RE.exec(line)) !== null) {
     if (m[1]) push(m[1], "com"); else if (m[2]) push(m[2], "str"); else if (m[3]) push(m[3], "pre"); else if (m[4]) push(m[4], "num");
     else if (m[5]) { const w = m[5], rest = line.slice(RE.lastIndex);
-      push(w, KW.has(w) ? "kw" : TYPE.has(w) ? "type" : /^\s*\(/.test(rest) ? "fn" : /^[A-Z][a-z0-9]+[A-Z]?/.test(w) && !/^[A-Z0-9_]+$/.test(w) ? "type" : "txt"); }
+      push(w, KW.has(w) ? "kw" : TYPE.has(w) ? "type" : /^\s*\(/.test(rest) ? "fn" : /^[A-Z][A-Za-z0-9]*[a-z]/.test(w) ? "type" : "txt"); }
     else push(m[6] || m[7], "txt");
   }
   return out.length ? out : [{ t: " ", c: COLOR.txt, i: false }];

@@ -11,9 +11,10 @@ public sealed class DeviceCommandViewModel
         if (!_session.Has(Role.Operator)) { await _dialog.LoginAsync(); return; }
 
         SelectResult sel = await _client.SelectAsync(unitId, Command.Start, ct);
-        if (!sel.Ok) { await _dialog.ErrorAsync(sel.Reason); return; }     // 연동 조건 불일치
+        if (!sel.Ok) { await _dialog.ErrorAsync(sel.Reason); return; }  // 연동 불일치
 
-        bool yes = await _dialog.ConfirmAsync($"{sel.UnitName} 을(를) 기동합니다. 계속합니까?");
+        string ask = $"{sel.UnitName} 을(를) 기동합니다. 계속합니까?";
+        bool yes = await _dialog.ConfirmAsync(ask);
         if (!yes) { await _client.CancelAsync(sel.Sid, ct); return; }
 
         OperateResult op = await _client.OperateAsync(sel.Sid, ct);

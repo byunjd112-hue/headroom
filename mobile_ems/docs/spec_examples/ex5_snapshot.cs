@@ -21,7 +21,11 @@ public sealed class SnapshotStore : INotifyPropertyChanged
     public Snapshot? Current
     {
         get => _current;
-        private set { _current = value; PropertyChanged?.Invoke(this, new(nameof(Current))); }
+        private set
+        {
+            _current = value;
+            PropertyChanged?.Invoke(this, new(nameof(Current)));
+        }
     }
 
     public async Task RunAsync(CancellationToken stop)
