@@ -502,8 +502,19 @@ canvas.tspark { display: block; width: calc(100% + 40px); margin: 8px -20px 0; h
 
 /* ═══════════ 배치 편집 ═══════════ */
 #siteMk { position: absolute; inset: 0; pointer-events: none; } #siteMk .spt { pointer-events: auto; }
-.ic-sum { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; padding: 9px 12px; border-radius: 9px; margin: 8px 0 10px; border: 1px solid var(--ok); } .ic-sum.bad { border-color: var(--alarm); } .ic-sum b { font-size: 14px; } .ic-sum.bad b { color: var(--alarm); } .ic-sum.ok b { color: var(--ok); } .ic-sum span { color: var(--muted); font-size: 12px; }
-.ic-t td { vertical-align: top; } .ic-t tr.ic-ok td { opacity: .78; } .ic-guide { margin: 6px 0 2px; padding-left: 18px; color: var(--text2); font-size: 12px; line-height: 1.55; } .ic-act { white-space: nowrap; text-align: right; } .ic-act .btn { margin: 0 0 4px 4px; } .ic-hist { margin-top: 10px; } .ic-hist summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+/* 설치 점검의 생각그물: 가운데(전체) → 가지(구분) → 마디(장비 · 부하) */
+.modal:has(> .wide .ic-map), .modal.wide:has(.ic-map) { width: min(1320px, calc(100vw - 24px)); }
+.ic-map { width: 100%; height: auto; max-height: 56vh; display: block; margin: 4px 0 8px; }
+.ic-ln { fill: none; stroke: rgba(160,220,90,.45); stroke-width: 1.6; } .ic-ln.warn { stroke: var(--warn); stroke-width: 2; } .ic-ln.bad { stroke: var(--alarm); stroke-width: 2.4; }
+.ic-core circle { fill: rgba(20,26,16,.96); stroke: var(--ok); stroke-width: 3; } .ic-core circle.in { fill: none; stroke-width: 1; opacity: .45; } .ic-core.warn circle { stroke: var(--warn); } .ic-core.bad circle { stroke: var(--alarm); }
+.ic-ct { font-size: 12px; fill: var(--muted); } .ic-cv { font-size: 26px; font-weight: 700; fill: var(--ok); } .ic-core.warn .ic-cv { fill: var(--warn); } .ic-core.bad .ic-cv { fill: var(--alarm); } .ic-cs { font-size: 10.5px; fill: var(--text2); }
+.ic-br rect { fill: rgba(28,34,22,.96); stroke: var(--ok); stroke-width: 2; } .ic-br.warn rect { stroke: var(--warn); } .ic-br.bad rect { stroke: var(--alarm); fill: rgba(60,14,12,.9); } .ic-bn { font-size: 13.5px; font-weight: 700; fill: #fff; } .ic-bs { font-size: 10.5px; fill: var(--text2); }
+.ic-leaf { cursor: pointer; } .ic-leaf rect { fill: rgba(255,255,255,.04); stroke: rgba(160,220,90,.35); stroke-width: 1; } .ic-leaf.warn rect { stroke: var(--warn); stroke-width: 1.6; fill: rgba(255,190,60,.10); } .ic-leaf.bad rect { stroke: var(--alarm); stroke-width: 2; fill: rgba(255,80,70,.14); }
+.ic-leaf:hover rect { fill: rgba(255,255,255,.10); } .ic-leaf.sel rect { stroke-width: 2.6; fill: rgba(255,255,255,.13); } .ic-nm { font-size: 11px; fill: #e9ecdf; font-weight: 600; } .ic-st { font-size: 9.5px; }
+.ic-leaf.bad .ic-dot, .ic-leaf.warn .ic-dot { animation: icp 1.2s ease-in-out infinite; } @keyframes icp { 50% { opacity: .25; } }
+.ic-det { border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 10px 12px; min-height: 64px; } .ic-det.warn { border-color: var(--warn); } .ic-det.bad { border-color: var(--alarm); } .ic-det.ok { border-color: rgba(160,220,90,.5); }
+.ic-dh { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; } .ic-dh b { font-size: 14px; } .ic-det p { margin: 6px 0 2px; } .ic-guide { margin: 6px 0 2px; padding-left: 20px; color: var(--text2); font-size: 12.5px; line-height: 1.6; }
+.ic-hist { margin-top: 10px; } .ic-hist summary { cursor: pointer; color: var(--muted); font-size: 12px; }
 .unitrows { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 6px; } .unitrows:empty { display: none; } .unitrows span { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,.05); color: var(--text2); white-space: nowrap; } .unitrows span b { color: var(--accent); font-weight: 600; } .unitrows span.bad { color: var(--alarm); }
 .spt.ppdu { cursor: default; } .spt.ppdu .scard { padding: 2px 7px 3px; background: rgba(12,14,11,.66); } .spt.ppdu .scard .sh { font-size: 10px; } .spt.ppdu .scard .sv .mono { font-size: 10.5px; } .spt.ppdu .scard .ss { font-size: 10px; } .spt.ppdu .core { width: 7px; height: 7px; left: -3.5px; top: -3.5px; }
 .spt.mini .scard { opacity: 0; pointer-events: none; transition: opacity .15s; } .spt.mini:hover .scard, .spt.mini.dragging .scard { opacity: 1; pointer-events: auto; }      /* 점에 마우스를 올리면 나타난 글상자도 끌어 옮길 수 있다 */

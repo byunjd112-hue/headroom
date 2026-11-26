@@ -8,7 +8,7 @@
   ⑤ 모선 구성   모선마다 전압을 세울 전원이 있는가(모선 구성 점검), 장비마다의 차단기가 닫혀 있는가.
   ⑥ 부하 경로   부하마다 구간분전함 · 배전체계가 필요한 대수만큼 붙었는가, 한 곳 고장에 끊기는 자리가 있는가.
 판정은 지금 읽히는 값으로 한다 — EMS 는 차단기를 조작해 가며 시험하지 않는다(가상 장치 · 실장비 모두). 한쪽 급전만 살려 보는 시험은 사람이 차단기를 조작한 뒤 다시 검사한다.
-결과는 state/initcheck.json 에 남는다(몇 번째 검사에서 무엇이 이상이었고 언제 풀렸는지). 이상(bad)이 0 이면 '설치 점검 완료'다 — 주의(warn)는 표시만 남는다.
+결과는 state/initcheck.json 에 남는다(몇 번째 검사에서 무엇이 이상이었고 언제 풀렸는지). 이상(bad)과 주의(warn)가 모두 0 이어야 '설치 점검 완료'다(사용자 결정). 일부러 그런 것 — 가져오지 않은 종류, 일부러 열어 둔 차단기 — 은 사람이 [확인]하면 정상으로 닫힌다(acks).
 """
 import json, os
 from .. import fleet, fsio
@@ -20,8 +20,9 @@ KEEP = 20                                                      # 남겨 두는 �
 G_COMM = ["장비의 전원이 켜져 있는지 본다.", "통신선(경로 A · B)이 장비와 스위치에 꽂혀 있는지 본다.", "장비에 정한 주소가 아래 '설정된 주소'와 같은지 본다 — 다르면 장비의 주소를 맞추거나 설정 편집(엔지니어)에서 주소를 고친다.", "고친 뒤 [이 항목만 다시 검사]를 누른다."]
 
 
-def _it(iid, area, name, level, text, guide=(), fix=None):
-    return {"id": iid, "area": area, "name": name, "level": level, "text": text, "guide": list(guide), "fix": fix}
+def _it(iid, area, name, level, text, guide=(), fix=None, ack=""):
+    """검사 한 줄. ack: 일부러 그런 것이면 사람이 확인해 닫을 수 있는 줄 — 확인 단추에 쓸 글(없으면 고쳐야만 닫힌다)."""
+    return {"id": iid, "area": area, "name": name, "level": level, "text": text, "guide": list(guide), "fix": fix, "ack": ack}
 
 
 def _addr(cfg, n):
@@ -34,7 +35,7 @@ def _comm(snap, cfg):
     for n, d in snap["devices"].items():
         if d.get("slot") and d.get("absent"): continue
         k = d.get("kind") or fleet.kind(n) or n; nm = f"{KIND_NAME.get(k, k)} {n}"; ps = d.get("paths") or {}; up = [p for p, v in ps.items() if v.get("alive")]; addr = _addr(cfg, n)
-        if d.get("absent"): out.append(_it(f"comm.{n}", "장비 통신", nm, "warn", f"한 번도 응답하지 않았다 — 가져오지 않은 종류면 그대로 둔다. 설정된 주소 {addr}", ["이 종류를 설치했다면:"] + G_COMM))
+        if d.get("absent"): out.append(_it(f"comm.{n}", "장비 통신", nm, "warn", f"한 번도 응답하지 않았다 — 가져오지 않은 종류면 그대로 둔다. 설정된 주소 {addr}", ["이 종류를 설치했다면:"] + G_COMM + ["가져오지 않았으면 [가져오지 않은 종류로 확인]을 누른다."], ack="가져오지 않은 종류로 확인"))
         elif not up: out.append(_it(f"comm.{n}", "장비 통신", nm, "bad", f"두 경로 모두 응답 없음 — 설정된 주소 {addr}", G_COMM))
         elif len(up) < len(ps): out.append(_it(f"comm.{n}", "장비 통신", nm, "warn", f"경로 {' · '.join(sorted(set(ps) - set(up)))} 응답 없음(경로 {' · '.join(sorted(up))} 로 운전 중) — 설정된 주소 {addr}", ["응답 없는 경로의 통신선과 스위치 포트를 본다.", "한 경로만으로도 운전은 되지만 그 경로가 끊기면 두절된다.", "고친 뒤 [이 항목만 다시 검사]를 누른다."]))
         else: out.append(_it(f"comm.{n}", "장비 통신", nm, "ok", f"경로 {' · '.join(sorted(up))} 응답 — {addr}"))
@@ -48,7 +49,7 @@ def _count(snap, lay):
         f = (snap.get("fleet") or {}).get(k)
         if f is None: continue
         n = len(f["units"]); pic = sum(1 for i in items if i.get("kind") == k) if items else 1; nm = KIND_NAME[k]
-        if n == 0: out.append(_it(f"count.{k}", "종류 · 대수", nm, "warn", "인식한 장비가 없다(가져오지 않았으면 정상)", ["설치했다면 '장비 통신'의 안내를 따른다."]))
+        if n == 0: out.append(_it(f"count.{k}", "종류 · 대수", nm, "warn", "인식한 장비가 없다(가져오지 않았으면 정상)", ["설치했다면 '장비 통신'의 안내를 따른다.", "가져오지 않았으면 [가져오지 않은 종류로 확인]을 누른다."], ack="가져오지 않은 종류로 확인"))
         elif pic > n: out.append(_it(f"count.{k}", "종류 · 대수", nm, "warn", f"배치도에는 {pic}대, 인식한 것은 {n}대 — 그림 {pic - n}개가 예비 자리로 남아 있다", ["설치한 장비가 더 있으면 그 장비의 전원 · 통신을 본다('장비 통신').", "설치하지 않았으면 개요의 [배치 편집]에서 남는 그림을 지우고 저장한다."], {"label": "개요에서 배치 편집", "act": "goto", "to": "#overview"}))
         else: out.append(_it(f"count.{k}", "종류 · 대수", nm, "ok", f"{n}대 인식" + (f" (슬롯 {f['slots']}자리)" if f.get("slots") else "")))
     return out
@@ -105,7 +106,7 @@ def _bus(snap, v):
         if not s.get("present") or s["kind"] in ("GRID", "GDG"): continue
         c = v.get(f"CB.{s['id']}")
         if c is None or int(round(c)) == 1: continue
-        out.append(_it(f"cb.{s['id']}", "모선 구성", f"{s['name']} 차단기(CB-{s['id']})", "warn", "트립" if int(round(c)) == 2 else "개방 — 이 장비는 모선에서 떨어져 있다", ["일부러 연 것이 아니면 차단기를 닫는다(트립이면 보호 동작 원인을 먼저 없앤다).", "닫은 뒤 [이 항목만 다시 검사]를 누른다."]))
+        out.append(_it(f"cb.{s['id']}", "모선 구성", f"{s['name']} 차단기(CB-{s['id']})", "warn", "트립" if int(round(c)) == 2 else "개방 — 이 장비는 모선에서 떨어져 있다", ["일부러 연 것이 아니면 차단기를 닫는다(트립이면 보호 동작 원인을 먼저 없앤다).", "닫은 뒤 [이 항목만 다시 검사]를 누른다.", "일부러 열어 둔 것이면 [일부러 열어 둔 것으로 확인]을 누른다."], ack="일부러 열어 둔 것으로 확인"))
     return out
 
 
@@ -125,24 +126,46 @@ def _loads(snap):
     return out
 
 
+def _pic(i, snap):
+    """그 줄을 나타내는 그림 종류(화면이 장비 · 부하 그림을 붙인다)."""
+    a, _, x = i["id"].partition(".")
+    if a == "comm": return (snap["devices"].get(x) or {}).get("kind") or fleet.kind(x) or x
+    if a == "count": return x
+    if a == "cb": return "G1" if x.startswith("G1") else fleet.kind(x) or x
+    if a == "load": return next((q.get("spr") for q in (snap.get("loads") or {}).get("items", []) if q["id"] == x), "L2")
+    return {"ring": "FSU", "bus": "DIST", "n1": "FSU"}.get(a, "DIST")
+
+
 def inspect(snap, cfg, lay, disc, val):
     """지금 상태로 검사한 줄들(순서: 통신 → 대수 → 환망 순서 → 환망 A · B → 모선 → 부하). val: 읽은 값(신호 이름 → 값)."""
-    return _comm(snap, cfg) + _count(snap, lay) + _ring_order(disc) + _ring_feed(snap, val) + _bus(snap, val) + _loads(snap)
+    out = _comm(snap, cfg) + _count(snap, lay) + _ring_order(disc) + _ring_feed(snap, val) + _bus(snap, val) + _loads(snap)
+    for i in out: i["pic"] = _pic(i, snap)
+    return out
 
 
 class InitCheck:
     """검사 결과와 이력(state/initcheck.json)."""
     def __init__(self, eng):
-        self.eng = eng; self.path = os.path.join(eng.rt.state_dir, "initcheck.json"); self.runs = []; self.last = None
+        self.eng = eng; self.path = os.path.join(eng.rt.state_dir, "initcheck.json"); self.runs = []; self.last = None; self.acks = set()
         try:
             with open(self.path, encoding="utf-8") as f: o = json.load(f)
-            self.runs = list(o.get("runs", []))[-KEEP:]; self.last = o.get("last")
+            self.runs = list(o.get("runs", []))[-KEEP:]; self.last = o.get("last"); self.acks = set(o.get("acks", []))
         except (OSError, ValueError): pass
 
     def _now(self):
         eng = self.eng; snap = eng.snapshot(); rw = getattr(eng, "ringw", None)
         disc = rw.view(eng).get("discover") if rw is not None and snap.get("ring") else None
-        return inspect(snap, eng.cfg, eng.layout(), disc, dict(eng.rt.val))
+        out = inspect(snap, eng.cfg, eng.layout(), disc, dict(eng.rt.val)); self.acks &= {i["id"] for i in out if i["ack"]}      # 사정이 바뀐 줄(장비가 응답함 · 차단기를 닫음)의 확인은 지운다
+        for i in out:
+            if i["id"] in self.acks: i.update(level="ok", text=i["text"] + " — 사람이 확인함", guide=[], fix=None, ack="", acked=True)
+        return out
+
+    def confirm(self, who, iid):
+        """일부러 그런 줄을 사람이 확인해 닫는다(그 줄이 확인할 수 있는 줄일 때만)."""
+        it = next((i for i in (self.last or {}).get("items", []) if i["id"] == iid), None)
+        if it is None or not it.get("ack"): return {"ok": False, "why": "확인으로 닫을 수 없는 항목입니다 — 고친 뒤 다시 검사하십시오"}
+        self.acks.add(iid); self.eng.rt.note("설치 점검", f"확인으로 닫음: {it['name']} — {it['ack']}", actor=who)
+        return self.run(who, iid)
 
     def _merge(self, new, only):
         """한 줄만 다시 검사: 직전 결과에서 그 줄만 새 결과로 바꾼다(그 줄이 직전에 없었으면 덧붙인다)."""
@@ -163,11 +186,11 @@ class InitCheck:
         old = {i["id"]: i for i in (self.last or {}).get("items", [])}; new = self._merge(self._now(), only); self._mark(new, old, only); ids = {i["id"] for i in new}
         gone = [o["name"] for k, o in old.items() if o["level"] != "ok" and k not in ids]                    # 직전에 문제였는데 이번에는 줄 자체가 없어진 것(뺀 장비 등)
         bad = sum(1 for i in new if i["level"] == "bad"); warn = sum(1 for i in new if i["level"] == "warn")
-        self.last = {"t": wall_iso(), "by": who, "n": len(self.runs) + 1, "items": new, "bad": bad, "warn": warn, "done": bad == 0, "cleared": gone, "only": only}
+        self.last = {"t": wall_iso(), "by": who, "n": len(self.runs) + 1, "items": new, "bad": bad, "warn": warn, "done": bad == 0 and warn == 0, "cleared": gone, "only": only}
         self.runs = (self.runs + [{"t": self.last["t"], "by": who, "bad": bad, "warn": warn, "only": only, "fixed": [i["name"] for i in new if i.get("was")] + gone, "open": [i["name"] for i in new if i["level"] == "bad"]}])[-KEEP:]
-        try: fsio.write_json(self.path, {"last": self.last, "runs": self.runs})
+        try: fsio.write_json(self.path, {"last": self.last, "runs": self.runs, "acks": sorted(self.acks)})
         except OSError: pass
-        self.eng.rt.note("설치 점검", f"{self.last['n']}차 검사{'(한 항목)' if only else ''}: 이상 {bad}건 · 주의 {warn}건" + (" — 설치 점검 완료" if bad == 0 else ""), actor=who)
+        self.eng.rt.note("설치 점검", f"{self.last['n']}차 검사{'(한 항목)' if only else ''}: 이상 {bad}건 · 주의 {warn}건" + (" — 설치 점검 완료" if bad == 0 and warn == 0 else ""), actor=who)
         return self.view()
 
     def brief(self):
@@ -180,11 +203,15 @@ class InitCheck:
 
 
 def http_get(hd, eng, q):
-    """GET /api/archive/initcheck[?run=1[&only=<줄>]] — 보기는 누구나, 검사는 운용자."""
+    """GET /api/archive/initcheck[?run=1[&only=<줄>] | ?ack=<줄>] — 보기는 누구나, 검사 · 확인은 운용자."""
     if eng is None: return hd._err(403, "기록 조회기에서는 검사할 수 없습니다")              # pylint: disable=protected-access
     if q.get("run"):
         s = hd._sess("operator")                                                           # pylint: disable=protected-access
         if s is None: return None
         with eng.lock: return hd._send(200, eng.initw.run(s["name"], q.get("only") or None))   # pylint: disable=protected-access
+    if q.get("ack"):
+        s = hd._sess("operator")                                                           # pylint: disable=protected-access
+        if s is None: return None
+        with eng.lock: return hd._send(200, eng.initw.confirm(s["name"], q["ack"]))          # pylint: disable=protected-access
     with eng.lock: return hd._send(200, eng.initw.view())                                  # pylint: disable=protected-access
 

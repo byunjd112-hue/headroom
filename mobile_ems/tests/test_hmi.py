@@ -39,7 +39,7 @@ class TestHmi(unittest.TestCase):
         """설치 점검: 검사(운용자) → 무응답 장비는 '이상'과 고치는 방법 → 고친 뒤 그 줄만 다시 검사하면 '해결됨', 이상 0 이면 완료. 스냅샷에 상태가 실린다."""
         e = self.eng; u = "/api/archive/initcheck"; op = self.login("4321"); self.assertEqual(self.req(u + "?run=1")[0], 403); self.assertTrue(self.req(u)[1]["ok"])
         d = self.req(u + "?run=1", tok=op)[1]; la = d["last"]; ids = {i["id"]: i for i in la["items"]}
-        self.assertTrue(d["ok"] and la["done"] and la["bad"] == 0, [i for i in la["items"] if i["level"] == "bad"])
+        self.assertTrue(d["ok"] and la["done"] and la["bad"] == 0 and la["warn"] == 0, [i for i in la["items"] if i["level"] != "ok"])      # 완료 = 이상 · 주의 모두 0
         for k in ("comm.ESS", "comm.MTR", "count.ESS", "ring.order", "ring.feedA", "ring.feedB", "ring.nop", "ring.fed", "bus.ok", "load.c2"): self.assertEqual(ids[k]["level"], "ok", ids[k])
         self.assertIn("127.0.0.1", ids["comm.ESS"]["text"]); self.assertNotIn("comm.DG2", ids)                                            # 설정된 주소를 보이고, 빈 자리는 검사하지 않는다
         self.assertTrue(e.snapshot()["init"]["done"])
@@ -51,6 +51,11 @@ class TestHmi(unittest.TestCase):
         self.assertEqual((it["level"], it["was"]), ("ok", "bad")); self.assertIn(it["name"], d["runs"][0]["fixed"]); self.assertGreaterEqual(len(d["runs"]), 3)
         with e.lock: e.busw.change({"op": "set", "node": "G1", "bus": "B"}, "시험")                                                             # 모선 약점 → 주의 + [자동 보완]
         la = self.req(u + "?run=1", tok=op)[1]["last"]; b = [i for i in la["items"] if i["id"].startswith("bus.") and i["level"] != "ok"]; self.assertTrue(b and b[0]["fix"]["act"] == "bus_auto", b)
+        self.assertFalse(la["done"]); self.assertFalse(self.req(u + "?ack=" + b[0]["id"], tok=op)[1]["ok"])                                   # 주의가 남으면 완료가 아니고, 고쳐야 하는 줄은 확인으로 닫지 못한다
+        e.sim_action({"action": "cb", "target": "FC", "on": False}, "시험"); self.assertTrue(self._until(lambda: e.rt.val.get("CB.FC") == 0))  # 일부러 열어 둔 차단기 → 주의 → [확인]으로 닫는다 → 닫으면 확인이 지워진다
+        la = self.req(u + "?run=1", tok=op)[1]["last"]; c = next(i for i in la["items"] if i["id"] == "cb.FC"); self.assertEqual((c["level"], bool(c["ack"]), c["pic"]), ("warn", True, "FC"))
+        c = next(i for i in self.req(u + "?ack=cb.FC", tok=op)[1]["last"]["items"] if i["id"] == "cb.FC"); self.assertEqual((c["level"], c.get("acked")), ("ok", True)); self.assertIn("cb.FC", e.initw.acks)
+        e.sim_action({"action": "cb", "target": "FC", "on": True}, "시험"); self.assertTrue(self._until(lambda: e.rt.val.get("CB.FC") == 1)); self.req(u + "?run=1", tok=op); self.assertNotIn("cb.FC", e.initw.acks)
         with e.lock: e.busw.change({"op": "reset"}, "시험")
         d = self.req(u + "?run=1&only=" + b[0]["id"], tok=op)[1]; self.assertEqual(next(i for i in d["last"]["items"] if i["id"] == b[0]["id"])["was"], b[0]["level"])     # 약점이 사라지면 그 줄은 해결됨
 

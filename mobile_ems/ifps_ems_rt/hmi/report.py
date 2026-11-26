@@ -66,7 +66,7 @@ def _init(doc, eng):
     w = getattr(eng, "initw", None); la = w.last if w is not None else None
     doc.h2("설치 점검(초기화) 결과")
     if not la: doc.p("아직 설치 점검을 하지 않았다(개요 화면의 [설치 점검])."); return
-    doc.p(f"{la['n']}차 검사 {la['t']} · {la.get('by') or ''} — 이상 {la['bad']}건 · 주의 {la['warn']}건 · {'설치 점검 완료' if la['done'] else '미완료(이상이 남아 있다)'}")
+    doc.p(f"{la['n']}차 검사 {la['t']} · {la.get('by') or ''} — 이상 {la['bad']}건 · 주의 {la['warn']}건 · {'설치 점검 완료' if la['done'] else '미완료(이상 · 주의가 남아 있다)'}")
     rows = [[i["area"], i["name"], {"bad": "이상", "warn": "주의"}[i["level"]], i["text"]] for i in la["items"] if i["level"] != "ok"]
     if rows: doc.table(["구분", "대상", "판정", "내용"], rows[:40], [14, 26, 8, 52])
     if len(w.runs) > 1: doc.table(["검사 시각", "검사자", "이상", "주의", "해결된 것"], [[r["t"], r.get("by") or "", r["bad"], r["warn"], ", ".join(r.get("fixed") or []) or "—"] for r in w.runs[-10:]], [22, 14, 8, 8, 48])

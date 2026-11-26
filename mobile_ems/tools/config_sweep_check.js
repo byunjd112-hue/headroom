@@ -1,6 +1,7 @@
 // 구성 변경 점검: 장비 대수를 늘리고 줄이고, 장비 한 대 한 대의 모선을 옮기고, 부하를 늘리고 나누고 옮기고, 상시 개방점을 옮겨 가며
 // ① 설치 점검이 그 구성 그대로 검사하는지(인식한 장비마다 통신 줄, 종류마다 대수 줄, 부하마다 경로 줄, 이상 0)
 // ② 개요 · 결선도 · 환망 · 설비 제어 · 부하 관리 · 운영 시나리오(실시간) · FMEA·FAT 내보내기가 같은 구성을 보이는지를 대조한다.
+// 상시 개방점을 옮길 때 설정 파일(config/runtime.json)이 다시 쓰여 줄 맞춤이 바뀐다(내용은 끝에 되돌린다) — 끝난 뒤 git checkout -- config/runtime.json 으로 되돌린다.
 // 가상 장치를 띄워 두고 실행한다: python -m ifps_ems_rt.hmi config/runtime.json --sim --plan results --port 8088 → node tools/config_sweep_check.js  (약 6분, 어긋남 0 이어야 한다)
 const { chromium } = require("playwright");
 const B = process.env.EMS_URL || "http://127.0.0.1:8088/";
@@ -50,7 +51,7 @@ const KN = { PV: "태양광", DG: "디젤 발전기", FC: "연료전지", ESS: "
     const ov = await p.evaluate(() => ({ k: Object.fromEntries(["DG", "ESS", "PV", "FC"].map(k => [k, L.view.filter(i => i.kind === k && !i.spare && !i.absent).length])), sp: L.view.filter(i => i.spare).length, lb: [...document.querySelectorAll("#siteMk .spt:not(.ppdu)")].map(e => e.textContent.replace(/\s+/g, " ")), btn: document.querySelector("#initBtn").textContent }));
     ["DG", "ESS", "PV", "FC"].forEach(k => chk(ov.k[k] === units(k).length, `개요 ${k} 그림 ${ov.k[k]}(인식 ${units(k).length})`)); chk(ov.sp === 0, "개요에 예비 자리 " + ov.sp + "개");
     src.filter(q => q.kind !== "G1" && q.kind !== "DG").forEach(q => chk(ov.lb.some(t => t.includes("모선 " + q.bus) && (units(q.kind).length < 2 || t.includes(q.id + " "))), `개요 표지: ${q.id} 모선 ${q.bus}`));
-    chk(/설치 점검 완료/.test(ov.btn), "개요의 설치 점검 단추 — " + ov.btn);
+    chk(ic.ok && (ic.last.done ? /설치 점검 완료/ : /남은/).test(ov.btn) && ic.last.done === (ic.last.bad + ic.last.warn === 0), `개요의 설치 점검 단추 — ${ov.btn}(이상 ${ic.ok ? ic.last.bad : "?"} · 주의 ${ic.ok ? ic.last.warn : "?"})`);
     // ⑦ 운영 시나리오 실시간: 장비 한 대 = 블록 하나
     await go("scenarios", 3500); await p.evaluate(() => { const e = [...document.querySelectorAll("#main button")].find(x => x.textContent.trim() === "실시간"); if (e) e.click(); }); await p.waitForTimeout(3500);
     const tx = await p.evaluate(() => [...document.querySelectorAll("#main svg text")].map(e => e.textContent.trim()));
@@ -80,7 +81,7 @@ const KN = { PV: "태양광", DG: "디젤 발전기", FC: "연료전지", ESS: "
   // 고장 → 안내 → 고침 → 해결됨: 구성을 바꾼 상태에서도 같은 흐름
   await post("/api/sim", { action: "mute", target: "ESS2", on: true }); await p.waitForTimeout(6000);
   let ic = await get("/api/archive/initcheck?run=1"), it = ic.last.items.find(i => i.id === "comm.ESS2"); n += 2;
-  if (!(it && it.level === "bad" && it.guide.length >= 3 && !ic.last.done)) { bad++; console.log("✕ ESS 2호기 무응답 → 이상 · 안내: " + JSON.stringify(it)); }
+  if (!(it && it.level === "bad" && it.pic === "ESS" && it.guide.length >= 3 && !ic.last.done)) { bad++; console.log("✕ ESS 2호기 무응답 → 이상 · 안내: " + JSON.stringify(it)); }
   await post("/api/sim", { action: "mute", target: "ESS2", on: false }); await p.waitForTimeout(7000); ic = await get("/api/archive/initcheck?run=1&only=comm.ESS2"); it = ic.last.items.find(i => i.id === "comm.ESS2");
   if (!(it && it.level === "ok" && it.was === "bad")) { bad++; console.log("✕ 고친 뒤 그 줄만 다시 검사 → 해결됨: " + JSON.stringify(it)); } else console.log("○ 구성을 바꾼 상태에서 무응답 → 이상 · 안내 → 고침 → 해결됨");
   for (const k of ["ESS", "DG"]) await post("/api/units", { kind: k, delta: -1 }); await reset(); await p.waitForTimeout(13000);
