@@ -130,8 +130,10 @@ class RingWatch:
         with open(eng.cfg_path, encoding="utf-8") as f: full = json.load(f)
         full["ring"] = new; ed._write("runtime", json.dumps(full, ensure_ascii=False, indent=1) + "\n")        # pylint: disable=protected-access
         if synced: ed.loaded["runtime"] = cfgedit._sha(ed._text("runtime"))                                   # pylint: disable=protected-access — 바로 적용되므로 '재기동 필요'로 보이지 않게
-        eng.cfg["ring"] = new; self.r = ring.settings(new)
-        if self.model is not None: self.model.r = self.r
+        moved = self.r is not None and new.get("open") != self.r.get("open"); eng.cfg["ring"] = new; self.r = ring.settings(new)
+        if self.model is not None:
+            self.model.r = self.r
+            if moved: self.model.move_open()                                # 가상 장치: 상시 개방점 설정을 옮기면 구간 차단기도 그 구성으로(현장에서 차단기를 옮겨 조작한 것처럼)
         eng.rt.note("설정", f"환망 구성 저장: {what}", actor=who); return {"ok": True}
 
     def _entry(self, new, e):

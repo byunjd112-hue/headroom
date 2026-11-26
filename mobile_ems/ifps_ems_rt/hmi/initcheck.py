@@ -74,9 +74,12 @@ def _feed_end(r, v, i, bus):
     return _it(f"ring.feed{bus}", "환망 A · B", f"급전 {bus}(모선 {bus} → {r['fsu'][0 if bus == 'A' else n - 1]['name']})", "ok" if ok else "bad", why, [] if ok else G_RING, None if ok else GO_RING)
 
 
-def _nop(sec):
-    """상시 개방점: 열린 구간이 꼭 한 곳."""
+def _nop(sec, want=None):
+    """상시 개방점: 열린 구간이 꼭 한 곳이고, 그곳이 설정의 상시 개방점(want)과 같다."""
     opens = [x["i"] for x in sec if x["state"] == 0]
+    if len(opens) == 1 and want is not None and opens[0] != want:
+        return _it("ring.nop", "환망 A · B", "상시 개방점", "warn", f"설정의 상시 개방점은 구간 {want} 인데 실제로 열린 곳은 구간 {opens[0]} 이다 — 부하가 받는 모선(A · B) 표시가 실제와 다를 수 있다",
+                   ["실제 결선이 맞으면 환망 화면의 [배전체계 구성]에서 상시 개방점을 열린 구간으로 맞춘다.", "설정이 맞으면 구간 차단기를 설정대로 조작한다(먼저 열 곳을 열고 닫을 곳을 닫는다 — 고리를 닫은 채 두지 않는다).", "맞춘 뒤 [이 항목만 다시 검사]를 누른다."], GO_RING)
     if len(opens) == 1: return _it("ring.nop", "환망 A · B", "상시 개방점", "ok", f"구간 {opens[0]} 한 곳이 열려 있다(순환 전류 방지)")
     if not opens: return _it("ring.nop", "환망 A · B", "상시 개방점", "bad", "열린 구간이 없다 — 고리가 닫혀 순환 전류가 흐를 수 있다", G_RING, GO_RING)
     return _it("ring.nop", "환망 A · B", "상시 개방점", "warn", f"열린 구간이 {len(opens)}곳({', '.join(map(str, opens))}) — 구간이 끊겼거나 차단기를 열어 둔 것이다", G_RING, GO_RING)
@@ -88,7 +91,7 @@ def _ring_feed(snap, v):
     if not r or not r.get("fsu"): return []
     n = len(r["fsu"]); dead = [f["name"] for f in r["fsu"] if f.get("live") is False]
     fed = _it("ring.fed", "환망 A · B", "구간분전함 급전", "bad", f"정전: {', '.join(dead)}", G_RING, GO_RING) if dead else _it("ring.fed", "환망 A · B", "구간분전함 급전", "ok", f"{n}개 모두 급전")
-    return [_feed_end(r, v, 0, "A"), _feed_end(r, v, n, "B"), _nop(r["sections"]), fed]
+    return [_feed_end(r, v, 0, "A"), _feed_end(r, v, n, "B"), _nop(r["sections"], r.get("open")), fed]
 
 
 def _bus(snap, v):

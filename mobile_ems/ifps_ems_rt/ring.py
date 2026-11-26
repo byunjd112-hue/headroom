@@ -464,6 +464,12 @@ class Model:
         for k, c in zip(ks, codes[1:] + codes[:1]): pp[k][0] = c
         self.init.clear()
 
+    def move_open(self):
+        """상시 개방점 설정이 바뀌었을 때: 고장(단선 · 차단)이 없으면 새 상시 개방점만 열고 나머지 구간을 닫는다. 고장 중이면 건드리지 않는다(복구 뒤 restore 가 맞춘다)."""
+        if self.r is None or self.brk: return
+        e = self.eff()
+        for i, t in enumerate(sw_tags(e)): self.p.set(t, 0 if i == e["open"] else 1)
+
     def restore(self):
         """고장을 없애고 처음 상태(처음 배치, 상시 개방점만 열림)로 되돌린다."""
         if self.r is None: return
