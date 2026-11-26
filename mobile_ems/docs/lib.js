@@ -10,7 +10,7 @@ const SP = { body: { after: 100, line: 300 }, h1: { before: 280, after: 140 }, h
 const KEEP = true;        // 제목 · 그림 · 표 설명을 다음 문단과 한 쪽에 두고 표의 줄을 쪽 사이에서 나누지 않는다(인쇄 미리보기 기준 쪽 구성). 끄려면 false
 let NI = 0;
 // ── 조판 다듬기(문서가 tune 으로 켠다 — 안 켜면 예전 그대로): 장평 · 자간, 본문 양쪽 정렬, 표 칸 여백, 줄바꿈 규칙
-const TN = { scale: 0, cs: 0, just: false, center: false, cell: { top: 50, bottom: 50, left: 90, right: 90 }, tline: 264, fx: null };
+const TN = { scale: 95, cs: -3, just: true, center: true, cell: { top: 60, bottom: 60, left: 100, right: 100 }, tline: 260, fx: t => tidy(nodot(nodash(t))), keep: { whole: 5, head: 3, tail: 2 } };   // 문서 작성 공통 규칙(모든 Word 문서의 기본값)
 const tune = o => Object.assign(TN, o);
 const NB = "\u00A0";
 /** 줄바꿈 규칙: 줄이 어절 사이에서만, 그리고 어색하지 않은 곳에서만 넘어가게 묶음 공백을 넣는다.
@@ -23,13 +23,22 @@ function tidy(t) {
 }
 /** 가운뎃점으로 낱말을 잇지 않는다(사용자 지시): 둘이면 '및', 셋 이상이면 쉼표로 나열하고 마지막만 '및'으로 잇는다. 괄호 안은 따로 센다 */
 function nodot(t) {
-  if (t.indexOf("·") < 0) return t;
+  t = t.replace(/[ㆍ•∙]/g, "·"); if (t.indexOf("·") < 0) return t;
+  if (t.indexOf("=") >= 0) t = t.replace(/([A-Za-z0-9_)])·(?=[A-Za-z0-9_(])/g, "$1 × ");
+  t = t.replace(/ ?· ?/g, " · ");
   const hold = [], seg = x => { const n = (x.match(/ · /g) || []).length; if (!n) return x; let k = 0; const has = /(^|\s)및(\s|$)/.test(x);
     return x.replace(/ · /g, () => (++k === n && !has ? " 및 " : ", ")); };
   const flat = x => x.split(/([,.:;=→\/①-⑳])/).map(seg).join("");
   let prev; do { prev = t; t = t.replace(/\(([^()]*)\)/g, (m, a) => { hold.push("(" + flat(a) + ")"); return "\u0001" + (hold.length - 1) + "\u0002"; }); } while (t !== prev);
   t = flat(t); do { prev = t; t = t.replace(/\u0001(\d+)\u0002/g, (m, i) => hold[+i]); } while (t !== prev);
-  return t.replace(/·/g, ",");
+  return t.replace(/ · /g, ", ");
+}
+/** 줄표로 구절을 잇지 않는다: 앞말이 짧은 이름표면 쌍점, 아니면 쉼표. 줄표만 있는 칸은 '해당 없음'(tools/doc_rules.py 와 같은 규칙) */
+function nodash(t) {
+  if (/^\s*[—–]\s*$/.test(t)) return t.replace(/[—–]/, "해당 없음");
+  if (!/[—–]| - /.test(t)) return t;
+  const rep = (m, off, all) => { const left = all.slice(0, off).split(/[.:;,(]/).pop().trim(); return left.length > 0 && left.length <= 14 && all.slice(Math.max(0, off - 30), off).indexOf(":") < 0 ? ": " : ", "; };
+  return t.replace(/\s*[—–]\s*/g, rep).replace(/([가-힣)]) - (?=[가-힣(])/g, (m, a, off, all) => a + rep(m, off + 1, all));
 }
 const run = (t, o = {}) => { const mono = o.font === "Consolas" || o.font === "Cambria Math";
   return new TextRun(Object.assign({ text: TN.fx && !mono && typeof t === "string" ? TN.fx(t) : t, font: F, size: S.body, color: "000000" }, TN.scale && !mono ? { scale: TN.scale, characterSpacing: TN.cs } : {}, o)); };
@@ -63,7 +72,7 @@ function TBL(head, rows, widths, o = {}) {
     children: [new Paragraph({ keepNext: !!kx, alignment: hd || (o.center || []).includes(i) || (TN.center && one(t, i)) ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { line: TN.tline },
       children: [typeof t === "object" && t !== null ? run(String(t.t), { size: S.table, bold: true, color: t.c }) : run(String(t), { size: S.table, bold: hd || (o.bold || []).includes(i), font: (o.mono || []).includes(i) && !hd ? "Consolas" : F })] })] });
   // o.keep = { whole, head, tail }: 줄 수가 whole 이하면 표를 한 쪽에 묶고, 길면 첫 head 줄 · 끝 tail 줄만 묶는다(쪽 끝에 한두 줄만 남거나 넘어가지 않게). 안 주면 예전대로
-  const k = o.keep, N = rows.length, kn = n => !!k && n < N - 1 && (N <= k.whole || n < k.head - 1 || n >= N - k.tail);
+  const k = o.keep || TN.keep, N = rows.length, kn = n => !!k && n < N - 1 && (N <= k.whole || n < k.head - 1 || n >= N - k.tail);
   return new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: cw, layout: TableLayoutType.FIXED,
     rows: [new TableRow({ tableHeader: true, cantSplit: KEEP, children: head.map((h, i) => cell(h, i, true, !!k)) })].concat(rows.map((r, n) => new TableRow({ cantSplit: KEEP, children: r.map((c, i) => cell(c, i, false, kn(n))) }))) });
 }
@@ -89,4 +98,4 @@ function save(body, out, foot) {
       children: body }] });
   return Packer.toBuffer(doc).then(b => { fs.writeFileSync(out, b); console.log("saved", out); });
 }
-module.exports = { tune, tidy, nodot, run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };
+module.exports = { tune, tidy, nodot, nodash, run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };

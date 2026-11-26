@@ -8,7 +8,7 @@ const ST = J("static_results.json"), TR = J("test_results.json"), BM = J("foreca
 const CFG = JSON.parse(fs.readFileSync(path.join(ROOT, "config/runtime.json"), "utf8"));
 const ED = "제13판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
 const REV = process.argv[2] || "Rev00", DATE = process.argv[3] || "2026. 11. 26.", OUT = process.argv[4] || __dirname + `/out/이동형전력체계EMS_개발용역의뢰사양서_${REV}.docx`;
-L.tune({ scale: 95, cs: -3, just: true, center: true, cell: { top: 60, bottom: 60, left: 100, right: 100 }, tline: 260, fx: t => L.tidy(L.nodot(t)) });   // 장평 95 % · 자간 좁힘 · 본문 양쪽 정렬 · 표 칸 여백 · 줄바꿈 규칙
+// 조판 · 줄바꿈 · 점 · 줄표 규칙은 lib.js 의 기본값(문서 작성 공통 규칙)
 const HL = require("./codehl.js"), { AlignmentType, BorderStyle } = require("docx");
 const body = []; let chap = 0, after = false;
 // 장 · 부록은 제목 문단의 '앞에서 쪽 나눔'으로 새 쪽에서 시작한다. 표 · 코드 뒤에는 빈 문단을 두지 않고 뒤 글의 앞 간격으로 띄운다(빈 쪽 방지)

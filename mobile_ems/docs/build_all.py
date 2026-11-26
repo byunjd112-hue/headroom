@@ -65,14 +65,15 @@ def manual_images():
 
 def _guide(rev, date, groups, evid):
     """문서 묶음 첫 화면(00_…문서안내.html): 읽는 순서와 문서별 한 줄 설명."""
-    esc = lambda t: t.replace("&", "&amp;").replace("<", "&lt;")
+    sys.path.insert(0, os.path.join(ROOT, "tools")); import doc_rules
+    esc = lambda t: doc_rules.clean(t).replace("&", "&amp;").replace("<", "&lt;")
     sec = "".join(f'<section><h2>{esc(d)}</h2><p>{esc(desc)}</p><ul>' + "".join(f'<li><a href="{esc(d)}/{esc(n)}">{esc(n)}</a></li>' for n in names) + "</ul></section>" for d, desc, names in groups if names)
-    ev = "".join(f'<li><a href="08_시험근거/{esc(n)}">{esc(n)}</a> — {esc(t)}</li>' for n, t in evid)
+    ev = "".join(f'<li><a href="08_시험근거/{esc(n)}">{esc(n)}</a>: {esc(t)}</li>' for n, t in evid)
     return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>IFPS EMS {rev} 문서 안내</title>
 <style>body{{font-family:"맑은 고딕","Malgun Gothic",sans-serif;margin:0;background:#f6f2ea;color:#24221d;line-height:1.6}}main{{max-width:980px;margin:0 auto;padding:28px 20px 60px}}
 h1{{font-size:26px;margin:0 0 4px}}h2{{font-size:17px;margin:0 0 2px;color:#5b4a34}}.sub{{color:#6f6b68;margin:0 0 18px}}section{{background:#fff;border:1px solid #e0d7c8;border-radius:8px;padding:14px 18px;margin:12px 0}}
 section p{{margin:0 0 6px;color:#4a463f;font-size:14px}}ul{{margin:4px 0 0;padding-left:20px}}li{{font-size:14px}}a{{color:#7b5a1e}}.note{{font-size:13px;color:#6f6b68}}</style></head><body><main>
-<h1>IFPS 이동형 전력체계 EMS — 문서 안내</h1><p class="sub">{rev} · {date} · 모든 문서와 실행 패키지는 같은 리비전이다</p>
+<h1>IFPS 이동형 전력체계 EMS 문서 안내</h1><p class="sub">{rev}, {date}. 모든 문서와 실행 패키지는 같은 리비전이다</p>
 <section><h2>읽는 순서</h2><p>제안 발표 → 화면과 운용 → 하드웨어 → AI 예측 → 통신 연동 → 장치별 연동 → 시험과 신뢰성 → 시험 근거. 처음 보는 분은 02 보고자료부터 보면 전체가 잡힌다.</p></section>
 {sec}
 <section><h2>08_시험근거</h2><p>문서에 실린 수치의 원자료. 문서의 표와 그래프는 이 파일에서 그대로 읽어 만든다.</p><ul>{ev}</ul></section>
@@ -130,6 +131,8 @@ def main(argv=None):
     run(["node", os.path.join(DOCS, "ppt", "build_ai_deck.js"), rev, ym], env=env)            # AI 예측 기술자료(수식·입체 모델 그림)
     run(["node", os.path.join(DOCS, "ppt", "build_hw_deck.js"), rev, ym], env=env)            # 하드웨어 구성 기술자료
     run(["node", os.path.join(DOCS, "ppt", "build_pd_deck.js"), rev, ym], env=env)            # 이동형 배전체계 무정전 구성 기술자료
+    decks = sorted(os.path.join(OUT, f) for f in os.listdir(OUT) if f.endswith(f"_{rev}.pptx") and any(k in f for k in ("보고자료", "기술자료")))
+    run([sys.executable, os.path.join(DOCS, "..", "tools", "doc_rules.py"), "pptx"] + decks)   # 문서 작성 공통 규칙(줄표 · 가운뎃점 금지)을 PPT 의 글에 적용
     run([sys.executable, os.path.join(DOCS, "..", "tools", "build_workbooks.py"), rev])       # 배전체계 계산서 · 개발비 보완본(원본이 docs/xlsx_base 에 있을 때만)
     run([sys.executable, os.path.join(DOCS, "fmea", "build_fmea.py"), rev, date])
     run([sys.executable, os.path.join(DOCS, "..", "tools", "build_fmsite.py"), rev])          # 현장 구성 FMEA 펼침 · FAT 점검표(HTML · Excel)

@@ -23,6 +23,17 @@ PRICE = {"ppdu": (3.6, "63 A 3상 IP67 휴대용 분전함(상용품) £432~2,04
          "dio": (0.6, "16점 디지털 입력 원격 I/O(Modbus TCP, 상용품) 약 US$414/대, 달러 ≈ 1,400원 어림 — 군용화 · 배선 공사비 없음", "newegg.com")}
 
 
+def _rules(wb, src):
+    """보완하며 넣은 글에 문서 작성 공통 규칙(줄표 · 가운뎃점 금지)을 적용한다. 원본에 있던 글과 수식은 건드리지 않는다."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import doc_rules
+    old = {c.value for ws in openpyxl.load_workbook(src).worksheets for row in ws.iter_rows() for c in row if isinstance(c.value, str)}
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for c in row:
+                if isinstance(c.value, str) and c.value not in old and not c.value.startswith("="): c.value = doc_rules.clean(c.value)
+
+
 def _find(folder, *keys):
     for f in sorted(glob.glob(os.path.join(folder, "*.xlsx"))):
         if any(k in os.path.basename(f) for k in keys): return f
@@ -129,7 +140,7 @@ def calc_book(src, dst, rev, ems_rev):
     d = wb["23_연계문서"]; _move_down(d, 16, d.max_row, 1); _style(d, 14, 15)
     for col, v in zip("ABCDEF", (11, "이동형 배전체계 무정전 구성 기술자료", f"IFPS_이동형배전체계_무정전구성_기술자료_{ems_rev}.pptx", ems_rev, "", "공급 경로(구간분전함 → 배전체계 → 부하), 병렬 · N+1, 우회 결선, 무정전 점검 — 우회 회로의 계산은 07A")): d[f"{col}15"] = v
     d["C5"] = os.path.basename(dst); d["D5"] = rev
-    wb.save(dst)
+    _rules(wb, src); wb.save(dst)
 
 
 # ───────────────────────── 개발비
@@ -188,7 +199,7 @@ def cost_book(src, dst, rev, ems_rev):
     n["A1"].font = BOLD
     for c in n[3]: c.font = BOLD
     for r in (4, 5, 6, 7): n[f"B{r}"].fill = SAND
-    wb.save(dst)
+    _rules(wb, src); wb.save(dst)
 
 
 def main(rev, base, out, calc_rev="Rev09", cost_rev="Rev06"):
