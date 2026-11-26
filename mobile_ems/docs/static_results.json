@@ -1,6 +1,6 @@
 {
- "date": "2026-11-26 12:36",
- "unittest_s": 737.1,
+ "date": "2026-11-26 14:13",
+ "unittest_s": 725.3,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -60,7 +60,7 @@
   "Excel 은 열리는 꾸러미(시트 3장, XML 정상), FAT · FMEA HTML 은 구성의 이름을 담는다. | ok",
   "장비 한 대 · 구간 · 구간분전함 · 부하마다 줄이 생기고, 번호는 기존 번호만 쓰며, 구성 때문에 달라지는 줄만 재검토로 표시한다. | ok",
   "test_10_security_lockout_hash_and_gate | ok",
-  "test_11_all_units_load_shed_elz_pv | 재시도 통과",
+  "test_11_all_units_load_shed_elz_pv | ok",
   "test_1_static_and_snapshot | ok",
   "test_2_auth_and_roles | ok",
   "test_3_sbo_command_with_ack | ok",
@@ -224,19 +224,17 @@
  ],
  "n_tests": 219,
  "tests_ok": true,
- "retried": [
-  "test_11_all_units_load_shed_elz_pv"
- ],
+ "retried": [],
  "coverage_pct": 92.6,
  "stmt": {
   "n": 7811,
-  "hit": 7458,
+  "hit": 7457,
   "pct": 95.5
  },
  "branch": {
   "n": 2774,
-  "hit": 2347,
-  "pct": 84.6
+  "hit": 2349,
+  "pct": 84.7
  },
  "coverage_files": [
   [
@@ -456,6 +454,14 @@
    "69-72, 161, 165"
   ],
   [
+   "ifps_ems_rt/archive.py",
+   96.6,
+   148,
+   83.3,
+   30,
+   "95-96, 110, 128-129"
+  ],
+  [
    "ifps_ems_rt/hmi/eng_command.py",
    96.6,
    118,
@@ -544,14 +550,6 @@
    "93-94, 110"
   ],
   [
-   "ifps_ems_rt/archive.py",
-   98.0,
-   148,
-   83.3,
-   30,
-   "95-96, 110"
-  ],
-  [
    "ifps_ems_rt/hmi/docx.py",
    98.1,
    53,
@@ -566,14 +564,6 @@
    78.8,
    52,
    "117-118"
-  ],
-  [
-   "ifps_ems_rt/simplant.py",
-   98.5,
-   196,
-   92.6,
-   68,
-   "205, 217-218"
   ],
   [
    "ifps_ems_rt/runtime.py",
@@ -614,6 +604,14 @@
    86.8,
    38,
    "134"
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   99.0,
+   196,
+   94.1,
+   68,
+   "217-218"
   ],
   [
    "ifps_ems_rt/fmsite.py",
@@ -811,7 +809,7 @@
    "ifps_ems_rt/hmi/fuelwatch.py",
    100.0,
    17,
-   90.0,
+   100.0,
    10,
    ""
   ],
