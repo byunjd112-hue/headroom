@@ -1,6 +1,6 @@
 {
- "date": "2026-11-26 09:35",
- "unittest_s": 755.6,
+ "date": "2026-11-26 11:44",
+ "unittest_s": 726.9,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -60,8 +60,8 @@
   "Excel 은 열리는 꾸러미(시트 3장, XML 정상), FAT · FMEA HTML 은 구성의 이름을 담는다. | ok",
   "장비 한 대 · 구간 · 구간분전함 · 부하마다 줄이 생기고, 번호는 기존 번호만 쓰며, 구성 때문에 달라지는 줄만 재검토로 표시한다. | ok",
   "test_10_security_lockout_hash_and_gate | ok",
-  "test_11_all_units_load_shed_elz_pv | 재시도 통과",
-  "test_1_static_and_snapshot | ok",
+  "test_11_all_units_load_shed_elz_pv | FAIL",
+  "test_1_static_and_snapshot | FAIL",
   "test_2_auth_and_roles | ok",
   "test_3_sbo_command_with_ack | ok",
   "test_4_fault_injection_alarms_and_parallel_scan | ok",
@@ -71,6 +71,7 @@
   "test_8_breaker_trip_shown_and_deenergizes_feeder | ok",
   "test_9_layout_edit_persist_and_validate | ok",
   "모선 구성을 바꾸면 스냅샷 · 가상 장치의 모선 전압 계산이 따라가고(엔지니어만), 배치의 크기 값이 저장된다. | ok",
+  "ESS 충전율 운용 범위: 기본 20 ~ 80 %, 엔지니어가 고치면 실행기의 한계 · 설정 파일 · 스냅샷이 함께 바뀌고, 틀린 값은 막는다. | ok",
   "화면의 FMEA · FAT 내보내기: 운용자만, 지금 구성으로 네 가지 자료가 나온다. | ok",
   "설치 점검: 검사(운용자) → 무응답 장비는 '이상'과 고치는 방법 → 고친 뒤 그 줄만 다시 검사하면 '해결됨', 이상 0 이면 완료. 스냅샷에 상태가 실린다. | ok",
   "앞선 지령에 밀려 늦어진 운용자 지령은 버린다(잊은 지령이 뒤늦게 나가지 않게). | ok",
@@ -199,7 +200,7 @@
   "test_start_failures_return_codes | ok",
   "test_start_serve_and_stop_by_signal | ok",
   "test_read_write_probe_check | ok",
-  "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
+  "test_write_asks_confirmation_and_watch_stops_on_interrupt | FAIL",
   "test_check_scans_and_module_entry | ok",
   "장치를 놓고 빼도 기록 · 보고가 사실대로 남는다: 있는 장치의 값만 저장하고, 보고서에 장치 구성 표가 들어간다. | ok",
   "test_extra_units_are_recognized_summed_and_commanded | ok",
@@ -221,21 +222,22 @@
   "test_parse_json_and_csv | ok",
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 218,
- "tests_ok": true,
+ "n_tests": 219,
+ "tests_ok": false,
  "retried": [
-  "test_11_all_units_load_shed_elz_pv"
+  "test_11_all_units_load_shed_elz_pv",
+  "test_1_static_and_snapshot"
  ],
  "coverage_pct": 92.6,
  "stmt": {
-  "n": 7758,
-  "hit": 7407,
+  "n": 7811,
+  "hit": 7457,
   "pct": 95.5
  },
  "branch": {
-  "n": 2756,
-  "hit": 2333,
-  "pct": 84.7
+  "n": 2774,
+  "hit": 2348,
+  "pct": 84.6
  },
  "coverage_files": [
   [
@@ -359,6 +361,14 @@
    "29, 78-79"
   ],
   [
+   "ifps_ems_rt/hmi/ringwatch.py",
+   92.9,
+   182,
+   74.0,
+   104,
+   "79-80, 188-193, 230-234"
+  ],
+  [
    "ifps_ems_rt/hmi/archapi.py",
    93.1,
    58,
@@ -373,14 +383,6 @@
    85.8,
    120,
    "74, 126-127, 263-264, 309, 321-322, 345, 358, 362, 364, 366, 391-396, 426"
-  ],
-  [
-   "ifps_ems_rt/hmi/ringwatch.py",
-   93.4,
-   182,
-   75.0,
-   104,
-   "80, 188-193, 230-234"
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
@@ -453,6 +455,14 @@
    86.4,
    44,
    "69-72, 161, 165"
+  ],
+  [
+   "ifps_ems_rt/archive.py",
+   96.6,
+   148,
+   83.3,
+   30,
+   "95-96, 110, 128-129"
   ],
   [
    "ifps_ems_rt/hmi/eng_command.py",
@@ -543,14 +553,6 @@
    "93-94, 110"
   ],
   [
-   "ifps_ems_rt/archive.py",
-   98.0,
-   148,
-   83.3,
-   30,
-   "95-96, 110"
-  ],
-  [
    "ifps_ems_rt/hmi/docx.py",
    98.1,
    53,
@@ -568,11 +570,11 @@
   ],
   [
    "ifps_ems_rt/runtime.py",
-   98.6,
-   438,
-   94.9,
-   138,
-   "116, 275, 396, 574-576"
+   98.7,
+   447,
+   95.0,
+   140,
+   "116, 275, 407, 585-587"
   ],
   [
    "ifps_ems_rt/hmi/loadctl.py",
@@ -609,10 +611,10 @@
   [
    "ifps_ems_rt/simplant.py",
    99.0,
-   192,
+   196,
    92.6,
    68,
-   "212-213"
+   "217-218"
   ],
   [
    "ifps_ems_rt/fmsite.py",
@@ -641,10 +643,10 @@
   [
    "ifps_ems_rt/hmi/cfgedit.py",
    99.6,
-   233,
+   237,
    93.9,
    98,
-   "112"
+   "119"
   ],
   [
    "ifps_ems/__init__.py",
@@ -791,10 +793,18 @@
    ""
   ],
   [
+   "ifps_ems_rt/hmi/esslimit.py",
+   100.0,
+   35,
+   81.2,
+   16,
+   ""
+  ],
+  [
    "ifps_ems_rt/hmi/fcstats.py",
    100.0,
    29,
-   87.5,
+   100.0,
    8,
    ""
   ],
@@ -849,7 +859,7 @@
   [
    "ifps_ems_rt/hybrid.py",
    100.0,
-   55,
+   56,
    92.9,
    14,
    ""
@@ -1105,7 +1115,7 @@
     "W0201",
     "attribute-defined-outside-init",
     "ifps_ems_rt/runtime.py",
-    331,
+    342,
     "Runtime._quiet_want",
     "Attribute 'quiet_h' defined outside __init__"
    ],
@@ -1113,7 +1123,7 @@
     "W0612",
     "unused-variable",
     "ifps_ems_rt/simplant.py",
-    120,
+    121,
     "Plant._tick_units",
     "Unused variable 'cb'"
    ],
@@ -1121,7 +1131,7 @@
     "W0612",
     "unused-variable",
     "ifps_ems_rt/simplant.py",
-    182,
+    187,
     "Plant._tick_bus",
     "Unused variable 'on'"
    ],
@@ -1129,7 +1139,7 @@
     "W0201",
     "attribute-defined-outside-init",
     "ifps_ems_rt/simplant.py",
-    113,
+    114,
     "Plant._tick_power",
     "Attribute '_dt' defined outside __init__"
    ],
@@ -1472,7 +1482,7 @@
   ]
  },
  "metrics": {
-  "n_func": 1021,
+  "n_func": 1028,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1484,7 +1494,7 @@
   "len_max": 199,
   "arg_max": 8,
   "depth_max": 5,
-  "file_max": 577,
+  "file_max": 588,
   "over": {
    "cc": [],
    "len": [],
@@ -1550,7 +1560,7 @@
    [
     "ifps_ems_rt/runtime.py",
     "decide",
-    416,
+    427,
     20,
     21,
     0,
@@ -1791,7 +1801,7 @@
   "files": [
    [
     "ifps_ems_rt/runtime.py",
-    577
+    588
    ],
    [
     "ifps_ems_rt/ring.py",
@@ -1807,7 +1817,7 @@
    ],
    [
     "ifps_ems_rt/hmi/cfgedit.py",
-    315
+    322
    ],
    [
     "ifps_ems_rt/hmi/server.py",
@@ -1818,12 +1828,12 @@
     252
    ],
    [
-    "ifps_ems_rt/hmi/scenextra.py",
-    249
+    "ifps_ems_rt/simplant.py",
+    252
    ],
    [
-    "ifps_ems_rt/simplant.py",
-    247
+    "ifps_ems_rt/hmi/scenextra.py",
+    249
    ],
    [
     "ifps_ems_rt/hmi/report.py",
@@ -1970,11 +1980,11 @@
     108
    ],
    [
-    "ifps_ems/nowcast.py",
-    99
+    "ifps_ems_rt/hybrid.py",
+    102
    ],
    [
-    "ifps_ems_rt/hybrid.py",
+    "ifps_ems/nowcast.py",
     99
    ],
    [
@@ -2054,6 +2064,10 @@
     56
    ],
    [
+    "ifps_ems_rt/hmi/esslimit.py",
+    55
+   ],
+   [
     "ifps_ems/__main__.py",
     54
    ],
@@ -2116,8 +2130,8 @@
   ]
  },
  "pyflakes": [
-  "ifps_ems_rt/simplant.py:120:12: local variable 'cb' is assigned to but never used",
-  "ifps_ems_rt/simplant.py:182:9: local variable 'on' is assigned to but never used",
+  "ifps_ems_rt/simplant.py:121:12: local variable 'cb' is assigned to but never used",
+  "ifps_ems_rt/simplant.py:187:9: local variable 'on' is assigned to but never used",
   "tools/build_workbooks.py:15:1: 'openpyxl.styles.Alignment' imported but unused",
   "tools/build_workbooks.py:175:14: f-string is missing placeholders"
  ],
@@ -2131,7 +2145,7 @@
    "SEVERITY.LOW": 1,
    "SEVERITY.MEDIUM": 2,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 10069,
+   "loc": 10133,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -2362,11 +2376,11 @@
   ]
  ],
  "cc_avg": 6.05,
- "cc_n": 1047,
+ "cc_n": 1054,
  "cc_rank": {
-  "A": 593,
-  "B": 273,
-  "C": 181,
+  "A": 597,
+  "B": 275,
+  "C": 182,
   "D": 0,
   "E": 0,
   "F": 0
@@ -2446,7 +2460,7 @@
   ],
   [
    "ifps_ems_rt/hmi/cfgedit.py",
-   0.9,
+   0.0,
    "C"
   ],
   [
@@ -2476,7 +2490,7 @@
   ],
   [
    "ifps_ems_rt/simplant.py",
-   21.4,
+   20.8,
    "A"
   ],
   [
@@ -2590,17 +2604,17 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/eng_view.py",
+   40.2,
+   "A"
+  ],
+  [
    "ifps_ems_rt/archxfer.py",
    40.3,
    "A"
   ],
   [
    "ifps_ems_rt/hmi/eng_forecast.py",
-   40.3,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/hmi/eng_view.py",
    40.3,
    "A"
   ],
@@ -2690,13 +2704,13 @@
    "A"
   ],
   [
-   "ifps_ems_rt/hybrid.py",
-   53.0,
+   "ifps_ems_rt/hmi/docx.py",
+   53.3,
    "A"
   ],
   [
-   "ifps_ems_rt/hmi/docx.py",
-   53.3,
+   "ifps_ems_rt/hybrid.py",
+   53.5,
    "A"
   ],
   [
@@ -2790,6 +2804,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/esslimit.py",
+   68.8,
+   "A"
+  ],
+  [
    "ifps_ems_rt/hmi/scenunit.py",
    72.8,
    "A"
@@ -2841,14 +2860,14 @@
   ]
  ],
  "loc_py": {
-  "files": 81,
-  "sloc": 8082,
-  "comments": 1176
+  "files": 82,
+  "sloc": 8135,
+  "comments": 1193
  },
  "js": [
   [
    "ifps_ems_rt/hmi/static/app.js",
-   598,
+   599,
    true
   ],
   [
@@ -2898,7 +2917,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/profile.js",
-   30,
+   41,
    true
   ],
   [
@@ -2933,7 +2952,7 @@
   ],
   [
    "ifps_ems_rt/hmi/static/train.js",
-   178,
+   180,
    true
   ],
   [
