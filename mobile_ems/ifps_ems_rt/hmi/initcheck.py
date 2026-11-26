@@ -20,10 +20,10 @@ KEEP = 20                                                      # 남겨 두는 �
 G_COMM = ["장비의 전원이 켜져 있는지 본다.", "통신선(경로 A · B)이 장비와 스위치에 꽂혀 있는지 본다.", "장비에 정한 주소가 아래 '설정된 주소'와 같은지 본다 — 다르면 장비의 주소를 맞추거나 설정 편집(엔지니어)에서 주소를 고친다.", "고친 뒤 [이 항목만 다시 검사]를 누른다."]
 
 
-def _it(iid, area, name, level, text, guide=(), fix=None, ack="", short=""):
+def _it(iid, area, name, level, text, guide=(), fix=None, **kw):
     """검사 한 줄. ack: 일부러 그런 것이면 사람이 확인해 닫을 수 있는 줄 — 확인 단추에 쓸 글(없으면 고쳐야만 닫힌다).
     short: 요약에 적는 '확인한 사실' 한마디(없으면 text 의 앞부분) — 그냥 '정상'이 아니라 무엇을 보고 정상인지 보이게."""
-    return {"id": iid, "area": area, "name": name, "level": level, "text": text, "guide": list(guide), "fix": fix, "ack": ack, "short": short or text.split(" — ")[0].split("(")[0].strip()}
+    return {"id": iid, "area": area, "name": name, "level": level, "text": text, "guide": list(guide), "fix": fix, "ack": kw.get("ack", ""), "short": kw.get("short") or text.split(" — ")[0].split("(")[0].strip()}
 
 
 def _addr(cfg, n):
