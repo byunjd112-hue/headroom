@@ -17,7 +17,7 @@ for (const s of M.sections) {
     else if (k.type === "h") b.push(H2(k.text));
     else if (k.type === "steps") k.items.forEach((t, i) => b.push(k.items.length > 1 ? NUM(t) : P("· " + t)));
     else if (k.type === "table") { const n = k.head.length; b.push(TBL(k.head, k.rows.map(r => r.concat(Array(n).fill("")).slice(0, n)), k.widths || Array(n).fill(Math.floor(100 / n)), { bold: [0] })); b.push(GAP()); }
-    else if (k.type === "note") b.push(new Paragraph({ keepLines: true, spacing: { before: 60, after: 120, line: 300 }, shading: { type: ShadingType.CLEAR, fill: "FFF4D6" }, indent: { left: 160, right: 160 }, children: [run("주의 · 참고  ", { bold: true }), run(k.text)] }));
+    else if (k.type === "note") b.push(new Paragraph({ spacing: { before: 60, after: 120, line: 300 }, shading: { type: ShadingType.CLEAR, fill: "FFF4D6" }, indent: { left: 160, right: 160 }, children: [run("주의 · 참고  ", { bold: true }), run(k.text)] }));
     else if (k.type === "shot") shot(k.name, k.caption);
   }
 }

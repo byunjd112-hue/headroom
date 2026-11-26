@@ -7,6 +7,7 @@ const F = "맑은 고딕", W = 9638;
 // 쪽: A4, 위·아래 25 mm(1418), 좌·우 20 mm(1134) → 본문 폭 W. 글자 크기는 반 포인트(22 = 11 pt)
 const S = { body: 22, h1: 28, h2: 24, h3: 22, table: 20, cap: 20, note: 18, code: 20, foot: 18, title: 28 };
 const SP = { body: { after: 100, line: 300 }, h1: { before: 280, after: 140 }, h2: { before: 200, after: 100 }, h3: { before: 160, after: 80 }, cap: { before: 60, after: 160 }, fig: { before: 120, after: 40 }, gap: 60 };
+const MARK = false;      // 문단의 '다음과 함께 · 줄 묶음 · 앞에서 쪽 나눔'을 쓰지 않는다(사용자 지시: Word 가 그런 문단 앞에 검은 네모 표시를 보인다). 묶음은 표의 머리줄 · 줄 나눔 금지로 한다
 const KEEP = true;        // 제목 · 그림 · 표 설명을 다음 문단과 한 쪽에 두고 표의 줄을 쪽 사이에서 나누지 않는다(인쇄 미리보기 기준 쪽 구성). 끄려면 false
 let NI = 0;
 // ── 조판 다듬기(문서가 tune 으로 켠다 — 안 켜면 예전 그대로): 장평 · 자간, 본문 양쪽 정렬, 표 칸 여백, 줄바꿈 규칙
@@ -43,7 +44,7 @@ function nodash(t) {
 const run = (t, o = {}) => { const mono = o.font === "Consolas" || o.font === "Cambria Math";
   return new TextRun(Object.assign({ text: TN.fx && !mono && typeof t === "string" ? TN.fx(t) : t, font: F, size: S.body, color: "000000" }, TN.scale && !mono ? { scale: TN.scale, characterSpacing: TN.cs } : {}, o)); };
 const P = (t, o = {}) => new Paragraph(Object.assign({ spacing: SP.body, children: Array.isArray(t) ? t : [run(t)] }, TN.just ? { alignment: AlignmentType.BOTH } : {}, o));
-const head = (lv, k) => t => (NI++, new Paragraph({ heading: lv, keepNext: KEEP, keepLines: KEEP, spacing: SP[k], children: [run(t, { size: S[k], bold: true })] }));
+const head = (lv, k) => t => (NI++, Object.assign(new Paragraph({ heading: lv, spacing: SP[k], children: [run(t, { size: S[k], bold: true })] }), { __h: true }));
 const H1 = head(HeadingLevel.HEADING_1, "h1"), H2 = head(HeadingLevel.HEADING_2, "h2"), H3 = head(HeadingLevel.HEADING_3, "h3");
 const CODE = t => new Paragraph({ spacing: { after: 40 }, shading: { type: ShadingType.CLEAR, fill: "F2F2F2" }, indent: { left: 200 }, children: [run(t, { font: "Consolas", size: S.code })] });
 const EQ = t => new Paragraph({ spacing: { before: 40, after: 100 }, indent: { left: 400 }, children: [run(t, { font: "Cambria Math", size: S.body })] });
@@ -52,15 +53,18 @@ const KV = (k, v) => P([run(k + "  ", { bold: true }), run(v)]);
 /** 주석(9 pt, 회색) */
 const NOTE = t => new Paragraph({ spacing: { after: 100, line: 280 }, children: [run(t, { size: S.note, color: "595959" })] });
 /** 그림 · 표의 설명(10 pt, 가운데). above 면 표 위 설명(다음 문단인 표와 한 쪽에) */
-const CAP = (t, above) => new Paragraph({ alignment: AlignmentType.CENTER, keepNext: KEEP && !!above, spacing: above ? { before: 140, after: 60 } : SP.cap, children: [run(t, { size: S.cap })] });
+// 표 위 설명(above)은 표의 첫 줄(되풀이 머리줄)로 넣어 표와 떨어지지 않게 한다 — save 가 바로 뒤의 표와 합친다
+const CAPP = (t, above) => new Paragraph({ alignment: AlignmentType.CENTER, spacing: above ? { before: 140, after: 60 } : SP.cap, children: [run(t, { size: S.cap })] });
+const CAP = (t, above) => above ? { __cap: t } : CAPP(t, false);
 /** 그림(가운데) + 설명. 그림과 설명은 한 쪽에 둔다. 문단 두 개를 돌려준다 */
 function FIG(file, w, h, cap) {
   const img = new ImageRun({ type: file.toLowerCase().endsWith("png") ? "png" : "jpg", data: fs.readFileSync(file), transformation: { width: w, height: h }, altText: { title: cap, description: cap, name: require("path").basename(file) } });
-  return [new Paragraph({ alignment: AlignmentType.CENTER, keepNext: KEEP, spacing: SP.fig, children: [img] }), CAP(cap)];
+  return [new Paragraph({ alignment: AlignmentType.CENTER, spacing: SP.fig, children: [img] }), CAP(cap)];
 }
 const bd = { style: BorderStyle.SINGLE, size: 4, color: "808080" }, B = { top: bd, bottom: bd, left: bd, right: bd };
 /** 표: 폭 = 본문 폭, 글자 10 pt, 머리줄은 회색 · 굵게 · 가운데 · 쪽이 넘어가면 되풀이, 줄은 쪽 사이에서 나누지 않는다. widths 는 비율 */
-function TBL(head, rows, widths, o = {}) {
+const TBL = (head, rows, widths, o = {}) => ({ __tbl: [head, rows, widths, o] });
+function mkTBL(head, rows, widths, o = {}, cap) {
   const sum = widths.reduce((a, b) => a + b, 0), cw = widths.map(w => Math.round(w / sum * W));
   cw[cw.length - 1] += W - cw.reduce((a, b) => a + b, 0);
   // 칸 가운데 맞춤이 기본(tune 의 center): 열 단위로 정한다. 긴 문장(한 줄 반을 넘는 글)이 있는 열만 통째로 왼쪽 맞춤 — 한 열 안에서 맞춤이 섞이지 않게
@@ -69,12 +73,15 @@ function TBL(head, rows, widths, o = {}) {
   const mid = cw.map((_, i) => rows.every(r => r[i] === undefined || lines(r[i], i) <= 1.5)), one = (t, i) => mid[i];
   const cell = (t, i, hd, kx) => new TableCell({ borders: B, width: { size: cw[i], type: WidthType.DXA }, margins: TN.cell, verticalAlign: VerticalAlign.CENTER,
     shading: hd ? { type: ShadingType.CLEAR, fill: "D9D9D9" } : undefined,
-    children: [new Paragraph({ keepNext: !!kx, alignment: hd || (o.center || []).includes(i) || (TN.center && one(t, i)) ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { line: TN.tline },
+    children: [new Paragraph({ alignment: hd || (o.center || []).includes(i) || (TN.center && one(t, i)) ? AlignmentType.CENTER : AlignmentType.LEFT, spacing: { line: TN.tline },
       children: [typeof t === "object" && t !== null ? run(String(t.t), { size: S.table, bold: true, color: t.c }) : run(String(t), { size: S.table, bold: hd || (o.bold || []).includes(i), font: (o.mono || []).includes(i) && !hd ? "Consolas" : F })] })] });
   // o.keep = { whole, head, tail }: 줄 수가 whole 이하면 표를 한 쪽에 묶고, 길면 첫 head 줄 · 끝 tail 줄만 묶는다(쪽 끝에 한두 줄만 남거나 넘어가지 않게). 안 주면 예전대로
   const k = o.keep || TN.keep, N = rows.length, kn = n => !!k && n < N - 1 && (N <= k.whole || n < k.head - 1 || n >= N - k.tail);
+  const no = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+  const capRow = cap ? [new TableRow({ tableHeader: true, cantSplit: true, children: [new TableCell({ columnSpan: cw.length, borders: { top: no, left: no, right: no, bottom: bd }, width: { size: W, type: WidthType.DXA },
+    margins: { top: 0, bottom: 40, left: 0, right: 0 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 140, after: 0 }, children: [run(cap, { size: S.cap })] })] })] })] : [];
   return new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: cw, layout: TableLayoutType.FIXED,
-    rows: [new TableRow({ tableHeader: true, cantSplit: KEEP, children: head.map((h, i) => cell(h, i, true, !!k)) })].concat(rows.map((r, n) => new TableRow({ cantSplit: KEEP, children: r.map((c, i) => cell(c, i, false, kn(n))) }))) });
+    rows: capRow.concat([new TableRow({ tableHeader: true, cantSplit: KEEP, children: head.map((h, i) => cell(h, i, true, !!k)) })].concat(rows.map((r, n) => new TableRow({ cantSplit: KEEP, children: r.map((c, i) => cell(c, i, false, kn(n))) })))) });
 }
 const GAP = () => new Paragraph({ spacing: { after: SP.gap }, children: [] });
 const PB = () => new Paragraph({ children: [new PageBreak()] });
@@ -87,15 +94,34 @@ function cover(body, title, sub, rows) {
   body.push(new Paragraph({ spacing: { after: 160 }, children: [run("목차", { size: S.h1, bold: true })] }));
   body.push(new TableOfContents("목차", { hyperlink: true, headingStyleRange: "1-2" })); body.push(PB());
 }
+/** 묶음 상자: 테두리 없는 한 칸짜리 표(줄 나눔 금지)에 담아 쪽 사이에서 갈리지 않게 한다. 문단 묶음 속성 대신 쓴다(검은 네모 표시가 생기지 않는다) */
+function BOX(kids) {
+  const no = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+  return new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [W], layout: TableLayoutType.FIXED, borders: { top: no, bottom: no, left: no, right: no, insideHorizontal: no, insideVertical: no },
+    rows: [new TableRow({ cantSplit: true, children: [new TableCell({ width: { size: W, type: WidthType.DXA }, borders: { top: no, bottom: no, left: no, right: no }, margins: { top: 0, bottom: 0, left: 0, right: 0 }, children: kids })] })] });
+}
+/** 본문 목록을 실제 문서 요소로 바꾼다: 표 설명은 표의 첫 줄로, 제목은 뒤따르는 문단과 한 상자로(제목만 쪽 끝에 남지 않게) */
+function solid(body) {
+  const out = [], isP = x => x instanceof Paragraph && !x.__h, isT = x => x && (x.__tbl || x.__cap !== undefined || x instanceof Table);
+  const gap = () => new Paragraph({ spacing: { after: 0, line: 20, lineRule: "exact" }, children: [] });       // 표가 잇달아 오면 한 표로 합쳐지므로 사이에 아주 낮은 빈 문단을 둔다
+  for (let i = 0; i < body.length; i++) { const x = body[i], y = body[i + 1];
+    if (x && x.__cap !== undefined) { if (y && y.__tbl) { out.push(mkTBL(...y.__tbl, x.__cap)); i++; if (isT(body[i + 1])) out.push(gap()); } else out.push(CAPP(x.__cap, true)); }
+    else if (x && x.__tbl) { out.push(mkTBL(...x.__tbl)); if (isT(y)) out.push(gap()); }
+    else if (x instanceof Table) { out.push(x); if (isT(y)) out.push(gap()); }
+    else if (x && x.__h && !x.__nb) { let k = i; while (body[k + 1] && body[k + 1].__h) k++;
+      if (isP(body[k + 1])) { out.push(BOX(body.slice(i, k + 2))); out.push(gap()); i = k + 1; } else out.push(x); }
+    else out.push(x); }
+  return out;
+}
 function save(body, out, foot) {
-  const hs = k => ({ run: { font: F, size: S[k], bold: true, color: "000000" }, paragraph: { spacing: SP[k], keepNext: KEEP, keepLines: KEEP } });
+  const hs = k => ({ run: { font: F, size: S[k], bold: true, color: "000000" }, paragraph: { spacing: SP[k] } });
   const doc = new Document({
     styles: { default: { document: { run: { font: F, size: S.body, color: "000000" } }, heading1: hs("h1"), heading2: hs("h2"), heading3: hs("h3") } },
     numbering: { config: [{ reference: "num", levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1)", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 420, hanging: 420 } }, run: { font: F, size: S.body } } }] }] },
     features: { updateFields: true },
     sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1418, bottom: 1418, left: 1134, right: 1134 } } },
       footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [run(foot + "  ", { size: S.foot, color: "595959" }), new TextRun({ children: [PageNumber.CURRENT], font: F, size: S.foot, color: "595959" })] })] }) },
-      children: body }] });
+      children: solid(body) }] });
   return Packer.toBuffer(doc).then(b => { fs.writeFileSync(out, b); console.log("saved", out); });
 }
-module.exports = { tune, tidy, nodot, nodash, run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };
+module.exports = { tune, tidy, nodot, nodash, solid, mkTBL, BOX, run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };

@@ -6,13 +6,13 @@ const { Paragraph, ShadingType, HeadingLevel } = require("docx");
 const ROOT = path.join(__dirname, ".."), J = f => JSON.parse(fs.readFileSync(path.join(__dirname, f), "utf8"));
 const ST = J("static_results.json"), TR = J("test_results.json"), BM = J("forecast_benchmark.json"), SC = J("scenario_results.json");
 const CFG = JSON.parse(fs.readFileSync(path.join(ROOT, "config/runtime.json"), "utf8"));
-const ED = "제13판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
+const ED = "제14판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
 const REV = process.argv[2] || "Rev00", DATE = process.argv[3] || "2026. 11. 26.", OUT = process.argv[4] || __dirname + `/out/이동형전력체계EMS_개발용역의뢰사양서_${REV}.docx`;
 // 조판 · 줄바꿈 · 점 · 줄표 규칙은 lib.js 의 기본값(문서 작성 공통 규칙)
-const HL = require("./codehl.js"), { AlignmentType, BorderStyle } = require("docx");
+const HL = require("./codehl.js"), { AlignmentType, BorderStyle, PageBreak, Table, TableRow, TableCell, WidthType, TableLayoutType } = require("docx");
 const body = []; let chap = 0, after = false;
 // 장 · 부록은 제목 문단의 '앞에서 쪽 나눔'으로 새 쪽에서 시작한다. 표 · 코드 뒤에는 빈 문단을 두지 않고 뒤 글의 앞 간격으로 띄운다(빈 쪽 방지)
-const HP = (t, brk, flow) => new Paragraph({ heading: HeadingLevel.HEADING_1, pageBreakBefore: brk, keepNext: true, keepLines: true, spacing: { before: flow ? 520 : 0, after: 200 }, children: [L.run(t, { size: L.S.h1, bold: true })] });
+const HP = (t, brk, flow) => Object.assign(new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { before: flow ? 520 : 0, after: 200 }, children: (brk ? [new PageBreak()] : []).concat([L.run(t, { size: L.S.h1, bold: true })]) }), { __h: true, __nb: !!brk });      // 새 쪽에서 시작하는 제목은 상자에 넣지 않는다(상자 안의 쪽 나눔은 듣지 않는다)
 const CH = t => { chap++; after = false; body.push(HP(`제${chap}장  ${t}`, false, chap > 1)); };
 const gapP = () => { const o = after ? { spacing: { before: 160, after: 100, line: 300 } } : {}; after = false; return o; };
 const S2 = t => { after = false; body.push(H2(t)); }, T = (...a) => a.forEach(x => body.push(P(x, gapP())));
@@ -20,14 +20,20 @@ const KEEP = { whole: 5, head: 3, tail: 2 };            // 표: 5줄까지는 �
 const tbl = (cap, head, rows, w, o) => { body.push(CAP(cap, true)); body.push(TBL(head, rows, w, Object.assign({ keep: KEEP }, o))); after = true; };
 const req = (cap, rows) => tbl(cap, ["번호", "요구사항", "확인 방법"], rows, [13, 67, 20], { center: [0], bold: [0] });
 const note = t => { const o = after; after = false; body.push(new Paragraph({ alignment: AlignmentType.BOTH, spacing: { before: o ? 100 : 0, after: 100, line: 280 }, children: [L.run(t, { size: L.S.note, color: "595959" })] })); };
-const nums = items => { items.forEach((t, i) => body.push(new Paragraph({ alignment: AlignmentType.BOTH, keepNext: i < items.length - 1, keepLines: true, spacing: { before: i === 0 && after ? 160 : 0, after: 60, line: 300 }, indent: { left: 420, hanging: 420 }, children: [L.run(`${i + 1})  ${t}`)] }))); after = false; };
+const nums = items => { items.forEach((t, i) => body.push(new Paragraph({ alignment: AlignmentType.BOTH, spacing: { before: i === 0 && after ? 160 : 0, after: 60, line: 300 }, indent: { left: 420, hanging: 420 }, children: [L.run(`${i + 1})  ${t}`)] }))); after = false; };
 const eq = t => { body.push(new Paragraph({ spacing: { before: after ? 160 : 40, after: 100 }, indent: { left: 400 }, children: [L.run(t, { font: "Cambria Math" })] })); after = false; };
 // 예시 코드: 파일을 그대로 싣는다. 한 묶음이 쪽 사이에서 갈리지 않게 한다
-const code = (cap, file) => { body.push(CAP(cap, true)); const a = fs.readFileSync(path.join(__dirname, "spec_examples", file), "utf8").replace(/\s+$/, "").split("\n");
-  const rule = { style: BorderStyle.SINGLE, size: 8, color: "404040", space: 4 }, mono = (t, o) => L.run(t, Object.assign({ font: "Consolas", size: 17 }, o));
-  a.forEach((l, i) => body.push(new Paragraph({ keepNext: i < a.length - 1, keepLines: true, spacing: { after: 0, line: 218 }, shading: { type: ShadingType.CLEAR, fill: "FAFAFA" },
-    border: Object.assign({}, i === 0 ? { top: rule } : {}, i === a.length - 1 ? { bottom: rule } : {}),
-    children: [mono(String(i + 1).padStart(3, " ") + "  ", { color: "9A9A9A" })].concat(HL.tokens(l.replace(/\t/g, "    ")).map(k => mono(k.t, { color: k.c, italics: k.i }))) }))); after = true; };
+// 예시 코드: 한 칸짜리 표에 담아 한 묶음이 쪽 사이에서 갈리지 않게 한다(문단 묶음 속성을 쓰지 않는다 — 검은 네모 표시 방지). 표 설명은 표의 첫 줄
+const code = (cap, file) => { const a = fs.readFileSync(path.join(__dirname, "spec_examples", file), "utf8").replace(/\s+$/, "").split("\n");
+  const rule = { style: BorderStyle.SINGLE, size: 8, color: "404040" }, no = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, mono = (t, o) => L.run(t, Object.assign({ font: "Consolas", size: 17 }, o));
+  const line = (l, i) => new Paragraph({ spacing: { after: 0, line: 218 }, children: [mono(String(i + 1).padStart(3, " ") + "  ", { color: "9A9A9A" })].concat(HL.tokens(l.replace(/\t/g, "    ")).map(k => mono(k.t, { color: k.c, italics: k.i }))) });
+  const cell = (kids, o) => new TableCell(Object.assign({ width: { size: L.W, type: WidthType.DXA }, children: kids }, o));
+  const capP = new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 140, after: 60 }, children: [L.run(cap, { size: L.S.cap })] });
+  const edge = (i) => Object.assign({}, i === 0 ? { top: Object.assign({ space: 3 }, rule) } : {}, i === a.length - 1 ? { bottom: Object.assign({ space: 3 }, rule) } : {});
+  body.push(L.BOX([capP].concat(a.map((l, i) => new Paragraph({ spacing: { after: 0, line: 218 }, shading: { type: ShadingType.CLEAR, fill: "FAFAFA" }, border: edge(i),
+    children: [mono(String(i + 1).padStart(3, " ") + "  ", { color: "9A9A9A" })].concat(HL.tokens(l.replace(/\t/g, "    ")).map(k => mono(k.t, { color: k.c, italics: k.i }))) })))));
+  body.push(new Paragraph({ spacing: { after: 0, line: 120, lineRule: "exact" }, children: [] }));
+  after = true; };
 const rng = k => `${Math.min(...TR[k]).toFixed(2)} ~ ${Math.max(...TR[k]).toFixed(2)}`;
 const mean = a => a.reduce((x, y) => x + y, 0) / a.length, bm = (tg, h, k, m) => mean(BM.runs.map(r => r.targets[tg][k][h][m])).toFixed(2);
 const pts = fs.readFileSync(path.join(ROOT, "config/pointmap.csv"), "utf8").trim().split(/\r?\n/).slice(1).map(l => l.split(","));
@@ -268,7 +274,7 @@ req("표 4-3  화면 공통 요구사항", [
   ["UI-13", "모든 화면에 도움말을 제공하고, 시뮬레이터 모드에는 화면 · 탭 · 선택 항목에 맞는 교육 창을 제공할 것.", "교육 창 검사"],
   ["UI-14", "수급자는 설계 단계에서 화면별 화면 설계서(배치 · 항목 · 조작 · 권한 · 오류 표시 · 빈 상태)를 제출하여 발주처의 승인을 받아야 함.", "설계서 검토"]]);
 S2("4.3 화면별 요구사항");
-let scrN = 3; const scr = (id, name, about, rows) => { after = false; scrN++; body.push(H3(`${id}  ${name}`)); body.push(P(about, { keepNext: true })); req(`표 4-${scrN}  ${id} ${name} 화면의 요구사항`, rows); };
+let scrN = 3; const scr = (id, name, about, rows) => { after = false; scrN++; body.push(H3(`${id}  ${name}`)); body.push(P(about)); req(`표 4-${scrN}  ${id} ${name} 화면의 요구사항`, rows); };
 scr("SCR-01", "개요", "체계 전체 상태를 한 화면에서 확인함. 상단 지표 행, 중앙 전개 배치도, 우측 발전원 구성 · 발전 부하 현황 · 경보 매트릭스로 구성함.", [
   ["OVW-01", "지표 타일 8개를 한 행으로 표시할 것: 총 부하(1 · 2등급 합, 3등급), 태양광 발전(용량 대비 비율), 재생에너지 활용률(현재 · 금일 누적), ESS 충전율(충 · 방전 전력, 운용 범위), 디젤 가동(출력, 운전 수량, 소모량, 금일 연료 사용량, 저소음 태세 시 '금지' 표시), 연료 · 수소(잔량 · 지속 가능 시간), N-1 예비력(여유 또는 부족, 자립 시간), 자동 제어(활성/비활성, 현재 판단, 다음 제어까지 시간).", "화면 검사"],
   ["OVW-02", "지표 타일마다 최근 추이를 세선 그래프로 표시하고, 임계값 초과 시 색을 변경할 것. 예: 충전율이 방전 하한 + 5 %p 미만이면 황색, 하한 미만이면 적색 등. 주둔지 연계 중에는 예비력 타일을 '상전 수전'(수전 전력 · 피크 목표 · 시간대)으로 변경할 것.", "값 주입 시험"],
