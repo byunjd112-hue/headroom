@@ -4,10 +4,10 @@ public sealed record PointValue(double? Value, int Quality, double? AgeSec);
 
 public sealed record Snapshot(
     DateTimeOffset Time,
-    IReadOnlyDictionary<string, PointValue> Values,   // "ESS.soc" → 값 · 품질
+    IReadOnlyDictionary<string, PointValue> Values,   // "ESS.soc" → 값 및 품질
     IReadOnlyList<UnitState> Units,                   // 장비 한 대마다
     IReadOnlyList<LoadItem> Loads,                    // 부하 하나마다
-    OpsState Ops,                                     // 운용 장소 · 태세 · 차단
+    OpsState Ops,                                     // 운용 장소, 태세 및 차단
     IReadOnlyList<Alarm> Alarms);
 
 public sealed class SnapshotStore : INotifyPropertyChanged

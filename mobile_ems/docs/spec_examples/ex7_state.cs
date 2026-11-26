@@ -1,5 +1,5 @@
-// 예시 7  상태를 색과 글로 함께 보이기 (CSC-SLD · CSC-OVW)
-// 차단 · 절감된 부하를 '급전 중'으로 보이지 않는다.
+// 예시 7  상태를 색과 글로 함께 보이기 (CSC-SLD 및 CSC-OVW)
+// 차단 및 절감된 부하를 '급전 중'으로 보이지 않는다.
 public enum LoadView { Fed, Reduced, Cut, Dead, Unknown }
 
 public static class LoadPresenter
@@ -16,7 +16,7 @@ public static class LoadPresenter
     {
         LoadView.Fed     => ("급전 중", "ok"),
         LoadView.Reduced => ("절감 공급", "warn"),
-        LoadView.Cut     => ($"{grade}등급 자동 차단 · 정전", "warn"),
+        LoadView.Cut     => ($"{grade}등급 자동 차단(정전)", "warn"),
         LoadView.Dead    => ("정전", "alarm"),
         _                => ("값 없음", "idle"),
     };

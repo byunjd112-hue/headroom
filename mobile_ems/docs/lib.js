@@ -21,6 +21,16 @@ function tidy(t) {
   t = t.replace(/([A-Za-z0-9)\]'%℃]) (가|이|은|는|을|를|와|과|의|에|에서|에는|에도|로|으로|도|만|까지|부터|보다|마다|이다|임)(?=[\s.,)·" + NB + "]|$)/g, "$1" + NB + "$2");
   return t.replace(/\(([^()]*)\)/g, (m, a) => a.length <= 20 ? "(" + a.replace(/ /g, NB) + ")" : "(" + a.replace(/^(\S+) /, "$1" + NB).replace(/ (\S+)$/, NB + "$1") + ")");
 }
+/** 가운뎃점으로 낱말을 잇지 않는다(사용자 지시): 둘이면 '및', 셋 이상이면 쉼표로 나열하고 마지막만 '및'으로 잇는다. 괄호 안은 따로 센다 */
+function nodot(t) {
+  if (t.indexOf("·") < 0) return t;
+  const hold = [], seg = x => { const n = (x.match(/ · /g) || []).length; if (!n) return x; let k = 0; const has = /(^|\s)및(\s|$)/.test(x);
+    return x.replace(/ · /g, () => (++k === n && !has ? " 및 " : ", ")); };
+  const flat = x => x.split(/([,.:;=→\/①-⑳])/).map(seg).join("");
+  let prev; do { prev = t; t = t.replace(/\(([^()]*)\)/g, (m, a) => { hold.push("(" + flat(a) + ")"); return "\u0001" + (hold.length - 1) + "\u0002"; }); } while (t !== prev);
+  t = flat(t); do { prev = t; t = t.replace(/\u0001(\d+)\u0002/g, (m, i) => hold[+i]); } while (t !== prev);
+  return t.replace(/·/g, ",");
+}
 const run = (t, o = {}) => { const mono = o.font === "Consolas" || o.font === "Cambria Math";
   return new TextRun(Object.assign({ text: TN.fx && !mono && typeof t === "string" ? TN.fx(t) : t, font: F, size: S.body, color: "000000" }, TN.scale && !mono ? { scale: TN.scale, characterSpacing: TN.cs } : {}, o)); };
 const P = (t, o = {}) => new Paragraph(Object.assign({ spacing: SP.body, children: Array.isArray(t) ? t : [run(t)] }, TN.just ? { alignment: AlignmentType.BOTH } : {}, o));
@@ -75,4 +85,4 @@ function save(body, out, foot) {
       children: body }] });
   return Packer.toBuffer(doc).then(b => { fs.writeFileSync(out, b); console.log("saved", out); });
 }
-module.exports = { tune, tidy, run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };
+module.exports = { tune, tidy, nodot, run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };

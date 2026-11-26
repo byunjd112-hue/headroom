@@ -32,7 +32,7 @@ void cmd_step(CmdCtx& c, f64 now, u16 seq_ack, bool hb_alive, bool reached)
     }
     else
     {
-        /* IDLE · DONE · FAILED: 할 일 없음 */
+        /* IDLE, DONE 및 FAILED: 할 일 없음 */
     }
     c.need_cancel = (c.state == CMD_FAILED);
 }

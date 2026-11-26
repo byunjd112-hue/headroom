@@ -6,9 +6,9 @@ const { Paragraph, ShadingType, HeadingLevel } = require("docx");
 const ROOT = path.join(__dirname, ".."), J = f => JSON.parse(fs.readFileSync(path.join(__dirname, f), "utf8"));
 const ST = J("static_results.json"), TR = J("test_results.json"), BM = J("forecast_benchmark.json"), SC = J("scenario_results.json");
 const CFG = JSON.parse(fs.readFileSync(path.join(ROOT, "config/runtime.json"), "utf8"));
-const ED = "제10판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
+const ED = "제11판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
 const REV = process.argv[2] || "Rev00", DATE = process.argv[3] || "2026. 11. 26.", OUT = process.argv[4] || __dirname + `/out/이동형전력체계EMS_개발용역의뢰사양서_${REV}.docx`;
-L.tune({ scale: 95, cs: -3, just: true, cell: { top: 60, bottom: 60, left: 100, right: 100 }, tline: 260, fx: L.tidy });   // 장평 95 % · 자간 좁힘 · 본문 양쪽 정렬 · 표 칸 여백 · 줄바꿈 규칙
+L.tune({ scale: 95, cs: -3, just: true, cell: { top: 60, bottom: 60, left: 100, right: 100 }, tline: 260, fx: t => L.tidy(L.nodot(t)) });   // 장평 95 % · 자간 좁힘 · 본문 양쪽 정렬 · 표 칸 여백 · 줄바꿈 규칙
 const HL = require("./codehl.js"), { AlignmentType, BorderStyle } = require("docx");
 const body = []; let chap = 0, after = false;
 // 장 · 부록은 제목 문단의 '앞에서 쪽 나눔'으로 새 쪽에서 시작한다. 표 · 코드 뒤에는 빈 문단을 두지 않고 뒤 글의 앞 간격으로 띄운다(빈 쪽 방지)
@@ -34,7 +34,7 @@ const pts = fs.readFileSync(path.join(ROOT, "config/pointmap.csv"), "utf8").trim
 const devN = {}; pts.forEach(r => { devN[r[1]] = devN[r[1]] || { r: 0, w: 0 }; devN[r[1]][r[9] === "w" ? "w" : "r"]++; });
 
 L.cover(body, "이동형 전력체계 EMS 개발 용역 의뢰 사양서", "과업 내용 · 구성 정의 · 요구사항 · 시험과 검수 · 사업 관리",
-  [["문서 번호", `IFPS-EMS-RFP-${ED}`], ["판 · 작성일", `${ED} · ${DATE}`], ["사업명", "작전지 종합전력공급체계(IFPS) ⑤ EMS 중앙제어 개발 용역"], ["용역 기간", "계약일부터 48개월(하자보수 기간 별도)"],
+  [["문서 번호", `IFPS-EMS-RFP-${ED}`], ["판, 작성일", `${ED}, ${DATE}`], ["사업명", "작전지 종합전력공급체계(IFPS) ⑤ EMS 중앙제어 개발 용역"], ["용역 기간", "계약일부터 48개월(하자보수 기간 별도)"],
    ["개발 방식", "신규 개발. 운용 화면 소프트웨어는 C#, 제어 소프트웨어는 C++ 로 구현"], ["참조 자료", `참조 구현(파이썬 판 ${REV})과 관련 문서 일체. 요구사항 이해용 자료이며 납품 대상 아님`], ["권리 귀속", "이 용역의 모든 산출물 및 지식재산권 · 사용권(라이선스)은 발주처에 귀속함"],
    ["사업 절차", "공공 부문 소프트웨어 개발 용역 절차 준용. 발주처는 공공기관이 아니며, 조건은 계약으로 정함"],
    ["요구사항 표기", "'~하여야 함' · '~할 것' = 필수, '~하는 것이 좋음' = 권고. 요구사항마다 번호와 확인 방법 부여"]]);
@@ -460,7 +460,7 @@ tbl("표 7-1  규칙 운전의 판단", ["조건", "판단"], [
   ["잉여 > 수전해 정격의 80 %, 충전율 > 충전 상한 − 10 %p, 수소 < 95 %, 디젤 정지", "수전해 기동"], ["저소음 태세", "디젤 · 주둔지 발전기 금지"], ["수소 잔량 < 하한(탱크의 30 %)", "연료전지 금지"]], [56, 44]);
 S2("7.2 운전계획(동적계획법)");
 T("24시간(15분 × 96구간)의 부하 · 태양광 예측으로 발전기 · 연료전지 · 수전해의 기동 · 정지를 결정함. 상태 변수는 ESS 충전율(방전 하한 ~ 충전 상한의 격자), 수소 잔량, 디젤 운전 여부임. 최종 구간부터 역순으로 구간 비용과 다음 상태의 값을 합산하여 최소 비용 선택을 결정함.");
-eq("V_k(s) = min_a [ c(s, a, 예측_k) + V_{k+1}(f(s, a, 예측_k)) ],   V_96(s) = 말기 값(남은 충전량 · 수소의 연료 환산)");
+eq("V_k(s) = min_a [ c(s, a, 예측_k) + V_{k+1}(f(s, a, 예측_k)) ],   V_96(s) = 말기 값(남은 충전량 및 수소의 연료 환산)");
 eq("c = 연료 소비(L) + 기동 벌점 + 야간 디젤 벌점 + 예비 충전율 미달 벌점 + 공급 부족 벌점");
 req("표 7-2  운전계획 요구사항", [
   ["AL-01", "계획 계산은 지령 처리와 별도 스레드에서 수행하고, 계산 중에는 직전 계획 또는 규칙 운전으로 즉시 판단을 출력하여야 함.", "지령 지연 시험"],
