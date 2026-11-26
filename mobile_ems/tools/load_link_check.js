@@ -109,8 +109,10 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   chk(del.pv === 1 && del.brk === 2 && del.ammo === 1, "그림을 지우고 저장 → 이동형 PV 1대 · 막사 2 · 탄약저장 1: " + JSON.stringify(del));
   await compare("배치 편집에서 장비 · 부하 그림을 지우고 저장");
   console.log("○ 배치 편집에서 추가한 그림 = 실제 장비 · 부하");
-  await post("/api/units", { kind: "PV", delta: -1 });
-  await post("/api/loads", { op: "reset" }); await p.goto(B + "#overview"); await p.waitForTimeout(9000); await post("/api/layout/reset", {});
+  { const fl = await p.evaluate(async () => (await (await fetch("/api/snapshot")).json()).fleet), m = fl.PV.units.length;      // 장비 대수를 처음(종류마다 한 대)으로 — 뒤에 도는 점검 · 화면 캡처에 이 도구의 흔적을 남기지 않는다
+    if (m !== 1) await post("/api/units", { kind: "PV", delta: m > 1 ? -1 : 1 }); }
+  await post("/api/loads", { op: "reset" }); await p.goto(B + "#overview"); await p.waitForTimeout(9000);
+  n++; if ((await p.evaluate(async () => (await (await fetch("/api/snapshot")).json()).fleet.PV.units.length)) !== 1) { bad++; console.log("✕ 끝난 뒤 이동형 PV 가 한 대가 아니다(도구가 장비 대수를 되돌리지 못함)"); } await post("/api/layout/reset", {});
   await compare("기본 목록으로 되돌림");
   console.log(`\n대조 ${n}건 · 어긋남 ${bad}건 · 화면 오류 ${errs.length}건`, errs.slice(0, 3)); await b.close(); process.exit(bad || errs.length ? 1 : 0);
 })();

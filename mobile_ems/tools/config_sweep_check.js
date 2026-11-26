@@ -62,7 +62,10 @@ const KN = { PV: "태양광", DG: "디젤 발전기", FC: "연료전지", ESS: "
     bad += miss.length; console.log(`${miss.length ? "✕" : "○"} ${what} | 전원 ${src.map(q => q.id + ":" + q.bus).join(" ")} | 부하 ${loads.map(i => i.name + (i.n > 1 ? "×" + i.n : "") + "@" + i.fsu).join(", ")} | 개방점 ${s.ring.open}` + (miss.length ? "\n    " + miss.slice(0, 10).join("\n    ") : ""));
   }
   const reset = async () => { await post("/api/loads", { op: "reset" }); await post("/api/layout/reset", {}); await post("/api/bus", { op: "reset" }); await post("/api/ring", { do: "config", open: 4 }); };
-  await post("/api/sim", { action: "clock", hour: 13 }); await reset(); await p.reload(); await p.waitForTimeout(6000);
+  const one = async () => { const fl = (await snap()).fleet; let moved = 0;                                      // 장비 대수를 종류마다 한 대로 맞춘다(앞서 돌린 도구 · 사람이 남긴 대수에 기대지 않는다)
+    for (const k of ["ESS", "PV", "DG", "FC"]) for (let m = fl[k].units.length; m !== 1; m += m < 1 ? 1 : -1) { await post("/api/units", { kind: k, delta: m < 1 ? 1 : -1 }); moved++; }
+    if (moved) await p.waitForTimeout(13000); };
+  await post("/api/sim", { action: "clock", hour: 13 }); await reset(); await one(); await p.reload(); await p.waitForTimeout(6000);
   await sweep("기본 구성");
   for (const k of ["ESS", "PV", "DG", "FC"]) await post("/api/units", { kind: k, delta: 1 }); await p.waitForTimeout(13000);
   await sweep("장비를 종류마다 한 대씩 늘림(8대)");
@@ -84,7 +87,7 @@ const KN = { PV: "태양광", DG: "디젤 발전기", FC: "연료전지", ESS: "
   if (!(it && it.level === "bad" && it.pic === "ESS" && it.guide.length >= 3 && !ic.last.done)) { bad++; console.log("✕ ESS 2호기 무응답 → 이상 · 안내: " + JSON.stringify(it)); }
   await post("/api/sim", { action: "mute", target: "ESS2", on: false }); await p.waitForTimeout(7000); ic = await get("/api/archive/initcheck?run=1&only=comm.ESS2"); it = ic.last.items.find(i => i.id === "comm.ESS2");
   if (!(it && it.level === "ok" && it.was === "bad")) { bad++; console.log("✕ 고친 뒤 그 줄만 다시 검사 → 해결됨: " + JSON.stringify(it)); } else console.log("○ 구성을 바꾼 상태에서 무응답 → 이상 · 안내 → 고침 → 해결됨");
-  for (const k of ["ESS", "DG"]) await post("/api/units", { kind: k, delta: -1 }); await reset(); await p.waitForTimeout(13000);
+  await reset(); await one(); await p.waitForTimeout(4000);
   await sweep("모두 되돌림(기본 구성)");
   await post("/api/sim", { action: "clock", hour: null });
   console.log(`\n대조 ${n}건 · 어긋남 ${bad}건 · 화면 오류 ${errs.length}건`, errs.slice(0, 3)); await b.close(); process.exit(bad || errs.length ? 1 : 0);
