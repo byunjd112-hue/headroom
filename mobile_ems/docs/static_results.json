@@ -1,6 +1,6 @@
 {
- "date": "2026-11-26 00:45",
- "unittest_s": 601.0,
+ "date": "2026-11-26 01:39",
+ "unittest_s": 622.4,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -60,8 +60,8 @@
   "Excel 은 열리는 꾸러미(시트 3장, XML 정상), FAT · FMEA HTML 은 구성의 이름을 담는다. | ok",
   "장비 한 대 · 구간 · 구간분전함 · 부하마다 줄이 생기고, 번호는 기존 번호만 쓰며, 구성 때문에 달라지는 줄만 재검토로 표시한다. | ok",
   "test_10_security_lockout_hash_and_gate | ok",
-  "test_11_all_units_load_shed_elz_pv | 재시도 통과",
-  "test_1_static_and_snapshot | 재시도 통과",
+  "test_11_all_units_load_shed_elz_pv | ok",
+  "test_1_static_and_snapshot | ok",
   "test_2_auth_and_roles | ok",
   "test_3_sbo_command_with_ack | ok",
   "test_4_fault_injection_alarms_and_parallel_scan | ok",
@@ -221,20 +221,17 @@
  ],
  "n_tests": 216,
  "tests_ok": true,
- "retried": [
-  "test_11_all_units_load_shed_elz_pv",
-  "test_1_static_and_snapshot"
- ],
+ "retried": [],
  "coverage_pct": 92.9,
  "stmt": {
   "n": 7619,
-  "hit": 7290,
+  "hit": 7291,
   "pct": 95.7
  },
  "branch": {
   "n": 2716,
-  "hit": 2308,
-  "pct": 85.0
+  "hit": 2310,
+  "pct": 85.1
  },
  "coverage_files": [
   [
@@ -318,14 +315,6 @@
    "186, 224-236, 240-242"
   ],
   [
-   "ifps_ems_rt/hmi/eng_forecast.py",
-   90.7,
-   118,
-   90.6,
-   32,
-   "30, 46-47, 61-64, 67-69, 123"
-  ],
-  [
    "ifps_ems_rt/hmi/eng_tools.py",
    90.9,
    121,
@@ -342,20 +331,20 @@
    "57-58, 66, 132-137"
   ],
   [
+   "ifps_ems_rt/hmi/eng_forecast.py",
+   92.4,
+   118,
+   90.6,
+   32,
+   "30, 61-64, 67-69, 123"
+  ],
+  [
    "ifps_ems_rt/hmi/fmexport.py",
    92.9,
    42,
    85.7,
    14,
    "29, 78-79"
-  ],
-  [
-   "ifps_ems_rt/hmi/ringwatch.py",
-   92.9,
-   182,
-   73.1,
-   104,
-   "79-80, 188-193, 230-234"
   ],
   [
    "ifps_ems_rt/hmi/archapi.py",
@@ -372,6 +361,14 @@
    85.8,
    120,
    "74, 126-127, 263-264, 309, 321-322, 345, 358, 362, 364, 366, 391-396, 426"
+  ],
+  [
+   "ifps_ems_rt/hmi/ringwatch.py",
+   93.4,
+   182,
+   74.0,
+   104,
+   "80, 188-193, 230-234"
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
@@ -428,14 +425,6 @@
    92.1,
    38,
    "104, 108-110"
-  ],
-  [
-   "ifps_ems/nowcast.py",
-   96.4,
-   84,
-   81.2,
-   32,
-   "32, 57, 60"
   ],
   [
    "ifps_ems/skycam.py",
@@ -510,6 +499,14 @@
    "53"
   ],
   [
+   "ifps_ems/nowcast.py",
+   97.6,
+   84,
+   84.4,
+   32,
+   "32, 57"
+  ],
+  [
    "ifps_ems/learner.py",
    97.7,
    173,
@@ -524,6 +521,14 @@
    93.3,
    30,
    "51-52"
+  ],
+  [
+   "ifps_ems_rt/archdev.py",
+   97.9,
+   141,
+   88.3,
+   60,
+   "93-94, 110"
   ],
   [
    "ifps_ems_rt/archive.py",
@@ -548,6 +553,14 @@
    78.8,
    52,
    "117-118"
+  ],
+  [
+   "ifps_ems_rt/simplant.py",
+   98.4,
+   192,
+   92.6,
+   68,
+   "200, 212-213"
   ],
   [
    "ifps_ems_rt/runtime.py",
@@ -590,28 +603,12 @@
    "134"
   ],
   [
-   "ifps_ems_rt/simplant.py",
-   99.0,
-   192,
-   92.6,
-   68,
-   "212-213"
-  ],
-  [
    "ifps_ems_rt/fmsite.py",
    99.2,
    118,
    90.7,
    54,
    "67"
-  ],
-  [
-   "ifps_ems_rt/archdev.py",
-   99.3,
-   141,
-   88.3,
-   60,
-   "110"
   ],
   [
    "ifps_ems_rt/weather.py",
@@ -785,7 +782,7 @@
    "ifps_ems_rt/hmi/fcstats.py",
    100.0,
    29,
-   100.0,
+   87.5,
    8,
    ""
   ],
@@ -793,7 +790,7 @@
    "ifps_ems_rt/hmi/fuelwatch.py",
    100.0,
    17,
-   90.0,
+   100.0,
    10,
    ""
   ],
