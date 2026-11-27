@@ -156,7 +156,7 @@ class TestOpsRuntime(Base):
 
     def test_garrison_generator_unavailable_falls_back_to_mobile_sources(self):
         clk = [1000.0]; self.rt.now = lambda: clk[0]; self.plant.set("ESS.soc", 22.0); self.plant.set("CB.GRID", 1); self.rt.scan(); self.rt.set_ops(mode="grid", who="시험")
-        self.plant.set("GDG.mode", 1); self.plant.set("CB.GRID", 0); self.loop(4, clk)                           # 발전기가 현장 수동이면 EMS 가 지령할 수 없다
+        self.plant.set("GDG.mode", 1); self.plant.set("CB.GRID", 0); self.loop(4, clk)                           # 발전기가 현장 수동이면 TPCS 가 지령할 수 없다
         d = self.rt.decide(); self.assertFalse(d["GDG"]); self.assertTrue(d["DG"] or d["FC"]); self.assertIn("지령 불가", self.rt.gdg_last["why"])
         self.rt.set_ops(mode="island", who="시험"); self.loop(2, clk); self.assertNotIn("GDG", self.rt.decide())
         self.rt.wall = lambda: dtm.datetime(2026, 11, 16, 1, 30); self.assertAlmostEqual(self.rt.hr(), 1.5); self.rt.hr_off = 11.5; self.assertAlmostEqual(self.rt.hr(), 13.0)   # 시연용 모의 시각

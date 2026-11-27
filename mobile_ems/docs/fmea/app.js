@@ -98,7 +98,7 @@ function integrity(rs, F, st){
   c.push(["개선 후 정점확률 감소", F.top1<F.top0, `${sci(F.top0)} → ${sci(F.top1)}`]);
   c.push(["단일고장점 판정 정합 (FV '예' = 1차 MCS 수)", F.imp.filter(b=>b.single).length===F.single, `${F.imp.filter(b=>b.single).length} / ${F.single}`]);
   c.push(["FV 합계 ≥ 100% (MCS 중첩)", F.imp.reduce((a,b)=>a+b.fv0,0)>=0.9999, pct(F.imp.reduce((a,b)=>a+b.fv0,0))]);
-  c.push(["고장모드 수 = EMS 본체 "+DATA.meta.nOrg+" + 연동 "+DATA.meta.nSup, st.nOrg===DATA.meta.nOrg && st.nSup===DATA.meta.nSup, `${st.nOrg} + ${st.nSup}`]);
+  c.push(["고장모드 수 = TPCS 본체 "+DATA.meta.nOrg+" + 연동 "+DATA.meta.nSup, st.nOrg===DATA.meta.nOrg && st.nSup===DATA.meta.nSup, `${st.nOrg} + ${st.nSup}`]);
   c.push(["개선 후 전건 관리기준(<60) 진입", rs.every(r=>r.RPN2<60), `${rs.filter(r=>r.RPN2<60).length}/${rs.length}건`]);
   c.push(["보완설계 반영표 FM 참조 유효", DATA.b_design.every(d=>rs.find(r=>r.id===d[0])), "미매칭 "+DATA.b_design.filter(d=>!rs.find(r=>r.id===d[0])).length]);
   const hiNo = rs.filter(r=>(r.grade==="고"||r.action==="필수조치") && !DATA.b_design.find(d=>d[0]===r.id)).map(r=>r.id);
@@ -130,9 +130,9 @@ function vDashboard(){
   const ss = ["ES-01","ES-02","ES-03","ES-04","ES-05","ES-06","ES-07","ES-08","ES-09","ES-10","ES-11","IF"].map(c=>{ const g=M.rs.filter(r=>r.code===c); return {c, n:g.length, a:g.reduce((x,r)=>x+r.RPN,0), b:g.reduce((x,r)=>x+r.RPN2,0)}; });
   const top3 = F.glist.filter(g=>["G1","G2","G3","G4","G5"].includes(g.id)).sort((a,b)=>b.q0-a.q0);
   const fvTop = [...F.imp].sort((a,b)=>b.fv0-a.fv0).slice(0,10);
-  setMain(head("대시보드", "IFPS 이동형 전력체계 EMS 소프트웨어 FMEA(IEC 60812)·FTA(IEC 61025) 통합 분석 · "+DATA.meta.rev+" 기준 · 전 지표 실시간 재계산") + `
+  setMain(head("대시보드", "IFPS 이동형 전력체계 TPCS 소프트웨어 FMEA(IEC 60812)·FTA(IEC 61025) 통합 분석 · "+DATA.meta.rev+" 기준 · 전 지표 실시간 재계산") + `
   <div class="grid kpis" style="margin-bottom:12px">
-    <div class="kpi"><div class="l">고장모드</div><div class="v">${st.n}건</div><div class="d">EMS 본체 ${st.nOrg} + 연동 장치측(제안) ${st.nSup}</div></div>
+    <div class="kpi"><div class="l">고장모드</div><div class="v">${st.n}건</div><div class="d">TPCS 본체 ${st.nOrg} + 연동 장치측(제안) ${st.nSup}</div></div>
     <div class="kpi"><div class="l">개선 전 RPN 합 (본체)</div><div class="v">${fmt(st.rpn)}</div><div class="d">평균 ${st.avg.toFixed(1)} · 최대 ${st.max}</div></div>
     <div class="kpi good"><div class="l">개선 후 RPN 합 (본체)</div><div class="v">${fmt(st.rpn2)}</div><div class="d">평균 ${st.avg2.toFixed(1)} · 최대 ${st.max2}</div></div>
     <div class="kpi good"><div class="l">RPN 저감률</div><div class="v">${pct(st.red)}</div><div class="d">전체 ${st.n}건 기준 ${pct(1-st.allRpn2/st.allRpn)}</div></div>
@@ -148,9 +148,9 @@ function vDashboard(){
     <div class="card"><h2>FTA 중간사상 발생확률 q (72시간 임무)</h2><div class="chart"><canvas id="cGate"></canvas></div></div>
     <div class="card"><h2>기본사상 중요도 FV 상위 10</h2><div class="chart"><canvas id="cFV"></canvas></div></div>
     <div class="card" style="grid-column:1/-1"><h2>핵심 결론 (수치 자동 생성)</h2><ol class="list">
-      <li>EMS 본체 ${st.nOrg}건: RPN 합 ${fmt(st.rpn)} → ${fmt(st.rpn2)} (저감률 ${pct(st.red)}), 고위험 ${st.hi}건 → ${st.hi2}건, 필수조치(S≥9) ${st.must}건${st.hi2?` <span class="rpn-hi">(개선 후 고위험 ${st.hi2}건 잔존 — 보완설계 재검토)</span>`:""}. '개선 전'은 ${DATA.meta.rev} 소프트웨어의 현 설계 상태, '개선 후'는 권고 조치가 구현·검증된 뒤의 목표값이다.</li>
+      <li>TPCS 본체 ${st.nOrg}건: RPN 합 ${fmt(st.rpn)} → ${fmt(st.rpn2)} (저감률 ${pct(st.red)}), 고위험 ${st.hi}건 → ${st.hi2}건, 필수조치(S≥9) ${st.must}건${st.hi2?` <span class="rpn-hi">(개선 후 고위험 ${st.hi2}건 잔존 — 보완설계 재검토)</span>`:""}. '개선 전'은 ${DATA.meta.rev} 소프트웨어의 현 설계 상태, '개선 후'는 권고 조치가 구현·검증된 뒤의 목표값이다.</li>
       <li>RPN 상위 5건: ${[...M.rs].sort((a,b)=>b.RPN-a.RPN).slice(0,5).map(r=>r.id+" "+r.mode+" ("+r.RPN+")").join(" > ")}.</li>
-      <li>연동 장치측 ${st.nSup}건(제작사·체계통합 협의 대상): 고위험 ${st.supHi}건, 필수조치 ${st.supMust}건, RPN ${fmt(st.supRpn)} → ${fmt(st.supRpn2)}. EMS 소프트웨어만으로 낮출 수 없으며 장치별 안내서 회신과 실장비 시험이 전제다.</li>
+      <li>연동 장치측 ${st.nSup}건(제작사·체계통합 협의 대상): 고위험 ${st.supHi}건, 필수조치 ${st.supMust}건, RPN ${fmt(st.supRpn)} → ${fmt(st.supRpn2)}. TPCS 소프트웨어만으로 낮출 수 없으며 장치별 안내서 회신과 실장비 시험이 전제다.</li>
       <li>FTA: 72시간 임무 중 정점사상 확률 ${pct(F.top0)} → ${pct(F.top1)}. 단일 고장점(1차 MCS) ${F.single}개. 중간사상 기여 ${top3.map(g=>g.id+" "+g.desc).join(" > ")}. FV 상위: ${fvTop.slice(0,3).map(b=>b.id+" "+b.fm+" "+b.desc).join(" > ")}.</li>
       <li>현 리비전은 가상 장치로만 검증했다. 발생도(O)는 설계 단계 추정값이고 확률은 상대 비교용이다. 실장비 연동시험(FAT)·현장 시운전(SAT) 결과로 다시 평가해야 한다.</li></ol></div>
   </div>`);
@@ -169,7 +169,7 @@ function vFmea(){
   const q = (state._q||"").toLowerCase(), fg=state._fg||"", fss=state._fss||"";
   const list = M.rs.filter(r=>(!fg||r.grade===fg)&&(!fss||r.code===fss)&&(!q||[r.id,r.ss,r.comp,r.mode,r.cause,r.effect,r.rec].join(" ").toLowerCase().includes(q)));
   const codes=[...new Set(M.rs.map(r=>r.code))];
-  setMain(head("FMEA 워크시트", `EMS 본체 ${M.st.nOrg}건 + 연동 장치측 ${M.st.nSup}건 · S·O·D·S'·O'·D' 편집 시 RPN·등급·조치구분·FTA·MCS 즉시 재계산 (등급: 고 ≥100 / 중 60~99 / 저 <60, S≥9 필수조치)`, `<button class="btn" id="btnReset">편집값 초기화</button>`) + `
+  setMain(head("FMEA 워크시트", `TPCS 본체 ${M.st.nOrg}건 + 연동 장치측 ${M.st.nSup}건 · S·O·D·S'·O'·D' 편집 시 RPN·등급·조치구분·FTA·MCS 즉시 재계산 (등급: 고 ≥100 / 중 60~99 / 저 <60, S≥9 필수조치)`, `<button class="btn" id="btnReset">편집값 초기화</button>`) + `
   <div class="filters"><label>검색 <input type="text" id="fq" value="${esc(state._q||"")}" placeholder="번호·구성품·고장모드·원인…" style="width:220px"></label>
    <label>등급 <select id="fg"><option value="">전체</option>${["고","중","저"].map(g=>`<option ${fg===g?"selected":""}>${g}</option>`).join("")}</select></label>
    <label>서브시스템 <select id="fss"><option value="">전체</option>${codes.map(c=>`<option ${fss===c?"selected":""}>${c}</option>`).join("")}</select></label>
@@ -256,9 +256,9 @@ function vFta(){
   <div class="card" style="margin-top:12px"><h2>계층 구조 및 정성 분석</h2><div class="tbl-wrap"><table><thead><tr><th class="l">계층</th><th>논리</th><th class="l">사상</th><th>근거</th><th>q 전</th><th>q 후</th><th>저감</th><th class="l">판정 근거·가정</th></tr></thead><tbody>${treeLines.join("")}</tbody></table></div>
    <ol class="list" style="margin-top:10px">
     <li>1차 MCS ${F.single}개(단일 고장점)가 ΣP(MCS)의 ${pct(F.mcs.filter(m=>m.order===1).reduce((a,m)=>a+m.p0,0)/F.sum0)} 차지 — 중복으로 방호되지 않으므로 발생도(O)·검출도(D)를 낮추는 것이 유일한 수단이다.</li>
-    <li>G1 오제어 q=${sci(F.gates["G1"].q0)} 대 G2 감시·제어 상실 q=${sci(F.gates["G2"].q0)} — EMS 가 멈추는 것보다 틀린 값·틀린 설정으로 잘못 제어하는 쪽이 약 ${Math.round(F.gates["G1"].q0/F.gates["G2"].q0)}배 위험하다. 자동 감시·제어 상실(G2.1) 자체는 q=${sci(F.gates["G2.1"].q0)}이나 수동 운전 전환(HE-01)이 방호한다.</li>
+    <li>G1 오제어 q=${sci(F.gates["G1"].q0)} 대 G2 감시·제어 상실 q=${sci(F.gates["G2"].q0)} — TPCS 가 멈추는 것보다 틀린 값·틀린 설정으로 잘못 제어하는 쪽이 약 ${Math.round(F.gates["G1"].q0/F.gates["G2"].q0)}배 위험하다. 자동 감시·제어 상실(G2.1) 자체는 q=${sci(F.gates["G2.1"].q0)}이나 수동 운전 전환(HE-01)이 방호한다.</li>
     <li>통신 이중화: 경로 A·B 독립 동시 고장(G2.3) q=${sci(F.gates["G2.3"].q0)}에 비해 공통 원인(BE-16) q=${sci(F.beMap["BE-16"].q0)} — 약 ${Math.round(F.beMap["BE-16"].q0/F.gates["G2.3"].q0).toLocaleString()}배. 스위치 전원·위치를 나누지 않으면 이중화 효과가 사라진다.</li>
-    <li>G4(주둔지 정전 대응)의 BE-27(PCS 무순단 전환)은 EMS 로 막을 수 없는 장치측 사상으로 q=${sci(F.beMap["BE-27"].q0)} — PCS·STS 사양 확인과 실부하 전환 시험이 필요하다.</li>
+    <li>G4(주둔지 정전 대응)의 BE-27(PCS 무순단 전환)은 TPCS 로 막을 수 없는 장치측 사상으로 q=${sci(F.beMap["BE-27"].q0)} — PCS·STS 사양 확인과 실부하 전환 시험이 필요하다.</li>
     <li>G3 은 모두 2차 MCS(재지령·대체 전원·부하 자동 차단·지휘 결심이 방호)다. 방호 수단 쪽 사상(BE-19·22)의 정기 시험이 효과를 좌우한다.</li></ol></div>`);
   drawTree(F); $("#fitTree").onchange=e=>$("#svgwrap").classList.toggle("fit",e.target.checked);
   $("#p_apply").onclick=()=>{ const g=id=>Number($("#"+id).value); const tm=g("p_tm"),b=g("p_beta"),h0=g("p_he0"),h1=g("p_he1"); if(!(tm>0&&b>=0&&b<=1&&h0>=0&&h0<=1&&h1>=0&&h1<=1)){toast("입력 범위를 확인하세요");return;} state.params={...state.params,tm,beta:b,he0:h0,he1:h1}; markDirty(); vFta(); toast("가정값 적용"); };
@@ -294,7 +294,7 @@ function vMcs(){
     <tr class="sum"><td colspan="5" class="l">ΣP(MCS)</td><td class="n">${sci(F.sum0)}</td><td class="n">${sci(F.sum1)}</td><td colspan="2"></td><td class="n">${pct(1-F.sum1/F.sum0,0)}</td></tr></tbody></table></div></div>
    <div class="card"><h2>6.2 기본사상 중요도 (Fussell-Vesely · Birnbaum · RAW · RRW)</h2><div class="tbl-wrap"><table><thead><tr><th>순위</th><th>ID</th><th>근거</th><th class="l">사상</th><th>FV 전</th><th>FV 후</th><th>단일고장점</th><th>관리 판단</th><th>Birnbaum</th><th>RAW</th><th>RRW</th><th>개선 기여</th></tr></thead><tbody>
     ${imp.map(b=>`<tr><td>${b.rank}</td><td>${b.id}</td><td>${b.fm}</td><td class="l small">${esc(b.desc)}</td><td class="n ${b.fv0>=0.03?"rpn-hi":""}">${pct(b.fv0)}</td><td class="n">${pct(b.fv1)}</td><td>${b.single?'<span class="badge b-고">예</span>':"아니오"}</td><td class="small">${b.mgmt}</td><td class="n">${b.birn.toFixed(3)}</td><td class="n">${b.raw.toFixed(1)}</td><td class="n">${b.rrw===Infinity?"∞":b.rrw.toFixed(3)}</td><td class="n">${pct(b.dPshare)}</td></tr>`).join("")}</tbody></table></div>
-    <p class="small">※ Birnbaum = ∂P(TOP)/∂q · RAW = 사상 확정 발생 시 정점확률 배수 · RRW = 사상 완전 제거 시 저감 배수 · 개선 기여 = 개선 전후 해당 사상 경유 확률 감소분 구성비. HE-01 을 포함한 2차 MCS(EMS 정지·통신 상실)는 인적 오류 확률에 비례한다 — 수동 운전 전환 훈련이 EMS 플랫폼 고장 전체에 대한 효과적 방호 수단이다.</p></div>
+    <p class="small">※ Birnbaum = ∂P(TOP)/∂q · RAW = 사상 확정 발생 시 정점확률 배수 · RRW = 사상 완전 제거 시 저감 배수 · 개선 기여 = 개선 전후 해당 사상 경유 확률 감소분 구성비. HE-01 을 포함한 2차 MCS(TPCS 정지·통신 상실)는 인적 오류 확률에 비례한다 — 수동 운전 전환 훈련이 TPCS 플랫폼 고장 전체에 대한 효과적 방호 수단이다.</p></div>
   </div>`);
 }
 
@@ -303,7 +303,7 @@ function vComm(){
   setMain(head("연동·CCF·일정 리스크", "근거: 실장치 통신 연동 방안서, 장치별 연동·디버깅 안내서 01~07, 대응표(pointmap.csv), 시험 결과 보고서 — 모두 "+DATA.meta.rev) + `
   <div class="card"><h2>7.1 통신 경로 고장 지점</h2>${tbl(["지점","구간","역무","주요 고장 메커니즘","관련 고장모드","근거"],DATA.s07_1,[1,3])}
    <p class="small">※ ③·⑤는 여러 장치가 함께 쓰는 지점 — 한 곳의 고장이 여러 장치의 동시 두절로 번진다(공통 원인).</p></div>
-  <div class="card" style="margin-top:12px"><h2>7.2 통신 두절 시 EMS 거동과 2차 위험</h2>${tbl(["설비","운전 상태","두절 시 EMS 거동","복구 시","2차 위험","위험도","검증"],DATA.s07_2,[2,3,4])}<p class="small">${esc(DATA.s07_note)}</p></div>
+  <div class="card" style="margin-top:12px"><h2>7.2 통신 두절 시 TPCS 거동과 2차 위험</h2>${tbl(["설비","운전 상태","두절 시 TPCS 거동","복구 시","2차 위험","위험도","검증"],DATA.s07_2,[2,3,4])}<p class="small">${esc(DATA.s07_note)}</p></div>
   <div class="card" style="margin-top:12px"><h2>7.3 검출도(D') 전제의 감시 점 정합성</h2>${tbl(["FM","D' 전제 감시 항목","대응 태그 (pointmap.csv)","판정","조치","관련"],DATA.s07_3,[1,2,4])}<p class="small">※ '미확보·미구현' 항목은 해당 기능이 구현·검증되기 전까지 개선 후 D' 를 인정하지 않는다.</p></div>
   <div class="card" style="margin-top:12px"><h2>7.4 문서·설계 간 상충과 미결 사항</h2>${tbl(["No","한쪽 내용","다른 쪽 내용","조치 권고"],DATA.s07_4,[1,2,3])}</div>
   <div class="card" style="margin-top:12px"><h2>8.1 공통 원인 고장(CCF) 후보</h2>${tbl(["No","공통 원인","동시 영향 범위","관련 항목","FTA 반영","권고 검증"],DATA.s08_1,[1,2,5])}</div>
@@ -328,11 +328,11 @@ function vQa(){
   <div class="grid row2">
    <div class="card"><h2>17. 데이터 무결성 자동 점검 — <span class="${M.ok?"rpn-lo":"rpn-hi"}">${M.ok?"정상":"점검 필요"}</span> (OK ${M.chk.filter(c=>c[1]).length} / NG ${M.chk.filter(c=>!c[1]).length})</h2><div class="tbl-wrap"><table><thead><tr><th>No</th><th class="l">점검 항목</th><th>판정</th><th class="l">상세값</th></tr></thead><tbody>${M.chk.map((c,i)=>`<tr><td>${i+1}</td><td class="l">${esc(c[0])}</td><td><span class="badge ${c[1]?"b-저":"b-고"}">${c[1]?"OK":"NG"}</span></td><td class="l n small">${esc(c[2])}</td></tr>`).join("")}</tbody></table></div></div>
    <div class="card"><h2>분석 개요 · 평가 기준 · 시스템 정의</h2>
-    <div class="kv"><b>목적</b><span>EMS 소프트웨어의 잠재 고장모드를 찾아 위험도(RPN)로 우선순위를 정하고 보완설계·시험 계획에 반영</span><b>범위</b><span>EMS 소프트웨어와 그 실행 플랫폼(노트북·제어망), 장치와의 연동 인터페이스. 장치 자체(PCS·발전기·배터리 등)의 고장은 범위 밖이며 EMS 에 영향을 주는 인터페이스 사상만 '연동' 항목으로 다룸</span><b>기준</b><span>${esc(DATA.meta.rev)} 소프트웨어·문서 — 가상 장치 검증 상태</span><b>전제</b><span>보호 차단·계통 형성·순간 절체는 보호 IED·PCS·STS 가 EMS 와 독립으로 수행. EMS 는 1등급 부하를 차단하지 않음</span></div>
+    <div class="kv"><b>목적</b><span>TPCS 소프트웨어의 잠재 고장모드를 찾아 위험도(RPN)로 우선순위를 정하고 보완설계·시험 계획에 반영</span><b>범위</b><span>TPCS 소프트웨어와 그 실행 플랫폼(노트북·제어망), 장치와의 연동 인터페이스. 장치 자체(PCS·발전기·배터리 등)의 고장은 범위 밖이며 TPCS 에 영향을 주는 인터페이스 사상만 '연동' 항목으로 다룸</span><b>기준</b><span>${esc(DATA.meta.rev)} 소프트웨어·문서 — 가상 장치 검증 상태</span><b>전제</b><span>보호 차단·계통 형성·순간 절체는 보호 IED·PCS·STS 가 TPCS 와 독립으로 수행. TPCS 는 1등급 부하를 차단하지 않음</span></div>
     <h3>1.4 분석 결과 요약 (자동)</h3><div class="kv"><b>고장모드</b><span>총 ${M.st.nOrg}건 (${["ES-01","ES-02","ES-03","ES-04","ES-05","ES-06","ES-07","ES-08","ES-09"].map(c=>c+" "+M.rs.filter(r=>r.code===c).length+"건").join(", ")}) + 연동 장치측 ${M.st.nSup}건(제안, 별도 집계)</span><b>개선 전</b><span>RPN 합계 ${fmt(M.st.rpn)}점 / 평균 ${M.st.avg.toFixed(1)}점 / 최댓값 ${M.st.max}점 — 고위험 ${M.st.hi}건, 중위험 ${M.st.mid}건, 저위험 ${M.st.lo}건, 필수조치 ${M.st.must}건</span><b>개선 후</b><span>RPN 합계 ${fmt(M.st.rpn2)}점 / 평균 ${M.st.avg2.toFixed(1)}점 / 최댓값 ${M.st.max2}점 — ${M.st.lo2}건 관리기준 이내 (${pct(M.st.red)} 저감)</span></div>
     <h3>2.1 평가 척도</h3>${tbl(["점수","심각도 S","발생도 O","검출도 D"],DATA.b_crit.slice(1,6),[1,2,3])}
     <p class="small">등급: 고 RPN ≥ 100 (보완설계 필수) · 중 60~99 (운영·점검 대책) · 저 < 60 · S ≥ 9 는 RPN 과 무관하게 필수조치</p>
-    <h3>3.2 EMS 기능 블록 9종</h3>${tbl(["코드","기능 블록","주요 구성","규모","요구 기능"],DATA.b_sys2,[1,2,3,4])}
+    <h3>3.2 TPCS 기능 블록 9종</h3>${tbl(["코드","기능 블록","주요 구성","규모","요구 기능"],DATA.b_sys2,[1,2,3,4])}
     <h3>약어 · 참고 기준</h3>${tbl(["약어","원어","뜻"],DATA.b_abbr,[1,2])}${tbl(["구분","기준·문서","내용"],DATA.b_ref,[1,2])}</div>
   </div>
   <div class="card" style="margin-top:12px"><h2>15. 현 예방대책 근거 추적 (소스 · 자동 시험)</h2>${tbl(["No","고장모드","현 예방대책","구현 위치","검증 시험 (tests/)","판정"],DATA.s09,[2,3,4,5])}<p class="small">※ 시험은 모두 가상 장치(Modbus TCP 모의 서버) 대상 자동 시험이다. 실장비에서의 유효성은 FAT·SAT 로 확인해야 한다.</p></div>`);
@@ -347,7 +347,7 @@ function vTools(){
     <div class="field" style="margin-top:10px"><label>변경 메모 (공유 저장 시 함께 기록)</label><textarea id="note" placeholder="예) FAT 결과 반영 — FM-05 O' 재평가">${esc(state.note||"")}</textarea></div>
     <h3>백업 · 복원 (JSON)</h3><div class="actions"><button class="btn" id="btnJson">편집 상태 JSON 내보내기</button><label class="btn">JSON 불러오기 <input type="file" id="fileJson" accept="application/json" hidden></label><button class="btn" id="btnCopy">편집 상태 클립보드 복사</button></div></div>
    <div class="card"><h2>Excel 내보내기</h2>
-    <p class="small">군 MG FMEA·FTA 통합분석서와 같은 시트 구성·순서(00 표지 ~ 18 약어·참고문헌, 19 변경 이력)로 EMS 분석 내용을 내보냅니다. 화면의 편집값이 반영되고 계산 열은 수식입니다. 편집하지 않았으면 기준값 그대로 나옵니다.</p>
+    <p class="small">군 MG FMEA·FTA 통합분석서와 같은 시트 구성·순서(00 표지 ~ 18 약어·참고문헌, 19 변경 이력)로 TPCS 분석 내용을 내보냅니다. 화면의 편집값이 반영되고 계산 열은 수식입니다. 편집하지 않았으면 기준값 그대로 나옵니다.</p>
     <div class="actions"><button class="btn primary" id="btnXlsx">Excel 워크북 생성</button><button class="btn" id="btnCsv">FMEA 워크시트 CSV</button></div>
     <p class="small" id="dlnote"></p>
     <h3>배포 · 공유</h3><p class="small">이 페이지의 주소(상단 공유 버튼 또는 브라우저 주소)를 전달하면 동일한 분석 도구를 열람·편집할 수 있습니다. 공유 저장소 권한(열람/기여/편집)은 아티팩트 공유 설정에서 관리합니다. 이 파일은 인터넷 없이도 열립니다(글꼴·도표·Excel 기능 내장).</p>
@@ -358,7 +358,7 @@ function vTools(){
   $("#btnShare").onclick=()=>sharedSave(true); $("#btnPull").onclick=()=>sharedPull();
   $("#btnClear").onclick=()=>{ state.ov={}; state.act={}; state.params={...DATA.params}; markDirty(); vTools(); toast("편집값을 모두 초기화했습니다"); };
   $("#note").onchange=e=>{ state.note=e.target.value; markDirty(); };
-  $("#btnJson").onclick=()=>saveFile("IFPS_EMS_FMEA_FTA_편집상태_"+stamp()+".json", JSON.stringify({...state, exportedAt:new Date().toISOString()},null,1));
+  $("#btnJson").onclick=()=>saveFile("IFPS_TPCS_FMEA_FTA_편집상태_"+stamp()+".json", JSON.stringify({...state, exportedAt:new Date().toISOString()},null,1));
   $("#fileJson").onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const o=JSON.parse(rd.result); state={...state, ov:o.ov||{}, act:o.act||{}, params:{...DATA.params,...(o.params||{})}, sel:o.sel||"본체", note:o.note||""}; markDirty(); vTools(); toast("편집 상태를 불러왔습니다"); }catch(err){ toast("JSON 형식 오류"); } }; rd.readAsText(f); };
   $("#btnCopy").onclick=()=>copyText(JSON.stringify(state));
   $("#btnXlsx").onclick=()=>exportXlsx();
@@ -380,15 +380,15 @@ async function saveFile(name, data){
   try{ const blob = data instanceof Blob? data : new Blob([data]); const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),2000); toast("다운로드: "+name); }catch(e){ toast("다운로드를 시작할 수 없습니다"); }
 }
 function exportXlsx(){
-  // 군 MG FMEA·FTA 통합분석서(Rev06)와 같은 시트 구성·순서(00~18)로 EMS 분석 내용을 내보낸다. 화면의 편집값이 반영되며, 계산 열은 수식이다.
+  // 군 MG FMEA·FTA 통합분석서(Rev06)와 같은 시트 구성·순서(00~18)로 TPCS 분석 내용을 내보낸다. 화면의 편집값이 반영되며, 계산 열은 수식이다.
   if(!window.XLSX){ toast("Excel 라이브러리를 불러오지 못했습니다"); return; }
   const M=compute(), F=M.F, rs=M.rs, st=M.st; const wb=XLSX.utils.book_new();
   const aoa=(name, rows, cols)=>{ const ws=XLSX.utils.aoa_to_sheet(rows); if(cols) ws["!cols"]=cols.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb, ws, name); return ws; };
   const par=[...rs].filter(r=>state.sel==="전체"||r.grp==="본체").sort((a,b)=>b.RPN-a.RPN); let cum=0, tot=par.reduce((a,r)=>a+r.RPN,0);
   const cnt=(k,v)=>par.filter(r=>r[k]===v).length, when=new Date().toLocaleString("ko-KR");
-  aoa("00_표지",[["IFPS 이동형 전력체계 EMS FMEA·FTA 통합 분석서"],[DATA.meta.project+" | "+DATA.meta.docno+" "+DATA.meta.rev],[],["항목","내용"],["문서번호",DATA.meta.docno],["리비전",DATA.meta.rev],["작성일",DATA.meta.date],["내보낸 시각",when],["분석 대상","EMS 본체 9개 서브시스템 "+st.nOrg+"건 + 연동 장치측 "+st.nSup+"건"],["적용 기준","IEC 60812 (FMEA) · IEC 61025 (FTA)"],["시트 구성","00 표지 · 01 대시보드 · 02 분석개요 · 03 평가기준 · 04 시스템정의 · 05 FMEA 워크시트 · 06 RPN 분석 · 07 위험 매트릭스 · 08 FTA 트리 · 09 FTA 도형 · 10 FTA 계산 · 11 최소절단집합 · 12 통신연동분석 · 13 CCF·일정리스크 · 14 보완설계반영 · 15 정합성검토 · 16 조치계획 · 17 무결성점검 · 18 약어·참고문헌"],["비고","S·O·D 는 제안값이며 사업 검토에서 확정한다. 화면에서 편집한 값이 반영되어 있다(19_변경이력)."]],[16,110]);
+  aoa("00_표지",[["IFPS 이동형 전력체계 TPCS FMEA·FTA 통합 분석서"],[DATA.meta.project+" | "+DATA.meta.docno+" "+DATA.meta.rev],[],["항목","내용"],["문서번호",DATA.meta.docno],["리비전",DATA.meta.rev],["작성일",DATA.meta.date],["내보낸 시각",when],["분석 대상","TPCS 본체 9개 서브시스템 "+st.nOrg+"건 + 연동 장치측 "+st.nSup+"건"],["적용 기준","IEC 60812 (FMEA) · IEC 61025 (FTA)"],["시트 구성","00 표지 · 01 대시보드 · 02 분석개요 · 03 평가기준 · 04 시스템정의 · 05 FMEA 워크시트 · 06 RPN 분석 · 07 위험 매트릭스 · 08 FTA 트리 · 09 FTA 도형 · 10 FTA 계산 · 11 최소절단집합 · 12 통신연동분석 · 13 CCF·일정리스크 · 14 보완설계반영 · 15 정합성검토 · 16 조치계획 · 17 무결성점검 · 18 약어·참고문헌"],["비고","S·O·D 는 제안값이며 사업 검토에서 확정한다. 화면에서 편집한 값이 반영되어 있다(19_변경이력)."]],[16,110]);
   aoa("01_대시보드",[["핵심 지표"],["항목","개선 전","개선 후","비고"],["고장모드 수(본체)",par.length,par.length,"연동 장치측 "+st.nSup+"건 별도"],["RPN 합(본체)",st.rpn,st.rpn2,"저감률 "+(st.red*100).toFixed(1)+"%"],["위험등급 '고' (RPN≥100)",cnt("grade","고"),cnt("grade2","고"),""],["위험등급 '중' (60≤RPN<100)",cnt("grade","중"),cnt("grade2","중"),""],["위험등급 '저'",cnt("grade","저"),cnt("grade2","저"),""],["P(TOP) — "+state.params.tm+"시간 임무",F.top0,F.top1,"저감률 "+((1-F.top1/F.top0)*100).toFixed(1)+"%"],["최소절단집합 수",F.mcs.length,F.mcs.length,"1차 "+F.mcs.filter(m=>m.order===1).length+"개"],["무결성 점검",M.ok?"정상":"점검 필요","","OK "+M.chk.filter(c=>c[1]).length+" / NG "+M.chk.filter(c=>!c[1]).length],[],["RPN 상위 10"],["순위","번호","코드","고장모드","개선 전 RPN","개선 후 RPN","잔여등급"]].concat(par.slice(0,10).map((r,i)=>[i+1,r.id,r.code,r.mode,r.RPN,r.RPN2,r.grade2])),[30,16,16,46,12,12,10]);
-  aoa("02_분석개요",[["분석 개요"],["항목","내용"],["목적","EMS 소프트웨어와 연동 구간의 고장모드를 찾아 위험도를 평가하고, 중요부하 급전 상실에 이르는 경로를 정량화한다"],["대상",DATA.meta.project+" — 본체 9개 서브시스템과 연동 장치측"],["방법","FMEA: 고장모드별 S·O·D 평가와 RPN / FTA: 기본사상 확률과 최소절단집합, 중요도"],["정상사상(TOP)",state.params.tm+"시간 임무 중 EMS 기인 중요부하(1·2등급) 급전 상실"],["전제","임무시간 "+state.params.tm+" h, CCF β "+state.params.beta+", 인적 오류 전/후 "+state.params.he0+"/"+state.params.he1],["근거","같은 리비전의 시험 결과 보고서·신뢰성 시험 결과서·실장치 통신 연동 방안서·장치별 안내서"],["한계","가상 장치 검증 결과에 근거한다. 실장비 연동(FAT·SAT) 전에는 개선 후 값(S'·O'·D')을 확정값으로 보지 않는다"],[],["보완설계 반영 후 확인"]].concat(DATA.b_after.map(t=>[t])),[18,120]);
+  aoa("02_분석개요",[["분석 개요"],["항목","내용"],["목적","TPCS 소프트웨어와 연동 구간의 고장모드를 찾아 위험도를 평가하고, 중요부하 급전 상실에 이르는 경로를 정량화한다"],["대상",DATA.meta.project+" — 본체 9개 서브시스템과 연동 장치측"],["방법","FMEA: 고장모드별 S·O·D 평가와 RPN / FTA: 기본사상 확률과 최소절단집합, 중요도"],["정상사상(TOP)",state.params.tm+"시간 임무 중 TPCS 기인 중요부하(1·2등급) 급전 상실"],["전제","임무시간 "+state.params.tm+" h, CCF β "+state.params.beta+", 인적 오류 전/후 "+state.params.he0+"/"+state.params.he1],["근거","같은 리비전의 시험 결과 보고서·신뢰성 시험 결과서·실장치 통신 연동 방안서·장치별 안내서"],["한계","가상 장치 검증 결과에 근거한다. 실장비 연동(FAT·SAT) 전에는 개선 후 값(S'·O'·D')을 확정값으로 보지 않는다"],[],["보완설계 반영 후 확인"]].concat(DATA.b_after.map(t=>[t])),[18,120]);
   aoa("03_평가기준",[["평가 기준 (제안값)"]].concat(DATA.b_crit).concat([[],["위험등급","기준","조치구분"],["고","RPN ≥ 100","중점관리 (S ≥ 9 는 RPN 과 관계없이 필수조치)"],["중","60 ≤ RPN < 100","일반관리"],["저","RPN < 60","일반관리"]]),[10,50,34,40]);
   aoa("04_시스템정의",[["시스템 정의 — 서브시스템"],["코드","서브시스템","구성","규모·주기","핵심 기능"]].concat(DATA.b_sys2),[8,22,46,34,60]);
   const H=["번호","구분","코드","서브시스템","구성품 (Level 2)","기능 요구사항","고장모드","고장원인","국부영향","최종영향 (시스템·임무)","현 예방대책 (설계)","현 검출수단","S","O","D","RPN","위험등급","조치구분","권고 조치사항","조치유형","담당","완료 목표","S'","O'","D'","개선 후 RPN","저감률","잔여등급","검증 방법","FTA 사상"];
@@ -398,11 +398,11 @@ function exportXlsx(){
   aoa("06_RPN분석",[["순위","번호","코드","고장모드","개선 전 RPN","구성비","누적 구성비","개선 후 RPN","저감률","잔여등급"]].concat(par.map((r,i)=>{cum+=r.RPN;return [i+1,r.id,r.code,r.mode,r.RPN,r.RPN/tot,cum/tot,r.RPN2,r.red,r.grade2];})).concat([["계","","",par.length+"개",tot,1,"",par.reduce((a,r)=>a+r.RPN2,0),1-par.reduce((a,r)=>a+r.RPN2,0)/tot,""]]),[6,8,7,46,12,10,12,12,10,10]);
   const mat=(pre)=>{ const out=[["S＼O",1,2,3,4,5,6,7,8,9,10,"계"]]; for(let s=10;s>=1;s--){ const rw=[s]; let t=0; for(let o=1;o<=10;o++){ const v=par.filter(r=>(pre?r.S:r.S2)===s&&(pre?r.O:r.O2)===o).length; rw.push(v); t+=v; } rw.push(t); out.push(rw);} return out; };
   aoa("07_위험매트릭스",[["개선 전 S×O ("+par.length+"건)"]].concat(mat(true)).concat([[],["개선 후 S'×O'"]]).concat(mat(false)));
-  aoa("08_FTA트리",[["정상사상: "+state.params.tm+"시간 임무 중 EMS 기인 중요부하 급전 상실"],["게이트","논리","내용","입력","q 전","q 후","저감률","분류"]].concat(F.glist.map(g=>[g.id,g.logic,g.desc,g.inputs,g.q0,g.q1,g.red,g.cls])),[8,6,50,40,12,12,8,12]);
+  aoa("08_FTA트리",[["정상사상: "+state.params.tm+"시간 임무 중 TPCS 기인 중요부하 급전 상실"],["게이트","논리","내용","입력","q 전","q 후","저감률","분류"]].concat(F.glist.map(g=>[g.id,g.logic,g.desc,g.inputs,g.q0,g.q1,g.red,g.cls])),[8,6,50,40,12,12,8,12]);
   aoa("09_FTA도형",[["고장수목 전개 (들여쓰기 = 하위 사상, ○ 기본사상 · ◇ 조건 · ⬡ 공통 원인)"],["구조","유형","내용","근거 FM","비고"]].concat(DATA.tree.map(t=>[t.lvl,t.logic,t.desc,t.basis||"",t.note||""])),[44,8,60,14,50]);
 aoa("10_FTA계산",[["임무시간 t_m",state.params.tm,"CCF β",state.params.beta,"HE-01 전/후",state.params.he0,state.params.he1],[],["ID","유형","근거 FM","사상","게이트","O","D","λ","τ","q 전","O'","D'","λ'","τ'","q 후","저감률"]].concat(F.be.map(b=>[b.id,b.type,b.fm,b.desc,b.gate,b.O,b.D,b.lam0,b.tau0,b.q0,b.O2,b.D2,b.lam1,b.tau1,b.q1,b.red])).concat([[],["게이트","논리","내용","입력","q 전","q 후","저감률","분류"]]).concat(F.glist.map(g=>[g.id,g.logic,g.desc,g.inputs,g.q0,g.q1,g.red,g.cls])),[8,6,8,40,8,4,4,6,7,12,4,4,6,7,12,8]);
 aoa("11_최소절단집합",[["MCS","차수","사상","—","내용","경로","P 전","P 후","구성비","순위","저감률"]].concat(F.mcs.map(m=>[m.id,m.order,m.ids.join(" ∧ "),"",m.desc,m.gate,m.p0,m.p1,m.share,m.rank,m.red])).concat([["ΣP(MCS)","","","","","",F.sum0,F.sum1],["P(TOP)","","","","","",F.top0,F.top1],[],["ID","근거 FM","사상","경로","FV 전","FV 후","순위","단일고장점","관리 판단","Birnbaum","RAW","RRW","개선 기여"]]).concat(F.imp.map(b=>[b.id,b.fm,b.desc,b.gate,b.fv0,b.fv1,b.rank,b.single?"예":"아니오",b.mgmt,b.birn,b.raw,b.rrw===Infinity?"∞":b.rrw,b.dPshare])),[8,6,8,8,46,8,12,12,8,6,8]);
-  aoa("12_통신연동분석",[["7.1 통신 경로 고장 지점"],["지점","구간","역무","주요 고장 메커니즘","관련 고장모드","근거"]].concat(DATA.s07_1).concat([[],["7.2 통신 두절 시 EMS 거동"],["설비","운전 상태","두절 시 EMS 거동","복구 시","2차 위험","위험도","검증"]]).concat(DATA.s07_2).concat([[],[DATA.s07_note],[],["7.3 검출도 전제 감시 점"],["FM","감시 항목","대응 태그","판정","조치","관련"]]).concat(DATA.s07_3),[16,34,30,44,40,20,16]);
+  aoa("12_통신연동분석",[["7.1 통신 경로 고장 지점"],["지점","구간","역무","주요 고장 메커니즘","관련 고장모드","근거"]].concat(DATA.s07_1).concat([[],["7.2 통신 두절 시 TPCS 거동"],["설비","운전 상태","두절 시 TPCS 거동","복구 시","2차 위험","위험도","검증"]]).concat(DATA.s07_2).concat([[],[DATA.s07_note],[],["7.3 검출도 전제 감시 점"],["FM","감시 항목","대응 태그","판정","조치","관련"]]).concat(DATA.s07_3),[16,34,30,44,40,20,16]);
   aoa("13_CCF·일정리스크",[["8.1 공통 원인 고장(CCF) 후보"],["No","공통 원인","동시 영향 범위","관련 항목","FTA 반영","권고 검증"]].concat(DATA.s08_1).concat([[],[DATA.s08_h2],["리스크","근거","목표","연계 고장모드 / 영향","대응","상태"]]).concat(DATA.s08_2),[26,36,36,36,30,30]);
   aoa("14_보완설계반영",[["번호","보완설계 반영 내용","반영 대상","검증 방법","검증 시기","담당"]].concat(DATA.b_design).concat([[],[DATA.b_design_note]]),[8,60,30,40,12,12]);
   aoa("15_정합성검토",[["9.1 현 예방대책의 근거 추적 (소스·시험)"],["No","고장모드","현 예방대책","구현 위치","검증 시험","판정"]].concat(DATA.s09).concat([[],["9.2 문서·설계 간 상충과 미결 사항"],["No","한쪽 내용","다른 쪽 내용","조치 권고"]]).concat(DATA.s07_4),[5,22,44,36,70,28]);
@@ -416,7 +416,7 @@ aoa("11_최소절단집합",[["MCS","차수","사상","—","내용","경로","P
     aoa("22_FAT점검표",[s.fat_head].concat(s.fat),[8,8,26,30,36,60,16,10,18]); }
   aoa("19_변경이력",log.length>1?log:[["편집값 없음 — 기준값 그대로"]],[12,10,40,40]);
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
-  saveFile("IFPS_EMS_FMEA_FTA_통합분석서_"+DATA.meta.rev+"_"+stamp()+".xlsx", new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+  saveFile("IFPS_TPCS_FMEA_FTA_통합분석서_"+DATA.meta.rev+"_"+stamp()+".xlsx", new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
 }
 
 
@@ -447,24 +447,24 @@ function vScn(){
   const fat=L.filter(x=>/FAT/.test(x.due)), pill=s=>`<span class="pill ${s.ok?"ok":"bad"}" title="${s.steps}단계${s.first?"":" · 최초 실행은 의도한 실패, 대기 시간 조정 뒤 통과"}">${esc(s.name)}</span>`;
   setMain(head("시나리오 · FAT 연결", "고장모드 "+L.length+"건을 무엇으로 확인하는지 — 운영 시나리오(가상 장치 검증) · 회귀 시험 · 실장비 시험(FAT·SAT)") + `
   <div class="grid kpis" style="margin-bottom:12px">
-    <div class="kpi good"><div class="l">운영 시나리오로 확인</div><div class="v">${n("운영 시나리오")}건</div><div class="d">가상 장치에서 고장 조건을 넣어 EMS 판단을 본다</div></div>
+    <div class="kpi good"><div class="l">운영 시나리오로 확인</div><div class="v">${n("운영 시나리오")}건</div><div class="d">가상 장치에서 고장 조건을 넣어 TPCS 판단을 본다</div></div>
     <div class="kpi"><div class="l">회귀 시험으로 확인</div><div class="v">${n("회귀 시험")}건</div><div class="d">소프트웨어 자동 시험(tests)</div></div>
     <div class="kpi"><div class="l">실장비 시험 · 절차로 확인</div><div class="v">${n("실장비 시험 · 절차")}건</div><div class="d">가상 장치로 만들 수 없는 고장(통신선 · 센서 · 노트북 등)</div></div>
     <div class="kpi"><div class="l">운영 시나리오</div><div class="v">${S.length}건</div><div class="d">통과 ${S.filter(s=>s.ok).length}건(재시험 기준)</div></div>
   </div>
   <div class="card"><h2>20-1. 운영 시나리오 분류별 결과</h2>${tbl(["분류","건수","통과"],Object.entries(cats).map(([k,v])=>[k,v[0],v[1]]),[0])}
-   <p class="small">시나리오는 EMS 화면의 '운영 시나리오'에서 고르고 고칠 수 있다([시나리오 고르기] 창의 분류와 같다). 고장은 가상 장치에 조건을 넣어 만든 것이며, 통과가 실장비에서의 동작을 보증하지는 않는다.</p></div>
+   <p class="small">시나리오는 TPCS 화면의 '운영 시나리오'에서 고르고 고칠 수 있다([시나리오 고르기] 창의 분류와 같다). 고장은 가상 장치에 조건을 넣어 만든 것이며, 통과가 실장비에서의 동작을 보증하지는 않는다.</p></div>
   <div class="card" style="margin-top:12px"><h2>20-2. 고장모드별 확인 수단과 연결된 시나리오</h2><div class="tbl-wrap"><table><thead><tr><th>번호</th><th class="l">부체계</th><th class="l">고장모드</th><th>확인 수단</th><th class="l">연결된 운영 시나리오</th><th>시험 시기</th><th class="l">검증 방법(실장비 시험에서 확인할 것)</th></tr></thead><tbody>
    ${L.map(x=>`<tr><td>${x.id}</td><td class="l small">${esc(x.ss)}</td><td class="l">${esc(x.mode)}</td><td><span class="pill ${x.how==="운영 시나리오"?"ok":x.how==="회귀 시험"?"":"warn"}">${x.how}</span></td><td class="l">${x.ls.map(pill).join(" ")||'<span class="small">—</span>'}</td><td class="small">${esc(x.due)}</td><td class="l small">${esc(x.verify)}</td></tr>`).join("")}</tbody></table></div></div>
   <div class="card" style="margin-top:12px"><h2>20-3. 실장비 연동시험(FAT) 확인 항목 ${fat.length}건</h2>
    ${tbl(["번호","고장모드","FAT 에서 확인할 것","미리 돌려 볼 시나리오"],fat.map(x=>[x.id,x.mode,x.verify,x.ls.map(s=>s.name).join(" / ")||"없음(실장비에서만 확인)"]),[1,2,3])}
    <p class="small">FAT 확인 항목은 FMEA 의 '검증 방법' 가운데 시험 시기가 실장비 연동시험(FAT) 전인 것이다. 별도의 FAT 절차서가 정해지면 그 항목 번호를 여기에 잇는다.</p></div>`);
 }
-/* 현장 구성 · FAT 점검표: EMS 가 인식한 구성(장비 대수 · 모선 · 환망 · 부하)에서 펼친 줄. EMS 화면의 [FMEA · FAT 내보내기]는 그때의 구성으로, 문서 묶음의 것은 가상 장치의 기본 구성으로 채운다 */
+/* 현장 구성 · FAT 점검표: TPCS 가 인식한 구성(장비 대수 · 모선 · 환망 · 부하)에서 펼친 줄. TPCS 화면의 [FMEA · FAT 내보내기]는 그때의 구성으로, 문서 묶음의 것은 가상 장치의 기본 구성으로 채운다 */
 function vSite(){
-  const s=DATA.site; if(!s){ setMain(head("현장 구성 · FAT 점검표","이 파일에는 현장 구성 자료가 없다")+`<div class="card"><p>EMS 화면의 [기록 · 보고서] → [FMEA · FAT 내보내기]로 만들면 그때의 장비 대수 · 모선 구성 · 환망 · 부하 목록으로 이 화면이 채워진다.</p></div>`); return; }
+  const s=DATA.site; if(!s){ setMain(head("현장 구성 · FAT 점검표","이 파일에는 현장 구성 자료가 없다")+`<div class="card"><p>TPCS 화면의 [기록 · 보고서] → [FMEA · FAT 내보내기]로 만들면 그때의 장비 대수 · 모선 구성 · 환망 · 부하 목록으로 이 화면이 채워진다.</p></div>`); return; }
   const rv=s.fmea.filter(r=>r[5]).length, by={}; s.fat.forEach(r=>{ by[r[1]]=(by[r[1]]||0)+1; });
-  setMain(head("현장 구성 · FAT 점검표","EMS 가 인식한 구성에서 펼친 FMEA 줄 "+s.fmea.length+"건 · FAT 점검 항목 "+s.fat.length+"건 — 만든 때 "+esc(s.when)) + `
+  setMain(head("현장 구성 · FAT 점검표","TPCS 가 인식한 구성에서 펼친 FMEA 줄 "+s.fmea.length+"건 · FAT 점검 항목 "+s.fat.length+"건 — 만든 때 "+esc(s.when)) + `
   <div class="grid kpis" style="margin-bottom:12px">
     <div class="kpi"><div class="l">현장 구성 FMEA 줄</div><div class="v">${s.fmea.length}건</div><div class="d">기존 번호(FM · C) 아래에 실제 이름으로 펼침</div></div>
     <div class="kpi ${rv?"warn":"good"}"><div class="l">재검토 표시</div><div class="v">${rv}건</div><div class="d">구성 때문에 영향이 달라지는 줄 — 점수는 사람이 정한다</div></div>

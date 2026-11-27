@@ -18,7 +18,7 @@ def _rss_now():
 
 def q(base, path, body=None, tok=None):
     r = urllib.request.Request(base + path, data=None if body is None else json.dumps(body).encode(), method="GET" if body is None else "POST")
-    if tok: r.add_header("X-EMS-Token", tok)
+    if tok: r.add_header("X-TPCS-Token", tok)
     with urllib.request.urlopen(r, timeout=10) as f: return json.loads(f.read())  # nosec B310 — 시험용, 127.0.0.1 http 고정
 
 

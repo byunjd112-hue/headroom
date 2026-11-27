@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""자료 대응표(포인트 맵). 장치의 레지스터 주소와 EMS 내부 이름(tag)을 잇는다.
+"""자료 대응표(포인트 맵). 장치의 레지스터 주소와 TPCS 내부 이름(tag)을 잇는다.
 
 CSV 열: tag, device, fc, addr, type, scale, unit, lo, hi, rw
-  tag     EMS 내부 이름(예: ESS.kw, DG.status, DG.cmd)
+  tag     TPCS 내부 이름(예: ESS.kw, DG.status, DG.cmd)
   device  장치 이름(runtime.json의 devices 키)
   fc      읽기 기능 코드(3 또는 4)
   addr    레지스터 주소(0부터)

@@ -12,7 +12,7 @@ const WAIT = 7000, PAGE = 2200;
   p.on("pageerror", e => errs.push(String(e))); p.on("dialog", d => d.accept());
   await p.goto(B);
   const tok = await p.evaluate(async () => { const r = await (await fetch("/api/login", { method: "POST", body: JSON.stringify({ pin: "2222", name: "김상사" }) })).json(); sessionStorage.setItem("ems.token", r.token); return r.token; });
-  const post = (path, body) => p.evaluate(async ([tok, path, body]) => (await fetch(path, { method: "POST", headers: { "X-EMS-Token": tok }, body: JSON.stringify(body) })).json(), [tok, path, body]);
+  const post = (path, body) => p.evaluate(async ([tok, path, body]) => (await fetch(path, { method: "POST", headers: { "X-TPCS-Token": tok }, body: JSON.stringify(body) })).json(), [tok, path, body]);
   const ring = body => post("/api/ring", { do: "sim", ...body }), sim = body => post("/api/sim", body);
   await p.evaluate(() => localStorage.setItem("ems.scenario.view", "live")); await p.reload(); await p.waitForTimeout(1500);
   const text = async (pg, sel) => { await p.goto(B + "#" + pg); await p.waitForTimeout(PAGE); return p.evaluate(sel => { const e = document.querySelector(sel); return e ? e.textContent.replace(/\s+/g, " ") : null; }, sel); };

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""교육용 가상 화면 묶음을 만든다: 실제 EMS 화면 파일(static) + 가상 장치에서 녹화한 응답 + 교육 창.
+"""교육용 가상 화면 묶음을 만든다: 실제 TPCS 화면 파일(static) + 가상 장치에서 녹화한 응답 + 교육 창.
 
   python -m tools.build_training <출력 폴더> [리비전]
-묶음의 index.html 을 두 번 누르면 브라우저에서 열린다(설치·서버 불필요). 화면은 실제 EMS 와 같은 파일이다.
+묶음의 index.html 을 두 번 누르면 브라우저에서 열린다(설치·서버 불필요). 화면은 실제 TPCS 와 같은 파일이다.
 값은 가상 장치를 장면별로 돌려 녹화한 것이라, 운용 장소·태세·지령·고장은 '녹화해 둔 장면을 바꾸는' 식으로 움직인다(새로 계산하지 않는다).
 """
 import base64, json, mimetypes, os, re, shutil, sys, tempfile, time, urllib.request
@@ -24,7 +24,7 @@ class Client:
         self.base = base; self.tok = ""
 
     def call(self, path, body=None):
-        req = urllib.request.Request(self.base + path, data=None if body is None else json.dumps(body).encode("utf-8"), headers={"X-EMS-Token": self.tok, "Content-Type": "application/json"})
+        req = urllib.request.Request(self.base + path, data=None if body is None else json.dumps(body).encode("utf-8"), headers={"X-TPCS-Token": self.tok, "Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=60) as r: return json.loads(r.read().decode("utf-8"))          # nosec B310 — 자기 자신(127.0.0.1)의 가상 장치 서버만 부른다
 
 
@@ -98,7 +98,7 @@ def build(out, rev):
         html = html.replace('<script src="core.js"></script>', '<script src="train_data.js"></script>\n<script src="train_mock.js"></script>\n<script src="core.js"></script>', 1)
         with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as f: f.write(html)
         with open(os.path.join(out, "읽어보기.txt"), "w", encoding="utf-8") as f:
-            f.write(f"IFPS 이동형 EMS 교육용 가상 화면 ({rev})\n\nPC: index.html 을 두 번 눌러 브라우저(Edge·Chrome)로 연다. 설치나 서버가 필요 없다.\n휴대전화·태블릿: 같이 나온 '_모바일.html' 파일 하나를 기기에 넣어 브라우저로 연다(화면을 밀어서 보고, 교육 창의 －·맞춤·＋ 로 크기를 바꾼다).\n화면은 실제 EMS 와 같은 파일이다. 값은 가상 장치에서 녹화한 가상값이며,\n운용 장소·태세·지령·고장은 녹화해 둔 장면을 바꾸는 식으로 움직인다(새로 계산하지 않는다).\n값이 실제로 계산되는 연습은 EMS 의 가상 장치 모드(run_sim.bat)에서 '교육' 단추를 눌러 한다.\n")
+            f.write(f"IFPS 이동형 TPCS 교육용 가상 화면 ({rev})\n\nPC: index.html 을 두 번 눌러 브라우저(Edge·Chrome)로 연다. 설치나 서버가 필요 없다.\n휴대전화·태블릿: 같이 나온 '_모바일.html' 파일 하나를 기기에 넣어 브라우저로 연다(화면을 밀어서 보고, 교육 창의 －·맞춤·＋ 로 크기를 바꾼다).\n화면은 실제 TPCS 와 같은 파일이다. 값은 가상 장치에서 녹화한 가상값이며,\n운용 장소·태세·지령·고장은 녹화해 둔 장면을 바꾸는 식으로 움직인다(새로 계산하지 않는다).\n값이 실제로 계산되는 연습은 TPCS 의 가상 장치 모드(run_sim.bat)에서 '교육' 단추를 눌러 한다.\n")
         size = sum(os.path.getsize(os.path.join(dp, n)) for dp, _, fs in os.walk(out) for n in fs)
         one = single_file(out, out + "_모바일.html")
         print(f"교육용 가상 화면: {out} (장면 {len(sc)}개, 묶음 {size / 1048576:.1f} MB, 파일 하나짜리 {one / 1048576:.1f} MB)")

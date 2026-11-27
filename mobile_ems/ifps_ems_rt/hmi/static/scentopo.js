@@ -18,7 +18,7 @@ const ScTopo = (() => {
     ELZ: {name: "수전해", kind: "load", bus: "A", at: [4.6, 7.9], kw: "ELZ.kw", st: "ELZ.status", c: "#8fd3ff", photo: "fc"},
     L2: {name: "2등급 중요 부하", kind: "load", bus: "B", at: [9.4, 7.9], cb: "L2", kw: "LOAD.p2_kw", c: "#ffc56b", photo: "l2"},
     L3: {name: "3등급 일반 부하", kind: "load", bus: "B", at: [11.8, 7.9], cb: "L3", kw: "LOAD.p3_kw", c: "#8fb7ff", photo: "l3"},
-    EMS: {name: "EMS", kind: "ctl", at: [7.3, -2.8], c: "#f2d27a", photo: "ems"},
+    TPCS: {name: "TPCS", kind: "ctl", at: [7.3, -2.8], c: "#f2d27a", photo: "ems"},
     MTR: {name: "계측·배전 게이트웨이", kind: "ctl", at: [14.0, 10.8], c: "#a9d18e", photo: "dist"},
     TEST: {name: "검증기", kind: "ctl", at: [-0.6, 11.2], c: "#c9a6c0", icon: "actor"},
   };
@@ -95,9 +95,9 @@ const ScTopo = (() => {
   }
   function ends(step) {                                      // [보내는 쪽, 받는 쪽, 선 모양]
     const to = step.device ? {node: step.device} : owner(step.tag);
-    if (step.type === "command") return ["EMS", to, "call"];
-    if (step.type === "policy") return ["TEST", {node: "EMS"}, "call"];
-    if (step.type === "policy_check") return ["EMS", {node: "TEST"}, "return"];
+    if (step.type === "command") return ["TPCS", to, "call"];
+    if (step.type === "policy") return ["TEST", {node: "TPCS"}, "call"];
+    if (step.type === "policy_check") return ["TPCS", {node: "TEST"}, "return"];
     if (step.type === "wait") return ["TEST", {node: "TEST"}, "self"];
     if (step.type === "set") return ["TEST", to, "call"];
     if (step.type === "response") return ["TEST", to, "inject"];

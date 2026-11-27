@@ -11,7 +11,7 @@
     시간 특성(curve): dt 정한시(delay_ms) / si·vi·ei 반한시(IEC 60255 표준·강·초 반한시, 배율 tms) — 넘는 정도가 클수록 빨리 동작한다.
     차단 실패 후비(backup·bf_ms): 트립을 냈는데 차단기가 열리지 않으면(STK.<차단기> = 1 로 모사) bf_ms 뒤 후비 차단기를 트립시킨다(고장 코드 50).
 보호 협조: 하위 차단기가 먼저 열리면 그 부하가 상위 감시 전력에서 빠진다 → 정정 시간이 맞으면 상위는 동작하지 않는다(선택 차단).
-수급 반영(급전선의 ems): 켜 두면 그 급전선의 전력을 EMS 가 보는 부하 합계(LOAD.kw)에 더하거나(부하) 뺀다(전원) → 발전기 기동 같은 급전 판단이 달라진다.
+수급 반영(급전선의 ems): 켜 두면 그 급전선의 전력을 TPCS 가 보는 부하 합계(LOAD.kw)에 더하거나(부하) 뺀다(전원) → 발전기 기동 같은 급전 판단이 달라진다.
 정정값은 시험용 가정값이다. 실제 값은 보호 협조 검토서로 정한다.
 """
 import json, os, re, shutil
@@ -232,7 +232,7 @@ class Model:
         if self.acc[r["id"]] >= 1.0 - 1e-9 or t <= 0: self.acc.pop(r["id"], None); self._trip(r, now)
 
     def _balance(self):
-        """수급 반영: ems 를 켠 급전선의 전력을 EMS 가 보는 부하 합계(LOAD.kw)에 반영한다. 시험이 LOAD.kw 를 새로 넣으면 그 값을 새 기준으로 삼는다."""
+        """수급 반영: ems 를 켠 급전선의 전력을 TPCS 가 보는 부하 합계(LOAD.kw)에 반영한다. 시험이 LOAD.kw 를 새로 넣으면 그 값을 새 기준으로 삼는다."""
         if not self._has("LOAD.kw"): return
         adj = sum((1 if f["kind"] == "load" else -1) * self.flow(f["id"]) for f in self.x["feeders"] if f.get("ems"))
         cur = self.p.get("LOAD.kw")

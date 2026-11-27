@@ -78,7 +78,7 @@ def evaluate(cases, pts, devices, profile=None):
     def run(case):
         if any(step["type"] == "policy" for step in case["steps"]):
             if profile is None:
-                raise ValueError("EMS 운전 정책 검증에는 runtime.json이 필요합니다")
+                raise ValueError("TPCS 운전 정책 검증에는 runtime.json이 필요합니다")
             return run_policy_case(runner, case, pts, units, profile)
         return runner(case, pts, units)
 
@@ -131,7 +131,7 @@ def validate_step(step, tags, commands, remaining):
         _validate_policy(step, tags)
     elif kind == "policy_check":
         if step.get("metric") not in METRICS or step.get("op") not in OPS:
-            raise ValueError("EMS 판단 항목과 비교 조건을 선택하세요")
+            raise ValueError("TPCS 판단 항목과 비교 조건을 선택하세요")
         number(step, "value", -1e12, 1e12)
     elif kind in ("set", "expect", "branch"):
         _validate_point(step, kind, tags, remaining)
@@ -226,7 +226,7 @@ def run_case(case, pts, units, profile=None, directory=None, extra=None):
                 target = step["value"]
                 row.update(actual=actual, expected=target)
                 if actual is None or not OPS[step["op"]](actual, target):
-                    row.update(state="fail", why="EMS 판단값이 없거나 기준과 다릅니다")
+                    row.update(state="fail", why="TPCS 판단값이 없거나 기준과 다릅니다")
             elif kind == "expect":
                 row.update(check_expectation(plant, step, advance, sequences))
             row["elapsed"] = elapsed

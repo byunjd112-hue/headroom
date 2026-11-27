@@ -32,7 +32,7 @@ def tick(plant):
 
 
 def fleet_merge(rt, plant):
-    """EMS 판단(정책 실행) 직전에: 놓인 장치만 '있는 장치'로 보고 종류 이름의 값을 합산한다(실행기의 자동 인식과 같은 계산)."""
+    """TPCS 판단(정책 실행) 직전에: 놓인 장치만 '있는 장치'로 보고 종류 이름의 값을 합산한다(실행기의 자동 인식과 같은 계산)."""
     got = {}
     for n, lk in rt.links.items():
         if not fleet.kind(n): continue

@@ -1,4 +1,4 @@
-/* IFPS Mobile EMS HMI — 공통: 통신, 상태, 다국어, 서식, 차트, 대화상자 */
+/* IFPS TPCS HMI — 공통: 통신, 상태, 다국어, 서식, 차트, 대화상자 */
 "use strict";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -59,7 +59,7 @@ const COLORS = new Proxy({}, { get: (_, k) => TV("--" + ({ soc: "ess", h2: "fc",
 /* ── 통신 */
 async function api(path, body) {
   const opt = { method: body === undefined ? "GET" : "POST", headers: {} };
-  if (S.token) opt.headers["X-EMS-Token"] = S.token;
+  if (S.token) opt.headers["X-TPCS-Token"] = S.token;
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
   const r = await fetch(path, opt);
   let j; try { j = await r.json(); } catch (e) { j = { ok: false, why: `HTTP ${r.status}` }; }

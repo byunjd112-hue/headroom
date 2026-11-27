@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """기동형 복합전력공급체계(발전기 + ESS 를 PCS 가 묶은 한 제품)의 운전 모드.
 
-EMS 는 이 체계의 PCS 와만 통신한다. 발전기와 ESS 의 감시 · 제어는 모두 PCS 를 거친다(대응표의 장치 이름 DG = 복합전력 PCS).
+TPCS 는 이 체계의 PCS 와만 통신한다. 발전기와 ESS 의 감시 · 제어는 모두 PCS 를 거친다(대응표의 장치 이름 DG = 복합전력 PCS).
   PCS 가 알려 주는 것  발전기 운전 · 출력 · 연료(DG.status · kw · fuel_l), ESS 충전율 · 충방전 전력(DG.ess_soc · ess_kw), 지금 모드(DG.pcs_mode)
-  EMS 가 내리는 것     발전기 기동 · 정지(DG.cmd — 선택 · 실행 규약), 운전 모드(DG.mode_set)
+  TPCS 가 내리는 것     발전기 기동 · 정지(DG.cmd — 선택 · 실행 규약), 운전 모드(DG.mode_set)
 운전 모드(열쇠 · 기본 값 · 뜻)
   stop   0  정지              발전기 정지, ESS 대기
   gen    1  발전기 단독       발전기만 공급(ESS 는 가득 차 있거나 쉬게 함)
   charge 2  발전기 + ESS 충전 발전기가 공급하면서 ESS 를 충전
   ess    3  ESS 방전          발전기 정지, ESS 가 공급(계통 형성 · 저소음)
 ESS 방전 모드에서는 복합전력의 ESS 도 이동형 ESS 와 함께 쓴다(사용자 요구, Rev67): 모선의 충 · 방전을 용량 비율로 나눠 맡는다(가상 장치의 모형 — 실제 분담은 두 PCS 의 수하 특성에 따른다).
-EMS 는 자립 지속시간에 이 ESS 의 에너지(soc_low 위의 양 × ess_kwh)를 더해 셈한다.
+TPCS 는 자립 지속시간에 이 ESS 의 에너지(soc_low 위의 양 × ess_kwh)를 더해 셈한다.
 자동 제어의 모드 선택: 디젤이 필요하면 charge(충전율이 soc_full 이상이면 gen), 필요 없으면 ess.
 복합전력의 ESS 가 soc_low 아래로 내려가면 발전기를 돌려 충전하고(want.DG 를 켬) soc_ok 를 넘으면 그친다(저소음 태세에서는 디젤을 켜지 않는다).
 모드의 값 · 이름과 한계값은 제작사 PCS 사양에 맞춰 고친다 — runtime.json 의 hybrid(관리자 화면의 설정 편집 → '복합전력 PCS' 탭). 신호 주소는 대응표(pointmap.csv)의 DG.* 줄이다.
@@ -62,7 +62,7 @@ def alarms(rt, now):
         if not differ: t0.pop(n, None)
         late = differ and now - t0.setdefault(n, now) >= MISMATCH_S
         known = mode is None or int(round(mode)) in name
-        out.append((f"hy.mode.{n}", bool(late), 2, n, f"{n} 복합전력 모드 불일치 — EMS 지령 {_txt(c, name, want)} / PCS {_txt(c, name, mode)}. PCS 의 현장 수동 · 보호 동작 · 모드 값 설정을 확인"))
+        out.append((f"hy.mode.{n}", bool(late), 2, n, f"{n} 복합전력 모드 불일치 — TPCS 지령 {_txt(c, name, want)} / PCS {_txt(c, name, mode)}. PCS 의 현장 수동 · 보호 동작 · 모드 값 설정을 확인"))
         out.append((f"hy.soc.{n}", soc is not None and soc < c["soc_low"], 2, n, f"{n} 복합전력 ESS 충전율 낮음({0.0 if soc is None else soc:.0f}% < {c['soc_low']:.0f}%) — " + ("저소음 태세라 발전기로 충전하지 않음. 태세를 바꾸거나 수동으로 충전" if rt.posture == "저소음" else "발전기로 충전 중인지 확인")))
         out.append((f"hy.unknown.{n}", not known, 3, n, f"{n} 복합전력 PCS 가 모르는 모드 값({0 if mode is None else int(round(mode))})을 알려 옴 — 설정 편집의 '복합전력 PCS' 탭에서 모드 값을 사양에 맞춤"))
     return out

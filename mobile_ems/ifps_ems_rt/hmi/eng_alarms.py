@@ -31,11 +31,11 @@ class AlarmsMixin:
             src = self._tag_dev.get(tag, dev)                                 # 그 점을 읽어 오는 장치(예: PV.kw 는 계측 게이트웨이)
             lost = rt.lm.state.get(src) in ("두절", "재조회 대기")           # 장치 두절이면 '통신 두절' 경보 하나로 충분하다(점마다 올리지 않는다)
             A.set(f"q3.{tag}", f == 3 and not lost, 3, dev, f"{tag} 값 갱신 지연(>{SUP['stale_s']:.0f}초)")
-        A.set("ai.degraded", rt.ai_degraded, 3, "EMS", "예측 정확도 저하 — 계획 운전을 쉬고 규칙 운전 중(자료가 쌓이면 다시 학습)")
-        A.set("audit", bool(rt.audit_err), 2, "EMS", f"감사 기록 쓰기 실패 — 저장 공간·권한 확인 ({rt.audit_err})")
+        A.set("ai.degraded", rt.ai_degraded, 3, "TPCS", "예측 정확도 저하 — 계획 운전을 쉬고 규칙 운전 중(자료가 쌓이면 다시 학습)")
+        A.set("audit", bool(rt.audit_err), 2, "TPCS", f"감사 기록 쓰기 실패 — 저장 공간·권한 확인 ({rt.audit_err})")
         bad = [i["text"] for i in self.busw.view()["issues"] if i["level"] == "bad"]
-        A.set("bus.plan", bool(bad), 3, "EMS", "모선 구성 점검 필요 — " + (bad[0] if bad else ""))
-        A.set("hist", bool(rt.hist_err), 2, "EMS", f"운전 이력 쓰기 실패 — 저장 공간·권한 확인 ({rt.hist_err})")
+        A.set("bus.plan", bool(bad), 3, "TPCS", "모선 구성 점검 필요 — " + (bad[0] if bad else ""))
+        A.set("hist", bool(rt.hist_err), 2, "TPCS", f"운전 이력 쓰기 실패 — 저장 공간·권한 확인 ({rt.hist_err})")
         for n, lk in rt.links.items():
             A.set(f"part.{n}", bool(lk.miss) and rt.lm.state[n] != "두절", 3, n, f"{n} 일부 신호를 읽지 못함 — 장치가 '없는 주소'로 답함: {', '.join(lk.miss[:6])}{' …' if len(lk.miss) > 6 else ''}")
 
@@ -51,10 +51,10 @@ class AlarmsMixin:
         h2 = g("H2.nm3", s.h2_nm3)
         A.set("h2.lo", h2 < s.h2_nm3 * s.h2_min * 1.5, 2, "FC", f"수소 잔량 낮음 {h2:.0f}Nm³")
         fuelwatch.alarms(self)
-        A.set("reserve", k["reserve_need"], 3, "EMS", f"N-1 순동 예비력 부족 {k['reserve_margin']:.0f}kW — 연료전지 병렬 필요")
+        A.set("reserve", k["reserve_need"], 3, "TPCS", f"N-1 순동 예비력 부족 {k['reserve_margin']:.0f}kW — 연료전지 병렬 필요")
         for n, d in rt.dev.items():
-            A.set(f"man.{n}", d.manual, 4, n, f"{n} 현장 수동 모드 — EMS 지령 차단")
-        A.set("auto.off", not self.auto, 4, "EMS", "자동 제어 해제 — 운용자 수동 지령 운전")
+            A.set(f"man.{n}", d.manual, 4, n, f"{n} 현장 수동 모드 — TPCS 지령 차단")
+        A.set("auto.off", not self.auto, 4, "TPCS", "자동 제어 해제 — 운용자 수동 지령 운전")
 
     def _alarms_unit_cb(self, v):
         """장비 한 대마다의 차단기 경보: 추가 자리 장비(CB.DG2 …)와 추가 복합전력 차량의 ESS(CB.G1_2 …) — 인식한 장치만(빈 자리의 신호로 경보를 내지 않는다)."""
@@ -92,11 +92,11 @@ class AlarmsMixin:
         """군 운용 경보: 자동 부하 차단, 저소음 태세 자원 고갈, 자립 목표 미달."""
         rt = self.rt; A = self.alarms; s = rt.site; soc = rt.val.get("ESS.soc", 60.0) / 100; h = rt.auto_h or {}
         for f, nm in (("L3", "3등급"), ("L2", "2등급")):
-            A.set(f"shed.{f}", f in rt.shedder.mine, 2 if f == "L2" else 3, "EMS", f"{nm} 부하 자동 차단 중 — {rt.shedder.why.get(f, '')}")
-            A.set(f"save.{f}", f in rt.shedder.saved, 3, "EMS", f"{nm} 부하 절감 공급 중 — {rt.shedder.why.get(f, '')}. 모자람이 이어지면 차단으로 넘어간다")
-        A.set("quiet.low", rt.posture == "저소음" and soc < s.soc_min + 0.06, 1, "EMS", f"저소음 태세: ESS {soc * 100:.0f}% — 자원 고갈 임박. 디젤을 쓰려면 운용 태세를 바꾸십시오")
+            A.set(f"shed.{f}", f in rt.shedder.mine, 2 if f == "L2" else 3, "TPCS", f"{nm} 부하 자동 차단 중 — {rt.shedder.why.get(f, '')}")
+            A.set(f"save.{f}", f in rt.shedder.saved, 3, "TPCS", f"{nm} 부하 절감 공급 중 — {rt.shedder.why.get(f, '')}. 모자람이 이어지면 차단으로 넘어간다")
+        A.set("quiet.low", rt.posture == "저소음" and soc < s.soc_min + 0.06, 1, "TPCS", f"저소음 태세: ESS {soc * 100:.0f}% — 자원 고갈 임박. 디젤을 쓰려면 운용 태세를 바꾸십시오")
         tgt = max(0.0, rt.auto_target_h - (rt.now() - rt.t_posture) / 3600.0)
-        A.set("auto.short", rt.posture == "자립" and bool(h) and h.get("p1", 999) < tgt, 1, "EMS", f"자립 태세: 1등급 부하만으로도 {h.get('p1', 0):.0f}시간 — 남은 목표 {tgt:.0f}시간 미달, 보급 필요")
+        A.set("auto.short", rt.posture == "자립" and bool(h) and h.get("p1", 999) < tgt, 1, "TPCS", f"자립 태세: 1등급 부하만으로도 {h.get('p1', 0):.0f}시간 — 남은 목표 {tgt:.0f}시간 미달, 보급 필요")
 
     def _alarms_events(self):
         """사건(지령 실패·차단, 주기 초과, 내부 오류)을 경보로 옮긴다."""
@@ -107,6 +107,6 @@ class AlarmsMixin:
             t = e["text"]
             if e["kind"] == "지령" and ("무응답" in t or "실패" in t or "미변화" in t): A.event(2, t.split()[0], t)
             elif e["kind"] == "지령" and "차단" in t: A.event(3, t.split()[0], t)
-            elif e["kind"] == "주기": A.event(4, "EMS", t)
-            elif e["kind"] == "오류": A.event(2, "EMS", t)
+            elif e["kind"] == "주기": A.event(4, "TPCS", t)
+            elif e["kind"] == "오류": A.event(2, "TPCS", t)
         if evs: self._ev_i = evs[-1]["id"]

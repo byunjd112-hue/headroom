@@ -82,7 +82,7 @@ class Engine(ForecastMixin, AlarmsMixin, CommandMixin, AuthMixin, ViewMixin, Too
         for n, lk in self.rt.links.items():
             for k, cl in lk.cl.items():
                 cl.tag = (n, k); cl.trace = self._tracer(cl)
-        self.rt.note("기동", f"HMI 엔진 기동 (EMS RT v{RT_VERSION}, 핵심 v{CORE_VERSION}, {'가상 장치' if sim else '실장치'} 모드)")
+        self.rt.note("기동", f"HMI 엔진 기동 (TPCS RT v{RT_VERSION}, 핵심 v{CORE_VERSION}, {'가상 장치' if sim else '실장치'} 모드)")
 
     # ── 프레임 추적
     def _tracer(self, cl):
@@ -135,11 +135,11 @@ class Engine(ForecastMixin, AlarmsMixin, CommandMixin, AuthMixin, ViewMixin, Too
             if dt > period and k > 1:                                            # 첫 주기는 모든 장치에 접속을 맺는 시간이 들어 있어 세지 않는다
                 self.rt.n_over += 1; self.rt.note("주기", f"주기 초과 {dt:.2f}초")
             stuck = self.rt.wd.check(self.rt.now())
-            self.alarms.set("wd", bool(stuck), 1, "EMS", "프로세스 정지 감지: " + ", ".join(stuck) if stuck else "프로세스 정지")
+            self.alarms.set("wd", bool(stuck), 1, "TPCS", "프로세스 정지 감지: " + ", ".join(stuck) if stuck else "프로세스 정지")
             if k == 1: sd_notify("READY=1")
             if not stuck: sd_notify("WATCHDOG=1")                                   # 수집·제어가 모두 살아 있을 때만 systemd 감시 신호
             if self.auto and self.busy is None and self.jobs.empty() and self.rt.now() - self.rt.t_ctl >= float(self.cfg.get("ctrl_s", 60.0)):
-                self.jobs.put({"kind": "auto", "who": "EMS"})
+                self.jobs.put({"kind": "auto", "who": "TPCS"})
             if k % 10 == 0:
                 try: self.rt.save()
                 except OSError: pass

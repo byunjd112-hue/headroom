@@ -250,7 +250,7 @@ class AutoDeviceTest(unittest.TestCase):
         eng.rt.lm.state["DG2"] = "두절"; autodev.link_alarm(eng, "DG2", "두절"); self.assertEqual((got["link.DG2"][0], got["absent.DG2"][0]), (False, False))            # 추가 자리가 빈 것은 알리지 않는다
         eng.rt.seen.add("DG2"); autodev.link_alarm(eng, "DG", "두절"); self.assertEqual((got["link.DG"][0], got["absent.DG"][0]), (False, False))                      # 같은 종류가 한 대라도 있으면 첫 자리가 비어도 알리지 않는다
         eng.rt.seen.add("DG"); autodev.link_alarm(eng, "DG", "두절"); self.assertEqual((got["link.DG"][0], got["absent.DG"][0]), (True, False))
-        eng.rt.val = {"BUS.a_v": 441.0, "BUS.b_v": 440.0}; eng.rt.lm.state["MTR"] = "정상"; autodev.ems_power(eng); self.assertEqual(got["ems.power"], (False, 2))                 # EMS 주 전원(배전 모선)
+        eng.rt.val = {"BUS.a_v": 441.0, "BUS.b_v": 440.0}; eng.rt.lm.state["MTR"] = "정상"; autodev.ems_power(eng); self.assertEqual(got["ems.power"], (False, 2))                 # TPCS 주 전원(배전 모선)
         eng.rt.val = {"BUS.a_v": 0.0, "BUS.b_v": 0.0}; autodev.ems_power(eng); self.assertEqual(got["ems.power"], (True, 2)); eng.rt.val = {"BUS.a_v": 0.0, "BUS.b_v": 440.0}; autodev.ems_power(eng); self.assertFalse(got["ems.power"][0])
         eng.rt.val = {"BUS.a_v": 0.0, "BUS.b_v": 0.0}; eng.rt.lm.state["MTR"] = "두절"; autodev.ems_power(eng); self.assertFalse(got["ems.power"][0])                              # 게이트웨이가 끊겨 값을 못 믿으면 내지 않는다
 

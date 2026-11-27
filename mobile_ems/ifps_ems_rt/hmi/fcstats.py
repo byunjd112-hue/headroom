@@ -26,7 +26,7 @@ def backtest(d, fl, fp, site, meta, stop=None):
     n = d["n"]; el = {b: [] for b in range(len(BUCKET))}; ep = {b: [] for b in range(len(BUCKET))}; cl = []; cp = []; mean_l = max(float(np.mean(d["load"][-7 * 96:])), 1e-6)
     day_l, day_p, pts = [], [], []
     for oo in range(n - 7 * 96 - 1, n - 97, 24):
-        if stop is not None and stop(): raise InterruptedError("예측 계산 중단")      # EMS 가 멈추면 그만둔다
+        if stop is not None and stop(): raise InterruptedError("예측 계산 중단")      # TPCS 가 멈추면 그만둔다
         a = learner.predict(fl, d, oo, "load", site, meta)[:3]; b = learner.predict(fp, d, oo, "pv", site, meta)[:3]; sl = slice(oo + 1, oo + 97)
         yl = d["load"][sl]; yp = d["pv"][sl]; valid_l = d["load_observed"][sl]; valid_p = d["pv_observed"][sl] & (d["clear"][sl] > 0.05 * site.pv_kwp)
         _score(a, yl, valid_l, mean_l, el, cl); _score(b, yp, valid_p, site.pv_kwp, ep, cp)

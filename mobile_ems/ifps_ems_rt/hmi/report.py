@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""EMS 운영 보고서(Word)를 그 자리에서 만든다: 현재 현황 · 최근 운영 현황 · 상황 기록 · 운전 시퀀스 · 전기안전 점검 기록 · 자료 보관 상태.
+"""TPCS 운영 보고서(Word)를 그 자리에서 만든다: 현재 현황 · 최근 운영 현황 · 상황 기록 · 운전 시퀀스 · 전기안전 점검 기록 · 자료 보관 상태.
 
 화면의 [보고서 출력]이 부른다. 현장 노트북에서 바로 만들 수 있게 표준 라이브러리만 쓴다(docx.py).
 수치는 기록 보관소(archive.db)와 지금 장치에서 읽은 값이다. 가상 장치 모드의 값과 시연용 과거 자료는 그렇게 표시한다.
@@ -15,7 +15,7 @@ MODES = [("작전지", "평시", "ESS·태양광 우선, 부족하면 연료전�
          ("주둔지 · 정전", "자립", "전시·유사시 상전 상실: ESS·태양광·주둔지 발전기로 자립, 연료 50% 이하 보충 경보")]
 RESULT = dict(zip(("pass", "fail", "skip"), ("통과", "실패", "건너뜀")))
 OP = {"eq": "=", "ge": "≥", "le": "≤"}
-KIND = {"command": "지령", "expect": "판정", "set": "입력", "wait": "대기", "branch": "분기", "response": "고장 주입", "policy": "EMS 정책 실행", "policy_check": "EMS 판단 판정"}
+KIND = {"command": "지령", "expect": "판정", "set": "입력", "wait": "대기", "branch": "분기", "response": "고장 주입", "policy": "TPCS 정책 실행", "policy_check": "TPCS 판단 판정"}
 
 
 def describe(s):
@@ -77,7 +77,7 @@ def _fleet(doc, fl):
     if not fl: return
     nm = {"DG": "디젤 발전기", "FC": "연료전지", "ESS": "ESS", "PV": "태양광", "ELZ": "수전해"}; st = lambda u: "두절" if not u["live"] else "운전" if u["on"] else "정지"
     doc.h2("1.5 장치 구성(자동 인식한 대수)")
-    doc.p("EMS 가 응답을 받아 인식한 장치다. 자리 수는 설정에 둔 추가 자리까지의 수이고, 대수의 변화(놓기 · 빼기 · 두절)는 3장 상황 기록의 '자동 인식' · '장치'에 시각과 함께 남는다. 장치별 자료(7장)에는 그때 있던 장치의 값만 들어간다.")
+    doc.p("TPCS 가 응답을 받아 인식한 장치다. 자리 수는 설정에 둔 추가 자리까지의 수이고, 대수의 변화(놓기 · 빼기 · 두절)는 3장 상황 기록의 '자동 인식' · '장치'에 시각과 함께 남는다. 장치별 자료(7장)에는 그때 있던 장치의 값만 들어간다.")
     doc.table(["종류", "인식 / 자리", "지금 통신되는 대수", "장치별 상태"], [[nm.get(k, k), f"{len(f['units'])} / {f['slots']}", f["n"], ", ".join(f"{u['id']} {st(u)}" + ("" if u.get("kw") is None else f" {_n(u['kw'], 1)} kW") for u in f["units"]) or "미설치"] for k, f in fl.items()], [18, 16, 18, 48])
 
 
@@ -143,9 +143,9 @@ def _events(doc, arch, a, b):
 def _sequences(doc, eng, arch, a, b):
     """4. 운전 시퀀스: 운전 모드 정의, 지령 시퀀스 기록, 운영 시나리오(단계와 검증 결과)"""
     doc.h1("4. 운전 시퀀스"); doc.h2("4.1 운용 장소 · 태세별 동작")
-    doc.table(["운용 장소", "태세", "EMS 동작"], [list(m) for m in MODES], [22, 12, 66])
+    doc.table(["운용 장소", "태세", "TPCS 동작"], [list(m) for m in MODES], [22, 12, 66])
     cmd = [r for r in arch.events(a.timestamp(), b.timestamp(), kind="지령", limit=300)]
-    doc.h2(f"4.2 지령 시퀀스 기록 ({len(cmd)}건)"); doc.p("EMS 가 장치에 낸 지령과 응답(수용·완료·재지령·대체)을 시간순으로 적는다.")
+    doc.h2(f"4.2 지령 시퀀스 기록 ({len(cmd)}건)"); doc.p("TPCS 가 장치에 낸 지령과 응답(수용·완료·재지령·대체)을 시간순으로 적는다.")
     doc.table(["시각", "내용", "행위자"], [[r["t"][5:], r["text"], r["actor"] or ""] for r in reversed(cmd)], [18, 68, 14], 16)
     if eng is not None: _scenarios(doc, eng)
 
@@ -179,14 +179,14 @@ def _safety(doc, arch, a, b):
     first, last = (rows[0], rows[-1]) if rows else ({}, {})
     names = [("cum_load", "부하 전력량"), ("cum_pv", "태양광 발전량"), ("cum_gen", "발전기 발전량"), ("cum_grid_in", "수전 전력량"), ("cum_grid_out", "역송 전력량")]
     doc.table(["검침 항목", "구간 시작 지침 kWh", "구간 끝 지침 kWh", "구간 사용량 kWh"], [[n, _n(first.get(c)), _n(last.get(c)), _n((last.get(c) or 0) - (first.get(c) or 0)) if rows else "—"] for c, n in names], [34, 22, 22, 22])
-    doc.p("지침은 EMS 가 계측값을 적산한 값이다. 요금 정산용 계량기의 지침과 다를 수 있으므로 검침 대조 때는 계량기 값을 기준으로 한다.", size=17, color="595959")
+    doc.p("지침은 TPCS 가 계측값을 적산한 값이다. 요금 정산용 계량기의 지침과 다를 수 있으므로 검침 대조 때는 계량기 값을 기준으로 한다.", size=17, color="595959")
     doc.h2("5.2 측정 항목 통계"); pick = lambda c: [r[c] for r in rows if r.get(c) is not None]
     stat = lambda c, d=1: [_n(min(pick(c)), d), _n(sum(pick(c)) / len(pick(c)), d), _n(max(pick(c)), d)] if pick(c) else ["—", "—", "—"]
     doc.table(["항목", "최소", "평균", "최대"], [["모선 A 전압 (V)"] + stat("va"), ["모선 B 전압 (V)"] + stat("vb"), ["주파수 (Hz)"] + stat("hz", 2), ["ESS 충전율 (%)"] + stat("soc"), ["기온 (℃)"] + stat("temp"),
                                            ["구간 최대 부하 (kW)"] + stat("load_max"), ["구간 최대 수전 (kW)"] + stat("grid_max")], [40, 20, 20, 20])
     trips = arch.events(a.timestamp(), b.timestamp(), q="트립", limit=200)
     doc.kv("보호 동작(트립) 기록", f"{len(trips)}건"); ins = arch.inspects(min(a, b - timedelta(days=366)).timestamp(), b.timestamp())
-    doc.h2(f"5.3 점검 기록(수기 입력) {len(ins)}건"); doc.p("절연저항·접지저항·누설전류처럼 EMS 가 재지 못하는 항목은 점검자가 기록 조회 화면에서 넣는다. 보고 구간이 짧아도 최근 1년의 점검 기록을 함께 싣는다.")
+    doc.h2(f"5.3 점검 기록(수기 입력) {len(ins)}건"); doc.p("절연저항·접지저항·누설전류처럼 TPCS 가 재지 못하는 항목은 점검자가 기록 조회 화면에서 넣는다. 보고 구간이 짧아도 최근 1년의 점검 기록을 함께 싣는다.")
     doc.table(["일시", "항목", "값", "단위", "의견", "점검자"], [[r["t"], r["item"], r["value"], r["unit"], r["note"], r["who"]] for r in ins], [18, 22, 12, 10, 26, 12], 16)
 
 
@@ -234,12 +234,12 @@ def build(eng, st, q):
     """보고서를 만들어 (파일 이름, 바이트)로 돌려준다."""
     a, b = _period(q); arch = st.arch; doc = Doc(); now = time.strftime("%Y-%m-%d %H:%M:%S")
     s = eng.snapshot() if eng is not None else {"site": "기록 보관소", "sim": False, "version": None}
-    doc.p("작전지 종합전력공급체계(IFPS) 이동형 EMS", bold=True, size=28, align="center").p("운영 보고서", bold=True, size=40, align="center")
+    doc.p("작전지 종합전력공급체계(IFPS) 이동형 TPCS", bold=True, size=28, align="center").p("운영 보고서", bold=True, size=40, align="center")
     doc.table(["항목", "내용"], [["현장", s["site"]], ["보고 구간", f"{a:%Y-%m-%d} ~ {b - timedelta(days=1):%Y-%m-%d}"], ["작성 시각", now], ["소프트웨어", f"패키지 {s['version']['pkg']} · 실행기 {s['version']['rt']} · 핵심 {s['version']['core']}" if s["version"] else "기록 조회기(보관소 파일만 읽음)"],
                                ["자료 출처", ("가상 장치(시연) — 실제 설비의 값이 아니다" if s["sim"] else "실장비 계측값" if eng is not None else "보관된 기록(현재 현황 없음)") + " · 기록 보관소 archive.db"]], [24, 76])
     doc.p("차례: 1 현재 현황 · 2 최근 운영 현황 · 3 상황 기록 · 4 운전 시퀀스 · 5 전기안전 점검 기록 · 6 ESS 안전 운영정보 · 7 장치별 자료 · 8 자료 보관 · 서버 전달", size=18, color="595959")
     if eng is not None: _current(doc, s); _init(doc, eng)
-    else: doc.h1("1. 현재 현황"); doc.p("기록 조회기에서 만든 보고서라 현재 현황은 없다. EMS 화면의 [보고서 출력]을 쓰면 들어간다.")
+    else: doc.h1("1. 현재 현황"); doc.p("기록 조회기에서 만든 보고서라 현재 현황은 없다. TPCS 화면의 [보고서 출력]을 쓰면 들어간다.")
     _recent(doc, arch, a, b); _events(doc, arch, a, b); _sequences(doc, eng, arch, a, b); _safety(doc, arch, a, b); _ess(doc, st, a, b); _devices(doc, st, a, b); _storage(doc, st)
     site = "".join(c for c in s["site"] if c.isascii() and (c.isalnum() or c in "-_")) or "archive"       # 파일 이름은 영문·숫자만(브라우저·압축 도구에 따라 한글 이름이 깨진다)
     return f"EMS_report_{site}_{a:%Y%m%d}-{b - timedelta(days=1):%Y%m%d}.docx", doc.to_bytes()

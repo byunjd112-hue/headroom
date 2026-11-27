@@ -1,6 +1,6 @@
 "use strict";
 /* 기록 · 보고서 화면: 검침 누적값과 운전 실적을 시간·일·월·년 단위로 찾아보고, 상황 기록을 글자로 찾고, 점검 기록을 넣고, 운영 보고서(Word)를 내려받는다.
-   EMS 화면의 한 쪽(P_ARCHIVE)이자 별도 기록 조회기(viewer.html)가 같이 쓴다. 조회기에서는 읽기만 한다. */
+   TPCS 화면의 한 쪽(P_ARCHIVE)이자 별도 기록 조회기(viewer.html)가 같이 쓴다. 조회기에서는 읽기만 한다. */
 const ARC = {
   unit: "hour", at: "", tab: "meter", dev: "", sig: "", essRaw: false, q: "", kind: "", data: null, info: null, standalone: false,
   UNITS: [["hour", "시간별", "하루"], ["day", "일별", "한 달"], ["month", "월별", "한 해"], ["year", "연도별", "전체"]],
@@ -10,7 +10,7 @@ const ARC = {
   n(v, d = 1) { return v === null || v === undefined ? "—" : Number(v).toLocaleString("ko-KR", { minimumFractionDigits: d, maximumFractionDigits: d }); },
   today() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; },
   async get(path) {
-    const h = {}; if (typeof S !== "undefined" && S.token) h["X-EMS-Token"] = S.token;
+    const h = {}; if (typeof S !== "undefined" && S.token) h["X-TPCS-Token"] = S.token;
     const r = await fetch(path, { headers: h }); let j; try { j = await r.json(); } catch (e) { j = { ok: false, why: `HTTP ${r.status}` }; } return j;
   },
   say(msg, kind) { if (typeof toast === "function") toast(msg, kind); else { const el = document.getElementById("arcMsg"); if (el) el.textContent = msg; } },
@@ -67,7 +67,7 @@ const ARC = {
       <div class="panel"><div class="hd"><h3>검침 누적값 (kWh)</h3></div><div class="bd np"><table class="t"><thead><tr><th>검침 항목</th><th class="n">구간 시작</th><th class="n">구간 끝</th><th class="n">사용량</th></tr></thead><tbody>
       ${this.CUM.map(c => { const a = first[c[0]], b = last[c[0]], u = rows.length ? (b || 0) - (a || 0) + ({ cum_load: first.load_kwh, cum_pv: first.pv_kwh, cum_gen: (first.dg_kwh || 0) + (first.fc_kwh || 0) + (first.gdg_kwh || 0), cum_grid_in: first.grid_in_kwh, cum_grid_out: first.grid_out_kwh }[c[0]] || 0) : null;
       return `<tr><td>${c[1]}</td><td class="n">${this.n(rows.length ? (b || 0) - u : null)}</td><td class="n">${this.n(b)}</td><td class="n"><b>${this.n(u)}</b></td></tr>`; }).join("")}</tbody></table>
-      <p class="sub arc-note">EMS 가 계측값을 적산한 지침이다. 요금 정산용 계량기와 대조할 때는 계량기 값을 기준으로 한다.</p></div></div></div>
+      <p class="sub arc-note">TPCS 가 계측값을 적산한 지침이다. 요금 정산용 계량기와 대조할 때는 계량기 값을 기준으로 한다.</p></div></div></div>
     <div class="panel"><div class="hd"><h3>${this.UNITS.find(u => u[0] === this.unit)[1]} 기록 ${rows.length}줄</h3>${demo ? '<span class="pill warn">* 시연용 합성 자료 포함</span>' : ""}<div class="spacer"></div><span class="sub">줄을 누르면 그 구간으로 들어간다</span></div>
       <div class="bd np scroll arc-table"><table class="t"><thead><tr><th>구간</th>${this.COLS.map(c => `<th class="n">${c[1]}</th>`).join("")}<th class="n">최대 부하 kW</th><th class="n">충전율 %</th><th class="n">전압 A / B V</th><th class="n">주파수 Hz</th><th class="n">기온 ℃</th></tr></thead>
       <tbody>${rows.map((x, i) => `<tr data-i="${i}" class="arc-row"><td class="mono">${this.e(x.k)}${x.demo ? " *" : ""}</td>${this.COLS.map(c => `<td class="n">${this.n(x[c[0]])}</td>`).join("")}<td class="n">${this.n(x.load_max)}</td><td class="n">${this.n(x.soc)}</td><td class="n">${this.n(x.va, 0)} / ${this.n(x.vb, 0)}</td><td class="n">${this.n(x.hz, 2)}</td><td class="n">${this.n(x.temp)}</td></tr>`).join("") || `<tr><td colspan="15" class="muted">이 구간에는 기록이 없습니다</td></tr>`}</tbody></table></div></div>`;
@@ -149,7 +149,7 @@ const ARC = {
     B.querySelectorAll("[data-a]").forEach(b => b.onclick = async () => {
       const id = +b.dataset.i; if (b.dataset.a === "send") return post("/api/archive/xfer/send", { id });
       if (b.dataset.a === "mark") { const note = prompt("전달 방법 · 받은 곳을 적으십시오 (예: 보안 USB → 주둔지 서버 담당 홍길동)", ""); if (note === null) return; return post("/api/archive/xfer/mark", { id, note }); }
-      const h = {}; if (typeof S !== "undefined" && S.token) h["X-EMS-Token"] = S.token; const f = await fetch(`/api/archive/bundle?id=${id}`, { headers: h }); if (!f.ok) return this.say("내려받지 못했습니다", "bad");
+      const h = {}; if (typeof S !== "undefined" && S.token) h["X-TPCS-Token"] = S.token; const f = await fetch(`/api/archive/bundle?id=${id}`, { headers: h }); if (!f.ok) return this.say("내려받지 못했습니다", "bad");
       const a = document.createElement("a"); a.href = URL.createObjectURL(await f.blob()); a.download = b.dataset.f; document.body.appendChild(a); a.click(); a.remove();
     });
   },
@@ -157,7 +157,7 @@ const ARC = {
   /* ── 수집 항목 관리(엔지니어): ESS 안전 항목 · 장치별 수집 신호 · 주기 · 보관 */
   async collect() {
     const B = document.querySelector("#arcBody"); document.querySelector("#arcTitle").textContent = "";
-    if (this.standalone || !this.role("engineer")) { B.innerHTML = `<div class="panel"><div class="bd"><p>수집 항목과 주기는 관리자(엔지니어 권한)가 EMS 화면에서 고칩니다.</p>${this.standalone ? "" : '<button class="btn pri" id="colLogin">로그인</button>'}</div></div>`; const b = B.querySelector("#colLogin"); if (b) b.onclick = () => loginDialog(); return; }
+    if (this.standalone || !this.role("engineer")) { B.innerHTML = `<div class="panel"><div class="bd"><p>수집 항목과 주기는 관리자(엔지니어 권한)가 TPCS 화면에서 고칩니다.</p>${this.standalone ? "" : '<button class="btn pri" id="colLogin">로그인</button>'}</div></div>`; const b = B.querySelector("#colLogin"); if (b) b.onclick = () => loginDialog(); return; }
     const r = await this.get("/api/archive/collect"); if (!r.ok) { B.innerHTML = `<div class="panel"><div class="bd warnc">${this.e(r.why || "불러오지 못했습니다")}</div></div>`; return; }
     const c = r.cfg, tags = r.signals.map(x => x.tag), devs = [...new Set(r.signals.map(x => x.dev))]; let items = r.items.map(x => ({ ...x }));
     const opt = (list, cur, f) => list.map(v => `<option value="${v}" ${v === cur ? "selected" : ""}>${f(v)}</option>`).join("");
@@ -207,7 +207,7 @@ const ARC = {
   /* ── 점검 기록(사람이 잰 값) */
   async inspect() {
     const B = document.querySelector("#arcBody"), ok = this.role("operator"), now = new Date(), stamp = `${this.today()} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    B.innerHTML = `<div class="panel"><div class="hd"><h3>점검 기록 넣기</h3><span class="sub">절연저항 · 접지저항 · 누설전류처럼 EMS 가 재지 못하는 항목을 점검자가 적는다${ok ? "" : " — 운용자 로그인이 필요하다"}</span></div>
+    B.innerHTML = `<div class="panel"><div class="hd"><h3>점검 기록 넣기</h3><span class="sub">절연저항 · 접지저항 · 누설전류처럼 TPCS 가 재지 못하는 항목을 점검자가 적는다${ok ? "" : " — 운용자 로그인이 필요하다"}</span></div>
       <div class="bd arc-form"><input class="in" id="insAt" value="${stamp}" title="점검 일시 (YYYY-MM-DD HH:MM)" style="width:150px"><input class="in" id="insItem" placeholder="항목 (예: 접지저항)" list="insItems" style="width:200px"><datalist id="insItems"><option>절연저항</option><option>접지저항</option><option>누설전류</option><option>외관 점검</option><option>차단기 동작 시험</option><option>계량기 지침 대조</option></datalist>
       <input class="in" id="insVal" placeholder="값" style="width:100px"><input class="in" id="insUnit" placeholder="단위" style="width:70px"><input class="in" id="insNote" placeholder="의견" style="width:360px"><button class="btn pri" id="insAdd" ${ok ? "" : "disabled"}>기록</button></div></div>
       <div class="panel"><div class="hd"><h3>점검 기록 — <span id="insTitle"></span></h3><div class="spacer"></div><span class="sub">보존 기간 ${this.info.legal_years}년(전기안전관리법 시행규칙) · 지금 설정 ${this.info.retain_years}년</span></div>
@@ -231,17 +231,17 @@ const ARC = {
       ${row("저장 주기", `<b>${i.interval_min}분</b> <span class="sub">(1 · 5 · 15 · 30 · 60분 중 선택)</span>`)}${row("보관 기간", `<b>${i.retain_years}년</b> <span class="sub">(1~5년)</span>` + (i.retain_years < i.legal_years ? ` <span class="pill warn">점검 기록 보존 기간 ${i.legal_years}년보다 짧음</span>` : ""))}
       ${row("기록 범위", `${this.e(i.first || "—")} ~ ${this.e(i.last || "—")}`)}${row("장치별 자료 / ESS 안전 운영정보", `${this.n(i.dev_rows, 0)}줄(${i.dev_step_min || i.interval_min}분) / ${this.n(i.ess_rows, 0)}줄(${(i.ess_step_s || 60) / 60}분)`)}${row("검침 기록", `${this.n(i.rows, 0)}줄 <span class="sub">(보관 기간을 다 채우면 약 ${this.n(i.rows_at_full, 0)}줄)</span><div class="arc-meter"><i style="width:${full.toFixed(1)}%"></i></div>`)}
       ${row("상황 기록 / 점검 기록", `${this.n(i.events, 0)}건 / ${this.n(i.inspects, 0)}건`)}${row("보관소 크기", `${this.n(i.size_mb)} MB / 한도 ${this.n(i.max_mb, 0)} MB<div class="arc-meter"><i style="width:${pct.toFixed(1)}%"></i></div>`)}
-      ${row("시연용 합성 자료", i.demo_rows ? `${this.n(i.demo_rows, 0)}줄 <span class="pill warn">가상 장치 모드의 첫 기동 때 넣은 과거 자료</span>` : "없음")}${i.err ? row("저장 오류", `<span class="badc">${this.e(i.err)}</span>`) : ""}${row("열기 방식", i.read_only ? "읽기 전용(기록 조회기)" : "EMS 가 쓰는 중")}</tbody></table></div></div>
+      ${row("시연용 합성 자료", i.demo_rows ? `${this.n(i.demo_rows, 0)}줄 <span class="pill warn">가상 장치 모드의 첫 기동 때 넣은 과거 자료</span>` : "없음")}${i.err ? row("저장 오류", `<span class="badc">${this.e(i.err)}</span>`) : ""}${row("열기 방식", i.read_only ? "읽기 전용(기록 조회기)" : "TPCS 가 쓰는 중")}</tbody></table></div></div>
       <div class="panel"><div class="hd"><h3>보관 규칙</h3></div><div class="bd arc-rules"><p>· 저장 주기마다 한 줄씩 적는다: 구간 전력량, 구간 최대, 평균 상태, <b>검침 누적값</b>.</p><p>· 보관 기간이 지난 기록은 자동으로 지운다. 파일이 한도를 넘으면 가장 오래된 달부터 지우고 빈 공간을 돌려받는다.</p>
       <p>· 점검 결과 기록의 보존 기간은 <b>4년</b>이다(전기안전관리법 시행규칙). 그래서 기본 보관 기간을 4년으로 했다.</p><p>· 검침 · 장치별 자료의 저장 주기를 직접 정한 조항은 확인하지 못했다. 전력 검침 관행인 <b>15분</b>을 기본으로 했고, 현장 지침이 있으면 그에 맞춰 바꾼다.</p><p>· ESS 안전 운영정보는 전기안전공사 통합관리시스템의 전송 주기인 <b>1분</b>으로 쌓는다. 인터넷으로 보내지 못하므로 보관하고 주둔지 서버로 넘긴다.</p>
-      <p>· 바꾸는 곳: 이 화면의 <b>수집 항목</b> 탭(엔지니어 권한) — 주기 · 보관 기간 · ESS 항목 · 장치별 수집 신호를 고치면 바로 적용된다.</p><p>· 별도 조회: <span class="mono">python -m ifps_ems_rt.archview state/archive.db</span> — EMS 를 켜지 않고 보관소 파일만 읽는다.</p></div></div></div>`;
+      <p>· 바꾸는 곳: 이 화면의 <b>수집 항목</b> 탭(엔지니어 권한) — 주기 · 보관 기간 · ESS 항목 · 장치별 수집 신호를 고치면 바로 적용된다.</p><p>· 별도 조회: <span class="mono">python -m ifps_ems_rt.archview state/archive.db</span> — TPCS 를 켜지 않고 보관소 파일만 읽는다.</p></div></div></div>`;
   },
 
   async report() { const days = document.querySelector("#arcDays").value; return this.fetchFile(`/api/report.docx?days=${days}`, "EMS_report.docx", "보고서"); },
   /* 서버가 만든 문서를 내려받는다(운용자 로그인). 파일 이름은 서버가 준 것을 쓴다 */
   async fetchFile(url, fallback, what) {
     if (!this.standalone && !this.role("operator")) { this.say(`${what} 출력은 운용자 로그인이 필요합니다`, "bad"); if (typeof loginDialog === "function") loginDialog(); return; }
-    const h = {}; if (typeof S !== "undefined" && S.token) h["X-EMS-Token"] = S.token; this.say(`${what}를 만드는 중…`);
+    const h = {}; if (typeof S !== "undefined" && S.token) h["X-TPCS-Token"] = S.token; this.say(`${what}를 만드는 중…`);
     const r = await fetch(url, { headers: h }); if (!r.ok) { let w = ""; try { w = (await r.json()).why; } catch (e) { } return this.say(w || `${what}를 만들지 못했습니다`, "bad"); }
     const m = /filename\*=UTF-8''([^;]+)/.exec(r.headers.get("Content-Disposition") || ""), a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = m ? decodeURIComponent(m[1]) : fallback;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); this.say(`${what}를 내려받았습니다`, "ok");

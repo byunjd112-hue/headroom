@@ -35,7 +35,7 @@ class PlanPolicy:
             self.meta = learner.active(self.md); self.t_plan = None
 
     def cancel(self):
-        """뒤에서 돌던 계획 계산을 그만두게 한다(EMS 종료 때)."""
+        """뒤에서 돌던 계획 계산을 그만두게 한다(TPCS 종료 때)."""
         self.stopped = True
 
     def _history(self):

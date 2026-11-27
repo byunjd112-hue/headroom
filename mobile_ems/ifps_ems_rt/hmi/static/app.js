@@ -1,4 +1,4 @@
-/* IFPS Mobile EMS HMI — 화면 */
+/* IFPS TPCS HMI — 화면 */
 "use strict";
 /* 운용 장소(작전지·주둔지)와 운용 태세(평시·저소음·자립) 표시 */
 function opsChip(s) {
@@ -167,7 +167,7 @@ const CTL_UNITS = [
   { id: "PV", no: "③", nm: "이동형 PV 발전체계 · 400kW급 (80kWp × 5식)", en: "Rollable thin-film PV · inverter", col: "pv", dev: "PV", kw: "PV.kw", ctl: true, on: "계통 연결", off: "분리", sp: ["PV.lim_set", "출력 제한", 400, 10] },
   { id: "FC", no: "④", nm: "수소생성·발전체계 · 연료전지 100kW", en: "PEM fuel cell", col: "fc", dev: "FC", kw: "FC.kw", ctl: true, sp: ["FC.kw_set", "출력 설정", 100, 5] },
   { id: "ELZ", no: "④", nm: "수소생성·발전체계 · 수전해 30Nm³/h", en: "Electrolyzer · 150kW", col: "fc", dev: "ELZ", kw: "ELZ.kw", ctl: true },
-  { id: "EMS", no: "⑤", nm: "이동형 전력체계 EMS · 중앙제어기", en: "Energy management system", col: "accent", dev: null },
+  { id: "TPCS", no: "⑤", nm: "이동형 전력체계 TPCS · 중앙제어기", en: "Energy management system", col: "accent", dev: null },
   { id: "MTR", no: "⑥", nm: "이동형 배전·변압체계 · 계측/보호 게이트웨이", en: "22.9/6.6kV/380V · metering & IED gateway", col: "load", dev: "MTR", kw: "LOAD.kw" },
   { id: "GDG", no: "주", nm: "주둔지 기존 디젤발전기 · 1MW급 컨테이너형(고정식)", en: "Garrison standby diesel generator", col: "dg", dev: "GDG", kw: "GDG.kw", ctl: true },
   { id: "GRID", no: "주", nm: "주둔지 상전 수전점 · 22.9kV", en: "Utility incoming (no export)", col: "g1", dev: null, kw: "GRID.kw", need: "GRID.kw" },
@@ -184,14 +184,14 @@ const hyCfg = () => (S.snap && S.snap.kpi && S.snap.kpi.hy) || HY0;
 const hyKey = v => v == null ? null : HY_KEYS.find(k => hyCfg().code[k] === Math.round(v)) || "";
 const hyMode = v => v == null ? "계통 형성" : hyKey(v) ? hyCfg().label[hyKey(v)] : `모르는 모드 ${Math.round(v)}`;
 const hyOn = v => v == null || hyKey(v) !== "stop";                    // 정지 모드가 아니면 운전 중으로 본다
-const CTL_PHOTO = { ELZ: "FC", EMS: "EMS", G1: "G1", GDG: "GDG", GRID: "MTR" };
+const CTL_PHOTO = { ELZ: "FC", TPCS: "TPCS", G1: "G1", GDG: "GDG", GRID: "MTR" };
 const P_CTL = {
   mount(m) {
     m.innerHTML = `<div class="pagehd"><h2>${t("ctl.title", "설비 제어")}</h2><span class="sub">IFPS 6개 서브시스템 · 선택-실행(SBO) 2단계 · 연동 조건 · 응답 확인 · 감사 기록</span><div class="spacer"></div><span class="pill" id="ctlCnt">—</span></div>
     <div class="pg" style="grid-template-columns:1fr 410px">
       <div class="devs devs4" id="devs"></div>
       <div class="col" style="grid-template-rows:auto auto 1fr">
-        <div class="panel"><div class="hd"><h3>${t("ctl.auto", "자동 제어 (EMS 급전)")}</h3><div class="spacer"></div><span class="sub" title="① 통신 두절 지령 금지 ② 현장 수동 모드 차단 ③ 작업 잠금 차단 ④ 중복 지령 차단 ⑤ 응답 1.5s·재지령 1회 → 지령 취소·대체 전원 ⑥ 선택 후 10s 내 실행 ⑦ 1등급 부하 차단 금지">연동 조건 ⓘ</span></div><div class="bd">
+        <div class="panel"><div class="hd"><h3>${t("ctl.auto", "자동 제어 (TPCS 급전)")}</h3><div class="spacer"></div><span class="sub" title="① 통신 두절 지령 금지 ② 현장 수동 모드 차단 ③ 작업 잠금 차단 ④ 중복 지령 차단 ⑤ 응답 1.5s·재지령 1회 → 지령 취소·대체 전원 ⑥ 선택 후 10s 내 실행 ⑦ 1등급 부하 차단 금지">연동 조건 ⓘ</span></div><div class="bd">
           <div style="display:flex;gap:8px;align-items:center"><div class="seg" id="autoSeg"><button data-v="1">AUTO</button><button data-v="0">MANUAL</button></div><div class="spacer"></div><button class="btn sm" id="ctlNow">제어 즉시 실행</button></div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><span class="lab" style="width:54px">운용 장소</span><div class="seg" id="placeSeg"><button data-v="island">작전지</button><button data-v="grid">주둔지</button></div></div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:6px"><span class="lab" style="width:54px">운용 태세</span><div class="seg" id="postSeg"><button data-v="평시">평시</button><button data-v="저소음">저소음</button><button data-v="자립">자립</button></div></div>
@@ -214,11 +214,11 @@ const P_CTL = {
     const units = CTL_UNITS.filter(u => (!u.dev || s.devices[u.dev]) && (!u.need || s.values[u.need]));
     $("#devs").className = "devs devs4" + (units.length > 8 ? " devs5" : "");                       // 9~10장이면 5칸 × 2줄
     $("#devs").innerHTML = units.map(u => `<div class="panel dev" id="dv-${u.id}"><div class="hd"><span class="lamp" id="lp-${u.id}"></span><h3 style="color:var(--text)"><span class="dno">${u.no}</span>${u.nm}</h3><div class="spacer"></div><span class="pill" id="lk-${u.id}">—</span></div>
-      <div class="bd"><div class="toprow"><div style="flex:1;min-width:0"><div class="muted" style="font-size:12px;margin:-4px 0 8px">${u.en}${u.dev ? ` · <span class="mono">${u.dev}</span>` : ""}</div><div class="row"><div><div class="lab">${u.id === "EMS" ? "수집 주기" : u.id === "MTR" ? "총 부하" : u.id === "ELZ" ? "소비" : "출력"}</div><div class="big" id="kw2-${u.id}" style="color:var(--${u.col})">—</div></div><div class="spacer"></div><div style="text-align:right"><div class="lab">상태</div><div class="mid" id="sx-${u.id}">—</div></div></div></div><div class="eqimg" id="eq-${u.id}"></div>${(u.uq || u.dev) && KF(u.uq || u.dev) && KF(u.uq || u.dev).slots > 1 ? `<span class="uq" title="차량(장치) 대수 — 가상 장치는 놓고 빼고, 실장비는 빈 자리를 다시 찾거나 철수한 장치를 지운다. ① 복합전력(디젤 + 계통 형성 ESS)과 ④ 수소(연료전지 + 수전해)는 한 차량이라 함께 바뀐다"><button class="btn sm" data-uq="${u.uq || u.dev}" data-dv="-1">−</button><b id="uq-${u.id}">—</b><button class="btn sm" data-uq="${u.uq || u.dev}" data-dv="1">＋</button></span>` : ""}</div>
+      <div class="bd"><div class="toprow"><div style="flex:1;min-width:0"><div class="muted" style="font-size:12px;margin:-4px 0 8px">${u.en}${u.dev ? ` · <span class="mono">${u.dev}</span>` : ""}</div><div class="row"><div><div class="lab">${u.id === "TPCS" ? "수집 주기" : u.id === "MTR" ? "총 부하" : u.id === "ELZ" ? "소비" : "출력"}</div><div class="big" id="kw2-${u.id}" style="color:var(--${u.col})">—</div></div><div class="spacer"></div><div style="text-align:right"><div class="lab">상태</div><div class="mid" id="sx-${u.id}">—</div></div></div></div><div class="eqimg" id="eq-${u.id}"></div>${(u.uq || u.dev) && KF(u.uq || u.dev) && KF(u.uq || u.dev).slots > 1 ? `<span class="uq" title="차량(장치) 대수 — 가상 장치는 놓고 빼고, 실장비는 빈 자리를 다시 찾거나 철수한 장치를 지운다. ① 복합전력(디젤 + 계통 형성 ESS)과 ④ 수소(연료전지 + 수전해)는 한 차량이라 함께 바뀐다"><button class="btn sm" data-uq="${u.uq || u.dev}" data-dv="-1">−</button><b id="uq-${u.id}">—</b><button class="btn sm" data-uq="${u.uq || u.dev}" data-dv="1">＋</button></span>` : ""}</div>
       <div class="meta" id="mt-${u.id}"></div><div class="unitrows" id="ur-${u.id}"></div>
       ${u.ctl ? `<div class="acts"><button class="btn go" data-c="start" data-d="${u.dev}">▶ ${u.on || t("btn.start", "기동")}</button><button class="btn stop" data-c="stop" data-d="${u.dev}">■ ${u.off || t("btn.stop", "정지")}</button>
         ${u.sp ? `<div class="spacer"></div><input class="in" id="sp-${u.id}" type="number" min="0" max="${u.sp[2]}" step="${u.sp[3]}" style="width:80px" placeholder="kW"><button class="btn" data-sp="${u.id}">${u.sp[1]}</button>` : ""}</div><div class="interlock" id="il-${u.id}"></div>`
-        : `<div class="interlock muted" style="color:var(--muted)">${u.id === "EMS" ? "EMS 자체 상태 — 자동 제어는 오른쪽 패널에서 전환" : u.id === "G1" ? `<span class="hym">${HY_KEYS.map(k => `<button class="btn sm" data-hm="${k}">${esc(hyCfg().label[k])}</button>`).join("")}</span><span class="hyn">발전기 · ESS 모두 복합전력 PCS 를 거쳐 감시 · 제어 — 자동 제어 중에는 EMS 가 모드를 정한다</span>` : "감시 전용 — EMS는 지령하지 않음"}</div>`}</div></div>`).join("");
+        : `<div class="interlock muted" style="color:var(--muted)">${u.id === "TPCS" ? "TPCS 자체 상태 — 자동 제어는 오른쪽 패널에서 전환" : u.id === "G1" ? `<span class="hym">${HY_KEYS.map(k => `<button class="btn sm" data-hm="${k}">${esc(hyCfg().label[k])}</button>`).join("")}</span><span class="hyn">발전기 · ESS 모두 복합전력 PCS 를 거쳐 감시 · 제어 — 자동 제어 중에는 TPCS 가 모드를 정한다</span>` : "감시 전용 — TPCS는 지령하지 않음"}</div>`}</div></div>`).join("");
     $$("#devs [data-c]").forEach(b => b.onclick = () => { const u = CTL_UNITS.find(x => x.dev === b.dataset.d); sbo(b.dataset.d, b.dataset.c, { label: `${u.no} ${u.nm.split(" · ").pop()} ${b.dataset.c === "start" ? (u.on || "기동") : (u.off || "정지")}` }); });
     $$("#devs [data-hm]").forEach(b => b.onclick = () => { const k = b.dataset.hm; sbo("DG", "set", { tag: "DG.mode_set", value: hyCfg().code[k], label: `① 복합전력 모드 → ${hyCfg().label[k]}` }); });      // 복합전력 운전 모드(PCS 로 보내는 지령)
     $$("#devs [data-uq]").forEach(b => b.onclick = async () => { if (!can("operator")) return loginDialog(); const k = b.dataset.uq, dv = +b.dataset.dv, f = KF(k);
@@ -238,24 +238,24 @@ const P_CTL = {
       const lp = $("#lp-" + u.id); if (!lp) continue;
       const d = u.dev ? D[u.dev] : null, kf = u.dev && KF(u.dev), lost = d ? (kf ? kLost(u.dev) : d.link === "두절") : u.id === "G1" ? kLost("DG") : (u.id === "GRID" && !gw), gone = !!(d && (kf ? kAbsent(u.dev) : d.absent));
       const o = s.ops || {}, garr = o.mode === "grid";
-      const on = u.id === "EMS" ? true : u.id === "G1" ? cb("G1") === 1 && hyOn(val("DG.pcs_mode")) : u.id === "GRID" ? (garr && cb("GRID") === 1) : u.id === "MTR" ? !lost : kf ? kOn(u.dev) : !!(d && d.on);
+      const on = u.id === "TPCS" ? true : u.id === "G1" ? cb("G1") === 1 && hyOn(val("DG.pcs_mode")) : u.id === "GRID" ? (garr && cb("GRID") === 1) : u.id === "MTR" ? !lost : kf ? kOn(u.dev) : !!(d && d.on);
       lp.className = "lamp " + (lost ? "lost" : on ? "on" : "");
       const lk = $("#lk-" + u.id), uq = $("#uq-" + u.id), qf = KF(u.uq || u.dev); if (uq && qf) uq.textContent = `${qf.units.length} / ${qf.slots}대`;
       const ur = $("#ur-" + u.id); if (ur) { const src = (BusPlan.s() || {}).sources || [], bus = id => (src.find(q => q.id === id) || {}).bus;      // 여러 대면 한 대마다: 출력 · 충전율 · 물린 모선(결선도 · 모선 구성과 같은 값)
         const h = kf && kf.units.length > 1 ? kf.units.map((x, i) => `<span class="${x.live ? "" : "bad"}"><b>${i + 1}호기</b> ${x.live ? (unitKw(u.dev, x) == null ? (x.on ? "운전" : "정지") : (unitEst(u.dev) ? "≈ " : "") + F.kw(unitKw(u.dev, x)) + " kW") : "두절"}${x.soc != null ? " · " + F.n(x.soc, 0) + "%" : ""}${bus(x.id) ? " · 모선 " + bus(x.id) : ""}</span>`).join("") : "";
         if (ur.dataset.h !== h) { ur.dataset.h = h; ur.innerHTML = h; } }
       if (d) { const best = kf && kf.units.find(x => x.live); lk.className = "pill " + (gone ? "" : LINK_CLS[best ? best.link : d.link]); lk.textContent = gone ? "미설치" : linkTxt(best ? best.link : d.link) + (kf ? kCnt(u.dev) : ""); lk.title = kf && kf.units.length > 1 ? kf.units.map(x => `${x.id}: ${x.live ? (x.on ? "운전" : "정지") : "두절"}${x.kw == null ? "" : " " + F.kw(x.kw) + " kW"}`).join(" / ") + " — 지령은 있는 장치 모두에게 간다" : ""; }
-      else if (u.id === "EMS") { lk.className = "pill " + (s.alarm_cnt[1].act ? "bad" : "ok"); lk.textContent = s.alarm_cnt[1].act ? `긴급 ${s.alarm_cnt[1].act}` : "정상"; }
+      else if (u.id === "TPCS") { lk.className = "pill " + (s.alarm_cnt[1].act ? "bad" : "ok"); lk.textContent = s.alarm_cnt[1].act ? `긴급 ${s.alarm_cnt[1].act}` : "정상"; }
       else if (u.id === "GRID" && !lost) { const g2 = s.ops || {}, t2 = g2.mode !== "grid" ? "미연계" : g2.outage ? "정전" : "연계"; lk.className = "pill " + (t2 === "정전" ? "bad" : t2 === "연계" ? "ok" : "info"); lk.textContent = t2; }
       else if (u.id === "G1") { lk.className = "pill " + (lost ? "bad" : "ok"); lk.textContent = lost ? "PCS 두절" : "PCS 정상" + kCnt("DG"); }      // 복합전력 ESS 는 발전기와 같은 PCS 로 감시한다
       else { lk.className = "pill " + (lost ? "bad" : "info"); lk.textContent = lost ? "게이트웨이 두절" : "미계측"; }
-      const big = u.id === "EMS" ? `${F.n(s.stats.last_ms, 0)}<small>ms</small>` : u.id === "G1" && val("DG.ess_kw") == null ? `${F.n(k.g1_kw, 0)}<small>kW 형성</small>` : `${lost ? "####" : F.kw(val(u.kw))}<small>kW</small>`;
+      const big = u.id === "TPCS" ? `${F.n(s.stats.last_ms, 0)}<small>ms</small>` : u.id === "G1" && val("DG.ess_kw") == null ? `${F.n(k.g1_kw, 0)}<small>kW 형성</small>` : `${lost ? "####" : F.kw(val(u.kw))}<small>kW</small>`;
       $("#kw2-" + u.id).innerHTML = big;
       const c = { G1: cb("G1"), PV: cb("PV"), DG: cb("DG"), FC: cb("FC"), ESS: cb("ESS"), GRID: cb("GRID"), GDG: lost ? -1 : Math.round(val("CB.GDG") ?? -1) }[u.id];
       $("#sx-" + u.id).innerHTML = gone ? `<span class="sub">미설치 (자동 인식)</span>` : lost ? `<span class="badc">통신 두절</span>` : c === 2 ? `<span class="badc">차단기 트립</span>`
         : u.id === "GRID" ? (!garr ? `<span class="muted">미연계(작전지)</span>` : o.outage ? `<span class="badc">정전</span>` : `<span class="okc">수전 중</span>`)
         : u.id === "GDG" ? (on ? `<span class="okc">운전 중</span>` : `<span class="muted">${garr ? "대기" : "미사용"}</span>`)
-        : u.id === "MTR" ? `<span class="okc">계측 중</span>` : u.id === "EMS" ? `<span class="okc">${s.auto ? "자동 제어" : "수동 운전"}</span>`
+        : u.id === "MTR" ? `<span class="okc">계측 중</span>` : u.id === "TPCS" ? `<span class="okc">${s.auto ? "자동 제어" : "수동 운전"}</span>`
         : u.id === "G1" ? `<span class="${hyOn(val("DG.pcs_mode")) ? "okc" : "muted"}">${esc(hyMode(val("DG.pcs_mode")))}</span>`
         : u.id === "ESS" ? `<span class="okc">${k.ess < -.5 ? "충전" : k.ess > .5 ? "방전" : "대기"}</span>` : u.id === "PV" ? (on ? `<span class="okc">계통 연결</span>` : `<span class="muted">분리</span>`)
         : on ? `<span class="okc">운전 중</span>` : `<span class="muted">정지</span>`;
@@ -268,14 +268,14 @@ const P_CTL = {
         ELZ: [mode, ["생산", F.n(val("ELZ.h2_rate"), 1) + " Nm³/h"], ["저장", F.n(val("H2.nm3"), 0) + " Nm³"], hb],
         GDG: [mode, ["연료", F.n(val("GDG.fuel_pct"), 0) + " %"], ["차단기", c === 1 ? "투입" : c === 0 ? "개방" : c === 2 ? "트립" : "미상"], hb],
         GRID: [["수전 차단기", c === 1 ? "투입" : c === 0 ? "개방" : c === 2 ? "트립" : "미상"], ["피크 목표", o.gcfg ? F.n(o.gcfg.peak_kw, 0) + " kW" : "—"], ["시간대", o.gcfg ? { peak: "최대부하", off: "경부하", mid: "중간부하" }[o.gcfg.band] : "—"], ["금일 수전", F.n(s.energy.grid, 1) + " kWh"]],
-        EMS: [["정책", s.policy.includes("예측") ? "예측 계획" : "규칙"], ["주기 초과", s.stats.n_over + "회"], ["감사 기록", s.stats.audit_seq + "건"], ["가동", F.dur(s.uptime)]],
+        TPCS: [["정책", s.policy.includes("예측") ? "예측 계획" : "규칙"], ["주기 초과", s.stats.n_over + "회"], ["감사 기록", s.stats.audit_seq + "건"], ["가동", F.dur(s.uptime)]],
         MTR: lost ? [["모선 A", "####"], ["기온", "####"], ["습도", "####"], ["경로", d ? paths(d) : "—"]] : [["모선 A", F.n(val("BUS.a_v"), 0) + " V"], ["기온", F.n(val("ENV.temp")) + " °C"], ["습도", F.n(val("ENV.rh"), 0) + " %"], ["경로", d ? paths(d) : "—"]] }[u.id];
       $("#mt-" + u.id).innerHTML = meta.map(([a, b]) => `<div><div class="lab">${a}</div><div class="v">${b}</div></div>`).join("");
-      const eqs = { on, lost, fault: c === 2, value: u.id === "ESS" ? F.n(k.soc, 0) + "% SOC" : u.id === "G1" ? (val("DG.ess_soc") == null ? undefined : F.n(val("DG.ess_soc"), 0) + "% SOC") : u.id === "EMS" ? undefined : on && u.kw ? F.n(val(u.kw), 0) + " kW" : undefined };
+      const eqs = { on, lost, fault: c === 2, value: u.id === "ESS" ? F.n(k.soc, 0) + "% SOC" : u.id === "G1" ? (val("DG.ess_soc") == null ? undefined : F.n(val("DG.ess_soc"), 0) + "% SOC") : u.id === "TPCS" ? undefined : on && u.kw ? F.n(val(u.kw), 0) + " kW" : undefined };
       const sig = JSON.stringify(eqs), eqb = $("#eq-" + u.id);
       if (eqb && eqb.dataset.sig !== sig) { eqb.dataset.sig = sig; eqb.innerHTML = equipPhoto(CTL_PHOTO[u.id] || u.id, eqs); }
       const il = $("#il-" + u.id); if (il && u.id === "GDG" && !lost && !d.manual && c !== 2 && !s.busy) { il.textContent = !garr ? "주둔지 운전에서만 자동 기동" : o.gdg ? o.gdg.why : "상전 연계 중 — 대기"; }
-      else if (il && d) il.textContent = lost ? "⚠ 통신 두절 — 지령 차단" : d.manual ? "⚠ 현장 수동 모드 — EMS 지령 차단" : c === 2 ? "⚠ 인입 차단기 트립 — 보호 IED 복구 후 지령" : (s.busy ? "지령 처리 중…" : "");
+      else if (il && d) il.textContent = lost ? "⚠ 통신 두절 — 지령 차단" : d.manual ? "⚠ 현장 수동 모드 — TPCS 지령 차단" : c === 2 ? "⚠ 인입 차단기 트립 — 보호 IED 복구 후 지령" : (s.busy ? "지령 처리 중…" : "");
       if (d) $$(`#devs [data-d="${u.dev}"]`).forEach(b => { b.disabled = !can("operator") || lost || d.manual || (b.dataset.c === "start" ? d.on : !d.on); });
       const spb = $(`#devs [data-sp="${u.id}"]`); if (spb) spb.disabled = !can("operator") || lost;
     }
@@ -292,7 +292,7 @@ const P_CTL = {
     }
     if (L.items) {
       const cnt = kk => L.items.filter(i => i.kind === kk).length;
-      const q = [["① 기동형 복합전력", cnt("DG")], ["② 이동형 ESS", cnt("ESS")], ["③ 이동형 PV", cnt("PV")], ["④ 수소생성·발전", cnt("FC")], ["⑤ EMS 쉘터", cnt("EMS")], ["⑥ 배전·변압", cnt("DIST")], ["⑥ 구간분전함(FSU)", cnt("FSU")], ["막사", cnt("BARRACK")], ["지휘통제·의무·탄약 시설", cnt("L1") + cnt("L2") + cnt("L3")]];
+      const q = [["① 기동형 복합전력", cnt("DG")], ["② 이동형 ESS", cnt("ESS")], ["③ 이동형 PV", cnt("PV")], ["④ 수소생성·발전", cnt("FC")], ["⑤ TPCS 쉘터", cnt("TPCS")], ["⑥ 배전·변압", cnt("DIST")], ["⑥ 구간분전함(FSU)", cnt("FSU")], ["막사", cnt("BARRACK")], ["지휘통제·의무·탄약 시설", cnt("L1") + cnt("L2") + cnt("L3")]];
       $("#ctlCnt").textContent = `설비 ${CTL_UNITS.length}종 · 배치 ${L.items.length}대`; $("#ctlCnt").title = q.map(([n, v]) => `${n} ${v}대`).join("\n");
     }
     $$("#autoSeg button").forEach(b => b.classList.toggle("on", (b.dataset.v === "1") === s.auto));
@@ -307,7 +307,7 @@ const P_CTL = {
     $$("#postSeg button").forEach(b => b.classList.toggle("on", b.dataset.v === (o.posture || "평시")));
     $("#ctlNote").textContent = d && d.policy && d.policy.includes("실패") ? d.policy : "";
     $("#qInfo").textContent = s.busy ? `처리 중: ${s.busy} · 대기 ${s.queue}` : `대기 ${s.queue}`;
-    $("#cmdlog").innerHTML = s.cmdlog.length ? s.cmdlog.slice(0, 20).map(e => `<tr title="${esc(e.text)}"><td class="mono">${esc((e.wall || "").slice(11))}</td><td>${esc(e.who || "EMS")}</td><td>${e.ok ? `<span class="pill ok">성공</span>` : `<span class="pill bad">실패</span>`}</td><td class="ell">${esc(e.text)}</td></tr>`).join("") : `<tr><td colspan="4" class="empty">지령 기록 없음</td></tr>`;
+    $("#cmdlog").innerHTML = s.cmdlog.length ? s.cmdlog.slice(0, 20).map(e => `<tr title="${esc(e.text)}"><td class="mono">${esc((e.wall || "").slice(11))}</td><td>${esc(e.who || "TPCS")}</td><td>${e.ok ? `<span class="pill ok">성공</span>` : `<span class="pill bad">실패</span>`}</td><td class="ell">${esc(e.text)}</td></tr>`).join("") : `<tr><td colspan="4" class="empty">지령 기록 없음</td></tr>`;
   },
 };
 
@@ -492,7 +492,7 @@ const P_ENG = {
     const s = S.snap;
     if (!s.sim) { $("#engBody").innerHTML = `<div class="panel"><div class="bd"><div class="empty">실장치 연동 모드입니다. 고장 주입은 가상 장치 모드(<span class="mono">--sim</span>)에서만 쓸 수 있습니다.</div></div></div>`; return; }
     const tags = ["LOAD.p1_kw", "LOAD.p2_kw", "LOAD.p3_kw", "PV.kw", "ESS.soc", "H2.nm3", "DG.fuel_l", "ENV.temp", "ENV.press", "ENV.rh", "DG.mode", "FC.mode", "ESS.status"];
-    $("#engBody").innerHTML = `<div class="engbox" style="margin-bottom:12px">가상 장치(Modbus TCP 서버, 127.0.0.1:${s.sim_state.ports.join(" / ")})에 고장을 주입해 EMS의 감시·지령·대체 전원 논리를 실제 통신으로 확인합니다. 엔지니어 권한 필요.</div>
+    $("#engBody").innerHTML = `<div class="engbox" style="margin-bottom:12px">가상 장치(Modbus TCP 서버, 127.0.0.1:${s.sim_state.ports.join(" / ")})에 고장을 주입해 TPCS의 감시·지령·대체 전원 논리를 실제 통신으로 확인합니다. 엔지니어 권한 필요.</div>
       <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
         <div class="panel"><div class="hd"><h3>장치 고장 주입</h3></div><div class="bd np"><table class="t"><thead><tr><th>장치</th><th>무응답 (시간 초과)</th><th>지령 무시 (무응답)</th><th>현장 수동 모드</th></tr></thead><tbody id="simDev"></tbody></table></div>
           <div class="bd"><div class="lab" style="margin-bottom:8px">통신 경로 단절 (전 장치)</div><div style="display:flex;gap:8px" id="simPath"></div></div>
@@ -533,7 +533,7 @@ const P_ENG = {
     const r = await api("/api/info"); const v = await api("/api/audit/verify");
     if (this.tab !== "info" || S.page !== "eng" || !$("#engBody") || !r.version) return;
     $("#engBody").innerHTML = `<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div class="panel"><div class="hd"><h3>실행 정보</h3></div><div class="bd"><div class="kv band">
-      <span class="k">패키지 리비전</span><span class="v">${esc(r.version.pkg || "")}</span><span class="k">EMS 연동 계층</span><span class="v">v${r.version.rt}</span><span class="k">핵심 프로그램</span><span class="v">v${r.version.core}</span><span class="k">운전 정책</span><span class="v" style="font-family:var(--sans)">${esc(r.policy)}</span>
+      <span class="k">패키지 리비전</span><span class="v">${esc(r.version.pkg || "")}</span><span class="k">TPCS 연동 계층</span><span class="v">v${r.version.rt}</span><span class="k">핵심 프로그램</span><span class="v">v${r.version.core}</span><span class="k">운전 정책</span><span class="v" style="font-family:var(--sans)">${esc(r.policy)}</span>
       <span class="k">설정 파일</span><span class="v">${esc(r.cfg_path)}</span><span class="k">상태 폴더</span><span class="v">${esc(r.state_dir)}</span><span class="k">모드</span><span class="v">${r.sim ? "가상 장치" : "실장치"}</span>
       <span class="k">지령 완료 시간</span><span class="v">${Object.keys((r.cmd || {}).took || {}).length ? Object.entries(r.cmd.took).map(([n, t]) => `${esc(n)} ${t.toFixed(1)}초`).join(" · ") : "아직 잰 것 없음"} <span class="muted">(잰 최대값 / 완료 한도 공통 ${(r.cmd || {}).done_default ?? "—"}초${Object.keys((r.cmd || {}).done_s || {}).length ? " · 장치별 " + Object.entries(r.cmd.done_s).map(([n, t]) => `${esc(n)} ${t}초`).join(", ") : ""})</span></span>
       <span class="k">암호 모듈</span><span class="v">${esc(r.crypto.module)} ${r.crypto.verified ? `<span class="okc">검증필</span>` : `<span class="warnc">미검증(개발 모드 한정)</span>`}</span>

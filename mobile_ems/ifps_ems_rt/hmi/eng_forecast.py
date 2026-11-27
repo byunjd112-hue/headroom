@@ -31,7 +31,7 @@ class ForecastMixin:
             if self.ai_cfg.get("enabled") and not self.ai_busy and time.time() >= self.ai_next: self.ai_train("주기")
 
     def ai_train(self, who="주기"):
-        """학습 한 주기를 별도 프로세스로 돌린다(제어 주기를 방해하지 않고, 학습이 죽어도 EMS 는 계속 돈다). 반환: 기록."""
+        """학습 한 주기를 별도 프로세스로 돌린다(제어 주기를 방해하지 않고, 학습이 죽어도 TPCS 는 계속 돈다). 반환: 기록."""
         import subprocess, sys  # nosec B404 — 같은 파이썬으로 학습 모듈을 실행(고정 인자)
         from ifps_ems import learner
         if self.ai_busy: return {"ok": False, "why": "학습이 이미 진행 중"}
@@ -81,7 +81,7 @@ class ForecastMixin:
             import numpy as np
             from ifps_ems import dataio
             from ifps_ems.forecast import LoadForecaster, PVForecaster
-            attn.set_cancel(lambda: getattr(self, "halted", False)); site = self.rt.site; hist, md, src = self._forecast_source(site)      # EMS 가 멈추면 이 계산도 그만둔다
+            attn.set_cancel(lambda: getattr(self, "halted", False)); site = self.rt.site; hist, md, src = self._forecast_source(site)      # TPCS 가 멈추면 이 계산도 그만둔다
             d = dataio.load_csv(hist, site); n = d["n"]; attn._check()      # pylint: disable=protected-access
             fl, fp = LoadForecaster(site), PVForecaster(site); tl = dataio.load_model(os.path.join(md, "model_load.npz"), fl); tp = dataio.load_model(os.path.join(md, "model_pv.npz"), fp) and fp.trained
             from ifps_ems import learner
@@ -100,7 +100,7 @@ class ForecastMixin:
         except Exception as e:
             with self.fc_lock: self.fc_cache = {"ok": False, "why": str(e) if isinstance(e, ValueError) else f"예측 계산 실패: {type(e).__name__}: {e}", "_t": time.time()}
         finally:
-            self._fc_busy = False; attn.set_cancel(None)      # 이 가닥에 건 중단 조건을 지운다 — 남으면 EMS 가 멈춘 뒤 같은 가닥의 다른 예측 계산까지 중단된다
+            self._fc_busy = False; attn.set_cancel(None)      # 이 가닥에 건 중단 조건을 지운다 — 남으면 TPCS 가 멈춘 뒤 같은 가닥의 다른 예측 계산까지 중단된다
 
     def _forecast_source(self, site, training=False):
         """예측에 쓸 이력 파일을 고른다. 반환: (이력 경로, 모델 폴더, 출처 설명)"""

@@ -93,7 +93,7 @@ class TestScenarioExtra(unittest.TestCase):
         pts, devices = scenarios.load_profile(self.cfg); return scenarios.verify([{"name": "환망", "steps": steps}], pts, devices, profile=self.cfg)["results"][0]
 
     def test_ring_points_are_real_and_break_inputs_are_virtual(self):
-        real = {p["tag"] for p in self.base if not p.get("virtual")}; self.assertTrue({"RING.sw0", "RING.auto", "FSU1.id", "FSU7.sw", "FSU4.v", "PPDU1.id", "PPDU3.kw"} <= real)      # 대응표에 있다 → EMS 가 감시한다
+        real = {p["tag"] for p in self.base if not p.get("virtual")}; self.assertTrue({"RING.sw0", "RING.auto", "FSU1.id", "FSU7.sw", "FSU4.v", "PPDU1.id", "PPDU3.kw"} <= real)      # 대응표에 있다 → TPCS 가 감시한다
         extra = scenextra.load(self.cfg); self.assertEqual(len(extra["ring"]["fsu"]), 7); virt = {p["tag"] for p in scenextra.points(extra)}
         self.assertTrue({"BRK.0", "BRK.7", "RING.ok"} <= virt); self.assertFalse(virt & real)
 

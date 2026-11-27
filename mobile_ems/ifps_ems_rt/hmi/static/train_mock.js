@@ -1,12 +1,12 @@
 "use strict";
-/* 교육용 가상 화면의 대역 서버: 실제 EMS 화면 파일을 그대로 쓰되, 서버 대신 가상 장치에서 녹화해 둔 응답(train_data.js 의 TRAIN_DATA)을 돌려준다.
+/* 교육용 가상 화면의 대역 서버: 실제 TPCS 화면 파일을 그대로 쓰되, 서버 대신 가상 장치에서 녹화해 둔 응답(train_data.js 의 TRAIN_DATA)을 돌려준다.
    운용 장소·태세·자동/수동·지령·고장 주입은 녹화해 둔 '장면'을 바꾸는 것으로 흉내 낸다. 값은 녹화한 가상값이며 계산을 새로 하지 않는다.
-   실제 EMS 에서는 이 파일을 쓰지 않는다(교육용 묶음의 index.html 만 부른다). */
+   실제 TPCS 에서는 이 파일을 쓰지 않는다(교육용 묶음의 index.html 만 부른다). */
 (function () {
   const D = window.TRAIN_DATA; if (!D) return;
   const st = { mode: "island", posture: "평시", auto: true, extra: "", frame: 0, acked: new Set(), t0: Date.now() };
   window.EMS_TRAIN = { offline: true, state: st };
-  const NO = { ok: false, why: "교육용 가상 화면에서는 쓰지 않는 기능입니다 — 실제 EMS 의 가상 장치 모드(run_sim)에서 연습하십시오" };
+  const NO = { ok: false, why: "교육용 가상 화면에서는 쓰지 않는 기능입니다 — 실제 TPCS 의 가상 장치 모드(run_sim)에서 연습하십시오" };
   const scene = () => { const k = st.extra || `${st.mode}|${st.posture}`; return D.scenes[k] || D.scenes["island|평시"]; };
   const copy = o => JSON.parse(JSON.stringify(o));
   function snapshot() {

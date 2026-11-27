@@ -1,10 +1,10 @@
-/* Scenario authoring and isolated simulation inside the existing EMS HMI. */
+/* Scenario authoring and isolated simulation inside the existing TPCS HMI. */
 const P_SCENARIOS = (() => {
   const key = "ems.scenarios.v1";
   const labels = {command: "기동·정지 지령", expect: "응답·조건 검증", set: "모의 입력", wait: "대기",
-    branch: "조건 분기", response: "응답 지연·무응답", policy: "EMS 운전 정책 실행", policy_check: "EMS 판단 검증"};
+    branch: "조건 분기", response: "응답 지연·무응답", policy: "TPCS 운전 정책 실행", policy_check: "TPCS 판단 검증"};
   const names = {DG: "디젤 발전기", FC: "연료전지", ESS: "에너지저장장치", PV: "태양광",
-    MTR: "계측·배전", ELZ: "수전해", GDG: "주둔지 발전기", EMS: "EMS"};
+    MTR: "계측·배전", ELZ: "수전해", GDG: "주둔지 발전기", TPCS: "TPCS"};
   const modes = {island: "작전지", grid: "주둔지"};
   const postures = {"평시": "평시", "저소음": "저소음", "자립": "자립"};
   const controls = {auto: "AUTO", manual: "MANUAL", immediate: "MANUAL · 제어 즉시 실행"};
@@ -24,7 +24,7 @@ const P_SCENARIOS = (() => {
 
   const scene = () => cases[active];
   const point = tag => config.points.find(p => p.tag === tag);
-  const lane = step => step.device || point(step.tag)?.device || "EMS";
+  const lane = step => step.device || point(step.tag)?.device || "TPCS";
   const slotOf = d => { const m = /^(DG|FC|ESS|PV|ELZ)(\d+)$/.exec(d); return m ? [m[1], m[2]] : null; };                  // 같은 종류의 둘째 장치(DG2 …)
   const deviceName = d => { const sl = slotOf(d); return names[d] || (sl ? `${names[sl[0]]} ${sl[1]}` : d); };
   const seenNow = d => { const sl = slotOf(d), f = sl && S.snap?.fleet?.[sl[0]]; return !sl || !f || f.units.some(u => u.id === d); };      // 자동 인식되지 않은 둘째 장치는 목록에서 뺀다(개요 · 결선도와 같게)
@@ -58,15 +58,15 @@ const P_SCENARIOS = (() => {
   }
 
   // ── 시퀀스 다이어그램(UML 식): 머리에 실제 장비 사진, 생명선과 활성 막대, 호출은 실선·응답과 판정은 점선
-  const photo = {DG: "dg", FC: "fc", ESS: "ess", PV: "pv", MTR: "dist", GDG: "gdg", EMS: "ems", ELZ: "fc"};      // 수전해는 수소생성 · 발전 차량에 실려 있다(개요 화면과 같은 그림)
+  const photo = {DG: "dg", FC: "fc", ESS: "ess", PV: "pv", MTR: "dist", GDG: "gdg", TPCS: "ems", ELZ: "fc"};      // 수전해는 수소생성 · 발전 차량에 실려 있다(개요 화면과 같은 그림)
   const photoOf = d => photo[d] || photo[(slotOf(d) || [])[0]] || "";                                                      // 그림이 없는 장치는 이름만 보인다(깨진 그림을 내지 않는다)
-  const tint = {TEST: "#c9a6c0", EMS: "#f2d27a", DG: "#e59866", FC: "#7fc8c0", ESS: "#9aa8e8", PV: "#f0c05a", MTR: "#a9d18e", ELZ: "#8fd3ff", GDG: "#d7a86e"};
+  const tint = {TEST: "#c9a6c0", TPCS: "#f2d27a", DG: "#e59866", FC: "#7fc8c0", ESS: "#9aa8e8", PV: "#f0c05a", MTR: "#a9d18e", ELZ: "#8fd3ff", GDG: "#d7a86e"};
   const SQ = {w: 138, row: 50, top: 14};
   function route(step) {                                   // [보내는 쪽, 받는 쪽, 선 모양]
-    const dev = step.device || point(step.tag)?.device || "EMS";
-    if (step.type === "command") return ["EMS", dev, "call"];
-    if (step.type === "policy") return ["TEST", "EMS", "call"];
-    if (step.type === "policy_check") return ["EMS", "TEST", "return"];
+    const dev = step.device || point(step.tag)?.device || "TPCS";
+    if (step.type === "command") return ["TPCS", dev, "call"];
+    if (step.type === "policy") return ["TEST", "TPCS", "call"];
+    if (step.type === "policy_check") return ["TPCS", "TEST", "return"];
     if (step.type === "wait") return ["TEST", "TEST", "self"];
     if (step.type === "set") return ["TEST", dev, "call"];
     if (step.type === "response") return ["TEST", dev, "inject"];
@@ -76,7 +76,7 @@ const P_SCENARIOS = (() => {
 
   function sequence() {
     const steps = scene().steps, routes = steps.map(route), rows = runOf()?.rows || [];
-    const lanes = ["TEST", "EMS", ...new Set(routes.flatMap(r => [r[0], r[1]]).filter(d => d !== "TEST" && d !== "EMS"))];
+    const lanes = ["TEST", "TPCS", ...new Set(routes.flatMap(r => [r[0], r[1]]).filter(d => d !== "TEST" && d !== "TPCS"))];
     const x = d => lanes.indexOf(d) * SQ.w + SQ.w / 2, y = i => SQ.top + i * SQ.row + 30, width = lanes.length * SQ.w, height = SQ.top + Math.max(1, steps.length) * SQ.row + 18;
     const state = i => rows.find(row => row.step === i);
     const heads = lanes.map(d => `<div class="sq-head" style="--c:${tint[d] || "#9fb0ad"}">
@@ -294,7 +294,7 @@ const P_SCENARIOS = (() => {
   // ── 설비 구성: 시나리오용 추가 설비(모의 급전선·변압기·보호 계전기)를 고친다. 실제 대응표는 바뀌지 않는다
   const EX_COLS = {
     feeders: [["id", "이름(영문)", "text", "L4"], ["name", "설명", "text", "정비고 부하"], ["kind", "종류", {load: "부하", src: "전원"}], ["bus", "모선", {A: "A", B: "B"}], ["kw", "전력 kW", "number", 40],
-      ["ems", "EMS 수급 반영", {false: "아니오", true: "예"}], ["photo", "사진", "photo"]],
+      ["ems", "TPCS 수급 반영", {false: "아니오", true: "예"}], ["photo", "사진", "photo"]],
     transformers: [["id", "이름(영문)", "text", "TR2"], ["name", "설명", "text", "변압기"], ["on", "급전선", "feeder"], ["kva", "정격 kVA", "number", 500], ["pf", "역률", "number", 0.9]],
     relays: [["id", "이름", "text", "51-L4"], ["name", "설명", "text", "과전류"], ["kind", "요소", {oc: "과전류(kW)", gf: "지락(A)", uv: "부족전압(V)"}], ["cb", "차단기", "breaker"],
       ["target", "감시 대상", "text", "L4"], ["pickup", "정정값", "number", 60], ["curve", "시간 특성", {dt: "정한시", si: "표준 반한시", vi: "강반한시", ei: "초반한시"}], ["delay_ms", "시간 ms(정한시)", "number", 200],
@@ -425,7 +425,7 @@ const P_SCENARIOS = (() => {
     if (!can("engineer")) return loginDialog();
     const indexes = [...selected].sort((a, b) => a - b); busy = true; paint();
     try {
-      const r = await fetch("/api/scenarios/pptx", {method: "POST", headers: {"X-EMS-Token": S.token || ""}, body: JSON.stringify({cases: indexes.map(i => cases[i]), verify: indexes.length <= maxBatch})});
+      const r = await fetch("/api/scenarios/pptx", {method: "POST", headers: {"X-TPCS-Token": S.token || ""}, body: JSON.stringify({cases: indexes.map(i => cases[i]), verify: indexes.length <= maxBatch})});
       if (!r.ok) { let why = ""; try { why = (await r.json()).why; } catch (_) { /* 무시 */ } return toast(why || "PPT 를 만들지 못했습니다", "bad"); }
       const link = document.createElement("a"); link.href = URL.createObjectURL(await r.blob()); link.download = `EMS_sequence_${new Date().toISOString().slice(0, 10)}.pptx`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 2000);
       toast(`시퀀스 문서를 내보냈습니다 (${indexes.length}건)`, "ok");
@@ -437,7 +437,7 @@ const P_SCENARIOS = (() => {
     const pick = document.createElement("input"); pick.type = "file"; pick.accept = ".pptx";
     pick.onchange = async () => {
       const file = pick.files[0]; if (!file) return; if (file.size > 8 * 1024 * 1024) return toast("파일이 너무 큽니다(8 MB 까지)", "bad");
-      let r; try { r = await (await fetch("/api/scenarios/import", {method: "POST", headers: {"X-EMS-Token": S.token || "", "Content-Type": "application/octet-stream"}, body: file})).json(); } catch (_) { return toast("올리지 못했습니다", "bad"); }
+      let r; try { r = await (await fetch("/api/scenarios/import", {method: "POST", headers: {"X-TPCS-Token": S.token || "", "Content-Type": "application/octet-stream"}, body: file})).json(); } catch (_) { return toast("올리지 못했습니다", "bad"); }
       if (r.ok === false) return toast(r.why || "읽지 못했습니다", "bad");
       const canon = st => st ? JSON.stringify(Object.keys(st).filter(k => k !== "limit").sort().map(k => [k, st[k]])) : "";      // 열쇠 순서와 판정 여유(limit)는 비교에서 뺀다
       const same = (a, b) => a.steps.length === b.steps.length && a.steps.every((st, i) => canon(st) === canon(b.steps[i]));

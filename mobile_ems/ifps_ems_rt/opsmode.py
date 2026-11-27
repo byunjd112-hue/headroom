@@ -148,11 +148,11 @@ class LoadShedder:
     공급 능력이 부하를 따라가지 못해서 끊어야 할 때는 단계를 밟는다: 먼저 '절감 공급'(그 급전선의 줄일 수 있는 몫만 줄임)을 하고,
     save_s(기본 10초) 뒤에도 모자라면 그때 차단한다. 순서는 3등급 절감 → 3등급 차단 → 2등급 절감 → 2등급 차단. 절감할 몫이 없는 급전선은 바로 차단한다.
     태세(저소음 · 자립)나 ESS 충전율 때문에 끊는 것은 절감을 거치지 않는다(자원을 아끼는 것이 목적이므로 바로 끊는다).
-    EMS 가 스스로 끊은 급전선만 되살린다(운용자·보호 IED 가 연 차단기는 건드리지 않는다)."""
+    TPCS 가 스스로 끊은 급전선만 되살린다(운용자·보호 IED 가 연 차단기는 건드리지 않는다)."""
 
     def __init__(self, hold_s=3.0, restore_s=60.0, save_s=10.0):
         self.hold_s, self.restore_s, self.save_s = hold_s, restore_s, save_s; self.t_bad = {}; self.t_ok = {}; self.mine = set(); self.why = {}
-        self.saved = set(); self.t_save = {}; self.held = {}        # saved: EMS 가 절감 공급 중인 급전선. held: 절감 · 차단으로 덜어 낸 전력(kW) — 되살리면 돌아올 부하
+        self.saved = set(); self.t_save = {}; self.held = {}        # saved: TPCS 가 절감 공급 중인 급전선. held: 절감 · 차단으로 덜어 낸 전력(kW) — 되살리면 돌아올 부하
 
     @staticmethod
     def want(site, posture, soc, src_avail_kw, load12_kw, load_kw, auto_h=None, target_h=72.0):

@@ -1,6 +1,6 @@
 /* 설치 점검(초기화): 장비를 설치한 뒤 한 번에 검사 → 문제마다 고치는 방법 안내 → 고친 뒤 다시 검사해 '해결됨' 확인. 서버: hmi/initcheck.py (GET /api/archive/initcheck)
    개요의 [설치 점검] 단추가 연다. 단추에는 지금 상태(미실시 · 남은 이상 · 주의 · 완료)가 보인다(스냅샷의 init).
-   창은 설치 그림이다: 결선도 그림을 그대로 쓰고 맨 위에 EMS(통신선)를 얹어 그림마다 ✔ · ! · ✕ 를 단다. 그림을 누르면 아래에 내용과 고치는 방법이 나온다. */
+   창은 설치 그림이다: 결선도 그림을 그대로 쓰고 맨 위에 TPCS(통신선)를 얹어 그림마다 ✔ · ! · ✕ 를 단다. 그림을 누르면 아래에 내용과 고치는 방법이 나온다. */
 "use strict";
 const InitCheck = {
   LV: { ok: ["정상", "ok", "var(--ok)"], warn: ["주의", "warn", "var(--warn)"], bad: ["이상", "bad", "var(--alarm)"] },
@@ -20,7 +20,7 @@ const InitCheck = {
     if (b.textContent !== t) b.textContent = t; b.classList.toggle("stop", !!(i.ran && i.bad)); b.classList.toggle("pri", !i.ran || !!(i.ran && !i.done && !i.bad));
   },
   async get(q) {
-    const h = S.token ? { "X-EMS-Token": S.token } : {}, r = await fetch("/api/archive/initcheck" + (q || ""), { headers: h });
+    const h = S.token ? { "X-TPCS-Token": S.token } : {}, r = await fetch("/api/archive/initcheck" + (q || ""), { headers: h });
     let d = null; try { d = await r.json(); } catch (e) { d = null; }
     return r.ok && d && d.ok !== false ? d : { ok: false, why: (d && d.why) || "검사하지 못했습니다" };
   },
@@ -33,7 +33,7 @@ const InitCheck = {
     this.show(d); toast(la.done ? `검사 ${la.n}차: 이상 · 주의 없음 — 설치 점검 완료` : `검사 ${la.n}차: 이상 ${la.bad}건 · 주의 ${la.warn}건 — ! · ✕ 그림을 눌러 안내대로 고친 뒤 다시 검사하십시오`, la.done ? "ok" : la.bad ? "bad" : "warn"); poll();
   },
   worst(items) { return items.some(i => i.level === "bad") ? "bad" : items.some(i => i.level === "warn") ? "warn" : "ok"; },
-  /* 설치 그림(사용자 요구 — 글보다 그림으로, 결선도를 따라가게): 결선도 그림을 그대로 쓰고 맨 위에 EMS(통신)만 얹은 뒤, 그림마다 ✔ · ! · ✕ 표를 단다.
+  /* 설치 그림(사용자 요구 — 글보다 그림으로, 결선도를 따라가게): 결선도 그림을 그대로 쓰고 맨 위에 TPCS(통신)만 얹은 뒤, 그림마다 ✔ · ! · ✕ 표를 단다.
      위쪽 이름표 여섯 개가 검사 구분. 그림을 누르면 아래에 확인한 내용 · 고치는 방법이 나온다. 결선도를 따로 그리지 않는다(sld.js 의 sldSvg · sldUpdate 를 부른다) */
   badge(x, y, lv, r) { r = r || 11; const g = { ok: "M-5 0 L-1.5 4 L5.5 -4", warn: "M0 -5 L0 1.5 M0 4.6 L0 5", bad: "M-4 -4 L4 4 M4 -4 L-4 4" }[lv];
     return `<g transform="translate(${x} ${y}) scale(${r / 11})" class="ic-bd ${lv}"><circle r="11"/><path d="${g}"/></g>`; },
@@ -65,9 +65,9 @@ const InitCheck = {
       const x0 = n.x - SR * k * 1.18, y0 = SY - SR * k * .8 + DY, c = id["comm." + (pcs || n.id)], nd = svg.querySelector("#n-" + CSS.escape(n.id)); if (nd) nd.setAttribute("transform", `translate(0 ${DY})`);
       if (c) com += `<path class="ic-com ${c.level}" d="M${EX} ${EY + 6} C${EX} ${EY + 46}, ${n.x} ${y0 - 44}, ${n.x} ${y0 - 2}"/>`;
       h += hot(it, x0 - 3, y0 - 3, SR * k * 2.36 + 6, SR * k * 1.6 + 6, x0 + 6, y0 + 6, Math.max(6, 11 * k)); });
-    /* EMS · 계측 게이트웨이(맨 위) */
-    const ems = typeof spriteSvg === "function" && spriteSvg("EMS", { on: true }, EX, EY + 4, 84), mtr = take("comm.MTR", "count.MTR");
-    h += com + `<defs>${SPRITE_FILTERS.replace(/id="sp/g, 'id="spIC')}</defs>${ems ? ems.replace(/url\(#sp/g, "url(#spIC") : ""}<text x="${EX + 52}" y="${EY - 22}" class="ic-nm">EMS</text><text x="${EX + 52}" y="${EY - 8}" class="ic-st">점선 = 통신선</text>`;
+    /* TPCS · 계측 게이트웨이(맨 위) */
+    const ems = typeof spriteSvg === "function" && spriteSvg("TPCS", { on: true }, EX, EY + 4, 84), mtr = take("comm.MTR", "count.MTR");
+    h += com + `<defs>${SPRITE_FILTERS.replace(/id="sp/g, 'id="spIC')}</defs>${ems ? ems.replace(/url\(#sp/g, "url(#spIC") : ""}<text x="${EX + 52}" y="${EY - 22}" class="ic-nm">TPCS</text><text x="${EX + 52}" y="${EY - 8}" class="ic-st">점선 = 통신선</text>`;
     if (mtr.length) { const mx = EX - 150, sp = spriteSvg("MTR", { on: true, fault: this.worst(mtr) === "bad" }, mx, EY + 4, 62); h += `<path class="ic-com ${mtr[0].level}" d="M${EX - 44} ${EY - 16} H${mx + 34}"/>${sp ? sp.replace(/url\(#sp/g, "url(#spIC") : ""}<text x="${mx - 38}" y="${EY - 22}" text-anchor="end" class="ic-nm">계측 게이트웨이</text><text x="${mx - 38}" y="${EY - 8}" text-anchor="end" class="ic-st">배전 · 변압 안(차단기 · 모선 값)</text>` + hot(mtr, mx - 36, EY - 44, 72, 52, mx + 34, EY - 40, 9); }
     /* ⑤ 모선 A · B */
     [["A", 250], ["B", 760]].forEach(([b, x]) => { const it = la.items.filter(i => i.area === "모선 구성" && (i.id === "bus.ok" || i.id.startsWith("bus." + b))); it.forEach(i => used.add(i.id)); h += hot(it, x - 210, BUS_Y - 9, 420, 18, x, BUS_Y + 18, 8); });
@@ -104,7 +104,7 @@ const InitCheck = {
     if (la && !this.sel) { const f = la.items.find(i => i.level === "bad") || la.items.find(i => i.level === "warn"); this.sel = f ? f.id : "*"; }      // 처음에는 가장 급한 마디를 골라 둔다
     const hist = d.runs && d.runs.length > 1 ? `<details class="ic-hist"><summary>검사 이력 ${d.runs.length}회</summary><table class="t"><thead><tr><th>때</th><th>검사자</th><th class="n">이상</th><th class="n">주의</th><th>해결된 것</th><th>남은 이상</th></tr></thead><tbody>${d.runs.map(r => `<tr><td class="mono">${esc(r.t)}</td><td>${esc(r.by || "")}${r.only ? " (한 항목)" : ""}</td><td class="n">${r.bad}</td><td class="n">${r.warn}</td><td>${esc((r.fixed || []).join(", ") || "—")}</td><td>${esc((r.open || []).join(", ") || "—")}</td></tr>`).join("")}</tbody></table></details>` : "";
     const box = modal(`<h3>설치 점검(초기화)</h3>
-      <p class="sub">결선도와 같은 그림에 검사 결과를 표로 붙였다(맨 위 = EMS 와 통신선). 지금 읽히는 값으로 판정하며 EMS 는 차단기를 조작하지 않는다.${d.sim ? " (가상 장치)" : ""}</p>
+      <p class="sub">결선도와 같은 그림에 검사 결과를 표로 붙였다(맨 위 = TPCS 와 통신선). 지금 읽히는 값으로 판정하며 TPCS 는 차단기를 조작하지 않는다.${d.sim ? " (가상 장치)" : ""}</p>
       <div id="icBody">${la ? this.map(la) + this.detail(la) : `<div class="ic-det muted" style="text-align:center;padding:38px 10px">아직 검사하지 않았습니다. 장비를 설치하고 전원 · 통신선을 이은 뒤 [검사 시작]을 누르십시오.<br>장비 통신 → 종류 · 대수 → 환망 순서 → 환망 A · B → 모선 구성 → 부하 경로 순으로 검사합니다.</div>`}${hist}</div>
       <div class="row" style="justify-content:flex-end;gap:8px;margin-top:10px"><button class="btn pri" id="icRun">${la ? "전체 다시 검사" : "검사 시작"}</button><button class="btn" id="icClose">닫기</button></div>`);
     if (la) this.paint(la);

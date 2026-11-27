@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """하늘 카메라 연결: 정해진 경로의 최신 하늘 사진에서 구름량을 읽어 실행기에 넘긴다(15분 이력의 sky 열 → 태양광 예측 입력).
 
-실장치: 카메라(또는 카메라 PC)가 runtime.json 의 skycam.path 에 최신 사진을 계속 덮어쓴다. EMS 는 읽기만 한다.
+실장치: 카메라(또는 카메라 PC)가 runtime.json 의 skycam.path 에 최신 사진을 계속 덮어쓴다. TPCS 는 읽기만 한다.
 가상 장치: 모의 구름 상태로 하늘 그림을 만들어 같은 경로에 쓴다(카메라 흉내) — 읽는 쪽은 실장치와 같은 코드다.
 사진이 없거나 오래됐거나 야간이면 값을 비워 둔다. 그때 예측은 발전 실적·기온·기압·습도만으로 계산한다(카메라 고장이 예측을 멈추지 않는다).
 """
@@ -37,7 +37,7 @@ class SkyWatch:
         now = eng.rt.wall(); hr = now.hour + now.minute / 60.0; site = eng.rt.site
         day = float(clear_pv_kw(site, now.timetuple().tm_yday, hr)) > 0.05 * site.pv_kwp
         bad = day and not self.last.get("ok") and "야간" not in self.last.get("why", "")
-        eng.alarms.set("skycam", bad, 3, "EMS", f"하늘 카메라 사진을 쓸 수 없음({self.last.get('why', '')}) — 카메라 없이 예측(발전 실적·기온·기압·습도만 사용)")
+        eng.alarms.set("skycam", bad, 3, "TPCS", f"하늘 카메라 사진을 쓸 수 없음({self.last.get('why', '')}) — 카메라 없이 예측(발전 실적·기온·기압·습도만 사용)")
 
     def status(self):
         s = self.last; c = s.get("cover") if s.get("ok") else None

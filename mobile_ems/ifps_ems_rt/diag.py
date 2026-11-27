@@ -125,7 +125,7 @@ def hb_check(cl, pts, wait):
         a = cl.read(hb["addr"], 1, hb["fc"])[0]; time.sleep(wait); b = cl.read(hb["addr"], 1, hb["fc"])[0]
     except mb.ModbusError as e:
         return BAD, f"hb 읽기 실패: {e}"
-    if a == b: return BAD, f"{wait:.1f}초 동안 hb 가 {a} 에서 변하지 않음 — 장비 제어기 정지 또는 hb 미구현. EMS 는 5초 정지 시 지령을 막는다"
+    if a == b: return BAD, f"{wait:.1f}초 동안 hb 가 {a} 에서 변하지 않음 — 장비 제어기 정지 또는 hb 미구현. TPCS 는 5초 정지 시 지령을 막는다"
     return OK, f"hb {a} → {b} ({wait:.1f}초)"
 
 
@@ -215,7 +215,7 @@ CSS = "body{font-family:'Malgun Gothic',sans-serif;margin:24px;color:#111}h1{fon
 
 def html_report(res):
     e = html.escape; st = lambda s: f'<span class="{s}">{s}</span>'; h = [f"<!doctype html><meta charset='utf-8'><title>통신 진단 {e(res['when'])}</title><style>{CSS}</style>",
-        f"<h1>IFPS EMS 현장 통신 진단 보고서</h1><p>일시 {e(res['when'])} · 현장 {e(res['site'])} · 종합 {st(res['state'])}</p>"]
+        f"<h1>IFPS TPCS 현장 통신 진단 보고서</h1><p>일시 {e(res['when'])} · 현장 {e(res['site'])} · 종합 {st(res['state'])}</p>"]
     if res["map_errors"]: h.append("<h2>대응표 오류</h2><ul>" + "".join(f"<li>{e(x)}</li>" for x in res["map_errors"]) + "</ul>")
     h.append("<h2>요약</h2><table><tr><th>장비</th><th>unit</th><th>판정</th><th>요약</th><th>확인 사항</th></tr>" + "".join(
         f"<tr><td>{e(d['name'])}</td><td>{d['unit']}</td><td>{st(d['state'])}</td><td>{e(d['summary'])}</td><td>{e(' / '.join(d['notes']))}</td></tr>" for d in res["devices"]) + "</table>")
@@ -302,7 +302,7 @@ def _handshake(cl, by, tags, cmd, wait, out):
     if st == want: out.write(f"  [주의] 이미 {'운전' if want else '정지'} 상태 — 반대 지령으로 시험하십시오\n"); return False
     seq = ack % 65535 + 1; wr(tags["seq"], seq); wr(tags["cmd"], 1 if cmd == "start" else 2)
     t_ack, t_st = _wait_ack(rd, tags, seq, want, wait); f = lambda t: "응답 없음" if t is None else f"{t:.2f}초"
-    out.write(f"  seq={seq} 지령 → seq_ack {f(t_ack)}, status {f(t_st)} (EMS 한도 1.5초)\n")
+    out.write(f"  seq={seq} 지령 → seq_ack {f(t_ack)}, status {f(t_st)} (TPCS 한도 1.5초)\n")
     if t_ack is None or t_st is None:
         wr(tags["cmd"], 0); out.write("  [이상] 응답 미확인 → cmd=0 으로 취소함. 장비 쪽 seq_ack 되돌림·인터록을 확인\n"); return False
     if max(t_ack, t_st) > 1.5:
@@ -325,7 +325,7 @@ def command_test(cfg, pts, name, cmd, path="A", wait=3.0, out=sys.stdout):
 
 
 MENU = """
-──────── IFPS EMS 현장 진단 ────────
+──────── IFPS TPCS 현장 진단 ────────
  1  전 장비 자동 진단 + 보고서 저장
  2  장비 하나 자동 진단(상세)
  3  실시간 감시(장비의 전 점)
@@ -397,7 +397,7 @@ def _enable_ansi():
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="diag", description="IFPS EMS 현장 간편 진단 도구")
+    ap = argparse.ArgumentParser(prog="diag", description="IFPS TPCS 현장 간편 진단 도구")
     ap.add_argument("config", nargs="?", default=os.path.join("config", "runtime.json")); ap.add_argument("--auto", action="store_true", help="자동 진단 1회 후 종료")
     ap.add_argument("--device", help="한 장비만"); ap.add_argument("--detail", action="store_true", help="정상 점도 모두 표시"); ap.add_argument("--report", help="보고서 폴더(기본: <state_dir>/diag)")
     ap.add_argument("--demo", action="store_true", help="내장 가상 장치로 시연"); ap.add_argument("--timeout", type=float)

@@ -1,5 +1,5 @@
 @echo off
-REM 이동형 전력체계 EMS - 가상 장치 모드(실장치 없이 시연·교육·시험)
+REM 이동형 전력체계 TPCS - 가상 장치 모드(실장치 없이 시연·교육·시험)
 chcp 65001 >nul
 set PYTHONUTF8=1
 cd /d "%~dp0"

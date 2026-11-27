@@ -1,6 +1,6 @@
 "use strict";
 /* 설정 편집기 — 장치별 카드에 대응표를 표로 보이고 그 자리에서 고친다. 바뀐 줄은 초록, 새 줄은 파랑, 지울 줄은 줄긋기.
-   저장 전에 서버가 검사하고, 오류가 있으면 저장하지 않는다. 저장한 설정은 EMS 재기동 후 적용된다. */
+   저장 전에 서버가 검사하고, 오류가 있으면 저장하지 않는다. 저장한 설정은 TPCS 재기동 후 적용된다. */
 const CfgEdit = {
   d: null, rows: [], base: [], rt: null, rtBase: "", sel: null, tab: "dev", res: null, q: "",
   COLW: { tag: 122, fc: 40, addr: 50, type: 54, scale: 48, unit: 54, lo: 48, hi: 48, rw: 40, order: 58 },
@@ -33,7 +33,7 @@ const CfgEdit = {
         <input class="in" id="ceQ" placeholder="이름·주소 찾기" value="${esc(this.q)}" style="width:170px">
         <span class="ce-stat" id="ceStat"></span>
         <span class="spacer" style="flex:1"></span>
-        ${pend ? `<span class="pill warn">저장된 설정이 운전 중인 것과 다름 — EMS 재기동 후 적용</span>` : `<span class="pill ok">운전 중인 설정과 같음</span>`}
+        ${pend ? `<span class="pill warn">저장된 설정이 운전 중인 것과 다름 — TPCS 재기동 후 적용</span>` : `<span class="pill ok">운전 중인 설정과 같음</span>`}
         <span class="muted mono" style="font-size:11px">${esc(d.runtime.file)} #${d.runtime.sha} · ${esc(d.pointmap.file)} #${d.pointmap.sha}</span>
       </div>
       <div class="ce-wrap">
@@ -85,7 +85,7 @@ const CfgEdit = {
         ${f("unit", "Unit ID", dv.unit)}${f("a_ip", "경로 A · IP", (p[0] || [])[0])}${f("a_port", "경로 A · 포트", (p[0] || [])[1])}${f("b_ip", "경로 B · IP", (p[1] || [])[0], "없으면 비움")}${f("b_port", "경로 B · 포트", (p[1] || [])[1])}
         <label>기본 바이트 순서<select class="in" data-k="order">${this.d.choices.order.map(o => `<option ${String(dv.order || "") === o ? "selected" : ""}>${o}</option>`).join("")}</select></label>
         ${f("done_s", "지령 완료 한도(초)", dv.done_s, "기본 1.5")}${f("gap", "블록 읽기 틈", dv.gap, "기본 0")}</div>
-        <p class="muted" style="font-size:11.5px;margin:10px 0 0">장치 제작사가 회신한 값으로 고친 뒤 [검사] → [저장] 하십시오. 저장한 값은 EMS 를 다시 기동해야 적용됩니다. 현장 확인은 현장 진단 도구(diag)로 합니다.</p></div>`;
+        <p class="muted" style="font-size:11.5px;margin:10px 0 0">장치 제작사가 회신한 값으로 고친 뒤 [검사] → [저장] 하십시오. 저장한 값은 TPCS 를 다시 기동해야 적용됩니다. 현장 확인은 현장 진단 도구(diag)로 합니다.</p></div>`;
       S2.querySelectorAll("[data-k]").forEach(el => el.onchange = () => this.devSet(n, el.dataset.k, el.value.trim()));
     } else if (this.tab === "hy") { this.sideHy(S2);
     } else if (this.tab === "res") {
@@ -97,7 +97,7 @@ const CfgEdit = {
       $("#ceJson").onchange = e => { try { const o = JSON.parse(e.target.value); if (!o || typeof o !== "object" || !o.devices) throw new Error("devices 항목이 없음"); this.rt = o; if (!o.devices[this.sel]) this.sel = Object.keys(o.devices)[0]; $("#ceJsonMsg").innerHTML = `<span class="okc">문법 정상</span>`; this.res = null; this.cards(); this.stat(); } catch (err) { $("#ceJsonMsg").innerHTML = `<span class="badc">JSON 문법 오류: ${esc(err.message)}</span>`; } };
     } else {
       const b = this.d.backups; S2.innerHTML = `<div class="ce-box"><h4>백업 <span class="muted">— 저장할 때마다 이전 판을 남깁니다(파일별 최근 20개)</span></h4>${b.length ? `<table class="t"><thead><tr><th>파일</th><th>저장 시각</th><th>크기</th><th></th></tr></thead><tbody>${b.map(x => `<tr><td>${x.kind === "pointmap" ? "대응표" : "운전 설정"}</td><td class="mono">${esc(x.time)}</td><td class="mono">${x.size}</td><td><button class="btn sm" data-bk="${esc(x.name)}">이 판으로 되돌리기</button></td></tr>`).join("")}</tbody></table>` : `<div class="muted">아직 백업이 없습니다.</div>`}</div>`;
-      S2.querySelectorAll("[data-bk]").forEach(x => x.onclick = async () => { if (!confirm(`${x.dataset.bk} 판으로 되돌립니다. 지금 판은 백업으로 남습니다.`)) return; const r = await api("/api/config/restore", { name: x.dataset.bk }); if (r.ok) { toast("되돌렸습니다 — EMS 재기동 후 적용", "ok"); this.open(this.root); } else { this.res = [{ kind: x.dataset.bk.split(".")[0], ok: false, errors: r.errors || [r.why || "실패"], warnings: [], diff: [] }]; this.tab = "res"; this.side(); } });
+      S2.querySelectorAll("[data-bk]").forEach(x => x.onclick = async () => { if (!confirm(`${x.dataset.bk} 판으로 되돌립니다. 지금 판은 백업으로 남습니다.`)) return; const r = await api("/api/config/restore", { name: x.dataset.bk }); if (r.ok) { toast("되돌렸습니다 — TPCS 재기동 후 적용", "ok"); this.open(this.root); } else { this.res = [{ kind: x.dataset.bk.split(".")[0], ok: false, errors: r.errors || [r.why || "실패"], warnings: [], diff: [] }]; this.tab = "res"; this.side(); } });
     }
   },
   /* 복합전력 PCS: 모드 값 · 이름, 충전율 한계값(runtime.json 의 hybrid), 신호 주소(대응표의 DG.* 줄). 제작사 PCS 사양에 맞춰 고친다 */
@@ -111,7 +111,7 @@ const CfgEdit = {
       <h4 style="margin-top:14px">충전율 한계값 <span class="muted">(%, hybrid.soc_low · soc_ok · soc_full)</span></h4><div class="ce-form">${num("soc_low", "이 아래면 발전기로 충전", 20)}${num("soc_ok", "이 위면 충전 그침", 50)}${num("soc_full", "이 위면 발전기 단독", 90)}${num("ess_kwh", "차량 한 대의 ESS 용량(kWh)", 200)}</div>
       <h4 style="margin-top:14px">신호 주소 <span class="muted">(pointmap.csv 의 DG.* 줄 — 장치 카드에서도 고친다)</span></h4>
       <table class="t"><thead><tr><th>신호</th><th>기능 코드</th><th>주소</th><th>배율</th></tr></thead><tbody>${SIG.map(([t, d]) => { const r = row(t); return `<tr><td class="mono">${t} <span class="muted">${d}</span></td>${r ? [2, 3, 5].map(c => `<td><input class="in" data-hs="${t}" data-c="${c}" style="width:80px" value="${esc(r.v[c])}"></td>`).join("") : `<td colspan="3" class="badc">대응표에 없음 — 디젤 카드에서 줄을 추가</td>`}</tr>`; }).join("")}</tbody></table>
-      <p class="muted" style="font-size:11.5px;margin:10px 0 0">제작사 PCS 사양으로 고친 뒤 [검사] → [저장] 하십시오. 모드 값을 고치면 DG.pcs_mode · DG.mode_set 의 허용 범위(최소 · 최대)도 함께 맞춥니다. 저장한 값은 EMS 를 다시 기동해야 적용됩니다.</p></div>`;
+      <p class="muted" style="font-size:11.5px;margin:10px 0 0">제작사 PCS 사양으로 고친 뒤 [검사] → [저장] 하십시오. 모드 값을 고치면 DG.pcs_mode · DG.mode_set 의 허용 범위(최소 · 최대)도 함께 맞춥니다. 저장한 값은 TPCS 를 다시 기동해야 적용됩니다.</p></div>`;
     const done = () => { this.res = null; this.cards(); this.stat(); };
     S2.querySelectorAll("[data-hk]").forEach(el => el.onchange = () => { h[el.dataset.hk] = Number(el.value); done(); });
     S2.querySelectorAll("[data-hl]").forEach(el => el.onchange = () => { h.labels[el.dataset.hl] = el.value.trim(); done(); });
@@ -138,11 +138,11 @@ const CfgEdit = {
   async save() {
     if (!this.dirtyPm() && !this.dirtyRt()) return toast("바뀐 내용이 없습니다", "");
     if (!(await this.check(true))) return toast("오류가 있어 저장하지 않았습니다", "bad");
-    const c = this.count(); if (!confirm(`설정을 저장합니다.\n대응표: 고침 ${c.chg} · 추가 ${c.new} · 삭제 ${c.del}${this.dirtyRt() ? "\n운전 설정: 변경 있음" : ""}\n\n이전 판은 백업으로 남고, 새 설정은 EMS 를 다시 기동해야 적용됩니다.`)) return;
+    const c = this.count(); if (!confirm(`설정을 저장합니다.\n대응표: 고침 ${c.chg} · 추가 ${c.new} · 삭제 ${c.del}${this.dirtyRt() ? "\n운전 설정: 변경 있음" : ""}\n\n이전 판은 백업으로 남고, 새 설정은 TPCS 를 다시 기동해야 적용됩니다.`)) return;
     const done = [];
     if (this.dirtyRt()) { const r = await api("/api/config/save", { kind: "runtime", text: JSON.stringify(this.rt), sha: this.d.runtime.sha }); if (!r.saved) { this.res = [Object.assign({ kind: "runtime", warnings: [], diff: [], errors: [r.why || "저장 실패"] }, r)]; this.tab = "res"; this.side(); return toast("운전 설정 저장 실패", "bad"); } done.push("운전 설정"); }
     if (this.dirtyPm()) { const r = await api("/api/config/save", Object.assign({ kind: "pointmap" }, this.payload())); if (!r.saved) { this.res = [Object.assign({ kind: "pointmap", warnings: [], diff: [], errors: [r.why || "저장 실패"] }, r)]; this.tab = "res"; this.side(); return toast("대응표 저장 실패", "bad"); } done.push("대응표"); }
-    toast(`${done.join("·")} 저장 완료 — EMS 재기동 후 적용`, "ok"); this.tab = "bak"; this.open(this.root);
+    toast(`${done.join("·")} 저장 완료 — TPCS 재기동 후 적용`, "ok"); this.tab = "bak"; this.open(this.root);
   },
   undo() { if ((this.dirtyPm() || this.dirtyRt()) && !confirm("편집한 내용을 버리고 저장된 판으로 되돌립니다.")) return; this.open(this.root); },
   reload() { this.undo(); },

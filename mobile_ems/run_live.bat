@@ -1,5 +1,5 @@
 @echo off
-REM 이동형 전력체계 EMS - 실장치 연동 모드. config\runtime.json의 장치 주소와 노트북 IP(192.168.10.x)를 먼저 맞추십시오.
+REM 이동형 전력체계 TPCS - 실장치 연동 모드. config\runtime.json의 장치 주소와 노트북 IP(192.168.10.x)를 먼저 맞추십시오.
 chcp 65001 >nul
 set PYTHONUTF8=1
 cd /d "%~dp0"

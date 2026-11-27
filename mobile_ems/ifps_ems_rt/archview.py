@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""기록 조회기: EMS 를 켜지 않고 기록 보관소(archive.db)만 읽어 브라우저로 보여 준다(읽기 전용).
+"""기록 조회기: TPCS 를 켜지 않고 기록 보관소(archive.db)만 읽어 브라우저로 보여 준다(읽기 전용).
 
   python -m ifps_ems_rt.archview [archive.db 경로] [--port 8091] [--no-browser]
 경로를 비우면 config/state/archive.db → config/state_sim/archive.db 순으로 찾는다. 노트북 자신(127.0.0.1)에서만 열린다.
@@ -15,7 +15,7 @@ FILES = {"/": "viewer.html", "/viewer.html": "viewer.html", "/archive.js": "arch
 
 def make_handler(st):
     class H(BaseHTTPRequestHandler):
-        server_version = "IFPS-EMS-ARCHVIEW"; sys_version = ""; timeout = 15
+        server_version = "IFPS-TPCS-ARCHVIEW"; sys_version = ""; timeout = 15
 
         def log_message(self, format, *args):       # pylint: disable=redefined-builtin
             pass
@@ -61,7 +61,7 @@ def serve(path, port=8091):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="EMS 기록 조회기(읽기 전용)"); ap.add_argument("db", nargs="?", default=""); ap.add_argument("--port", type=int, default=8091); ap.add_argument("--no-browser", action="store_true")
+    ap = argparse.ArgumentParser(description="TPCS 기록 조회기(읽기 전용)"); ap.add_argument("db", nargs="?", default=""); ap.add_argument("--port", type=int, default=8091); ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args(argv); path = find(a.db); httpd, arch = serve(path, a.port); url = f"http://127.0.0.1:{httpd.server_address[1]}/"
     print(f"기록 조회기: {url}\n보관소: {path}\n끝내려면 Ctrl+C"); sys.stdout.flush()
     if not a.no_browser: webbrowser.open(url)

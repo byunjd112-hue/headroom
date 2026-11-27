@@ -13,7 +13,7 @@ from . import xlsxw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-NOTE = ("이 표는 EMS 가 지금 인식한 구성에서 자동으로 펼친 것이다. 심각도 · 발생도 · 검출도는 원래 항목의 값을 따르며 새로 매기지 않았다 — '재검토' 표시가 있는 줄은 사람이 다시 본다. "
+NOTE = ("이 표는 TPCS 가 지금 인식한 구성에서 자동으로 펼친 것이다. 심각도 · 발생도 · 검출도는 원래 항목의 값을 따르며 새로 매기지 않았다 — '재검토' 표시가 있는 줄은 사람이 다시 본다. "
         "FAT 의 번호 칸은 비워 두었다(정한 번호 체계를 적는다). 합격 기준의 시간은 설정값(환망의 차단 · 투입 시간)이며 현장 보호 설정값이 아니다.")
 
 
@@ -46,11 +46,11 @@ def _table(head, rows, blank=()):
 def fat_html(data, rev):
     """FAT 점검표 — 인쇄해서 결과를 적는 한 쪽 문서."""
     sm = "".join(f"<tr><th>{_h.escape(k)}</th><td>{_h.escape(v)}</td></tr>" for k, v in data["summary"])
-    return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>IFPS EMS FAT 점검표 {rev}</title><style>
+    return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>IFPS TPCS FAT 점검표 {rev}</title><style>
 body{{font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:11px;color:#222;margin:18px}} h1{{font-size:18px;margin:0 0 4px}} h2{{font-size:13px;margin:16px 0 6px}} p{{margin:4px 0;color:#555}}
 table{{border-collapse:collapse;width:100%}} th,td{{border:1px solid #999;padding:4px 6px;vertical-align:top;text-align:left}} thead th{{background:#e7e0d0}} td.b{{min-width:54px}} .sm th{{width:90px;background:#f3efe4}}
 @media print{{body{{margin:8mm}} tr{{page-break-inside:avoid}}}}</style></head><body>
-<h1>IFPS 이동형 전력체계 EMS — FAT 점검표(현장 구성 반영)</h1><p>{rev} · 만든 때 {_h.escape(data["when"])} · 항목 {len(data["fat"])}건</p>
+<h1>IFPS 이동형 전력체계 TPCS — FAT 점검표(현장 구성 반영)</h1><p>{rev} · 만든 때 {_h.escape(data["when"])} · 항목 {len(data["fat"])}건</p>
 <h2>1. 구성 요약</h2><table class="sm">{sm}</table>
 <h2>2. 점검 항목</h2>{_table(data["fat_head"], data["fat"], blank=(0, 7, 8))}
 <p>{_h.escape(NOTE)}</p><p>시험자: ________________ &nbsp; 확인자: ________________ &nbsp; 날짜: ________________</p></body></html>"""
@@ -58,7 +58,7 @@ table{{border-collapse:collapse;width:100%}} th,td{{border:1px solid #999;paddin
 
 def site_xlsx(data, rev):
     """현장 구성 FMEA 펼침 + FAT 점검표(Excel)."""
-    cover = [["#IFPS EMS 현장 구성 반영 — FMEA 펼침 · FAT 점검표", ""], ["리비전", rev], ["만든 때", data["when"]]] + [[k, v] for k, v in data["summary"]] + [["알림", NOTE]]
+    cover = [["#IFPS TPCS 현장 구성 반영 — FMEA 펼침 · FAT 점검표", ""], ["리비전", rev], ["만든 때", data["when"]]] + [[k, v] for k, v in data["summary"]] + [["알림", NOTE]]
     return xlsxw.write([("00_구성요약", cover, [16, 110]),
                         ("21_현장구성FMEA", [["#" + data["fm_head"][0]] + data["fm_head"][1:]] + data["fmea"], [10, 34, 34, 70, 44, 9]),
                         ("22_FAT점검표", [["#" + data["fat_head"][0]] + data["fat_head"][1:]] + data["fat"], [8, 8, 26, 30, 36, 60, 16, 10, 18])])
@@ -66,13 +66,13 @@ def site_xlsx(data, rev):
 
 def http_get(hd, eng, q):
     """내보내기 GET — 운용자."""
-    if eng is None: return hd._err(403, "기록 조회기에서는 내보낼 수 없습니다(구성은 EMS 가 안다)")      # pylint: disable=protected-access
+    if eng is None: return hd._err(403, "기록 조회기에서는 내보낼 수 없습니다(구성은 TPCS 가 안다)")      # pylint: disable=protected-access
     if hd._sess("operator") is None: return None                                                          # pylint: disable=protected-access
     doc, fmt = q.get("doc", "fmea"), q.get("fmt", "html"); rev = _rev(); data = site(eng); stamp = time.strftime("%Y%m%d_%H%M")
     try:
-        if (doc, fmt) == ("fmea", "html"): name, body, ct = f"IFPS_EMS_FMEA_FTA_{rev}_{stamp}.html", fmea_html(data, rev), "text/html; charset=utf-8"
-        elif (doc, fmt) == ("fat", "html"): name, body, ct = f"IFPS_EMS_FAT_checklist_{rev}_{stamp}.html", fat_html(data, rev), "text/html; charset=utf-8"
-        elif (doc, fmt) == ("site", "xlsx"): name, body, ct = f"IFPS_EMS_FMEA_FAT_site_{rev}_{stamp}.xlsx", site_xlsx(data, rev), XLSX
+        if (doc, fmt) == ("fmea", "html"): name, body, ct = f"IFPS_TPCS_FMEA_FTA_{rev}_{stamp}.html", fmea_html(data, rev), "text/html; charset=utf-8"
+        elif (doc, fmt) == ("fat", "html"): name, body, ct = f"IFPS_TPCS_FAT_checklist_{rev}_{stamp}.html", fat_html(data, rev), "text/html; charset=utf-8"
+        elif (doc, fmt) == ("site", "xlsx"): name, body, ct = f"IFPS_TPCS_FMEA_FAT_site_{rev}_{stamp}.xlsx", site_xlsx(data, rev), XLSX
         elif (doc, fmt) == ("site", "json"): return hd._send(200, json.dumps(data, ensure_ascii=False))     # pylint: disable=protected-access
         else: return hd._err(400, "doc · fmt 오류")                                                        # pylint: disable=protected-access
     except (OSError, ValueError, KeyError) as e:

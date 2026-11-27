@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """발표 자료(.pptx)의 양식 점검: 글자 크기 · 내용 영역 · 첫 요소 높이가 기준(제안 발표 자료)과 같은지 본다.
 
-  python tools/deck_check.py docs/out/IFPS_EMS_SW_화면구성_사용설명_보고자료_Rev56.pptx …
-  python tools/deck_check.py --match "⑤ EMS (하드웨어|소프트웨어)" docs/out/IFPS_제안발표_EMS보완_Rev56.pptx
+  python tools/deck_check.py docs/out/IFPS_TPCS_SW_화면구성_사용설명_보고자료_Rev56.pptx …
+  python tools/deck_check.py --match "⑤ TPCS (하드웨어|소프트웨어)" docs/out/IFPS_제안발표_EMS보완_Rev56.pptx
 
 기준(docs/ppt/deck_lib.js 의 FS · L 과 같은 값): 글자 크기는 SIZES 안, 내용은 x 0.50~12.83 · y 1.72~6.75(※ 주석은 6.82까지),
 내용의 첫 요소는 모든 장에서 y 1.72. 표지 · 맺음 장은 점검하지 않는다. --match 를 주면 그 글이 들어 있는 장만 본다(사용자 원본에 넣은 장).

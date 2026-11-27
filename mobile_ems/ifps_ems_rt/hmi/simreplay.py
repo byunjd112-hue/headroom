@@ -5,7 +5,7 @@ CSV 형식(쉼표, UTF-8)
   첫 줄   t,<신호>,<신호>…           t 는 처음부터 잰 초(0, 60, 120 …) 또는 시각(2026-05-01 13:00[:00])
   신호    대응표의 읽기 신호 이름(LOAD.p1_kw, PV.kw, ESS.soc, ENV.temp …) 또는 운전 이력(history.csv)의 열 이름(load_kw, load_p1, pv_kw, temp …)
   값      숫자. 빈 칸은 '앞 값 그대로'
-EMS 가 남긴 history.csv 를 그대로 넣어도 된다(ts 열을 시각으로 읽고, 모르는 열은 건너뛴다).
+TPCS 가 남긴 history.csv 를 그대로 넣어도 된다(ts 열을 시각으로 읽고, 모르는 열은 건너뛴다).
 줄 사이의 값은 앞 줄 값을 유지한다(계단). 상태 · 생존 계수 · 지령 신호는 넣을 수 없다 — 그것은 가상 장치가 스스로 만든다."""
 import csv, io, math, time
 from datetime import datetime

@@ -9,7 +9,7 @@ const SimReplay = {
         <label style="flex-direction:row;gap:6px;align-items:center;text-transform:none"><input type="checkbox" id="rpLoop">끝나면 처음부터</label>
         <button class="btn eng" id="rpGo">재생 시작</button><button class="btn" id="rpStop">멈춤(값 유지 해제)</button><button class="btn" id="rpSample">양식 받기</button></div>
         <div id="rpState" class="muted" style="margin-top:10px"></div>
-        <div class="muted" style="margin-top:8px;font-size:12px">형식: 첫 열 t(초) 또는 시각(2026-05-01 13:00), 나머지 열은 신호 이름(LOAD.p1_kw · PV.kw · ESS.soc · ENV.temp …). EMS 의 운전 이력(history.csv)도 그대로 넣을 수 있다. 한 번에 5,000줄 · 120KB 까지. 상태 · 지령 신호는 넣을 수 없다(가상 장치가 스스로 만든다).</div></div></div>`);
+        <div class="muted" style="margin-top:8px;font-size:12px">형식: 첫 열 t(초) 또는 시각(2026-05-01 13:00), 나머지 열은 신호 이름(LOAD.p1_kw · PV.kw · ESS.soc · ENV.temp …). TPCS 의 운전 이력(history.csv)도 그대로 넣을 수 있다. 한 번에 5,000줄 · 120KB 까지. 상태 · 지령 신호는 넣을 수 없다(가상 장치가 스스로 만든다).</div></div></div>`);
     $("#rpGo").onclick = () => { const f = $("#rpFile").files[0]; if (!f) return toast("CSV 파일을 고르십시오", "bad"); if (f.size > 120 * 1024) return toast("파일이 120KB 를 넘습니다 — 나누어 넣으십시오", "bad");
       const rd = new FileReader(); rd.onload = async () => { await act({ action: "replay", op: "start", text: String(rd.result), name: f.name, speed: +$("#rpSpeed").value, loop: $("#rpLoop").checked }); this.update(); }; rd.readAsText(f, "utf-8"); };
     $("#rpStop").onclick = async () => { await act({ action: "replay", op: "stop" }); this.update(); };

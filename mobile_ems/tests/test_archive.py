@@ -167,7 +167,7 @@ class ArchiveTest(unittest.TestCase):
     def test_receiver_rejects_bad_upload(self):
         httpd = archrecv.serve(os.path.join(self.dir, "inbox"), port=0); url = f"http://127.0.0.1:{httpd.server_address[1]}/"
         try:
-            for head, body in (({"X-EMS-File": "../x.zip"}, b"zz"), ({"X-EMS-File": "EMS_bundle_202603021000-202603021100.zip", "X-EMS-SHA256": "00"}, b"zz"), ({"X-EMS-File": "EMS_bundle_202603021000-202603021100.zip"}, b"not a zip")):
+            for head, body in (({"X-TPCS-File": "../x.zip"}, b"zz"), ({"X-TPCS-File": "EMS_bundle_202603021000-202603021100.zip", "X-TPCS-SHA256": "00"}, b"zz"), ({"X-TPCS-File": "EMS_bundle_202603021000-202603021100.zip"}, b"not a zip")):
                 with self.assertRaises(urllib.error.HTTPError) as e: urllib.request.urlopen(urllib.request.Request(url, data=body, headers=head))
                 self.assertEqual(e.exception.code, 400)
             self.assertEqual(os.listdir(os.path.join(self.dir, "inbox")), [])
@@ -223,8 +223,8 @@ class ArchiveTest(unittest.TestCase):
     def test_sequence_ppt_edit_and_errors(self):
         cases, pts, devices, prof = self._cases(); one = [c for c in cases if c["name"] == "작전지 · PV 급감과 디젤 인수"]; tl = seqppt.timeline(one[0]); self.assertEqual(tl[2], 100); self.assertEqual(tl[-1], 1200)        # 대기 100 + 판정 한도 500 + 600
         self.assertEqual(seqppt.step_of(["판정", "DG.status", "≥", "1", "700"]), {"type": "expect", "tag": "DG.status", "value": 1, "op": "ge", "ms": 700, "limit": 700}); self.assertEqual(seqppt.step_of(["지령", "DG", "", "정지", ""])["value"], 2)
-        self.assertEqual(seqppt.step_of(["EMS 정책 실행", "AUTO · 주둔지 · 자립", "", "13", ""]), {"type": "policy", "control": "auto", "mode": "grid", "posture": "자립", "hour": 13})
-        for bad in (["모름", "", "", "", ""], ["판정", "DG.status", "?", "1", "0"], ["대기", "", "", "", "abc"], ["지령", "DG", "", "켜라", ""], ["EMS 정책 실행", "AUTO · 작전지", "", "", ""]): self.assertRaises(ValueError, seqppt.step_of, bad)
+        self.assertEqual(seqppt.step_of(["TPCS 정책 실행", "AUTO · 주둔지 · 자립", "", "13", ""]), {"type": "policy", "control": "auto", "mode": "grid", "posture": "자립", "hour": 13})
+        for bad in (["모름", "", "", "", ""], ["판정", "DG.status", "?", "1", "0"], ["대기", "", "", "", "abc"], ["지령", "DG", "", "켜라", ""], ["TPCS 정책 실행", "AUTO · 작전지", "", "", ""]): self.assertRaises(ValueError, seqppt.step_of, bad)
         d = pptx.Deck(); s = d.slide(); s.box(0, 0, 5, 0.5, "시나리오: 회의 수정안").box(0, 1, 5, 0.5, "설명: 전문가 검토")
         s.table(0, 2, 12, seqppt.HEAD, [[1, "입력", "LOAD.kw", "", "120", "", "", "", ""], [2, "대기", "", "", "", "200", "", "", "여유 필요"], [3, "판정", "ESS.kw", "≥", "0", "0", "", "", ""]])
         s2 = d.slide(); s2.box(0, 0, 5, 0.5, "시나리오: 틀린 안"); s2.table(0, 2, 12, seqppt.HEAD, [[1, "입력", "NO.tag", "", "1", "", "", "", ""]])

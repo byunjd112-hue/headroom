@@ -17,7 +17,7 @@ _local = threading.local()
 
 
 def set_cancel(fn):
-    """이 가닥에서 도는 예측 계산을 그만둘지 묻는 함수를 정한다(없으면 None). EMS 가 멈출 때 뒤에서 돌던 계산을 끝내는 데 쓴다."""
+    """이 가닥에서 도는 예측 계산을 그만둘지 묻는 함수를 정한다(없으면 None). TPCS 가 멈출 때 뒤에서 돌던 계산을 끝내는 데 쓴다."""
     _local.cancel = fn
 
 

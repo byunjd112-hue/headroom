@@ -20,7 +20,7 @@ class CommandMixin:
                 self.rt.wd.kick("제어", self.rt.now()); continue
             self.busy = job
             try:
-                if job["kind"] == "auto": self._auto_control(job.get("who", "EMS"))
+                if job["kind"] == "auto": self._auto_control(job.get("who", "TPCS"))
                 elif job["kind"] == "cmd": self._do_cmd(job)
             except Exception as e:
                 self.rt.note("오류", f"지령 처리 예외: {type(e).__name__}: {e}")

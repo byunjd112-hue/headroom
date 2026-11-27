@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""EMS 실행기. 1초 주기로 장치를 읽어 품질을 확인하고, 제어 주기마다 전원 투입을 정해 지령한다.
+"""TPCS 실행기. 1초 주기로 장치를 읽어 품질을 확인하고, 제어 주기마다 전원 투입을 정해 지령한다.
 
 한 주기(scan)의 순서
   1) 수집      전 장치·경로를 동시에 읽는다(값은 경로 A 우선, 실패하면 B)
@@ -237,7 +237,7 @@ class Runtime:
         self.save_ops()
 
     def save_ops(self):
-        """운용 상태를 적어 둔다: 운용 장소 · 태세, 자동 제어 켬/끔, EMS 가 스스로 끊은 급전선. 재기동해도 운용자가 끈 자동 제어가 켜지지 않고, 끊어 둔 부하를 되살릴 수 있다."""
+        """운용 상태를 적어 둔다: 운용 장소 · 태세, 자동 제어 켬/끔, TPCS 가 스스로 끊은 급전선. 재기동해도 운용자가 끈 자동 제어가 켜지지 않고, 끊어 둔 부하를 되살릴 수 있다."""
         o = {"mode": self.mode, "posture": self.posture, "shed": sorted(self.shedder.mine), "saved": sorted(self.shedder.saved)}
         if self.ops_auto is not None: o["auto"] = bool(self.ops_auto)
         fsio.write_json(self._ops_path(), o)
@@ -383,7 +383,7 @@ class Runtime:
         return done
 
     def _blind_outage(self, t):
-        """수전점을 못 읽는 동안 정전을 미루어 본다. 상전 연계 중 ESS 는 EMS 설정값대로 충 · 방전한다. ESS 가 설정값보다 훨씬 많이 내보내는 상태가 BLIND_S 이어지면
+        """수전점을 못 읽는 동안 정전을 미루어 본다. 상전 연계 중 ESS 는 TPCS 설정값대로 충 · 방전한다. ESS 가 설정값보다 훨씬 많이 내보내는 상태가 BLIND_S 이어지면
         상전이 끊겨 ESS 가 부하를 떠안은 것(계통 형성)으로 보고 자립 운전 논리로 넘긴다. ESS 의 출력 · 설정값을 모르면 미루어 보지 않는다(ESS 충전율이 낮아질 때까지 보류)."""
         us = self.fleet.live("ESS"); sp = [self._w.get(f"{n}.kw_set") for n in us]
         if self.grid_lost or not us or None in sp or not self.fresh("ESS.kw"): self._t_blind = None; return

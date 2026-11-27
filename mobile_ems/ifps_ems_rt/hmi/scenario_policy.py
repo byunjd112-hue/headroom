@@ -1,4 +1,4 @@
-"""Run EMS policy with virtual-clock measurements and recorded plant outputs."""
+"""Run TPCS policy with virtual-clock measurements and recorded plant outputs."""
 import json
 from datetime import datetime
 from pathlib import Path

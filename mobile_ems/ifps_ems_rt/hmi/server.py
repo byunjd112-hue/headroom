@@ -26,7 +26,7 @@ def make_handler(eng):
     scenario_slot = threading.BoundedSemaphore(1)
 
     class H(BaseHTTPRequestHandler):
-        server_version = "IFPS-EMS-HMI"; sys_version = ""; timeout = 15        # 느린 연결(slowloris) 차단
+        server_version = "IFPS-TPCS-HMI"; sys_version = ""; timeout = 15        # 느린 연결(slowloris) 차단
 
         def log_message(self, format, *args):       # pylint: disable=redefined-builtin — 상위 클래스와 같은 인자 이름            # 접속 기록은 감사 기록에만(지령 계열) 남긴다
             pass
@@ -50,7 +50,7 @@ def make_handler(eng):
             self._send(code, {"ok": False, "why": why})
 
         def _sess(self, need=None):
-            s = eng.session(self.headers.get("X-EMS-Token"))
+            s = eng.session(self.headers.get("X-TPCS-Token"))
             if need is None: return s or {"role": "viewer", "name": "조회"}
             if s is None or ROLES[s["role"]] < ROLES[need]:
                 self._err(403, f"권한 필요: {need}"); return None
@@ -127,7 +127,7 @@ def make_handler(eng):
                 if p in ("/api/scenarios/pptx", "/api/scenarios/import"): return seqppt.http_post(self, eng, p)      # 시퀀스 문서(PPT) 내보내기 · 고친 문서 올리기(본문이 커서 따로 읽는다)
                 b = self._body()
                 if p == "/api/login": return self._send(200, eng.login(b.get("pin", ""), (b.get("name") or "운용자")[:24], self.client_address[0]))
-                if p == "/api/logout": return self._send(200, eng.logout(self.headers.get("X-EMS-Token")))
+                if p == "/api/logout": return self._send(200, eng.logout(self.headers.get("X-TPCS-Token")))
                 if p == "/api/scenarios/extra":                  # 시나리오용 추가 설비(모의 급전선·변압기·계전기) 저장 — 실제 대응표는 바꾸지 않는다
                     if not eng.sim: return self._err(403, "시나리오는 가상 장치 모드에서 실행할 수 있습니다")
                     s = self._sess("engineer")

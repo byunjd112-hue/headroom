@@ -39,7 +39,7 @@ class AuthMixin:
         role = "engineer" if self._pin_ok(pin, "engineer") else "operator" if self._pin_ok(pin, "operator") else None
         if role is None:
             f[0] += 1
-            if f[0] >= self.LOCK_N: f = [0, now + self.LOCK_S]; self.rt.note("보안", f"로그인 {self.LOCK_N}회 실패 — {src} {self.LOCK_S}초 잠금", actor=name); self.alarms.event(2, "EMS", f"로그인 반복 실패 — {src} 잠금")
+            if f[0] >= self.LOCK_N: f = [0, now + self.LOCK_S]; self.rt.note("보안", f"로그인 {self.LOCK_N}회 실패 — {src} {self.LOCK_S}초 잠금", actor=name); self.alarms.event(2, "TPCS", f"로그인 반복 실패 — {src} 잠금")
             else: self.rt.note("보안", f"로그인 실패(PIN 불일치) {f[0]}/{self.LOCK_N}", actor=name)
             self.fail[src] = f; return {"ok": False, "why": "PIN 불일치"}
         self.fail.pop(src, None)

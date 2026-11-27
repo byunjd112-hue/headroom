@@ -53,7 +53,7 @@ class Fleet:
         self.raw = {}; self.park = {}; self.live_now = {k: [] for k in self.slots}; self.keep = True; self.agg = {}      # keep: 인식 목록을 파일로 남길지(가상 장치 모드는 남기지 않는다)
 
     def restore(self, path):
-        """재기동 전에 인식했던 장치를 되살린다. 그래야 EMS 를 다시 켰을 때 그사이 고장 난 장치가 '설치되지 않은 장치'로 낮춰지지 않고 통신 두절(1등급)로 알려진다.
+        """재기동 전에 인식했던 장치를 되살린다. 그래야 TPCS 를 다시 켰을 때 그사이 고장 난 장치가 '설치되지 않은 장치'로 낮춰지지 않고 통신 두절(1등급)로 알려진다.
         철수한 장치는 설비 제어 화면의 − 로 지운다. 파일이 없거나 깨졌으면 아무것도 되살리지 않는다(처음 켠 것과 같다)."""
         self.path = path; known = set(self.names)
         try:

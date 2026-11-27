@@ -8,7 +8,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   p.on("pageerror", e => errs.push(String(e))); p.on("dialog", d => d.accept());
   await p.goto(B);
   const tok = await p.evaluate(async () => { const r = await (await fetch("/api/login", { method: "POST", body: JSON.stringify({ pin: "2222", name: "점검" }) })).json(); sessionStorage.setItem("ems.token", r.token); return r.token; });
-  const post = (path, body) => p.evaluate(async ([tok, path, body]) => (await fetch(path, { method: "POST", headers: { "X-EMS-Token": tok }, body: JSON.stringify(body) })).json(), [tok, path, body]);
+  const post = (path, body) => p.evaluate(async ([tok, path, body]) => (await fetch(path, { method: "POST", headers: { "X-TPCS-Token": tok }, body: JSON.stringify(body) })).json(), [tok, path, body]);
   const text = async (pg, sel, ms = 2600) => { await p.goto(B + "#" + pg); await p.waitForTimeout(ms); return p.evaluate(s => [...document.querySelectorAll(s)].map(e => e.textContent).join(" | ").replace(/\s+/g, " "), sel); };
   const loads = () => p.evaluate(async () => (await (await fetch("/api/snapshot")).json()).loads);
   const lab = i => i.n > 1 ? `${i.name} ×${i.n}` : i.name;
@@ -57,7 +57,7 @@ const { chromium } = require("playwright"); const B = process.argv[2] || "http:/
   // ── 하나씩 고르기: 추가한 장비의 모선, 나눈 부하, 결선도에서 마우스로 끌어 옮기기
   const chk = (ok, what) => { n++; if (!ok) { bad++; console.log("✕ " + what); } return ok; };
   let ic = null;      // 설치 점검: 기본 구성에서 이상 0 · 개요의 단추가 완료를 보인다. 낮(태양광이 많아 연료전지가 서 있을 때)에는 부하를 늘린 직후 예비력이 잠깐 모자라 '전원' 주의가 뜬다 — 자동 제어가 연료전지를 병렬할 때까지(제어 주기) 기다려 다시 검사한다
-  for (let k = 0; k < 30; k++) { ic = await p.evaluate(async tok => (await (await fetch("/api/archive/initcheck?run=1", { headers: { "X-EMS-Token": tok } })).json()), tok);
+  for (let k = 0; k < 30; k++) { ic = await p.evaluate(async tok => (await (await fetch("/api/archive/initcheck?run=1", { headers: { "X-TPCS-Token": tok } })).json()), tok);
     if (!(ic.ok && ic.last.items.some(i => i.level === "warn" && /^n1\./.test(i.id) && /전원 한 대가 빠지면/.test(i.text)))) break; await p.waitForTimeout(5000); }
   chk(ic.ok && ic.last.bad === 0 && ic.last.items.length > 15, "설치 점검(기본 구성): 이상 0 — " + JSON.stringify(ic.ok ? ic.last.items.filter(i => i.level === "bad").map(i => i.name) : ic.why));
   await p.goto(B + "#overview"); await p.waitForTimeout(3500); chk(await p.evaluate(() => /설치 점검 완료/.test(document.querySelector("#initBtn").textContent)), "개요의 [설치 점검] 단추가 완료를 보인다 — 남은 줄: " + JSON.stringify(ic.ok ? ic.last.items.filter(i => i.level !== "ok").map(i => i.id + ": " + i.text) : ic.why));

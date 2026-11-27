@@ -1,6 +1,6 @@
 /* 작전지 전개 현황(배치도 위 실시간 상태), 장비 사진 카드, 발전원 구성 도넛, 경보 매트릭스 */
 "use strict";
-const EQ_KIND = { GDG: "DG", GRID: "DIST", ELZ: "FC", PV: "PV", DG: "DG", G1: "DG", FC: "FC", ESS: "ESS", MTR: "DIST", DIST: "DIST", EMS: "EMS", L1: "L1", L2: "L2", L3: "L3" };
+const EQ_KIND = { GDG: "DG", GRID: "DIST", ELZ: "FC", PV: "PV", DG: "DG", G1: "DG", FC: "FC", ESS: "ESS", MTR: "DIST", DIST: "DIST", TPCS: "TPCS", L1: "L1", L2: "L2", L3: "L3" };
 function siteState(s) {
   const k = s.kpi, D = s.devices, gw = D.MTR && D.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? 1) : 1;
   const lost = n => kLost(n);
@@ -13,7 +13,7 @@ function siteState(s) {
     PV: !gw ? r("bad", "####", "게이트웨이 두절") : cb("PV") === 2 ? r("bad", "0 kW", "트립") : r(k.pv > 0.5 ? "ok" : "idle", `${F.kw(k.pv)} kW`, k.pv > 0.5 ? "발전" : "발전 없음"),
     FC: cb("FC") === 2 ? r("bad", "0 kW", "트립") : lost("FC") ? gone("FC") : r(kOn("FC") ? "ok" : "idle", `${F.kw(k.fc)} kW · H₂ ${F.n(k.h2, 0)}`, kOn("FC") ? "운전" : "정지"),
     DIST: !gw ? r("bad", "####", "게이트웨이 두절") : r((val("BUS.a_v") || 0) > 300 && (val("BUS.b_v") || 0) > 300 ? "ok" : "bad", `${F.n(val("BUS.a_v"), 0)} V · ${F.n(val("BUS.hz"), 2)} Hz`, cb("TIE") === 1 ? "모선 연계" : "연계 개방"),
-    EMS: r(s.alarm_cnt[1].act ? "bad" : "ok", `${s.auto ? "AUTO" : "MANUAL"} · ${F.n(s.stats.last_ms, 0)} ms`, s.alarm_cnt[1].act ? `긴급 경보 ${s.alarm_cnt[1].act}` : "정상"),
+    TPCS: r(s.alarm_cnt[1].act ? "bad" : "ok", `${s.auto ? "AUTO" : "MANUAL"} · ${F.n(s.stats.last_ms, 0)} ms`, s.alarm_cnt[1].act ? `긴급 경보 ${s.alarm_cnt[1].act}` : "정상"),
   };
   [["G1", "DG"], ["ESS", "ESS"], ["PV", "PV"], ["FC", "FC"]].forEach(([b, kd]) => { if (out[b].st !== "bad" && out[b].t !== "미설치") out[b].t += kCnt(kd); });       // 같은 종류 여러 대면 대수를 붙인다
   ["L1", "L2", "L3"].forEach((f, i) => { const kw = [k.l1, k.l2, k.l3][i], c = cb(f); out[f] = !gw ? r("bad", "####", "게이트웨이 두절") : c === 2 ? r("bad", "0 kW", "트립 · 정전") : c === 0 ? r("warn", "0 kW", LD.cutText(i + 1)) : LD.stage(f) === "save" ? r("warn", `${F.kw(kw)} kW`, "절감 공급 중") : r("ok", `${F.kw(kw)} kW`, "급전 중"); });
@@ -21,7 +21,7 @@ function siteState(s) {
 }
 /* 장비 카드: photos/ 폴더에 실사 이미지가 있으면 사진, 없으면 자체 벡터 일러스트 + 상태 띠 */
 api("/api/photos").then(r => { S.photos = r.files || []; S.sprites = r.sprite_meta || {}; const b = $("#siteMap"); if (b) b.dataset.sig = ""; document.querySelectorAll("[id^=art-]").forEach(g => g.dataset.sig = ""); }).catch(() => { S.photos = []; S.sprites = {}; });
-const SPR_KEY = { GDG: "gdg", GRID: "dist", DG: "dg", G1: "dg", ESS: "ess", PV: "pv", FC: "fc", DIST: "dist", MTR: "dist", EMS: "ems", FSU: "fsu", L1: "l1", L2: "l2", L3: "l3", BARRACK: "barrack" };
+const SPR_KEY = { GDG: "gdg", GRID: "dist", DG: "dg", G1: "dg", ESS: "ess", PV: "pv", FC: "fc", DIST: "dist", MTR: "dist", TPCS: "ems", FSU: "fsu", L1: "l1", L2: "l2", L3: "l3", BARRACK: "barrack" };
 /* 실사 스프라이트(투명 배경). 상태: 정지 → 채도·밝기 낮춤, 고장·두절 → 적색 착색 */
 function spriteSvg(kind, st, cx, by, w) {
   const k = SPR_KEY[kind], m = S.sprites && S.sprites[k]; if (!m) return null;
@@ -45,10 +45,10 @@ function mixDonut(parts, total, size = 148) {
 }
 
 /* 경보 매트릭스(장비 × 우선순위) */
-const MTX_ROWS = [["DG", ["DG", "CB-DG"]], ["FC·수전해", ["FC", "CB-FC", "ELZ"]], ["ESS", ["ESS", "CB-ESS"]], ["PV·계측", ["MTR", "CB-PV", "PV"]], ["모선·배전", ["BUS-A", "BUS-B", "CB-TIE", "CB-G1"]], ["부하", ["CB-L1", "CB-L2", "CB-L3"]], ["EMS·기타", ["EMS"]]];
+const MTX_ROWS = [["DG", ["DG", "CB-DG"]], ["FC·수전해", ["FC", "CB-FC", "ELZ"]], ["ESS", ["ESS", "CB-ESS"]], ["PV·계측", ["MTR", "CB-PV", "PV"]], ["모선·배전", ["BUS-A", "BUS-B", "CB-TIE", "CB-G1"]], ["부하", ["CB-L1", "CB-L2", "CB-L3"]], ["TPCS·기타", ["TPCS"]]];
 const MTX_KNOWN = new Set(MTX_ROWS.flatMap(r => r[1]));
 function alarmMatrix(alarms) {
-  const cnt = MTX_ROWS.map(([, srcs]) => [1, 2, 3, 4].map(p => alarms.filter(a => a.prio === p && (srcs.includes(a.src) || (srcs[0] === "EMS" && !MTX_KNOWN.has(a.src))) && (a.state === "ACT" || !a.acked)).length));   // 표에 없는 출처는 마지막 줄에 모은다(머리줄 합계와 일치)
+  const cnt = MTX_ROWS.map(([, srcs]) => [1, 2, 3, 4].map(p => alarms.filter(a => a.prio === p && (srcs.includes(a.src) || (srcs[0] === "TPCS" && !MTX_KNOWN.has(a.src))) && (a.state === "ACT" || !a.acked)).length));   // 표에 없는 출처는 마지막 줄에 모은다(머리줄 합계와 일치)
   return `<div class="mtx"><span></span>${[1, 2, 3, 4].map(p => `<span class="mh">${prioTxt(p)}</span>`).join("")}
     ${MTX_ROWS.map(([nm], i) => `<span class="mr">${nm}</span>${cnt[i].map((n, j) => `<span class="mc ${n ? "p" + (j + 1) : ""}">${n}</span>`).join("")}`).join("")}</div>`;
 }
@@ -59,14 +59,14 @@ const _mapI = new Iso(MAP_O[0], MAP_O[1], MAP_S);
 const LB = ["L1", "L2", "L3"];
 const LAY_KINDS = {
   DG: { nm: "복합전력(디젤)", bind: "G1", binds: ["G1"] }, ESS: { nm: "이동형 ESS", bind: "ESS", binds: ["ESS"] }, PV: { nm: "이동형 PV", bind: "PV", binds: ["PV"] },
-  FC: { nm: "수소생성·발전", bind: "FC", binds: ["FC"] }, DIST: { nm: "배전·변압", bind: "DIST", binds: ["DIST"] }, EMS: { nm: "EMS 쉘터", bind: "EMS", binds: ["EMS"] },
+  FC: { nm: "수소생성·발전", bind: "FC", binds: ["FC"] }, DIST: { nm: "배전·변압", bind: "DIST", binds: ["DIST"] }, TPCS: { nm: "TPCS 쉘터", bind: "TPCS", binds: ["TPCS"] },
   FSU: { nm: "구간분전함(FSU)", bind: "", binds: [""] }, BARRACK: { nm: "막사", bind: "L2", binds: LB },
   L1: { nm: "지휘통제 천막", bind: "L1", binds: LB }, L2: { nm: "의무 천막", bind: "L2", binds: LB }, L3: { nm: "탄약고", bind: "L3", binds: LB },
 };
-const BIND_TXT = { G1: "① 복합전력", ESS: "② ESS", PV: "③ PV", FC: "④ 수소", DIST: "⑥ 배전·변압", EMS: "⑤ EMS", L1: "1등급 부하", L2: "2등급 부하", L3: "3등급 부하", "": "—" };
+const BIND_TXT = { G1: "① 복합전력", ESS: "② ESS", PV: "③ PV", FC: "④ 수소", DIST: "⑥ 배전·변압", TPCS: "⑤ TPCS", L1: "1등급 부하", L2: "2등급 부하", L3: "3등급 부하", "": "—" };
 const LAY_DEFAULT = [
   ["DG", "G1", "① 기동형 복합전력", 230, 330], ["ESS", "ESS", "② 이동형 ESS(GFM)", 500, 300], ["PV", "PV", "③ 이동형 PV", 850, 225], ["FC", "FC", "④ 수소생성·발전", 1250, 300],
-  ["DIST", "DIST", "⑥ 배전·변압", 810, 500], ["EMS", "EMS", "⑤ EMS 중앙제어", 1400, 540],
+  ["DIST", "DIST", "⑥ 배전·변압", 810, 500], ["TPCS", "TPCS", "⑤ TPCS 중앙제어", 1400, 540],
   ["L1", "L1", "지휘통제(C2)", 230, 740], ["L2", "L2", "의무시설", 780, 820], ["L3", "L3", "탄약저장", 1380, 770],
   ["BARRACK", "L2", "막사 #1", 1040, 800], ["BARRACK", "L2", "막사 #2", 520, 820],
   ...[[400, 450], [630, 420], [1020, 410], [1180, 460], [500, 630], [800, 670], [1130, 640]].map((c, i) => ["FSU", "", `FSU-${i + 1}`, c[0], c[1]]),
@@ -110,10 +110,10 @@ function layCables(items) {
   const hubs = fsu.length ? fsu : dist;
   if (!ring) dist.forEach(d => fsu.slice().sort((a, b) => _d2(a, d) - _d2(b, d)).slice(0, 2).forEach(f => cab.push([pt(d), pt(f), "RING"])));
   items.filter(i => i.kind !== "FSU" && i.kind !== "DIST").forEach(i => {
-    if (!hubs.length) return; const src = ring && dist.length && ["DG", "ESS", "PV", "FC", "EMS"].includes(i.kind);      // 환망을 감시 중이면 결선도와 같게: 발전 장비 · EMS 는 배전 · 변압(모선)으로, 부하 시설은 가까운 구간분전함으로
+    if (!hubs.length) return; const src = ring && dist.length && ["DG", "ESS", "PV", "FC", "TPCS"].includes(i.kind);      // 환망을 감시 중이면 결선도와 같게: 발전 장비 · TPCS 는 배전 · 변압(모선)으로, 부하 시설은 가까운 구간분전함으로
     const own = i.fsu && fsu.find(f => _fsuNo(f) === i.fsu);                   // 부하 목록이 정한 구간분전함(그 부하가 물린 배전체계가 붙은 곳) — 결선도와 같은 자리
     const h = own || (src ? dist : hubs).slice().sort((a, b) => _d2(a, i) - _d2(b, i))[0];
-    cab.push([pt(i), pt(h), i.kind === "EMS" ? "EMSP" : (i.bind || "RING")]);
+    cab.push([pt(i), pt(h), i.kind === "TPCS" ? "EMSP" : (i.bind || "RING")]);
   });
   return cab;
 }
@@ -174,7 +174,7 @@ function mapEqSt(s, it) {
   if (c === 0) return { on: false };                                   // 차단기 개방 → 정지 표시
   if (u && KF(LAY_FLEET[it.kind]).units.length > 1) return { on: it.kind === "ESS" ? u.live : it.kind === "PV" ? u.live && k.pv > .5 : u.on, lost: !u.live, soc: it.kind === "ESS" && u.soc != null ? Math.round(u.soc / 5) * 5 : undefined };     // 여러 대면 장치마다 제 상태
   return ({ G1: { on: kOn("DG"), lost: lost("DG") }, ESS: { on: true, lost: lost("ESS"), soc: Math.round(k.soc / 5) * 5 }, PV: { on: k.pv > .5 }, FC: { on: kOn("FC"), lost: lost("FC") },
-    DIST: { on: true, lost: lost("MTR") }, EMS: { on: true } })[b] || { on: true };
+    DIST: { on: true, lost: lost("MTR") }, TPCS: { on: true } })[b] || { on: true };
 }
 function siteMapSvg(s) {
   const I = _mapI, items = L.view || L.items || [], cab = L.cab = layCables(items); let g = "";
@@ -191,19 +191,19 @@ function siteMapSvg(s) {
     <path d="M0 210 L160 150 L330 200 L470 140 L640 205 L820 150 L980 210 L1150 150 L1330 205 L1480 160 L1600 190 L1600 330 L0 330Z" fill="url(#mTr)" opacity=".7"/>
     <path d="M0 255 Q800 225 1600 255 L1600 900 L0 900Z" fill="url(#mGnd)"/><path d="M0 255 Q800 225 1600 255 L1600 900 L0 900Z" fill="url(#mGv)" opacity=".55"/>
     ${L.edit ? `<path d="M0 255 Q800 225 1600 255 L1600 900 L0 900Z" fill="url(#mGrid)"/>` : ""}`;
-  const ems = items.find(i => i.kind === "EMS");
-  /* 통신선은 전력 케이블과 같은 경로로 간다(복합 케이블 · 같은 관로): 발전 장비 ↔ 배전 · 변압 ↔ EMS, 그리고 구간분전함을 도는 환형. 한 구간이 끊겨도 반대 방향으로 EMS 에 닿는다.
-     EMS 에서 장치마다 따로 끄는 방사형으로 그리지 않는다(구간 손실 때 통신이 함께 끊기는 구조로 보인다 — 사용자 지적) */
+  const ems = items.find(i => i.kind === "TPCS");
+  /* 통신선은 전력 케이블과 같은 경로로 간다(복합 케이블 · 같은 관로): 발전 장비 ↔ 배전 · 변압 ↔ TPCS, 그리고 구간분전함을 도는 환형. 한 구간이 끊겨도 반대 방향으로 TPCS 에 닿는다.
+     TPCS 에서 장치마다 따로 끄는 방사형으로 그리지 않는다(구간 손실 때 통신이 함께 끊기는 구조로 보인다 — 사용자 지적) */
   const rgc = !L.edit && s.ring ? s.ring : null;
   cab.forEach(([a, b, f]) => { if (["L1", "L2", "L3", "RING"].includes(f)) return; const sec = /^RS\d+$/.test(f) && rgc ? rgc.sections[+f.slice(2)] : null, up = f === "EMSP" ? [9, 5] : [7];
-    up.forEach(o => { g += `<path d="${_cabPath([a[0], a[1] - o], [b[0], b[1] - o])}" class="mcom ${sec && sec.state === 2 ? "cut" : ""}" fill="none"/>`; }); });      // EMS ↔ 배전 · 변압 구간은 A · B 두 줄
+    up.forEach(o => { g += `<path d="${_cabPath([a[0], a[1] - o], [b[0], b[1] - o])}" class="mcom ${sec && sec.state === 2 ? "cut" : ""}" fill="none"/>`; }); });      // TPCS ↔ 배전 · 변압 구간은 A · B 두 줄
   cab.forEach(([a, b, f], i) => { const d = _cabPath(a, b); g += `<path d="${d}" class="mcab" fill="none"/><path d="${d}" class="mflow" id="mf-${i}" fill="none"/>`; });
   items.slice().sort((a, b) => a.y - b.y).forEach(it => {
     const kind = it.kind === "BARRACK" ? "BARRACK" : it.kind, [Lx, Ly] = ISO_EXT[kind] || ISO_EXT.FSU, [wx, wy] = mapWorld(it.x, it.y), [px, py] = I.p(wx - Lx / 2, wy - Ly / 2, 0);
     const sel = L.edit && L.sel === it.uid;
     g += `<g class="meq ${L.edit ? "editable" : ""} ${sel ? "sel" : ""}" data-uid="${it.uid}">${sel ? `<ellipse cx="${it.x}" cy="${it.y}" rx="${(Lx + Ly) * ISO_C * MAP_S * .62}" ry="${(Lx + Ly) * ISO_S * MAP_S * .62}" class="msel"/>` : ""}${spriteSvg(kind, mapEqSt(s, it), it.x, it.y + (Lx + Ly) * ISO_S * MAP_S / 2 + 6, (Lx + Ly) * ISO_C * MAP_S * (kind === "FSU" ? 1.5 : kind === "PV" ? .78 : 1.12) * (it.sc || 1) * (it.s || 1)) || isoPlace(kind, mapEqSt(s, it), px, py, MAP_S)}</g>`;
   });
-  if (ems && !L.edit) g += `<text x="${Math.min(MAP_W - 190, Math.max(190, ems.x))}" y="${ems.y + 58}" text-anchor="middle" class="mfsu sec">EMS 전원: 배전 모선(주) · 차량 28 V(예비) · 내장 무정전 전원</text><text x="${Math.min(MAP_W - 190, Math.max(190, ems.x))}" y="${ems.y + 72}" text-anchor="middle" class="mfsu sec">통신: 전력 케이블과 같은 경로 · 구간분전함은 환형</text>`;      // 하드웨어 설계의 전원 이중화
+  if (ems && !L.edit) g += `<text x="${Math.min(MAP_W - 190, Math.max(190, ems.x))}" y="${ems.y + 58}" text-anchor="middle" class="mfsu sec">TPCS 전원: 배전 모선(주) · 차량 28 V(예비) · 내장 무정전 전원</text><text x="${Math.min(MAP_W - 190, Math.max(190, ems.x))}" y="${ems.y + 72}" text-anchor="middle" class="mfsu sec">통신: 전력 케이블과 같은 경로 · 구간분전함은 환형</text>`;      // 하드웨어 설계의 전원 이중화
   const rg = !L.edit && s.ring ? s.ring : null;                                    // 구간분전함 이름표(환망 화면의 이름과 같다)
   if (rg && !MK.fsuOn()) items.filter(i => i.kind === "FSU").forEach(it => { const f = rg.fsu.find(x => x.id === _fsuNo(it)); if (f) g += `<text x="${it.x}" y="${it.y + 34}" text-anchor="middle" class="mfsu ${f.live === false || f.comm === false ? "bad" : ""}">${esc(f.name)}${f.comm === false ? " · 통신 고립" : ""}</text>`; });      // 글상자를 숨겼을 때는 그림 아래에 이름을 쓴다
   const dst = rg && items.find(i => i.kind === "DIST");                            // 고리가 닫히는 곳: 첫 · 마지막 구간분전함은 배전 · 변압 안의 모선에서 만난다
@@ -291,10 +291,10 @@ function siteUpdate(s, force) {
     if (force || box.dataset.sig !== sig) { box.dataset.sig = sig; box.innerHTML = siteMapSvg(s); layBindDrag(); }
     const D = s.devices, gw = D.MTR && D.MTR.link !== "두절", cb = f => gw ? Math.round(val("CB." + f) ?? 1) : 1, k = s.kpi;
     const busLive = (val("BUS.a_v") ?? 440) > 300 || (val("BUS.b_v") ?? 440) > 300;
-    const flow = { G1: kOn("DG") ? k.dg : 0, ESS: Math.abs(k.ess), PV: k.pv, FC: k.fc, L1: k.l1, L2: k.l2, L3: k.l3, RING: k.load, EMSP: 1, DIST: k.load, EMS: 1 };
+    const flow = { G1: kOn("DG") ? k.dg : 0, ESS: Math.abs(k.ess), PV: k.pv, FC: k.fc, L1: k.l1, L2: k.l2, L3: k.l3, RING: k.load, EMSP: 1, DIST: k.load, TPCS: 1 };
     (L.cab || []).forEach(([a, b, f], i) => {
       const e = document.getElementById("mf-" + i); if (!e) return; const sec = /^RS\d+$/.test(f) && s.ring ? s.ring.sections[+f.slice(2)] : null;      // 환망 구간: 차단 2 → 고장 표시, 개방 0 → 꺼짐(상시 개방점)
-      const c = sec ? (sec.state == null ? 1 : sec.state) : ["RING", "EMSP", "DIST", "EMS", ""].includes(f) ? 1 : cb(f); if (sec) flow[f] = k.load;
+      const c = sec ? (sec.state == null ? 1 : sec.state) : ["RING", "EMSP", "DIST", "TPCS", ""].includes(f) ? 1 : cb(f); if (sec) flow[f] = k.load;
       const cls = c === 2 ? "flt" : c === 0 || !busLive ? "off" : (flow[f] || 0) > .5 ? "on" : "idle";
       e.setAttribute("class", "mflow " + cls); e.style.animationDirection = f === "ESS" && k.ess < 0 ? "reverse" : "normal";
       e.style.animationDuration = Math.max(.6, 2.4 - Math.min(1, (flow[f] || 0) / 150) * 1.8) + "s";
@@ -404,7 +404,7 @@ async function laySync(fresh) {
 }
 function layDelete() {
   const it = L.items.find(i => i.uid === L.sel); if (!it) return;
-  if (["DIST", "EMS"].includes(it.kind) && L.items.filter(i => i.kind === it.kind).length === 1 && !confirm(`마지막 ${LAY_KINDS[it.kind].nm}입니다. 삭제합니까?`)) return;
+  if (["DIST", "TPCS"].includes(it.kind) && L.items.filter(i => i.kind === it.kind).length === 1 && !confirm(`마지막 ${LAY_KINDS[it.kind].nm}입니다. 삭제합니까?`)) return;
   const v = layLoads(L.items, true).find(q => q.uid === it.uid); (L.gone = L.gone || []).push({ kind: it.kind, load: v && !v.spare ? v.load : null, fresh: !!it.fresh });      // 저장할 때 장비 · 부하도 뺄지 묻는다(layDrop)
   L.items = L.items.filter(i => i.uid !== it.uid); L.sel = null; L.dirty = true; siteRebuild();
 }

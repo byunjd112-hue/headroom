@@ -1,5 +1,5 @@
 @echo off
-REM 이동형 전력체계 EMS - 기록 조회기(읽기 전용). EMS 를 켜지 않고 보관소 파일(archive.db)만 읽는다
+REM 이동형 전력체계 TPCS - 기록 조회기(읽기 전용). TPCS 를 켜지 않고 보관소 파일(archive.db)만 읽는다
 chcp 65001 >nul
 set PYTHONUTF8=1
 cd /d "%~dp0"

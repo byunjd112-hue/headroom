@@ -6,7 +6,7 @@
   · 저장 전에 반드시 검사한다. 오류가 있으면 저장하지 않는다.
   · 저장할 때마다 이전 판을 config/backup 에 남기고, 임시 파일에 쓴 뒤 바꿔치기한다(쓰는 중 전원이 꺼져도 원본 보존).
   · PIN·키 값은 화면에 '********' 로 가려 보내고, 그대로 돌아오면 기존 값을 유지한다.
-  · 저장한 설정은 EMS 를 다시 기동해야 적용된다(운전 중인 값은 바꾸지 않는다).
+  · 저장한 설정은 TPCS 를 다시 기동해야 적용된다(운전 중인 값은 바꾸지 않는다).
 """
 import csv, difflib, hashlib, io, json, math, os, re, tempfile, time
 from .. import modbus as mb, fsio
@@ -68,7 +68,7 @@ def _check_path(n, p, u, bad, units, allow=None):
     ok = isinstance(p, list) and len(p) == 2 and isinstance(p[0], str) and re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", p[0]) and isinstance(p[1], int) and 1 <= p[1] <= 65535
     if not ok: bad.append(f"devices.{n}.paths: [\"IP\", 포트] 형식 오류 {p}")
     elif any(int(x) > 255 for x in p[0].split(".")): bad.append(f"devices.{n}.paths: IP 범위 오류 {p[0]}")
-    elif allow is not None and not mb.allowed(p[0], allow): bad.append(f"devices.{n}.paths: {p[0]} 는 허용 대역(allow) 밖 — 이대로 저장하면 EMS 가 기동하지 못함")
+    elif allow is not None and not mb.allowed(p[0], allow): bad.append(f"devices.{n}.paths: {p[0]} 는 허용 대역(allow) 밖 — 이대로 저장하면 TPCS 가 기동하지 못함")
     elif (p[0], p[1], u) in units: bad.append(f"devices.{n}: 주소·Unit ID 가 {units[(p[0], p[1], u)]} 과 같음 ({p[0]}:{p[1]} unit {u})")
     else: units[(p[0], p[1], u)] = n
 

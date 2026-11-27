@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""이동형 전력체계 EMS 핵심 프로그램.
+"""이동형 전력체계 TPCS 핵심 프로그램.
 
 예측(forecast), 24시간 운전계획(dispatch), 운영 감시 판정(supervisor), 감사 기록(security),
 태양 위치(solar), 자료 입출력(dataio)을 담는다. 이 패키지는 통신 모듈(socket 등)을 쓰지 않는다.

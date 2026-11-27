@@ -78,7 +78,7 @@ class Plant:
         if dev in self.later and now >= self.later[dev][0]: self.set(f"{dev}.status", self.later.pop(dev)[1])
 
     def _tick_shed(self):
-        """EMS 부하 지령 → 복구(1) · 차단(2)은 보호 IED 가 차단기를 조작하고, 절감 공급(3)은 그 급전선의 줄일 수 있는 부하만 줄인다(차단기는 그대로)."""
+        """TPCS 부하 지령 → 복구(1) · 차단(2)은 보호 IED 가 차단기를 조작하고, 절감 공급(3)은 그 급전선의 줄일 수 있는 부하만 줄인다(차단기는 그대로)."""
         for f, tag in (("L2", "LOAD.p2_kw"), ("L3", "LOAD.p3_kw")):
             t = f"LDS.{f}"; v = int(round(self.get(t))) if t in self.by_tag else 0
             if v not in (1, 2, 3): continue
@@ -165,7 +165,7 @@ class Plant:
         if tied and "GDG.status" in self.by_tag:
             self.set("GDG.kw", 0.0)
             if int(round(g("CB.GDG"))) != 2: self.set("CB.GDG", 0)
-        if tied:                                                             # 상전 연계: ESS 는 EMS 지령대로(충전율 한계 안에서), 나머지는 상전이 메운다
+        if tied:                                                             # 상전 연계: ESS 는 TPCS 지령대로(충전율 한계 안에서), 나머지는 상전이 메운다
             soc = soc_avg; sp = ess_set; ess = (min(sp, 500.0 * n_e) if soc > 10.5 else min(sp, 0.0)) if sp >= 0 else (max(sp, -500.0 * n_e) if soc < 89.5 else 0.0)
             ess *= ce; grid = net - ess
             self._exp_t = self._exp_t if (grid < -20 and self._exp_t is not None) else now

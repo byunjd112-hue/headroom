@@ -151,14 +151,14 @@ const ISO_MODELS = {
     for (let i = 0; i < 6; i++) { const [a, b] = I.p(1 + i * 1.3, 3.6, .1), [c2, d2] = I.p(.6 + i * 1.4, 6.4, 0); s += `<path d="M${a} ${b} Q${(a + c2) / 2 - 10} ${(b + d2) / 2 + 8} ${c2} ${d2}" stroke="#15170f" stroke-width="${I.S * .16}" fill="none"/>`; }
     return s + lamp(I, 8.6, 3.0, 3.1, st.lost ? "#ff5148" : st.on ? "#8fd36a" : "#f0b23a", true);
   },
-  EMS(I, st) {
+  TPCS(I, st) {
     let s = I.shadow(0, 0, 9, 3) + I.box(-.2, -.2, 0, 9.4, 3.4, .3, { t: "#4a503a", l: "#363b2a", r: "#2b2f21" });
     let con = ""; const scr = st.on === false ? "#203028" : "#34d2a8";
     for (let i = 0; i < 4; i++) con += `<rect x="${.7 + i * 1.75}" y="1.55" width="1.5" height=".75" fill="#2c3124"/><rect x="${.8 + i * 1.75}" y=".7" width=".62" height=".42" fill="#0a1218"/><rect x="${1.48 + i * 1.75}" y=".7" width=".62" height=".42" fill="#0a1218"/>
       <path d="M${.85 + i * 1.75} 1.0 l.15 -.1 .12 .06 .14 -.16 .12 .08" stroke="${scr}" stroke-width=".035" fill="none"/><rect x="${1.53 + i * 1.75}" y=".76" width=".5" height=".08" fill="${scr}" opacity=".7"/><rect x="${1.53 + i * 1.75}" y=".9" width=".32" height=".08" fill="#e6c552" opacity=".7"/>
       <rect x="${1.05 + i * 1.75}" y="1.25" width=".7" height=".3" rx=".1" fill="#1b1e16"/>`;
     s += isoContainer(I, 0, 0, .3, 8.8, 3.0, 2.7, { inL: `<rect x=".35" y=".25" width="8.1" height="2.25" fill="#141811"/><rect x=".35" y=".25" width="8.1" height="2.25" fill="#34d2a8" opacity="${st.on === false ? 0 : .05}"/>${con}`, label: "" });
-    s += I.faceL(0, 3.0, .3, 2.7, `<text x=".35" y="-.12" font-size=".3" font-family="Consolas,monospace" font-weight="700" fill="${OD.sten}" opacity=".7">IFPS EMS · C2 SHELTER</text>`);
+    s += I.faceL(0, 3.0, .3, 2.7, `<text x=".35" y="-.12" font-size=".3" font-family="Consolas,monospace" font-weight="700" fill="${OD.sten}" opacity=".7">IFPS TPCS · C2 SHELTER</text>`);
     const [ax, ay] = I.p(7.8, .6, 3.0); s += `<line x1="${ax}" y1="${ay}" x2="${ax}" y2="${ay - I.S * 2.2}" stroke="#3b4130" stroke-width="2"/><circle cx="${ax}" cy="${ay - I.S * 2.2}" r="${I.S * .14}" fill="#c9cba8"/>`;
     return s + lamp(I, 8.6, 3.0, 2.8, st.lost ? "#ff5148" : "#8fd36a", true);
   },
@@ -192,7 +192,7 @@ const ISO_MODELS = {
   L2(I, st) { return ISO_MODELS.TENT(I, st, { cross: true, w: 6.5 }); },
   L3(I, st) { return ISO_MODELS.AMMO(I, st); },
 };
-const ISO_EXT = { ESS: [10.2, 2.6, 4.2], PV: [10.6, 10.9, 4.6], FC: [11, 2.6, 4.2], DG: [9.4, 2.6, 4.8], G1: [9.4, 2.6, 4.8], DIST: [9.6, 6.6, 3.5], MTR: [9.6, 6.6, 3.5], EMS: [9.4, 3.4, 5.4], FSU: [1.8, 1.6, 1.8], L1: [7, 4.5, 5.5], L2: [6.8, 4.2, 3.2], L3: [6.2, 4.6, 1.6], BARRACK: [9.4, 4.5, 3.2] };
+const ISO_EXT = { ESS: [10.2, 2.6, 4.2], PV: [10.6, 10.9, 4.6], FC: [11, 2.6, 4.2], DG: [9.4, 2.6, 4.8], G1: [9.4, 2.6, 4.8], DIST: [9.6, 6.6, 3.5], MTR: [9.6, 6.6, 3.5], TPCS: [9.4, 3.4, 5.4], FSU: [1.8, 1.6, 1.8], L1: [7, 4.5, 5.5], L2: [6.8, 4.2, 3.2], L3: [6.2, 4.6, 1.6], BARRACK: [9.4, 4.5, 3.2] };
 /* 단독 그림: 뷰박스에 맞춰 축척 자동 계산 */
 function isoArt(kind, st = {}, W = 400, H = 250, pad = 14) {
   const [Lx, Ly, Lz] = ISO_EXT[kind] || ISO_EXT.DIST, oy0 = 0;

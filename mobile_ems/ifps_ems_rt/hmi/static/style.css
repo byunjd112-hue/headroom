@@ -1,4 +1,4 @@
-/* IFPS Mobile EMS — Control Room HMI
+/* IFPS TPCS — Control Room HMI
    설계 원칙: 고성능 HMI(ISA-101) — 정상은 차분한 무채색, 색은 상태·이상을 알릴 때만 쓴다. */
 :root {
   --bg: #090d13; --bg2: #0d131b; --panel: #111923; --panel2: #16212d; --panel3: #1b2836;

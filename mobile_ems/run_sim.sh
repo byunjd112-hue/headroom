@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 이동형 전력체계 EMS - 가상 장치 모드
+# 이동형 전력체계 TPCS - 가상 장치 모드
 set -e; cd "$(dirname "$0")"
 python3 -c "import numpy" 2>/dev/null || python3 -m pip install -r requirements.txt
 if [ ! -f results/model_pv.npz ]; then

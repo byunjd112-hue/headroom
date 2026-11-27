@@ -36,7 +36,7 @@ const P_LOADS = {
         절감 공급은 그 급전선의 '절감 비율'만큼만 줄인다(냉난방 완화 · 조명 감광 · 비필수 회로). 태세(저소음 · 자립)나 ESS 충전율 때문에 끊을 때는 절감을 거치지 않고 바로 끊는다.</div>
       <div class="panel"><div class="hd"><h3>부하 목록</h3><div class="spacer"></div><select class="in" id="ldKind"></select><button class="btn go" id="ldAdd">＋ 부하 추가</button></div>
         <div class="bd np"><table class="t"><thead><tr><th>이름</th><th>종류</th><th>등급</th><th>공급 경로</th><th class="n">대당 정격</th><th style="text-align:center">수량</th><th class="n">정격 합</th><th class="n">지금(추정)</th><th class="n">절감 비율</th><th>상태</th><th></th></tr></thead><tbody id="ldRows"></tbody></table></div>
-        <div class="bd muted" style="font-size:12px;border-top:1px solid var(--line)">EMS 가 재는 것은 급전선(등급)별 합계다. 부하 하나하나의 '지금' 값은 급전선 계측값을 정격 비율로 나눈 추정값이다. 등급별 정격 합은 그 급전선의 계측 범위를 넘을 수 없다(<span id="ldLim"></span>). <b>배전체계(PPDU-20)</b>는 부하를 늘리면 필요한 대수가 자동으로 늘어 부하 앞에 짝지어진다: <span id="ldPp"></span>.</div></div>
+        <div class="bd muted" style="font-size:12px;border-top:1px solid var(--line)">TPCS 가 재는 것은 급전선(등급)별 합계다. 부하 하나하나의 '지금' 값은 급전선 계측값을 정격 비율로 나눈 추정값이다. 등급별 정격 합은 그 급전선의 계측 범위를 넘을 수 없다(<span id="ldLim"></span>). <b>배전체계(PPDU-20)</b>는 부하를 늘리면 필요한 대수가 자동으로 늘어 부하 앞에 짝지어진다: <span id="ldPp"></span>.</div></div>
       <div class="panel" style="margin-top:14px;display:none" id="ldEdit"></div>`;
     $("#ldReset").onclick = () => { if (confirm("부하 목록을 기본으로 되돌립니다. 계속합니까?")) this.post({ op: "reset" }); };
     $("#ldAdd").onclick = () => this.post({ op: "add", kind: $("#ldKind").value });
@@ -55,7 +55,7 @@ const P_LOADS = {
         <div><div class="lab">정격 합</div><div style="font-size:18px">${F.n(g.rated, 0)} kW</div></div><div><div class="lab">부하</div><div style="font-size:18px">${g.n}개</div></div>
         <div><div class="lab">절감 가능</div><div style="font-size:18px">${g.grade === 1 ? "—" : Math.round(g.save_frac * 100) + "%"}</div></div></div>
         <div style="margin-top:8px;font-size:12.5px;min-height:18px"><span class="muted">이 등급의 부하: </span>${esc(LD.names(g.feeder).join(", ")) || '<span class="muted">없음 — 목록에서 [고치기]로 등급을 바꾸거나 [＋ 부하 추가]</span>'}</div>
-        <div class="muted" style="margin-top:6px;min-height:18px;font-size:12px">${g.auto ? `EMS 자동 ${g.auto === "save" ? "절감" : "차단"} — ${esc(g.why)}` : g.grade === 1 ? "끊지 않는 부하(지휘 · 통신)" : "CB-" + g.feeder}</div>
+        <div class="muted" style="margin-top:6px;min-height:18px;font-size:12px">${g.auto ? `TPCS 자동 ${g.auto === "save" ? "절감" : "차단"} — ${esc(g.why)}` : g.grade === 1 ? "끊지 않는 부하(지휘 · 통신)" : "CB-" + g.feeder}</div>
         ${g.grade === 1 ? "" : `<div style="display:flex;gap:6px;margin-top:8px"><button class="btn sm" data-lds="${g.feeder}" data-v="3">절감 공급</button><button class="btn sm stop" data-lds="${g.feeder}" data-v="2">차단</button><button class="btn sm go" data-lds="${g.feeder}" data-v="1">복구</button></div>`}</div></div>`).join("");
     $$("#ldGrades [data-lds]").forEach(b => b.onclick = () => sbo("MTR", "set", { tag: "LDS." + b.dataset.lds, value: +b.dataset.v, label: `${b.dataset.lds === "L2" ? "2등급" : "3등급"} 부하 ${{ 1: "복구", 2: "차단", 3: "절감 공급" }[b.dataset.v]}` }));
   },

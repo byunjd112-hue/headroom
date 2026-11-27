@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""주둔지 서버 쪽 수신기(참조 구현): 현장 EMS 가 올린 기록 묶음을 받아 검사하고 폴더에 둔다.
+"""주둔지 서버 쪽 수신기(참조 구현): 현장 TPCS 가 올린 기록 묶음을 받아 검사하고 폴더에 둔다.
 
   python -m ifps_ems_rt.archrecv <받을 폴더> [--bind 0.0.0.0] [--port 8092]
 받으면 manifest 와 파일별 SHA-256 을 맞춰 본 뒤 저장하고, 받은 묶음 전체의 SHA-256 을 돌려준다(보낸 쪽이 이것으로 전달 완료를 적는다).
@@ -16,7 +16,7 @@ def make_handler(folder):
     lock = threading.Lock()
 
     class H(BaseHTTPRequestHandler):
-        server_version = "IFPS-EMS-ARCHRECV"; sys_version = ""; timeout = 60
+        server_version = "IFPS-TPCS-ARCHRECV"; sys_version = ""; timeout = 60
 
         def log_message(self, format, *args):       # pylint: disable=redefined-builtin
             pass
@@ -26,11 +26,11 @@ def make_handler(folder):
 
         def do_POST(self):
             try:
-                n = int(self.headers.get("Content-Length") or 0); name = self.headers.get("X-EMS-File") or ""
+                n = int(self.headers.get("Content-Length") or 0); name = self.headers.get("X-TPCS-File") or ""
                 if not 0 < n <= MAX_BODY: return self._send(413, {"ok": False, "why": "본문 길이 오류"})
                 if not re.fullmatch(r"EMS_bundle_\d{12}-\d{12}\.zip", name): return self._send(400, {"ok": False, "why": "파일 이름 형식 오류"})
                 body = self.rfile.read(n); sha = hashlib.sha256(body).hexdigest()
-                if sha != (self.headers.get("X-EMS-SHA256") or sha): return self._send(400, {"ok": False, "why": "SHA-256 불일치(전송 중 손상)"})
+                if sha != (self.headers.get("X-TPCS-SHA256") or sha): return self._send(400, {"ok": False, "why": "SHA-256 불일치(전송 중 손상)"})
                 man = archxfer.verify(body)
                 with lock:
                     with open(os.path.join(folder, name), "wb") as f: f.write(body)

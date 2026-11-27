@@ -11,8 +11,8 @@ const KN = { PV: "태양광", DG: "디젤 발전기", FC: "연료전지", ESS: "
   p.on("pageerror", e => errs.push(String(e))); p.on("dialog", d => d.accept());
   await p.goto(B);
   const tok = await p.evaluate(async () => { const r = await (await fetch("/api/login", { method: "POST", body: JSON.stringify({ pin: "2222", name: "점검" }) })).json(); sessionStorage.setItem("ems.token", r.token); return r.token; });
-  const post = (path, body) => p.evaluate(async ([tok, path, body]) => (await fetch(path, { method: "POST", headers: { "X-EMS-Token": tok }, body: JSON.stringify(body) })).json(), [tok, path, body]);
-  const get = path => p.evaluate(async ([tok, path]) => (await (await fetch(path, { headers: { "X-EMS-Token": tok } })).json()), [tok, path]);
+  const post = (path, body) => p.evaluate(async ([tok, path, body]) => (await fetch(path, { method: "POST", headers: { "X-TPCS-Token": tok }, body: JSON.stringify(body) })).json(), [tok, path, body]);
+  const get = path => p.evaluate(async ([tok, path]) => (await (await fetch(path, { headers: { "X-TPCS-Token": tok } })).json()), [tok, path]);
   const snap = () => p.evaluate(async () => (await (await fetch("/api/snapshot")).json()));
   const go = async (pg, ms = 3500) => { await p.goto(B + "#" + pg); await p.waitForTimeout(ms); };
   const same = (a, c) => JSON.stringify([...a].sort()) === JSON.stringify([...c].sort());

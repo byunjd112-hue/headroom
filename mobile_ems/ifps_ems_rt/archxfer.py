@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """주둔지 서버 전달: 보관한 기록을 구간별 묶음(zip)으로 만들고, 넘긴 이력을 남긴다.
 
-현장 EMS 는 인터넷에 붙지 못한다. 그래서 ESS 안전 운영정보(1분)와 검침·상황·점검·장치별 자료를 묶음 파일로 만들어
+현장 TPCS 는 인터넷에 붙지 못한다. 그래서 ESS 안전 운영정보(1분)와 검침·상황·점검·장치별 자료를 묶음 파일로 만들어
 ① 주둔지 서버가 같은 망에 있으면 HTTP 로 올리고(archive.server_url)  ② 아니면 보조 기억 매체로 옮긴 뒤 '전달 완료'를 사람이 적는다.
 묶음마다 구간·줄 수·SHA-256 을 이력(표 xfer)에 적어, 어느 구간이 아직 넘어가지 않았는지 알 수 있다.
 
@@ -117,7 +117,7 @@ class Transfer:
         d = self.get(i); path = os.path.join(self.outbox, d["file"])
         if not d["exists"]: raise ValueError("묶음 파일이 없습니다. 다시 만드십시오")
         with open(path, "rb") as f: body = f.read()
-        req = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": "application/zip", "X-EMS-File": d["file"], "X-EMS-SHA256": d["sha256"]})
+        req = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": "application/zip", "X-TPCS-File": d["file"], "X-TPCS-SHA256": d["sha256"]})
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r: ans = json.loads(r.read(4096).decode("utf-8") or "{}")          # nosec B310 — 주소는 설정 파일의 http(s) 주소만(settings 에서 검사)
         except (urllib.error.URLError, OSError, ValueError) as e:

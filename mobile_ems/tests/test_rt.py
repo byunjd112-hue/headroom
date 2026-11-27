@@ -2,7 +2,7 @@
 """실장치 연동 계층 시험. 가상 장치(Modbus TCP 서버)를 로컬에 띄워 실제 통신으로 확인한다."""
 import json, os, shutil, sys, tempfile, time, unittest
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
-CORE = os.environ.get("IFPS_EMS_CORE", ROOT)
+CORE = os.environ.get("IFPS_TPCS_CORE", ROOT)
 sys.path.insert(0, ROOT); sys.path.insert(0, CORE)
 from ifps_ems_rt import modbus as mb, pointmap as pm, simplant, runtime
 from ifps_ems.config import SUP
@@ -302,7 +302,7 @@ class TestPlanLink(Base):
         v_old = pol.V; clk[0] = 3700.0; gate.clear(); t0 = time.monotonic(); pol(dict(self.rt.val), 15.0); self.assertLess(time.monotonic() - t0, 0.5)
         self.assertIs(pol.V, v_old); self.assertEqual(pol.note, "계획 운전(실측 이력)")                                      # 다시 세우는 동안에는 직전 계획을 쓴다
         gate.set(); pol._bg.join(120.0); self.assertIsNot(pol.V, v_old)
-        pol.cancel(); clk[0] = 7400.0; pol(dict(self.rt.val), 16.0); pol._bg.join(30.0); self.assertIn("중단", pol.bg_err)                 # 멈추라고 하면 계산을 그만둔다(EMS 종료)
+        pol.cancel(); clk[0] = 7400.0; pol(dict(self.rt.val), 16.0); pol._bg.join(30.0); self.assertIn("중단", pol.bg_err)                 # 멈추라고 하면 계산을 그만둔다(TPCS 종료)
         short = os.path.join(self.td, "short_bg.csv")
         with open(os.path.join(res, "sample_site_data.csv"), encoding="utf-8") as f, open(short, "w", encoding="utf-8") as g: g.writelines(f.readlines()[:200])
         pol2 = PlanPolicy(self.rt.site, short, res); pol2.background = True; pol2(dict(self.rt.val), 14.0); pol2._bg.join(60.0); pol2(dict(self.rt.val), 14.0)

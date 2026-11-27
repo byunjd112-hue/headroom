@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""EMS FMEA·FTA 통합 분석 워크벤치(HTML 한 파일, 인터넷 없이 열림)를 만든다.
+"""TPCS FMEA·FTA 통합 분석 워크벤치(HTML 한 파일, 인터넷 없이 열림)를 만든다.
 
-  python docs/fmea/build_fmea.py Rev23 "2026. 11. 16."     → docs/out/IFPS_EMS_FMEA_FTA_통합분석_Rev23.html
+  python docs/fmea/build_fmea.py Rev23 "2026. 11. 16."     → docs/out/IFPS_TPCS_FMEA_FTA_통합분석_Rev23.html
 
 자료: data_fmea.py(고장모드), data_fta.py(고장수목·부속 표). 화면·계산: app.js, style.css. 도표·Excel: lib/(Chart.js MIT, SheetJS Apache-2.0).
 RPN·등급·확률·최소절단집합·중요도는 화면에서 자료로부터 계산한다(이 스크립트는 자료를 묶기만 한다)."""
@@ -11,8 +11,8 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import data_fmea as FM   # noqa: E402
 import data_fta as FT    # noqa: E402
 
-OSCALE = [[1, "매우 낮음 (10년 1회 미만)", 0.03, "자동 감시·즉시 경보", 0.1], [2, "매우 낮음", 0.07, "자동 감시·즉시 경보", 1.0], [3, "낮음 (3년 1회)", 0.2, "EMS 경보", 8.0],
-          [4, "낮음", 0.33, "EMS 경보", 24.0], [5, "보통 (연 1회)", 0.7, "운전 자료 추이 분석", 168.0], [6, "보통", 1.0, "운전 자료 추이 분석", 720.0],
+OSCALE = [[1, "매우 낮음 (10년 1회 미만)", 0.03, "자동 감시·즉시 경보", 0.1], [2, "매우 낮음", 0.07, "자동 감시·즉시 경보", 1.0], [3, "낮음 (3년 1회)", 0.2, "TPCS 경보", 8.0],
+          [4, "낮음", 0.33, "TPCS 경보", 24.0], [5, "보통 (연 1회)", 0.7, "운전 자료 추이 분석", 168.0], [6, "보통", 1.0, "운전 자료 추이 분석", 720.0],
           [7, "높음 (분기 1회)", 2.0, "정기 점검·시험 때 검출", 2160.0], [8, "높음", 4.0, "정기 점검·시험 때 검출", 4380.0],
           [9, "매우 높음 (월 1회 이상)", 8.0, "상시 감시 불가(고장 후 인지)", 8760.0], [10, "매우 높음", 12.0, "상시 감시 불가(고장 후 인지)", 17520.0]]
 NAV = [("dashboard", "01", "대시보드"), ("fmea", "05", "FMEA 워크시트"), ("rpn", "06", "RPN·위험매트릭스"), ("fta", "08", "FTA 고장수목"), ("mcs", "11", "MCS·중요도"),
@@ -66,30 +66,30 @@ def build_data(rev, date, site=None):
             "tree": tree, "s07_1": FT.S07_1, "s07_2": FT.S07_2, "s07_note": FT.S07_NOTE, "s07_3": FT.S07_3, "s07_4": FT.S07_4, "s08_1": FT.S08_1, "s08_h2": FT.S08_H2, "s08_2": FT.S08_2,
             "s09": FT.S09, "s10": [[str(a[0])] + a[1:] for a in FT.S10], "b_crit": FT.B_CRIT, "b_sys2": FT.B_SYS2, "b_design": FT.B_DESIGN, "b_design_note": FT.B_DESIGN_NOTE,
             "b_after": FT.B_AFTER, "b_abbr": FT.B_ABBR, "b_ref": FT.B_REF, "params": {"tm": 72, "hours": 8760, "beta": 0.1, "he0": 0.1, "he1": 0.03},
-            "meta": {"docno": "HAES-IFPS-EMS-FMEA-001", "rev": rev, "date": date, "project": "IFPS 이동형 전력체계 EMS", "org": "",
+            "meta": {"docno": "HAES-IFPS-TPCS-FMEA-001", "rev": rev, "date": date, "project": "IFPS 이동형 전력체계 TPCS", "org": "",
                      "nOrg": sum(r["grp"] == "본체" for r in rows), "nSup": sum(r["grp"] == "연동" for r in rows)}}
 
 
 def render(rev, date, site=None):
-    """워크벤치 HTML 한 파일. site: 현장 구성 자료(ifps_ems_rt/fmsite.build) — EMS 화면의 내보내기는 지금 구성을, 빌드는 받아 둔 기본 구성을 넣는다."""
+    """워크벤치 HTML 한 파일. site: 현장 구성 자료(ifps_ems_rt/fmsite.build) — TPCS 화면의 내보내기는 지금 구성을, 빌드는 받아 둔 기본 구성을 넣는다."""
     rd = lambda *p: open(os.path.join(HERE, *p), encoding="utf-8").read()
     data = build_data(rev, date, site)
     js = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     nav = "\n".join(f'      <a href="#{h}"><span class="k">{k}</span>{t}</a>' for h, k, t in NAV)
     html = f"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>IFPS EMS FMEA·FTA 통합 분석 워크벤치 {rev}</title>
+<title>IFPS TPCS FMEA·FTA 통합 분석 워크벤치 {rev}</title>
 <!-- 인터넷 없이 동작: 웹 글꼴 미사용, 도표·Excel 기능 내장 -->
 <style>
 {rd("style.css")}
 </style></head><body>
 <div class="app">
   <aside class="rail">
-    <div class="brand">IFPS EMS FMEA·FTA 통합 분석<small>Failure Analysis Workbench · {rev}</small></div>
+    <div class="brand">IFPS TPCS FMEA·FTA 통합 분석<small>Failure Analysis Workbench · {rev}</small></div>
     <nav class="nav" id="nav">
 {nav}
     </nav>
-    <div class="railfoot">{data["meta"]["docno"]} {rev}<br>EMS 본체 {data["meta"]["nOrg"]}건 + 연동 {data["meta"]["nSup"]}건<br>IEC 60812 · IEC 61025 · {date}<br><span id="railstate"></span></div>
+    <div class="railfoot">{data["meta"]["docno"]} {rev}<br>TPCS 본체 {data["meta"]["nOrg"]}건 + 연동 {data["meta"]["nSup"]}건<br>IEC 60812 · IEC 61025 · {date}<br><span id="railstate"></span></div>
   </aside>
   <main class="main" id="main"></main>
 </div>
@@ -113,7 +113,7 @@ def main(argv=None):
     date = a[1] if len(a) > 1 else ""
     html, data = render(rev, date, site_default())
     out = os.path.join(HERE, "..", "out"); os.makedirs(out, exist_ok=True)
-    path = os.path.abspath(os.path.join(out, f"IFPS_EMS_FMEA_FTA_통합분석_{rev}.html"))
+    path = os.path.abspath(os.path.join(out, f"IFPS_TPCS_FMEA_FTA_통합분석_{rev}.html"))
     with open(path, "w", encoding="utf-8") as f: f.write(html)
     print(f"saved {path}  고장모드 {len(data['fmea'])}건, 기본사상 {len(data['be'])}개, 게이트 {len(data['gates'])}개")
     return 0

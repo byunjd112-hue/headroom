@@ -29,7 +29,7 @@ class TestHmi(unittest.TestCase):
         """화면의 FMEA · FAT 내보내기: 운용자만, 지금 구성으로 네 가지 자료가 나온다."""
         import io, zipfile                                                        # pylint: disable=import-outside-toplevel
         u = self.base + "/api/archive/fmexport?doc={}&fmt={}"; self.assertEqual(self.req("/api/archive/fmexport?doc=site&fmt=json")[0], 403)
-        tok = self.login("4321"); get = lambda d, f: urllib.request.urlopen(urllib.request.Request(u.format(d, f), headers={"X-EMS-Token": tok}), timeout=20)
+        tok = self.login("4321"); get = lambda d, f: urllib.request.urlopen(urllib.request.Request(u.format(d, f), headers={"X-TPCS-Token": tok}), timeout=20)
         d = json.loads(get("site", "json").read()); self.assertTrue(d["fmea"] and d["fat"]); self.assertIn("지휘통제(C2)", json.dumps(d, ensure_ascii=False))
         r = get("site", "xlsx"); self.assertIn(".xlsx", r.headers["Content-Disposition"]); self.assertEqual(len(zipfile.ZipFile(io.BytesIO(r.read())).namelist()), 8)
         self.assertIn("FAT 점검표", get("fat", "html").read().decode("utf-8")); self.assertIn("const DATA", get("fmea", "html").read().decode("utf-8"))
@@ -109,7 +109,7 @@ class TestHmi(unittest.TestCase):
 
     def req(self, path, body=None, tok=None):
         r = urllib.request.Request(self.base + path, data=None if body is None else json.dumps(body).encode(), method="GET" if body is None else "POST")
-        if tok: r.add_header("X-EMS-Token", tok)
+        if tok: r.add_header("X-TPCS-Token", tok)
         try:
             with urllib.request.urlopen(r, timeout=5) as f: return f.status, json.loads(f.read())
         except urllib.error.HTTPError as e:
@@ -334,7 +334,7 @@ class TestHmi(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/", timeout=5) as f: self.assertIn("camera=()", f.headers["Permissions-Policy"])
 
     def test_11_all_units_load_shed_elz_pv(self):
-        self.eng.set_auto(False, "시험")      # 운용자 지령만 본다: 자동 제어 주기(60초)가 시험 도중에 걸리면 EMS 가 수전해를 도로 세워(잉여 없음) 기다리는 조건이 어긋난다 — 간헐 실패의 원인
+        self.eng.set_auto(False, "시험")      # 운용자 지령만 본다: 자동 제어 주기(60초)가 시험 도중에 걸리면 TPCS 가 수전해를 도로 세워(잉여 없음) 기다리는 조건이 어긋난다 — 간헐 실패의 원인
         try: self._units_by_operator()
         finally: self.eng.set_auto(True, "시험")
 

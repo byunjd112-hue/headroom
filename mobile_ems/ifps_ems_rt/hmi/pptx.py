@@ -37,9 +37,9 @@ def _rels(items):
 def _theme():
     c = lambda n, v: f'<a:{n}><a:srgbClr val="{v}"/></a:{n}>'
     fill = '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>'; ln = '<a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>'; font = f'<a:latin typeface="{FONT}"/><a:ea typeface="{FONT}"/><a:cs typeface="{FONT}"/>'
-    return (HEAD + '<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="EMS"><a:themeElements><a:clrScheme name="EMS">'
+    return (HEAD + '<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="TPCS"><a:themeElements><a:clrScheme name="TPCS">'
             + c("dk1", "000000") + c("lt1", "FFFFFF") + c("dk2", "44546A") + c("lt2", "E7E6E6") + c("accent1", "4472C4") + c("accent2", "ED7D31") + c("accent3", "A5A5A5") + c("accent4", "FFC000") + c("accent5", "5B9BD5") + c("accent6", "70AD47") + c("hlink", "0563C1") + c("folHlink", "954F72")
-            + f'</a:clrScheme><a:fontScheme name="EMS"><a:majorFont>{font}</a:majorFont><a:minorFont>{font}</a:minorFont></a:fontScheme><a:fmtScheme name="EMS"><a:fillStyleLst>{fill * 3}</a:fillStyleLst><a:lnStyleLst>{ln * 3}</a:lnStyleLst>'
+            + f'</a:clrScheme><a:fontScheme name="TPCS"><a:majorFont>{font}</a:majorFont><a:minorFont>{font}</a:minorFont></a:fontScheme><a:fmtScheme name="TPCS"><a:fillStyleLst>{fill * 3}</a:fillStyleLst><a:lnStyleLst>{ln * 3}</a:lnStyleLst>'
             + '<a:effectStyleLst>' + '<a:effectStyle><a:effectLst/></a:effectStyle>' * 3 + f'</a:effectStyleLst><a:bgFillStyleLst>{fill * 3}</a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>')
 
 

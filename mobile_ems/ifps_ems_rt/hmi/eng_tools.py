@@ -67,7 +67,7 @@ class ToolsMixin:
         if f"FLT.{f}" in self.plant.by_tag: self.plant.set(f"FLT.{f}", 0)
 
     def _sim_clock(self, hour):
-        """시연용 모의 시각: 가상 장치(태양광·부하)와 EMS 시간대 판단을 같은 시각으로 옮긴다. hour 가 없으면 실제 시각으로 되돌린다."""
+        """시연용 모의 시각: 가상 장치(태양광·부하)와 TPCS 시간대 판단을 같은 시각으로 옮긴다. hour 가 없으면 실제 시각으로 되돌린다."""
         off = 0.0
         if hour is not None:
             h = float(hour); now = datetime.now()
@@ -105,9 +105,9 @@ class ToolsMixin:
         return {"ok": True, "sim": self.sim_state()}
 
     # ── 작전지 배치(운용자 편집): state/layout.json. 장비 대수·막사 수량·위치·연결 급전선
-    LAYOUT_KINDS = {"DG", "ESS", "PV", "FC", "DIST", "EMS", "FSU", "L1", "L2", "L3", "BARRACK"}
+    LAYOUT_KINDS = {"DG", "ESS", "PV", "FC", "DIST", "TPCS", "FSU", "L1", "L2", "L3", "BARRACK"}
 
-    LAYOUT_BINDS = {"", "G1", "ESS", "PV", "FC", "DIST", "EMS", "L1", "L2", "L3"}
+    LAYOUT_BINDS = {"", "G1", "ESS", "PV", "FC", "DIST", "TPCS", "L1", "L2", "L3"}
 
     def layout(self):
         pth = os.path.join(self.rt.state_dir, "layout.json")

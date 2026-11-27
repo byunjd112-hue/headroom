@@ -108,7 +108,7 @@ class Planner:
         """load, pv: (T,), lclass: (T, 3), hrs: (T,). 반환: 가치함수 V (T+1, N_SOC, N_H2, 2)."""
         T = len(load); V = np.zeros((T + 1, N_SOC, N_H2, 2)); V[T] = self.terminal()
         for t in range(T - 1, -1, -1):
-            if self.cancel is not None and self.cancel(): raise InterruptedError("운전계획 계산 중단")      # 멈추라는 요청(EMS 종료)이 오면 그만둔다
+            if self.cancel is not None and self.cancel(): raise InterruptedError("운전계획 계산 중단")      # 멈추라는 요청(TPCS 종료)이 오면 그만둔다
             best = np.full((N_SOC, N_H2, 2), np.inf)
             for a in ACTIONS:
                 for dp_ in (0, 1):

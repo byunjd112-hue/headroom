@@ -1,5 +1,5 @@
 @echo off
-REM 이동형 전력체계 EMS - 현장 간편 진단 도구 (더블클릭 실행). 인자를 주면 그대로 넘긴다: diag.bat --auto / diag.bat --demo
+REM 이동형 전력체계 TPCS - 현장 간편 진단 도구 (더블클릭 실행). 인자를 주면 그대로 넘긴다: diag.bat --auto / diag.bat --demo
 chcp 65001 >nul
 set PYTHONUTF8=1
 cd /d "%~dp0"
