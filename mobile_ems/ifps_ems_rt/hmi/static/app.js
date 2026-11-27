@@ -167,7 +167,7 @@ const CTL_UNITS = [
   { id: "PV", no: "③", nm: "이동형 PV 발전체계 · 400kW급 (80kWp × 5식)", en: "Rollable thin-film PV · inverter", col: "pv", dev: "PV", kw: "PV.kw", ctl: true, on: "계통 연결", off: "분리", sp: ["PV.lim_set", "출력 제한", 400, 10] },
   { id: "FC", no: "④", nm: "수소생성·발전체계 · 연료전지 100kW", en: "PEM fuel cell", col: "fc", dev: "FC", kw: "FC.kw", ctl: true, sp: ["FC.kw_set", "출력 설정", 100, 5] },
   { id: "ELZ", no: "④", nm: "수소생성·발전체계 · 수전해 30Nm³/h", en: "Electrolyzer · 150kW", col: "fc", dev: "ELZ", kw: "ELZ.kw", ctl: true },
-  { id: "TPCS", no: "⑤", nm: "이동형 전력체계 TPCS · 중앙제어기", en: "Energy management system", col: "accent", dev: null },
+  { id: "TPCS", no: "⑤", nm: "전술전력통제체계(TPCS)", en: "Tactical Power Control System", col: "accent", dev: null },
   { id: "MTR", no: "⑥", nm: "이동형 배전·변압체계 · 계측/보호 게이트웨이", en: "22.9/6.6kV/380V · metering & IED gateway", col: "load", dev: "MTR", kw: "LOAD.kw" },
   { id: "GDG", no: "주", nm: "주둔지 기존 디젤발전기 · 1MW급 컨테이너형(고정식)", en: "Garrison standby diesel generator", col: "dg", dev: "GDG", kw: "GDG.kw", ctl: true },
   { id: "GRID", no: "주", nm: "주둔지 상전 수전점 · 22.9kV", en: "Utility incoming (no export)", col: "g1", dev: null, kw: "GRID.kw", need: "GRID.kw" },
