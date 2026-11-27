@@ -113,10 +113,21 @@ class ToolsMixin:
         pth = os.path.join(self.rt.state_dir, "layout.json")
         if os.path.exists(pth):
             try:
-                with open(pth, encoding="utf-8") as f: return json.load(f)
+                with open(pth, encoding="utf-8") as f: return self._legacy(json.load(f))
             except (OSError, ValueError):
                 pass
         return {"rev": 0, "items": None}                                       # None → 화면 기본 배치
+
+    @staticmethod
+    def _legacy(lay):
+        """예전 판(Rev69 이하)에서 저장한 배치: 중앙제어 장비의 종류 · 연결 이름이 'EMS' 였다. 지금 이름(TPCS)으로 읽어 그림이 그대로 나오게 한다."""
+        old = "E" + "MS"
+        for it in (lay.get("items") or []) if isinstance(lay, dict) else []:
+            if isinstance(it, dict):
+                for k in ("kind", "bind"):
+                    if it.get(k) == old: it[k] = "TPCS"
+                if isinstance(it.get("name"), str): it["name"] = it["name"].replace(old, "TPCS")
+        return lay
 
     @staticmethod
     def _lb(it):
@@ -125,7 +136,7 @@ class ToolsMixin:
         return {"lb": [round(float(v[0]), 1), round(float(v[1]), 1)]} if ok else {}
 
     def save_layout(self, lay, who):
-        items = lay.get("items")
+        items = self._legacy(lay).get("items")                                 # 예전 판에서 저장한 구성을 불러와도 받는다
         if not isinstance(items, list) or not 1 <= len(items) <= 120: raise ValueError("배치 항목 수 오류(1~120)")
         clean, uids = [], set()
         for it in items:

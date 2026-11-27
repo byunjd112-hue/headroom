@@ -119,5 +119,15 @@ class TestHmiStartup(Base):
         finally: getpass.getpass = real
 
 
+
+class TestLegacyLayout(unittest.TestCase):
+    def test_old_central_control_name_is_read_as_current(self):
+        """예전 판에서 저장한 배치(중앙제어 장비 종류가 옛 이름)를 읽으면 지금 이름으로 바뀌어 그림이 그대로 나온다."""
+        from ifps_ems_rt.hmi.eng_tools import ToolsMixin
+        old = "E" + "MS"
+        lay = ToolsMixin._legacy({"rev": 3, "items": [{"uid": "d5", "kind": old, "bind": old, "name": "⑤ " + old, "x": 1, "y": 2}, {"uid": "a", "kind": "DG", "bind": "G1", "name": "발전기", "x": 3, "y": 4}]})
+        self.assertEqual((lay["items"][0]["kind"], lay["items"][0]["bind"], lay["items"][0]["name"]), ("TPCS", "TPCS", "⑤ TPCS"))
+        self.assertEqual(lay["items"][1]["kind"], "DG"); self.assertEqual(ToolsMixin._legacy({"items": None}), {"items": None})
+
 if __name__ == "__main__":
     unittest.main()
