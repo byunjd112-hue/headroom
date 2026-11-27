@@ -1,6 +1,6 @@
 {
- "date": "2026-11-26 23:07",
- "unittest_s": 603.3,
+ "date": "2026-11-27 15:03",
+ "unittest_s": 722.1,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -204,7 +204,7 @@
   "test_check_scans_and_module_entry | ok",
   "장치를 놓고 빼도 기록 · 보고가 사실대로 남는다: 있는 장치의 값만 저장하고, 보고서에 장치 구성 표가 들어간다. | ok",
   "test_extra_units_are_recognized_summed_and_commanded | ok",
-  "운전 중인 EMS(가상 장치)에서 자동 제어가 복합전력 PCS 의 모드를 바꾼다: 디젤 필요 → 발전기 + ESS 충전, 가득 → 발전기 단독, 불필요 → ESS 방전, 복합전력 ESS 저충전 → 충전. | ok",
+  "운전 중인 TPCS(가상 장치)에서 자동 제어가 복합전력 PCS 의 모드를 바꾼다: 디젤 필요 → 발전기 + ESS 충전, 가득 → 발전기 단독, 불필요 → ESS 방전, 복합전력 ESS 저충전 → 충전. | ok",
   "test_kind_not_brought_is_marked_absent_and_replaced | ok",
   "설비 제어 화면의 − · ＋: 가상 장치를 놓으면 조작 없이 인식되고, 빼면 두절 경보 없이 빈 자리로 돌아간다. | ok",
   "차량 단위 대수: ④ 수소 차량은 연료전지와 수전해가 함께 늘고 줄며, ① 복합전력의 계통 형성 용량은 인식한 디젤 대수를 따른다. | ok",
@@ -225,16 +225,16 @@
  "n_tests": 219,
  "tests_ok": true,
  "retried": [],
- "coverage_pct": 92.7,
+ "coverage_pct": 92.6,
  "stmt": {
   "n": 7811,
-  "hit": 7461,
+  "hit": 7457,
   "pct": 95.5
  },
  "branch": {
   "n": 2774,
-  "hit": 2350,
-  "pct": 84.7
+  "hit": 2348,
+  "pct": 84.6
  },
  "coverage_files": [
   [
@@ -281,7 +281,7 @@
    "ifps_ems_rt/hmi/archwatch.py",
    80.6,
    108,
-   60.4,
+   62.5,
    48,
    "29-30, 43, 56, 59-63, 67-68, 114-116, 120-122, 132-134, 137"
   ],
@@ -358,14 +358,6 @@
    "29, 78-79"
   ],
   [
-   "ifps_ems_rt/hmi/ringwatch.py",
-   92.9,
-   182,
-   74.0,
-   104,
-   "79-80, 188-193, 230-234"
-  ],
-  [
    "ifps_ems_rt/hmi/archapi.py",
    93.1,
    58,
@@ -380,6 +372,14 @@
    85.8,
    120,
    "74, 126-127, 263-264, 309, 321-322, 345, 358, 362, 364, 366, 391-396, 426"
+  ],
+  [
+   "ifps_ems_rt/hmi/ringwatch.py",
+   93.4,
+   182,
+   75.0,
+   104,
+   "80, 188-193, 230-234"
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
@@ -430,6 +430,14 @@
    "104, 108-110"
   ],
   [
+   "ifps_ems/nowcast.py",
+   96.4,
+   84,
+   81.2,
+   32,
+   "32, 57, 60"
+  ],
+  [
    "ifps_ems/skycam.py",
    96.4,
    84,
@@ -444,6 +452,14 @@
    86.4,
    44,
    "69-72, 161, 165"
+  ],
+  [
+   "ifps_ems_rt/archive.py",
+   96.6,
+   148,
+   83.3,
+   30,
+   "95-96, 110, 128-129"
   ],
   [
    "ifps_ems_rt/hmi/eng_command.py",
@@ -502,14 +518,6 @@
    "53"
   ],
   [
-   "ifps_ems/nowcast.py",
-   97.6,
-   84,
-   84.4,
-   32,
-   "32, 57"
-  ],
-  [
    "ifps_ems/learner.py",
    97.7,
    173,
@@ -534,12 +542,12 @@
    "52"
   ],
   [
-   "ifps_ems_rt/archive.py",
-   98.0,
-   148,
-   83.3,
-   30,
-   "95-96, 110"
+   "ifps_ems_rt/archdev.py",
+   97.9,
+   141,
+   88.3,
+   60,
+   "93-94, 110"
   ],
   [
    "ifps_ems_rt/hmi/docx.py",
@@ -561,7 +569,7 @@
    "ifps_ems_rt/simplant.py",
    98.5,
    196,
-   94.1,
+   92.6,
    68,
    "205, 217-218"
   ],
@@ -612,14 +620,6 @@
    90.7,
    54,
    "67"
-  ],
-  [
-   "ifps_ems_rt/archdev.py",
-   99.3,
-   141,
-   88.3,
-   60,
-   "110"
   ],
   [
    "ifps_ems_rt/weather.py",
@@ -801,7 +801,7 @@
    "ifps_ems_rt/hmi/fcstats.py",
    100.0,
    29,
-   100.0,
+   87.5,
    8,
    ""
   ],
@@ -809,7 +809,7 @@
    "ifps_ems_rt/hmi/fuelwatch.py",
    100.0,
    17,
-   100.0,
+   90.0,
    10,
    ""
   ],
@@ -2142,7 +2142,7 @@
    "SEVERITY.LOW": 1,
    "SEVERITY.MEDIUM": 2,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 10203,
+   "loc": 10209,
    "nosec": 0,
    "skipped_tests": 22
   },
