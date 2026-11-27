@@ -11,7 +11,7 @@ const MARK = false;      // 문단의 '다음과 함께 · 줄 묶음 · 앞에�
 const KEEP = true;        // 제목 · 그림 · 표 설명을 다음 문단과 한 쪽에 두고 표의 줄을 쪽 사이에서 나누지 않는다(인쇄 미리보기 기준 쪽 구성). 끄려면 false
 let NI = 0;
 // ── 조판 다듬기(문서가 tune 으로 켠다 — 안 켜면 예전 그대로): 장평 · 자간, 본문 양쪽 정렬, 표 칸 여백, 줄바꿈 규칙
-const TN = { scale: 95, cs: -3, just: true, center: true, cell: { top: 60, bottom: 60, left: 100, right: 100 }, tline: 260, fx: t => tidy(nodot(nodash(t))), keep: { whole: 5, head: 3, tail: 2 } };   // 문서 작성 공통 규칙(모든 Word 문서의 기본값)
+const TN = { scale: 95, cs: -3, just: true, center: true, cell: { top: 60, bottom: 60, left: 100, right: 100 }, tline: 260, fx: t => tidy(nodot(nodash(rename(t)))), keep: { whole: 5, head: 3, tail: 2 } };   // 문서 작성 공통 규칙(모든 Word 문서의 기본값)
 const tune = o => Object.assign(TN, o);
 const NB = "\u00A0";
 /** 줄바꿈 규칙: 줄이 어절 사이에서만, 그리고 어색하지 않은 곳에서만 넘어가게 묶음 공백을 넣는다.
@@ -21,6 +21,12 @@ function tidy(t) {
   t = t.replace(/(\d) (kWh|kWp|kW|kHz|MHz|GHz|Hz|ms|mΩ|Ω|GB|MB|KB|V|A|%|℃|pt|mm)(?![A-Za-z])/g, "$1" + NB + "$2");
   t = t.replace(/([A-Za-z0-9)\]'%℃]) (가|이|은|는|을|를|와|과|의|에|에서|에는|에도|로|으로|도|만|까지|부터|보다|마다|이다|임)(?=[\s.,)·" + NB + "]|$)/g, "$1" + NB + "$2");
   return t.replace(/\(([^()]*)\)/g, (m, a) => a.length <= 20 ? "(" + a.replace(/ /g, NB) + ")" : "(" + a.replace(/^(\S+) /, "$1" + NB).replace(/ (\S+)$/, NB + "$1") + ")");
+}
+/** 체계 명칭(사용자 결정, Rev70): EMS → 전술전력통제체계(TPCS, Tactical Power Control System). 문서의 글에서 바꾼다(프로그램의 모듈 · 신호 이름은 그대로). tools/doc_rules.py 와 같은 규칙 */
+function rename(t) {
+  if (t.indexOf("EMS") < 0) return t;
+  return t.replace(/IFPS_Mobile_EMS/g, "IFPS_TPCS").replace(/IFPS_EMS_/g, "IFPS_TPCS_").replace(/이동형전력체계EMS/g, "전술전력통제체계TPCS")
+    .replace(/이동형 전력체계 EMS|이동형 EMS|EMS 중앙제어/g, "전술전력통제체계(TPCS)").replace(/(?<![A-Za-z0-9_.\/])EMS(?![A-Za-z0-9_])/g, "TPCS");
 }
 /** 가운뎃점으로 낱말을 잇지 않는다(사용자 지시): 둘이면 '및', 셋 이상이면 쉼표로 나열하고 마지막만 '및'으로 잇는다. 괄호 안은 따로 센다 */
 function nodot(t) {
@@ -42,7 +48,7 @@ function nodash(t) {
   return t.replace(/\s*[—–]\s*/g, rep).replace(/([가-힣)]) - (?=[가-힣(])/g, (m, a, off, all) => a + rep(m, off + 1, all));
 }
 const run = (t, o = {}) => { const mono = o.font === "Consolas" || o.font === "Cambria Math";
-  return new TextRun(Object.assign({ text: typeof t !== "string" || !TN.fx ? t : !mono ? TN.fx(t) : o.font === "Cambria Math" ? t.replace(/ ?· ?/g, " × ") : /[가-힣]/.test(t) ? nodot(nodash(t)) : t, font: F, size: S.body, color: "000000" }, TN.scale && !mono ? { scale: TN.scale, characterSpacing: TN.cs } : {}, o)); };
+  return new TextRun(Object.assign({ text: typeof t !== "string" || !TN.fx ? t : !mono ? TN.fx(t) : o.font === "Cambria Math" ? t.replace(/ ?· ?/g, " × ") : /[가-힣]/.test(t) ? nodot(nodash(rename(t))) : t, font: F, size: S.body, color: "000000" }, TN.scale && !mono ? { scale: TN.scale, characterSpacing: TN.cs } : {}, o)); };
 const P = (t, o = {}) => new Paragraph(Object.assign({ spacing: SP.body, children: Array.isArray(t) ? t : [run(t)] }, TN.just ? { alignment: AlignmentType.BOTH } : {}, o));
 const head = (lv, k) => t => (NI++, Object.assign(new Paragraph({ heading: lv, spacing: SP[k], children: [run(t, { size: S[k], bold: true })] }), { __h: true }));
 const H1 = head(HeadingLevel.HEADING_1, "h1"), H2 = head(HeadingLevel.HEADING_2, "h2"), H3 = head(HeadingLevel.HEADING_3, "h3");
@@ -124,4 +130,4 @@ function save(body, out, foot) {
       children: solid(body) }] });
   return Packer.toBuffer(doc).then(b => { fs.writeFileSync(out, b); console.log("saved", out); });
 }
-module.exports = { tune, tidy, nodot, nodash, solid, mkTBL, BOX, run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };
+module.exports = { tune, tidy, nodot, nodash, rename, solid, mkTBL, BOX, run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };

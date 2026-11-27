@@ -48,8 +48,16 @@ def nodash(t):
     return re.sub(r"(?<=[가-힣)]) - (?=[가-힣(])", rep, t)
 
 
+def rename(t):
+    """체계 명칭(사용자 결정, Rev70): EMS → 전술전력통제체계(TPCS). 문서의 글에서만 바꾼다(docs/lib.js 의 rename 과 같은 규칙)."""
+    if "EMS" not in t: return t
+    t = t.replace("IFPS_Mobile_EMS", "IFPS_TPCS").replace("IFPS_EMS_", "IFPS_TPCS_").replace("이동형전력체계EMS", "전술전력통제체계TPCS")
+    t = re.sub(r"이동형 전력체계 EMS|이동형 EMS|EMS 중앙제어", "전술전력통제체계(TPCS)", t)
+    return re.sub(r"(?<![A-Za-z0-9_./])EMS(?![A-Za-z0-9_])", "TPCS", t)
+
+
 def clean(t):
-    return nodot(nodash(t)) if isinstance(t, str) else t
+    return nodot(nodash(rename(t))) if isinstance(t, str) else t
 
 
 def fix_pptx(path):

@@ -3,7 +3,7 @@
 
   python docs/build_all.py              VERSION 파일의 리비전으로 생성
   python docs/build_all.py --measure    정적·동적 측정부터 다시 하고 생성(약 10분)
-  python docs/build_all.py --zip        (커밋한 뒤) 실행 패키지 IFPS_Mobile_EMS_<Rev>.zip 만 묶음. 문서는 다시 만들지 않는다
+  python docs/build_all.py --zip        (커밋한 뒤) 실행 패키지 IFPS_TPCS_<Rev>.zip 만 묶음. 문서는 다시 만들지 않는다
 
 규칙: 소프트웨어 패키지·문서·보고자료는 모두 VERSION 의 리비전 하나를 쓴다. 리비전을 올릴 때는 VERSION 만 고치고 이 스크립트를 돌린다.
 docs/out 에는 현재 리비전 파일만 남긴다(이전 리비전 산출물은 지운다 — 이력은 git 에 있다).
@@ -14,6 +14,11 @@ import argparse, datetime, os, re, subprocess, sys  # nosec B404 — 개발 도�
 
 DOCS = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(DOCS); OUT = os.path.join(DOCS, "out")
 BUILDERS = ["build_test_report.js", "build_reliability_report.js", "build_security_review.js", "build_interface_guide.js", "build_device_guides.js", "build_cpp_report.js", "build_ai_paper.js", "build_user_manual.js", "build_dev_spec.js"]
+
+
+def doc_rules_name(f):
+    """산출물 파일 이름의 체계 명칭: EMS → TPCS."""
+    return f.replace("이동형전력체계EMS", "전술전력통제체계TPCS").replace("IFPS_EMS_", "IFPS_TPCS_").replace("EMS연동", "TPCS연동").replace("EMS보완", "TPCS보완")
 
 
 def run(args, cwd=ROOT, env=None):
@@ -43,7 +48,7 @@ LAYOUT = [("10_개발용역사양", "EMS 개발 용역 의뢰 사양서 — 화�
           ("09_배전체계계산과개발비", "IFPU 케이블·보호기 연동 계산서 보완본(우회 결선 · 1등급 부하 N+1 시트 추가)과 ⑥ 이동형 배전·변압체계 개발비 보완본(PPDU-20 · 우회 결선 · 시험 추가 — 새 품목 단가는 공개 시세 임시값)", ("연동계산서_보완", "개발비용_보완")),
           ("04_AI예측", "예측 수식·학습된 모델의 입체 그림·독립 검증(기술자료)과 같은 내용의 논문 초안", ("AI예측_기술자료", "AI예측_논문")),
           ("05_통신연동", "실장치 통신 연동 방안서(Modbus TCP 규약·설정·시운전 절차)", ("실장치통신연동방안서",)),
-          ("06_장치별연동", "장치 제작사에 보내는 연동·디버깅 안내서 7종", ("EMS연동디버깅안내서",)),
+          ("06_장치별연동", "장치 제작사에 보내는 연동·디버깅 안내서 7종", ("TPCS연동디버깅안내서",)),
           ("07_시험과신뢰성", "FMEA·FTA 워크벤치, 시험 결과 보고서, 신뢰성 시험 결과서, 보안성 검토, C++ 이식 사전 점검", ("FMEA_FTA", "FAT점검표", "현장구성_FMEA_FAT", "SW시험결과보고서", "SW신뢰성시험결과서", "보안성검토결과", "Cpp이식"))]
 EVIDENCE = [("scenario_results.json", "운영 시나리오 20건 실행 결과(운전 모드 12종 포함)"), ("forecast_benchmark.json", "예측 독립 시험 6세트 — 매일 구간 보정 + 변동 여유"),
             ("forecast_benchmark_static.json", "같은 시험 — 구간을 학습 때 한 번만 보정(개선 전 비교 기준)"), ("ppt/ai_paper_eval.json", "AI 기술자료·논문의 모든 수치와 그림용 값"),
@@ -81,12 +86,12 @@ section p{{margin:0 0 6px;color:#4a463f;font-size:14px}}ul{{margin:4px 0 0;paddi
 
 
 def bundle(rev):
-    """docs/out 전체를 IFPS_EMS_문서_<Rev>.zip 으로 묶는다. 읽는 순서대로 폴더(01~08)에 나눠 담고 첫 화면(00 문서 안내)을 넣는다.
+    """docs/out 전체를 IFPS_TPCS_문서_<Rev>.zip 으로 묶는다. 읽는 순서대로 폴더(01~08)에 나눠 담고 첫 화면(00 문서 안내)을 넣는다.
     한글 파일 이름이 Windows 에서 깨지지 않게 파이썬 zipfile 로 만든다(zipfile 은 한글 이름에 UTF-8 표시를 붙인다. 리눅스 zip 명령은 붙이지 않는다)."""
     import zipfile
     for f in os.listdir(ROOT):
-        if re.fullmatch(r"IFPS_EMS_문서_Rev\d+\.zip", f): os.remove(os.path.join(ROOT, f))
-    z = os.path.join(ROOT, f"IFPS_EMS_문서_{rev}.zip"); files = sorted((os.path.join(dp, f), f) for dp, _, fs in os.walk(OUT) for f in fs); placed = set(); groups = []
+        if re.fullmatch(r"IFPS_TPCS_문서_Rev\d+\.zip", f): os.remove(os.path.join(ROOT, f))
+    z = os.path.join(ROOT, f"IFPS_TPCS_문서_{rev}.zip"); files = sorted((os.path.join(dp, f), f) for dp, _, fs in os.walk(OUT) for f in fs); placed = set(); groups = []
     today = datetime.date.today(); date = f"{today.year}. {today.month}. {today.day}."
     with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as zf:
         for d, desc, keys in LAYOUT:
@@ -98,7 +103,7 @@ def bundle(rev):
         evid = [(os.path.basename(n), t) for n, t in EVIDENCE if os.path.exists(os.path.join(DOCS, n))]
         for n, _ in EVIDENCE:
             if os.path.exists(os.path.join(DOCS, n)): zf.write(os.path.join(DOCS, n), "08_시험근거/" + os.path.basename(n))
-        zf.writestr(f"00_IFPS_EMS_문서안내_{rev}.html", _guide(rev, date, groups, evid))
+        zf.writestr(f"00_IFPS_TPCS_문서안내_{rev}.html", _guide(rev, date, groups, evid))
         bad = [i.filename for i in zf.infolist() if not i.filename.isascii() and not i.flag_bits & 0x800]
     if bad: sys.exit(f"UTF-8 표시가 없는 파일 이름: {bad}")
     return z
@@ -115,10 +120,10 @@ def main(argv=None):
     env = dict(os.environ); env["NODE_PATH"] = os.pathsep.join(p for p in (os.path.join(DOCS, "node_modules"), os.path.join(DOCS, "ppt", "node_modules"), env.get("NODE_PATH", "")) if p)
     print(f"리비전 {rev} · 작성일 {date}")
     if a.zip:                                                    # 묶기만 한다(문서는 다시 만들지 않는다 — 커밋된 것과 같은 파일이 들어가게)
-        z = os.path.join(ROOT, f"IFPS_Mobile_EMS_{rev}.zip")
+        z = os.path.join(ROOT, f"IFPS_TPCS_{rev}.zip")
         dirty = subprocess.run(["git", "status", "--porcelain", "."], cwd=ROOT, capture_output=True, text=True).stdout.strip()  # nosec B603 B607 — 고정 인자
         if dirty: sys.exit("커밋하지 않은 변경이 있습니다. 먼저 커밋하십시오:\n" + dirty[:600])
-        run(["git", "archive", "--format=zip", f"--prefix=IFPS_Mobile_EMS_{rev}/", "-o", z, "HEAD:" + os.path.basename(ROOT)], cwd=os.path.dirname(ROOT)); print("패키지:", z)
+        run(["git", "archive", "--format=zip", f"--prefix=IFPS_TPCS_{rev}/", "-o", z, "HEAD:" + os.path.basename(ROOT)], cwd=os.path.dirname(ROOT)); print("패키지:", z)
         print("문서 묶음:", bundle(rev)); return 0
     if a.measure:
         run([sys.executable, "tools/cpp_report.py"])                       # C++ 핵심부: 동등성 시험·실행률·정적 점검
@@ -142,6 +147,10 @@ def main(argv=None):
         name = f"IFPS_EMS_교육용_가상화면_{rev}"; run([sys.executable, "-m", "tools.build_training", os.path.join(td, name), rev])
         shutil.make_archive(os.path.join(OUT, name), "zip", td, name)
         shutil.copyfile(os.path.join(td, name + "_모바일.html"), os.path.join(OUT, name + "_모바일.html"))      # 휴대전화·태블릿용: 파일 하나
+    for dp, _, fs in os.walk(OUT):                                 # 체계 명칭 변경(Rev70): 산출물 파일 이름의 EMS → TPCS
+        for f in fs:
+            g = doc_rules_name(f)
+            if g != f: os.replace(os.path.join(dp, f), os.path.join(dp, g))
     names = sorted(os.path.relpath(os.path.join(dp, f), OUT) for dp, _, fs in os.walk(OUT) for f in fs)
     bad = [n for n in names if rev not in n]
     print(f"산출물 {len(names)}개 (docs/out):"); [print("   ", n) for n in names]

@@ -6,7 +6,7 @@ const { Paragraph, ShadingType, HeadingLevel } = require("docx");
 const ROOT = path.join(__dirname, ".."), J = f => JSON.parse(fs.readFileSync(path.join(__dirname, f), "utf8"));
 const ST = J("static_results.json"), TR = J("test_results.json"), BM = J("forecast_benchmark.json"), SC = J("scenario_results.json");
 const CFG = JSON.parse(fs.readFileSync(path.join(ROOT, "config/runtime.json"), "utf8"));
-const ED = "제14판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
+const ED = "제15판";                                   // 사양서의 판(실행 패키지 리비전과 따로 센다 — 사용자 지시: 앞으로는 이 문서만 고쳐 배포)
 const REV = process.argv[2] || "Rev00", DATE = process.argv[3] || "2026. 11. 26.", OUT = process.argv[4] || __dirname + `/out/이동형전력체계EMS_개발용역의뢰사양서_${REV}.docx`;
 // 조판 · 줄바꿈 · 점 · 줄표 규칙은 lib.js 의 기본값(문서 작성 공통 규칙)
 const HL = require("./codehl.js"), { AlignmentType, BorderStyle, PageBreak, Table, TableRow, TableCell, WidthType, TableLayoutType } = require("docx");
@@ -62,7 +62,7 @@ T(`발주처는 요구사항 사전 확인용으로 제작한 참조 구현(파�
   "참조 구현은 납품 대상이 아니며, 코드의 단순 이식은 과업이 아님. 수급자는 이 사양서의 요구사항을 기준으로 C# · C++ 로 신규 설계 · 구현하여야 함. 참조 구현과 사양서가 상이한 경우 사양서를 따름. 사양서에 없는 세부 동작은 참조 구현을 참고하되 발주처의 승인을 받아 정함. 참조 구현의 개요와 현재 측정값은 부록 A 에 수록함.");
 S2("1.4 용어 · 약어");
 tbl("표 1-2  용어", ["용어", "정의"], [
-  ["EMS", "에너지 관리 체계. 이 문서에서는 ⑤ EMS 중앙제어의 소프트웨어와 탑재 하드웨어"],
+  ["TPCS", "전술전력통제체계(Tactical Power Control System). 작전지와 주둔지의 전원과 부하를 통합 감시하고 통제하는 소프트웨어와 탑재 하드웨어. 종전 명칭은 EMS(에너지 관리 체계)"],
   ["CSCI / CSC / CSU", "소프트웨어 형상 항목 / 구성 요소 / 단위. CSCI 는 별도로 형상 관리 · 시험 · 납품하는 소프트웨어 집합, CSC 는 그 내부의 기능 집합, CSU 는 구현 · 단위 시험의 최소 단위"],
   ["HWCI", "하드웨어 형상 항목"], ["ICD", "인터페이스 통제 문서. 신호 · 메시지의 형식과 의미를 규정한 문서"],
   ["작전지 / 주둔지", "운용 장소. 작전지 = 상전 없이 자립 운전, 주둔지 = 상전 연계(정전 시 자립 논리)"],

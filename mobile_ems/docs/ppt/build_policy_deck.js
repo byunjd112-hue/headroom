@@ -146,9 +146,10 @@ const GRAD = k => /\bno\b/.test(k) ? "167E72" : /\bkv\b.*\bg\b/.test(k) ? "128A5
 (async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pol")), br = await chromium.launch(), pg = await br.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1.5 });
   const view = new pptxgen(), edit = new pptxgen(), IN = 13.333 / 1920;
-  for (const d of [view, edit]) { d.defineLayout({ name: "WIDE", width: 13.333, height: 7.5 }); d.layout = "WIDE"; d.title = "이동형 EMS 정책 설명 자료"; }
+  for (const d of [view, edit]) { d.defineLayout({ name: "WIDE", width: 13.333, height: 7.5 }); d.layout = "WIDE"; d.title = "전술전력통제체계(TPCS) 정책 설명 자료"; }
   let n = 0;
-  for (const body of [S1, S2, S3]) { n++; const f = path.join(tmp, `s${n}.html`);
+  const RN = require("../lib.js").rename;                          // 체계 명칭: EMS → 전술전력통제체계(TPCS)
+  for (const body of [S1, S2, S3].map(h => RN(h).replace(/ONE EMS FOR/g, "ONE TPCS FOR"))) { n++; const f = path.join(tmp, `s${n}.html`);
     fs.writeFileSync(f, `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>${CSS}</style></head><body>${body}</body></html>`);
     await pg.goto(U(f)); await pg.evaluate(() => document.fonts.ready); await pg.waitForTimeout(400);
     const full = path.join(tmp, `v${n}.jpg`), plate = path.join(tmp, `p${n}.jpg`); await pg.screenshot({ path: full, type: "jpeg", quality: 90 });
@@ -160,7 +161,7 @@ const GRAD = k => /\bno\b/.test(k) ? "167E72" : /\bkv\b.*\bg\b/.test(k) ? "128A5
       if (!runs.length) continue; const grow = al === "left" ? it.w * 0.35 + 20 : 0, pad = al === "center" ? 30 : 0;
       s.addText(runs, { x: (it.x - pad) * IN, y: it.y * IN, w: (it.w + grow + pad * 2) * IN, h: it.h * IN, fontFace: it.disp ? "Black Han Sans" : "맑은 고딕", fontSize: Math.round(it.fs * 5) / 10, lineSpacing: it.lh * 0.5, charSpacing: it.ls ? it.ls * 0.5 : undefined, align: al, valign: "top", margin: 0, wrap: false }); } }
   await br.close();
-  await view.writeFile({ fileName: path.join(OUTDIR, "IFPS_EMS_정책설명자료_보기용.pptx") }); await edit.writeFile({ fileName: path.join(OUTDIR, "IFPS_EMS_정책설명자료_편집용.pptx") });
+  await view.writeFile({ fileName: path.join(OUTDIR, "IFPS_TPCS_정책설명자료_보기용.pptx") }); await edit.writeFile({ fileName: path.join(OUTDIR, "IFPS_TPCS_정책설명자료_편집용.pptx") });
   for (let i = 1; i <= 3; i++) fs.copyFileSync(path.join(tmp, `v${i}.jpg`), path.join(os.tmpdir(), `pol_v${i}.jpg`));
   console.log("saved", OUTDIR);
 })();
