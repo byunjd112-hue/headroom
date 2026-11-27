@@ -28,7 +28,7 @@ def make_handler(folder):
             try:
                 n = int(self.headers.get("Content-Length") or 0); name = self.headers.get("X-TPCS-File") or ""
                 if not 0 < n <= MAX_BODY: return self._send(413, {"ok": False, "why": "본문 길이 오류"})
-                if not re.fullmatch(r"EMS_bundle_\d{12}-\d{12}\.zip", name): return self._send(400, {"ok": False, "why": "파일 이름 형식 오류"})
+                if not re.fullmatch(r"TPCS_bundle_\d{12}-\d{12}\.zip", name): return self._send(400, {"ok": False, "why": "파일 이름 형식 오류"})
                 body = self.rfile.read(n); sha = hashlib.sha256(body).hexdigest()
                 if sha != (self.headers.get("X-TPCS-SHA256") or sha): return self._send(400, {"ok": False, "why": "SHA-256 불일치(전송 중 손상)"})
                 man = archxfer.verify(body)

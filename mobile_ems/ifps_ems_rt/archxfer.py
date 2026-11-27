@@ -87,7 +87,7 @@ class Transfer:
             z.writestr("manifest.json", json.dumps(man, ensure_ascii=False, indent=1))
             for k, v in files.items(): z.writestr(k, v)
         body = buf.getvalue(); os.makedirs(self.outbox, exist_ok=True)
-        name = f"EMS_bundle_{datetime.fromtimestamp(t0):%Y%m%d%H%M}-{datetime.fromtimestamp(t1):%Y%m%d%H%M}.zip"; tmp = os.path.join(self.outbox, name + ".tmp")
+        name = f"TPCS_bundle_{datetime.fromtimestamp(t0):%Y%m%d%H%M}-{datetime.fromtimestamp(t1):%Y%m%d%H%M}.zip"; tmp = os.path.join(self.outbox, name + ".tmp")
         with open(tmp, "wb") as f: f.write(body)
         os.replace(tmp, os.path.join(self.outbox, name))
         with self.a.lock:

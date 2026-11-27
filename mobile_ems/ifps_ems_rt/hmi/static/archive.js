@@ -237,7 +237,7 @@ const ARC = {
       <p>· 바꾸는 곳: 이 화면의 <b>수집 항목</b> 탭(엔지니어 권한) — 주기 · 보관 기간 · ESS 항목 · 장치별 수집 신호를 고치면 바로 적용된다.</p><p>· 별도 조회: <span class="mono">python -m ifps_ems_rt.archview state/archive.db</span> — TPCS 를 켜지 않고 보관소 파일만 읽는다.</p></div></div></div>`;
   },
 
-  async report() { const days = document.querySelector("#arcDays").value; return this.fetchFile(`/api/report.docx?days=${days}`, "EMS_report.docx", "보고서"); },
+  async report() { const days = document.querySelector("#arcDays").value; return this.fetchFile(`/api/report.docx?days=${days}`, "TPCS_report.docx", "보고서"); },
   /* 서버가 만든 문서를 내려받는다(운용자 로그인). 파일 이름은 서버가 준 것을 쓴다 */
   async fetchFile(url, fallback, what) {
     if (!this.standalone && !this.role("operator")) { this.say(`${what} 출력은 운용자 로그인이 필요합니다`, "bad"); if (typeof loginDialog === "function") loginDialog(); return; }

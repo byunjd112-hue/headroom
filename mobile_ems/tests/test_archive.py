@@ -167,7 +167,7 @@ class ArchiveTest(unittest.TestCase):
     def test_receiver_rejects_bad_upload(self):
         httpd = archrecv.serve(os.path.join(self.dir, "inbox"), port=0); url = f"http://127.0.0.1:{httpd.server_address[1]}/"
         try:
-            for head, body in (({"X-TPCS-File": "../x.zip"}, b"zz"), ({"X-TPCS-File": "EMS_bundle_202603021000-202603021100.zip", "X-TPCS-SHA256": "00"}, b"zz"), ({"X-TPCS-File": "EMS_bundle_202603021000-202603021100.zip"}, b"not a zip")):
+            for head, body in (({"X-TPCS-File": "../x.zip"}, b"zz"), ({"X-TPCS-File": "TPCS_bundle_202603021000-202603021100.zip", "X-TPCS-SHA256": "00"}, b"zz"), ({"X-TPCS-File": "TPCS_bundle_202603021000-202603021100.zip"}, b"not a zip")):
                 with self.assertRaises(urllib.error.HTTPError) as e: urllib.request.urlopen(urllib.request.Request(url, data=body, headers=head))
                 self.assertEqual(e.exception.code, 400)
             self.assertEqual(os.listdir(os.path.join(self.dir, "inbox")), [])

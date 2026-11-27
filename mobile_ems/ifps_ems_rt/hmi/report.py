@@ -242,4 +242,4 @@ def build(eng, st, q):
     else: doc.h1("1. 현재 현황"); doc.p("기록 조회기에서 만든 보고서라 현재 현황은 없다. TPCS 화면의 [보고서 출력]을 쓰면 들어간다.")
     _recent(doc, arch, a, b); _events(doc, arch, a, b); _sequences(doc, eng, arch, a, b); _safety(doc, arch, a, b); _ess(doc, st, a, b); _devices(doc, st, a, b); _storage(doc, st)
     site = "".join(c for c in s["site"] if c.isascii() and (c.isalnum() or c in "-_")) or "archive"       # 파일 이름은 영문·숫자만(브라우저·압축 도구에 따라 한글 이름이 깨진다)
-    return f"EMS_report_{site}_{a:%Y%m%d}-{b - timedelta(days=1):%Y%m%d}.docx", doc.to_bytes()
+    return f"TPCS_report_{site}_{a:%Y%m%d}-{b - timedelta(days=1):%Y%m%d}.docx", doc.to_bytes()
