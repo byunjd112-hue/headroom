@@ -67,6 +67,86 @@ function sld() {
   g += T(512, 648, "작전지에서는 고압 측 미사용, 주둔지에서는 상전 22.9 kV 수전. 저압 모선 정격은 전원 합계 전류로 선정", { s: 14 });
   return g;
 }
+/** 단선 결선도(도면 양식: 도면 틀, IEC 식 기호, 범례, 정격표, 표제란). 1640 × 626 */
+function sldPro() {
+  const HV = "#b3261e", LV = "#1f3a5f", SRC = "#2f6b3f", INK = "#1b2733", GR = "#5b6773", RED = "#b3261e"; let g = "";
+  const t = (x, y, s, o = {}) => `<text x="${x}" y="${y}" font-size="${o.s || 11}" font-weight="${o.b ? 700 : 400}" fill="${o.c || INK}" text-anchor="${o.a || "start"}">${s}</text>`;
+  const ln = (a, b, c, d, col = INK, w = 1.6, ex = "") => `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="${col}" stroke-width="${w}" stroke-linecap="round" ${ex}/>`;
+  const cb = (x, y, col = INK) => `<rect x="${x - 7}" y="${y - 7}" width="14" height="14" fill="#fff" stroke="${col}" stroke-width="1.6"/>` + ln(x - 4.5, y - 4.5, x + 4.5, y + 4.5, col, 1.4) + ln(x - 4.5, y + 4.5, x + 4.5, y - 4.5, col, 1.4);
+  const ct = (x, y, col = INK) => `<circle cx="${x}" cy="${y}" r="5.5" fill="none" stroke="${col}" stroke-width="1.4"/>`;
+  const earth = (x, y) => ln(x, y, x, y + 8, INK, 1.4) + ln(x - 8, y + 8, x + 8, y + 8, INK, 1.4) + ln(x - 5, y + 11.5, x + 5, y + 11.5, INK, 1.4) + ln(x - 2, y + 15, x + 2, y + 15, INK, 1.4);
+  const tag = (x, y, w, s1, col = GR) => `<rect x="${x}" y="${y}" width="${w}" height="16" rx="3" fill="#fff" stroke="${col}" stroke-width="1"/>` + t(x + w / 2, y + 11.5, s1, { s: 10, a: "middle", c: col });
+  // 도면 틀과 구역 눈금
+  g += `<rect x="6" y="6" width="1628" height="614" fill="#fff" stroke="${INK}" stroke-width="2"/><rect x="14" y="14" width="1612" height="598" fill="none" stroke="${INK}" stroke-width="0.8"/>`;
+  for (let i = 0; i < 8; i++) g += t(14 + 1612 / 16 + i * 1612 / 8, 12.5, String(i + 1), { s: 7, a: "middle", c: GR }) + (i ? ln(14 + i * 1612 / 8, 6, 14 + i * 1612 / 8, 14, INK, 0.8) : "");
+  ["A", "B", "C", "D"].forEach((c, i) => { g += t(10, 14 + 598 / 8 + i * 598 / 4 + 3, c, { s: 7, a: "middle", c: GR }) + (i ? ln(6, 14 + i * 598 / 4, 14, 14 + i * 598 / 4, INK, 0.8) : ""); });
+  // 컨테이너 경계
+  g += `<rect x="52" y="64" width="1016" height="338" rx="6" fill="#f7f9fb" stroke="${GR}" stroke-width="1.2" stroke-dasharray="9 5"/>` + t(1056, 82, "⑥ 고전압 배전 및 변압체계: 20ft ISO 컨테이너 1대", { s: 12, b: 1, c: GR, a: "end" });
+  // 고압 인입
+  const X = 300;
+  g += t(X, 34, "한전 22.9 kV, 3상 60 Hz(주둔지 상전)", { s: 12, b: 1, a: "middle", c: HV }) + ln(X, 40, X, 100, HV, 2.4) + `<path d="M${X - 6} 52 h12 l-6 10 Z" fill="${HV}"/>` + t(X + 12, 60, "고압 케이블, 엘보형 접속재", { s: 10, c: GR });
+  g += ln(X, 92, X - 46, 92, HV, 1.6) + `<rect x="${X - 60}" y="86" width="14" height="24" fill="#fff" stroke="${INK}" stroke-width="1.4"/>` + `<path d="M${X - 53} 90 v12 m-3 -4 l3 4 l3 -4" fill="none" stroke="${INK}" stroke-width="1.2"/>` + earth(X - 53, 110) + t(X - 66, 101, "피뢰기", { s: 10, a: "end", c: GR });
+  g += cb(X, 108, HV) + t(X + 14, 106, "고압 개폐 장치(24 kV급)", { s: 11, b: 1 }) + t(X + 14, 119, "형식, 인입 회선 수: 설계 확정 필요", { s: 10, c: RED });
+  g += ln(X, 115, X, 150, HV, 2.4) + ct(X, 132, HV) + ln(X + 6, 132, X + 150, 132, GR, 1, 'stroke-dasharray="3 3"') + tag(X + 150, 124, 112, "보호 계전기와 계량기");
+  // 변압기
+  g += `<circle cx="${X}" cy="164" r="15" fill="#fff" stroke="${HV}" stroke-width="2.2"/><circle cx="${X}" cy="186" r="15" fill="none" stroke="${LV}" stroke-width="2.2"/>`;
+  g += t(X + 24, 170, "TR  몰드형 변압기 500 kVA", { s: 12, b: 1 }) + t(X + 24, 184, "22.9 kV / 380 V, 권선 온도 감시", { s: 10.5 }) + t(X + 24, 197, "결선 방식, 임피던스: 설계 확정 필요", { s: 10, c: RED });
+  g += t(X - 24, 168, "1차 약 12.6 A", { s: 10, a: "end", c: GR }) + t(X - 24, 190, "2차 약 760 A", { s: 10, a: "end", c: GR });
+  g += ln(X, 201, X, 290, LV, 2.4) + cb(X, 226, LV) + t(X + 14, 224, "저압 주 차단기(800 A급 이상)", { s: 11, b: 1 }) + t(X + 14, 237, "TPCS 신호 CB.GRID, 역가압 방지 연동 잠금", { s: 10, c: GR });
+  g += ct(X, 258, LV) + ln(X - 6, 258, X - 40, 258, GR, 1, 'stroke-dasharray="3 3"') + `<circle cx="${X - 50}" cy="258" r="10" fill="#fff" stroke="${GR}" stroke-width="1.2"/>` + t(X - 50, 262, "M", { s: 10, a: "middle", b: 1, c: GR });
+  // 모선
+  const YB = 290, A1 = 80, A2 = 500, B1 = 620, B2 = 1040;
+  g += ln(A1, YB, A2, YB, LV, 5.5) + ln(B1, YB, B2, YB, LV, 5.5) + t(A1, YB - 9, "모선 A  380 V", { s: 12, b: 1, c: LV }) + t(B2, YB - 9, "모선 B  380 V", { s: 12, b: 1, a: "end", c: LV });
+  g += ln(A2, YB, B1, YB, LV, 1.8) + cb(560, YB, LV) + t(560, YB - 14, "연계 차단기 CB.TIE", { s: 10.5, a: "middle", b: 1 });
+  // 게이트웨이와 TPCS
+  g += `<rect x="760" y="110" width="180" height="42" rx="4" fill="#fff" stroke="${INK}" stroke-width="1.4"/>` + t(850, 127, "계측 및 보호 게이트웨이", { s: 11, b: 1, a: "middle" }) + t(850, 142, "차단기 상태, 고장, 전압, 전력", { s: 10, a: "middle", c: GR });
+  g += ln(940, 131, 1090, 131, INK, 1.2, 'stroke-dasharray="6 3"') + ln(940, 137, 1090, 137, INK, 1.2, 'stroke-dasharray="6 3"') + t(1000, 124, "Modbus TCP 이중 경로", { s: 10, a: "middle", c: GR });
+  g += `<rect x="760" y="176" width="180" height="30" rx="4" fill="#fff" stroke="${GR}" stroke-width="1.2"/>` + t(850, 195, "변압기 구획 강제 환기 팬", { s: 10.5, a: "middle", c: GR });
+  // 분기
+  const fd = (x, col, y2) => ln(x, YB, x, y2, col, 2) + cb(x, YB + 26, col);
+  const src = (x, sym, n1, n2) => { let o = fd(x, SRC, 408) + `<path d="M${x - 5} ${YB + 50} h10 l-5 -9 Z" fill="${SRC}"/>` + ln(x, 402, x, 426, SRC, 2);
+    o += sym === "G" ? `<circle cx="${x}" cy="442" r="16" fill="#fff" stroke="${SRC}" stroke-width="2"/>` + t(x, 447, "G", { s: 14, b: 1, a: "middle", c: SRC })
+      : `<rect x="${x - 16}" y="426" width="32" height="32" fill="#fff" stroke="${SRC}" stroke-width="2"/>` + ln(x - 16, 458, x + 16, 426, SRC, 1.2) + t(x - 8, 439, "~", { s: 12, b: 1, a: "middle", c: SRC }) + t(x + 8, 454, "=", { s: 12, b: 1, a: "middle", c: SRC });
+    return o + t(x, 476, n1, { s: 11, b: 1, a: "middle" }) + (n2 ? t(x, 489, n2, { s: 9.5, a: "middle", c: GR }) : ""); };
+  const spare = x => fd(x, GR, 350) + t(x, 364, "예비", { s: 10, a: "middle", c: GR });
+  g += src(110, "G", "복합전력 발전기", "디젤") + src(200, "P", "복합전력 ESS", "계통 형성 PCS") + src(290, "P", "태양광", "인버터") + spare(355);
+  g += spare(765) + src(840, "P", "이동형 ESS", "PCS") + src(930, "P", "수소 연료전지", "인버터") + spare(1005);
+  // 환망
+  const RA = 420, RB = 700, YR = 548;
+  g += fd(RA, LV, YR) + fd(RB, LV, YR) + ln(RA, YR, RB, YR, LV, 2);
+  g += ct(RA, YB + 46, LV) + ct(RB, YB + 46, LV) + t(RA + 12, YB + 30, "환망 급전 A  630 A", { s: 11, b: 1 }) + t(RB - 12, YB + 30, "환망 급전 B  630 A", { s: 11, b: 1, a: "end" });
+  g += tag(RA + 12, YB + 38, 96, "87  67  27 보호") + tag(RB - 108, YB + 38, 96, "87  67  27 보호");
+  const fsu = (x, y, n) => `<rect x="${x - 23}" y="${y - 11}" width="46" height="22" rx="3" fill="#eaf1f8" stroke="${LV}" stroke-width="1.6"/>` + t(x, y + 4, n, { s: 10.5, b: 1, a: "middle", c: LV });
+  g += fsu(RA, 440, "FSU 1") + fsu(RB, 440, "FSU n") + fsu(480, YR, "FSU 2") + fsu(640, YR, "FSU …");
+  g += `<rect x="552" y="${YR - 8}" width="16" height="16" fill="#fff" stroke="${RED}" stroke-width="1.8"/>` + ln(556, YR + 4, 564, YR - 4, RED, 1.6) + t(560, YR - 14, "상시 개방점 1개소", { s: 10.5, b: 1, a: "middle", c: RED });
+  [[RA - 23, 440, -1], [RB + 23, 440, 1]].forEach(([x, y, d]) => { g += ln(x, y, x + d * 22, y, LV, 1.4) + t(x + d * 26, y + 4, "PPDU-20, 부하", { s: 9.5, a: d < 0 ? "end" : "start", c: GR }); });
+  [480, 640].forEach(x => { g += ln(x, YR + 11, x, YR + 26, LV, 1.4) + t(x, YR + 38, "PPDU-20, 부하", { s: 9.5, a: "middle", c: GR }); });
+  g += t(560, YR + 52, "환상 간선: 양쪽 급전, 구간분전함으로 구간 분할(제안 발표 기준 6구간)", { s: 10.5, a: "middle", c: GR });
+  g += t(560, 378, "분기 합계 12회로", { s: 10.5, b: 1, c: RED, a: "middle" }) + t(560, 392, "회로별 배정표: 설계 확정 필요", { s: 10, c: RED, a: "middle" }) + t(1056, 98, "전원의 모선 배정은 TPCS 모선 구성 설정에 따름", { s: 10, a: "end", c: GR });
+  // 오른쪽 단: 범례, 정격, 확정 필요, 표제란
+  const PX = 1100, PW = 518; g += ln(PX - 12, 14, PX - 12, 612, INK, 0.8);
+  const hd = (y, s1) => `<rect x="${PX}" y="${y}" width="${PW}" height="20" fill="${LV}"/>` + t(PX + 10, y + 14.5, s1, { s: 12, b: 1, c: "#fff" });
+  g += hd(24, "범례");
+  const lg = [[cb(PX + 18, 62), "차단기"], [ct(PX + 18, 84), "변류기"], [`<circle cx="${PX + 18}" cy="106" r="8" fill="#fff" stroke="${GR}" stroke-width="1.2"/>` + t(PX + 18, 110, "M", { s: 9, a: "middle", b: 1, c: GR }), "계량기"],
+    [ln(PX + 150, 62, PX + 186, 62, HV, 2.4), "22.9 kV"], [ln(PX + 150, 84, PX + 186, 84, LV, 2.4), "380 V"], [ln(PX + 150, 106, PX + 186, 106, SRC, 2), "전원 접속"],
+    [ln(PX + 300, 62, PX + 336, 62, INK, 1.2, 'stroke-dasharray="6 3"'), "통신"], [ln(PX + 300, 84, PX + 336, 84, GR, 1.2, 'stroke-dasharray="9 5"'), "컨테이너 경계"], [`<rect x="${PX + 310}" y="98" width="16" height="16" fill="#fff" stroke="${RED}" stroke-width="1.8"/>`, "상시 개방점"]];
+  lg.forEach(([sy, nm], i) => { g += sy + t(PX + [36, 196, 346][Math.floor(i / 3)], 66 + (i % 3) * 22, nm, { s: 11 }); });
+  g += t(PX + 10, 134, "87 구간 차동, 67 방향성, 27 저전압(제안 발표 자료의 보호 요소)", { s: 10.5, c: GR });
+  g += hd(148, "주요 정격");
+  const rt = [["형태", "20ft ISO 컨테이너 1대, 15 t 이하, PLS 운송", "받은 자료"], ["변압기", "몰드형 500 kVA, 22.9 kV / 380 V", "받은 자료"], ["저압 분기", "12회로", "받은 자료"], ["환상 간선", "630 A, 구간분전함으로 분할", "받은 자료"],
+    ["변압기 전류", "1차 약 12.6 A, 2차 약 760 A", "계산값"], ["저압 주 차단기", "800 A급 이상", "검토 의견"]];
+  rt.forEach((r, i) => { const y = 168 + i * 21; g += `<rect x="${PX}" y="${y}" width="${PW}" height="21" fill="${i % 2 ? "#fff" : "#f3f6f9"}" stroke="#c9d1d9" stroke-width="0.6"/>` + t(PX + 10, y + 14.5, r[0], { s: 11, b: 1 }) + t(PX + 118, y + 14.5, r[1], { s: 11 }) + t(PX + PW - 10, y + 14.5, r[2], { s: 10, a: "end", c: r[2] === "받은 자료" ? GR : "#8a4b12" }); });
+  g += `<rect x="${PX}" y="306" width="${PW}" height="20" fill="${RED}"/>` + t(PX + 10, 320.5, "설계 확정 필요 항목", { s: 12, b: 1, c: "#fff" });
+  ["분기 12회로 배정. TPCS 기본 구성의 접속 회로는 14회로(전원 9, 환망 2, 등급 3)", "저압 모선 정격. 전원 합계 전류로 선정(변압기 2차 760 A 기준 아님)", "변압기 2차 접속 모선. 모선 A 인입은 검토안, 양 모선 인입 여부",
+    "역가압 방지. 전원 운전 중 주 차단기 투입 시 고압 단자 가압, 연동 잠금", "고압 측 구성. 인입 회선 수, 개폐 장치 형식, 고압 환상 여부", "작전지 운용. 고압 측 미사용으로 해석함, 확인 필요"].forEach((s1, i) => {
+    const y = 326 + i * 22; g += `<rect x="${PX}" y="${y}" width="${PW}" height="22" fill="#fff" stroke="#e3c4c1" stroke-width="0.6"/>` + `<circle cx="${PX + 14}" cy="${y + 11}" r="7.5" fill="${RED}"/>` + t(PX + 14, y + 14.5, String(i + 1), { s: 9.5, b: 1, a: "middle", c: "#fff" }) + t(PX + 28, y + 15, s1, { s: 10.5 }); });
+  // 표제란
+  const TY = 472; g += `<rect x="${PX}" y="${TY}" width="${PW}" height="132" fill="#fff" stroke="${INK}" stroke-width="1.4"/>` + ln(PX, TY + 44, PX + PW, TY + 44, INK, 0.8) + ln(PX, TY + 88, PX + PW, TY + 88, INK, 0.8) + ln(PX + 300, TY + 44, PX + 300, TY + 132, INK, 0.8) + ln(PX + 150, TY + 88, PX + 150, TY + 132, INK, 0.8);
+  g += t(PX + 10, TY + 15, "도면명", { s: 9, c: GR }) + t(PX + 10, TY + 35, "⑥ 고전압 배전 및 변압체계 단선 결선도", { s: 15, b: 1 });
+  g += t(PX + 10, TY + 59, "체계", { s: 9, c: GR }) + t(PX + 10, TY + 78, "IFPS 이동형 배전체계", { s: 12.5, b: 1 }) + t(PX + 310, TY + 59, "구분", { s: 9, c: GR }) + t(PX + 310, TY + 78, "검토안(설계 확정 전)", { s: 12.5, b: 1, c: RED });
+  g += t(PX + 10, TY + 103, "리비전", { s: 9, c: GR }) + t(PX + 10, TY + 122, process.argv[3] || "Rev72", { s: 12.5, b: 1 }) + t(PX + 160, TY + 103, "축척", { s: 9, c: GR }) + t(PX + 160, TY + 122, "없음(계통도)", { s: 12.5, b: 1 }) + t(PX + 310, TY + 103, "비고", { s: 9, c: GR }) + t(PX + 310, TY + 122, "시공 도면 아님", { s: 12.5, b: 1 });
+  return g;
+}
 function garrison() {
   let g = ""; const box = (x, y, w, h, f, st, t1, t2, t3) => R(x, y, w, h, f, st, 2, 'rx="8"') + T(x + w / 2, y + (t2 ? 30 : h / 2 + 5), t1, { s: 15, b: 1 }) + (t2 ? T(x + w / 2, y + 52, t2, { s: 13 }) : "") + (t3 ? T(x + w / 2, y + 71, t3, { s: 13, c: "#55626f" }) : "");
   const ar = (x1, y1, x2, y2, col, sw = 3) => LN(x1, y1, x2, y2, col, sw) + (y1 === y2 ? `<path d="M${x2} ${y2} l-12 -7 v14 Z" fill="${col}"/>` : `<path d="M${x2} ${y2} l-7 ${y2 > y1 ? -12 : 12} h14 Z" fill="${col}"/>`);
@@ -96,6 +176,7 @@ function garrison() {
   g += T(512, 658, "TPCS 는 수전 차단기 상태를 감시만 하고 조작하지 않음", { s: 14 });
   return g;
 }
-(async () => { const b = await chromium.launch(), p = await b.newPage({ viewport: { width: 1024, height: 688 }, deviceScaleFactor: 2 });
-  for (const [n, f] of [["pd2_layout", plan], ["pd2_sld", sld], ["pd2_grid", garrison]]) { await p.setContent(`<style>${css} body{margin:0;background:#fff} text{font-family:NSK}</style><svg xmlns="http://www.w3.org/2000/svg" width="1024" height="688" viewBox="0 0 1024 688">${f()}</svg>`); await p.evaluate(() => document.fonts.ready); await p.screenshot({ path: path.join(out, n + ".png") }); }
+(async () => { const b = await chromium.launch();
+  for (const [n, f, w, h] of [["pd2_layout", plan, 1024, 688], ["pd2_sld", sldPro, 1640, 626], ["pd2_grid", garrison, 1024, 688]]) { const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+    await p.setContent(`<style>${css} body{margin:0;background:#fff} text{font-family:NSK}</style><svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${f()}</svg>`); await p.evaluate(() => document.fonts.ready); await p.screenshot({ path: path.join(out, n + ".png") }); await p.close(); }
   await b.close(); })();
