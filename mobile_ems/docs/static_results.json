@@ -1,6 +1,6 @@
 {
- "date": "2026-11-27 15:03",
- "unittest_s": 722.1,
+ "date": "2026-11-28 00:19",
+ "unittest_s": 708.2,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -199,6 +199,7 @@
   "test_pin_tool_hashes_and_rejects_mismatch | ok",
   "test_start_failures_return_codes | ok",
   "test_start_serve_and_stop_by_signal | ok",
+  "예전 판에서 저장한 배치(중앙제어 장비 종류가 옛 이름)를 읽으면 지금 이름으로 바뀌어 그림이 그대로 나온다. | ok",
   "test_read_write_probe_check | ok",
   "test_write_asks_confirmation_and_watch_stops_on_interrupt | ok",
   "test_check_scans_and_module_entry | ok",
@@ -222,19 +223,19 @@
   "test_parse_json_and_csv | ok",
   "test_manual_input_changes_forecast_and_network_fetch | ok"
  ],
- "n_tests": 219,
+ "n_tests": 220,
  "tests_ok": true,
  "retried": [],
- "coverage_pct": 92.6,
+ "coverage_pct": 92.7,
  "stmt": {
-  "n": 7811,
-  "hit": 7457,
+  "n": 7820,
+  "hit": 7471,
   "pct": 95.5
  },
  "branch": {
-  "n": 2774,
-  "hit": 2348,
-  "pct": 84.6
+  "n": 2780,
+  "hit": 2354,
+  "pct": 84.7
  },
  "coverage_files": [
   [
@@ -334,20 +335,20 @@
    "30, 46-47, 61-64, 67-69, 123"
   ],
   [
-   "ifps_ems_rt/hmi/eng_tools.py",
-   90.9,
-   121,
-   78.1,
-   64,
-   "71-76, 85-87, 117-118"
-  ],
-  [
    "ifps_ems_rt/hmi/weatherwatch.py",
    90.9,
    99,
    50.0,
    22,
    "57-58, 66, 132-137"
+  ],
+  [
+   "ifps_ems_rt/hmi/eng_tools.py",
+   91.5,
+   130,
+   80.0,
+   70,
+   "71-76, 85-87, 117-118"
   ],
   [
    "ifps_ems_rt/hmi/fmexport.py",
@@ -454,14 +455,6 @@
    "69-72, 161, 165"
   ],
   [
-   "ifps_ems_rt/archive.py",
-   96.6,
-   148,
-   83.3,
-   30,
-   "95-96, 110, 128-129"
-  ],
-  [
    "ifps_ems_rt/hmi/eng_command.py",
    96.6,
    118,
@@ -542,12 +535,12 @@
    "52"
   ],
   [
-   "ifps_ems_rt/archdev.py",
-   97.9,
-   141,
-   88.3,
-   60,
-   "93-94, 110"
+   "ifps_ems_rt/archive.py",
+   98.0,
+   148,
+   83.3,
+   30,
+   "95-96, 110"
   ],
   [
    "ifps_ems_rt/hmi/docx.py",
@@ -564,14 +557,6 @@
    78.8,
    52,
    "117-118"
-  ],
-  [
-   "ifps_ems_rt/simplant.py",
-   98.5,
-   196,
-   92.6,
-   68,
-   "205, 217-218"
   ],
   [
    "ifps_ems_rt/runtime.py",
@@ -614,12 +599,28 @@
    "134"
   ],
   [
+   "ifps_ems_rt/simplant.py",
+   99.0,
+   196,
+   92.6,
+   68,
+   "217-218"
+  ],
+  [
    "ifps_ems_rt/fmsite.py",
    99.2,
    118,
    90.7,
    54,
    "67"
+  ],
+  [
+   "ifps_ems_rt/archdev.py",
+   99.3,
+   141,
+   88.3,
+   60,
+   "110"
   ],
   [
    "ifps_ems_rt/weather.py",
@@ -1479,7 +1480,7 @@
   ]
  },
  "metrics": {
-  "n_func": 1028,
+  "n_func": 1029,
   "limits": {
    "cc": 20,
    "len": 200,
@@ -1889,6 +1890,10 @@
     167
    ],
    [
+    "ifps_ems_rt/hmi/eng_tools.py",
+    164
+   ],
+   [
     "ifps_ems_rt/loads.py",
     162
    ],
@@ -1914,10 +1919,6 @@
    ],
    [
     "ifps_ems_rt/hmi/eng_command.py",
-    153
-   ],
-   [
-    "ifps_ems_rt/hmi/eng_tools.py",
     153
    ],
    [
@@ -2142,7 +2143,7 @@
    "SEVERITY.LOW": 1,
    "SEVERITY.MEDIUM": 2,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 10209,
+   "loc": 10219,
    "nosec": 0,
    "skipped_tests": 22
   },
@@ -2373,10 +2374,10 @@
   ]
  ],
  "cc_avg": 6.05,
- "cc_n": 1054,
+ "cc_n": 1055,
  "cc_rank": {
   "A": 597,
-  "B": 275,
+  "B": 276,
   "C": 182,
   "D": 0,
   "E": 0,
@@ -2516,6 +2517,11 @@
    "A"
   ],
   [
+   "ifps_ems_rt/hmi/eng_tools.py",
+   28.3,
+   "A"
+  ],
+  [
    "ifps_ems_rt/weather.py",
    28.5,
    "A"
@@ -2528,11 +2534,6 @@
   [
    "ifps_ems_rt/hmi/loadctl.py",
    29.1,
-   "A"
-  ],
-  [
-   "ifps_ems_rt/hmi/eng_tools.py",
-   29.8,
    "A"
   ],
   [
@@ -2858,8 +2859,8 @@
  ],
  "loc_py": {
   "files": 82,
-  "sloc": 8135,
-  "comments": 1193
+  "sloc": 8144,
+  "comments": 1194
  },
  "js": [
   [
