@@ -47,9 +47,24 @@ function nodash(t) {
   const rep = (m, off, all) => { const left = all.slice(0, off).split(/[.:;,(]/).pop().trim(); return left.length > 0 && left.length <= 14 && all.slice(Math.max(0, off - 30), off).indexOf(":") < 0 ? ": " : ", "; };
   return t.replace(/\s*[—–]\s*/g, rep).replace(/([가-힣)]) - (?=[가-힣(])/g, (m, a, off, all) => a + rep(m, off + 1, all));
 }
-const run = (t, o = {}) => { const mono = o.font === "Consolas" || o.font === "Cambria Math";
+const run = (t, o = {}) => { mark(typeof t === "string" ? rename(t) : t); const mono = o.font === "Consolas" || o.font === "Cambria Math";
   return new TextRun(Object.assign({ text: typeof t !== "string" || !TN.fx ? t : !mono ? TN.fx(t) : o.font === "Cambria Math" ? t.replace(/ ?· ?/g, " × ") : /[가-힣]/.test(t) ? nodot(nodash(rename(t))) : t, font: F, size: S.body, color: "000000" }, TN.scale && !mono ? { scale: TN.scale, characterSpacing: TN.cs } : {}, o)); };
-const P = (t, o = {}) => new Paragraph(Object.assign({ spacing: SP.body, children: Array.isArray(t) ? t : [run(t)] }, TN.just ? { alignment: AlignmentType.BOTH } : {}, o));
+// ── 약어(사용자 요구): 문서에 나온 약어만 끝의 '별첨 약어 설명' 표에 싣고, 핵심 약어는 본문에 처음 나올 때 쪽 아래에 8pt 주석을 단다(문서마다 FN_MAX 개까지 — 과하지 않게)
+const ABBR = JSON.parse(fs.readFileSync(__dirname + "/abbr.json", "utf8")), FN_MAX = 10;
+ABBR.items.forEach(a => { a.rx = new RegExp(a.re ? a.re : "(?<![A-Za-z0-9])" + a.k.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&") + "(?![A-Za-z0-9])"); });
+let USED = new Set(), NOTED = new Set(), NOTES = {};
+const { FootnoteReferenceRun } = require("docx");
+const mark = t => { if (typeof t === "string" && /[A-Z①-⑥]|\dms/.test(t)) ABBR.items.forEach(a => { if (!USED.has(a.k) && a.rx.test(t)) USED.add(a.k); }); };
+/** 본문 문단의 글: 핵심 약어가 처음 나오면 그 뒤에 주석 번호를 붙인다 */
+function runsFn(t) {
+  const s = rename(t); let best = null;
+  if (NOTED.size < FN_MAX) ABBR.items.forEach(a => { if (!a.fn || NOTED.has(a.k)) return; const m = a.rx.exec(s); if (m && (!best || m.index < best.i)) best = { a, i: m.index, e: m.index + m[0].length }; });
+  if (!best) return [run(t)];
+  NOTED.add(best.a.k); const id = NOTED.size;
+  NOTES[id] = { children: [new Paragraph({ spacing: { after: 0, line: 220 }, children: [new TextRun({ text: ` ${best.a.k}: ${best.a.en}. ${best.a.ko}`, font: F, size: 16, color: "000000" })] })] };
+  return [run(s.slice(0, best.e)), new FootnoteReferenceRun(id)].concat(s.length > best.e ? [run(s.slice(best.e))] : []);
+}
+const P = (t, o = {}) => new Paragraph(Object.assign({ spacing: SP.body, children: Array.isArray(t) ? t : runsFn(t) }, TN.just ? { alignment: AlignmentType.BOTH } : {}, o));
 const head = (lv, k) => t => (NI++, Object.assign(new Paragraph({ heading: lv, spacing: SP[k], children: [run(t, { size: S[k], bold: true })] }), { __h: true }));
 const H1 = head(HeadingLevel.HEADING_1, "h1"), H2 = head(HeadingLevel.HEADING_2, "h2"), H3 = head(HeadingLevel.HEADING_3, "h3");
 const CODE = t => new Paragraph({ spacing: { after: 40 }, shading: { type: ShadingType.CLEAR, fill: "F2F2F2" }, indent: { left: 200 }, children: [run(t, { font: "Consolas", size: S.code })] });
@@ -119,15 +134,24 @@ function solid(body) {
     else out.push(x); }
   return out;
 }
+/** 별첨: 이 문서에 나온 약어만 표기 · 원어 · 의미 표로(묶음 순서대로) */
+function appendix(body) {
+  const rows = ABBR.items.filter(a => USED.has(a.k)); if (rows.length < 3) return;
+  body.push(Object.assign(new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { before: 0, after: 160 }, children: [new PageBreak(), run("별첨  약어 설명", { size: S.h1, bold: true })] }), { __h: true, __nb: true }));
+  body.push(new Paragraph({ spacing: { after: 100, line: 280 }, children: [run("이 문서에 쓰인 영문 약어, 단위 및 기호의 원어와 의미", { size: S.note, color: "595959" })] }));
+  body.push(TBL(["표기", "원어", "의미"], rows.map(a => [a.k, a.en, a.ko]), [17, 35, 48], { bold: [0] }));
+}
 function save(body, out, foot) {
+  const main = solid(body), app = []; appendix(app);             // 본문을 먼저 굳혀야(표의 글까지) 나온 약어를 다 센다
   const hs = k => ({ run: { font: F, size: S[k], bold: true, color: "000000" }, paragraph: { spacing: SP[k] } });
   const doc = new Document({
     styles: { default: { document: { run: { font: F, size: S.body, color: "000000" } }, heading1: hs("h1"), heading2: hs("h2"), heading3: hs("h3") } },
     numbering: { config: [{ reference: "num", levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1)", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 420, hanging: 420 } }, run: { font: F, size: S.body } } }] }] },
-    features: { updateFields: true },
+    features: { updateFields: true }, footnotes: NOTES,
     sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1418, bottom: 1418, left: 1134, right: 1134 } } },
       footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [run(foot + "  ", { size: S.foot, color: "595959" }), new TextRun({ children: [PageNumber.CURRENT], font: F, size: S.foot, color: "595959" })] })] }) },
-      children: solid(body) }] });
+      children: main.concat(solid(app)) }] });
+  USED = new Set(); NOTED = new Set(); NOTES = {};                 // 한 프로세스에서 문서를 여러 개 만들 때 문서마다 새로 센다
   return Packer.toBuffer(doc).then(b => { fs.writeFileSync(out, b); console.log("saved", out); });
 }
 module.exports = { tune, tidy, nodot, nodash, rename, solid, mkTBL, BOX, run, P, H1, H2, H3, CODE, EQ, NUM, KV, NOTE, CAP, FIG, TBL, GAP, PB, cover, save, S, W, BLUE: "0000FF", RED: "FF0000" };

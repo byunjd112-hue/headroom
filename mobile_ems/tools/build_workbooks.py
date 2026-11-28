@@ -32,6 +32,16 @@ def _rules(wb, src):
         for row in ws.iter_rows():
             for c in row:
                 if isinstance(c.value, str) and c.value not in old and not c.value.startswith("="): c.value = doc_rules.clean(c.value)
+    import json, re                                                       # 별첨: 이 문서에 나온 약어만 표기 · 원어 · 의미 시트로(사용자 요구)
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "abbr.json"), encoding="utf-8") as f: ab = json.load(f)["items"]
+    text = " ".join(c.value for ws in wb.worksheets for row in ws.iter_rows() for c in row if isinstance(c.value, str) and not c.value.startswith("="))
+    rows = [a for a in ab if re.search(a.get("re") or r"(?<![A-Za-z0-9])" + re.escape(a["k"]) + r"(?![A-Za-z0-9])", text)]
+    if len(rows) >= 3:
+        ws = wb.create_sheet("별첨_약어설명"); ws.append(["표기", "원어", "의미"])
+        for a in rows: ws.append([a["k"], a["en"], a["ko"]])
+        for col, w in zip("ABC", (18, 46, 64)): ws.column_dimensions[col].width = w
+        for row in ws.iter_rows():
+            for c in row: c.alignment = Alignment(horizontal="center" if c.column == 1 or c.row == 1 else "left", vertical="center", wrap_text=True); c.font = Font(bold=c.row == 1 or c.column == 1, size=10)
 
 
 def _find(folder, *keys):

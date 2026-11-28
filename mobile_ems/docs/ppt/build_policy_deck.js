@@ -74,6 +74,7 @@ ${["01. 필요성", "02. 체계 구성과 운용", "03. 작전 성능과 추진"
 <div class="army">${fs.existsSync(LOGO) ? `<img src="${U(LOGO)}">` : `<div class="lg"><div class="lgt t">로고</div></div>`}<div><div class="n1 t">대한민국 육군</div><div class="n2 t">Republic of Korea Army</div></div></div><div class="tag t">이동형 전력체계 EMS</div>
 <div class="no d t">0${n}</div><div class="lab t">${lab}</div><div class="labu"></div><div class="h1 d t">${h1}<br><span class="g">${h2}</span></div><div class="en t">${en}</div><div class="lead t">${lead}</div><div class="sol"></div>
 ${body}
+<div class="t" style="position:absolute;left:452px;top:1000px;width:1434px;font-size:16px;line-height:20px;color:#3d4a60">약어  TPCS: 전술전력통제체계 / IFPS: 작전지 종합전력공급체계 / ESS: 에너지저장장치 / N-1: 전원 1대 상실에도 공급을 유지하는 기준</div>
 <div class="bot">${[["bolt", "작전지속능력 강화"], ["moon", "피탐 위험 감소"], ["fuel", "연료와 인력 절감"], ["shield", "무정전 전력 공급"]].map((b, i) => `<div class="bi" style="left:${48 + i * 300}px">${ico(b[0], "#ffd66b")}<span class="t">${b[1]}</span></div>`).join("")}<div class="bf t">${foot}</div></div>`;
 const rb = (x, y, w, k, s, c) => `<div class="rb ${c || ""}" style="left:${x}px;top:${y}px;width:${w}px"><div class="k t">${k}</div>${s ? `<div class="s t">${s}</div>` : ""}</div>`;
 const X = 452, CWD = 1434;

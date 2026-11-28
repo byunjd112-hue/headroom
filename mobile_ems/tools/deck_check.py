@@ -61,7 +61,9 @@ def content(slide):
 def check_slide(n, slide, w, h):
     """한 장의 문제 목록과 첫 요소 높이를 돌려준다."""
     bad = []
+    abbr = lambda sh: sh.has_text_frame and sh.text_frame.text.startswith("약어  ")        # 쪽 아래 8pt 약어 주석(사용자 요구) — 내용 영역 · 글자 크기 점검에서 뺀다
     for sh in slide.shapes:
+        if abbr(sh): continue
         odd = sorted(sizes(sh) - SIZES)
         if odd:
             bad.append(f"{n}쪽: 글자 크기 {odd} — '{sh.name}'")
@@ -70,7 +72,7 @@ def check_slide(n, slide, w, h):
             bad.append(f"{n}쪽: 번호 동그라미 비율 — '{sh.name}' {x1 - x0:.2f} × {y1 - y0:.2f}")
         if x0 < -TOL or y0 < -TOL or x1 > w + TOL or y1 > h + TOL:
             bad.append(f"{n}쪽: 슬라이드 밖 — '{sh.name}' ({x0:.2f},{y0:.2f})~({x1:.2f},{y1:.2f})")
-    body = content(slide)
+    body = [sh for sh in content(slide) if not abbr(sh)]
     for sh in body:
         x0, y0, x1, y1 = box(sh)
         lim = NOTE_BOT if sizes(sh) == {NOTE_PT} else BOT

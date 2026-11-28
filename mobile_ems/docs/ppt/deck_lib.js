@@ -50,7 +50,12 @@ function textH(text, w, pt = FS.body, o = {}) {
   return ps.reduce((a, p) => a + paraH(p, w), 0) + gap * Math.max(0, ps.length - 1);
 }
 
+// 약어(사용자 요구): 쪽 아래에 그 쪽의 핵심 약어를 8pt 한 줄로 달고, 맺음 장 앞에 '별첨 약어 설명' 쪽을 넣는다(자료에 나온 약어만)
+const ABBR = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "abbr.json"), "utf8"));
+ABBR.items.forEach(a => { a.rx = new RegExp(a.re ? a.re : "(?<![A-Za-z0-9])" + a.k.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&") + "(?![A-Za-z0-9])"); a.short = a.ko.split(/[.(]/)[0].trim(); });
+const flat = t => Array.isArray(t) ? t.map(x => Array.isArray(x) ? flat(x) : typeof x === "string" ? x : x && x.text !== undefined ? flat(x.text) : "").join(" ") : typeof t === "string" ? t : "";
 function makeDeck(cfg) {
+  let ALLTXT = "";
   const pres = new pptxgen(); pres.layout = "LAYOUT_WIDE"; pres.theme = { headFontFace: THEME.headFontFace, bodyFontFace: THEME.bodyFontFace };
   pres.title = cfg.title; pres.author = "한화에어로스페이스㈜ 에너지솔루션사업센터"; pres.company = "한화에어로스페이스㈜"; pres.subject = cfg.subject;
   const C = pres.SchemeColor, K = { INK: C.text1, DARK: C.text2, CREAM: C.background2, TAN: C.accent1, BROWN: C.accent2, GOLD: C.accent3, LINE: C.accent4, GRAY: C.accent5, RED: C.accent6, WHITE: C.background1 };
@@ -91,7 +96,8 @@ function makeDeck(cfg) {
     const ops = cur_ops = []; const put = (fn, f, args, o) => { if (cur && o && !o.placeholder && o.x !== undefined && o.y !== undefined) ops.push({ fn, f, args, o }); else f(...args); };
     ["addShape", "addImage", "addChart", "addTable"].forEach(fn => { const f = s[fn].bind(s); s[fn] = (a, b, c) => { const o = fn === "addImage" ? a : fn === "addChart" ? c : b; if (fn !== "addTable") seen(o, fn.slice(3)); put(fn, f, [a, b, c], o); return s; }; });
     const t = s.addText.bind(s);
-    s.addText = (text, o) => { seen(o, "글");
+    const tb = s.addTable.bind(s), tw = s.addTable; s.addTable = (rows, o) => { const x = flat(rows); if (cur) cur.txt = (cur.txt || "") + " " + x; ALLTXT += " " + x; return tw(rows, o); };
+    s.addText = (text, o) => { seen(o, "글"); { const x = flat(text); if (cur) cur.txt = (cur.txt || "") + " " + x; ALLTXT += " " + x; }
       if (cur && o && !o.placeholder && o.h && o.w) { const need = textH(text, o.w, o.fontSize || FS.body, o); if (need > o.h + 0.02) say(`글 넘침 ${need.toFixed(2)} > ${o.h.toFixed(2)} : ${String(Array.isArray(text) ? text[0].text : text).slice(0, 24)}…`); }
       put("addText", t, [text, o], o); return s; };
     return s;
@@ -133,14 +139,16 @@ function makeDeck(cfg) {
   function closePage() {
     if (cur && Math.abs(cur.top - L.TOP) > 0.011) say(`첫 요소 높이 ${cur.top.toFixed(2)} (기준 ${L.TOP})`);
     if (cur && cur.foot && cur.bot > L.NOTE_Y - 0.03) say(`내용이 ※ 주석과 겹침 (아래쪽 ${cur.bot.toFixed(2)})`);
-    if (cur) { spread(cur_ops, cur.foot); cur_ops.forEach(p => p.f(...p.args)); }
+    if (cur) { spread(cur_ops, cur.foot); cur_ops.forEach(p => p.f(...p.args));
+      const ab = cur.s && !cur.noabbr ? ABBR.items.filter(a => a.fn && a.rx.test(cur.txt || "")).slice(0, 4) : [];
+      if (ab.length) { const c0 = cur; cur = null; c0.s.addText("약어  " + ab.map(a => `${a.k}: ${a.short}`).join("  /  "), { x: L.X, y: 6.86, w: L.CW - 1.2, h: 0.16, fontSize: 8, color: THEME.colors.GRAY || "6F6B68", margin: 0, valign: "middle", isTextBox: true }); cur = c0; } }
     cur_ops = []; cur = null;
   }
 
   // ── 장 만들기
   let curSec = 0, sub = 0;
   function content(secTitle, no, name, en, title, subtitle, notes) {
-    closePage(); nSlide++; const s = watch(pres.addSlide({ masterName: "CONTENT", sectionTitle: secTitle })); cur = { n: nSlide, title, top: 99, bot: 0, foot: false };
+    closePage(); nSlide++; const s = watch(pres.addSlide({ masterName: "CONTENT", sectionTitle: secTitle })); cur = { n: nSlide, title, top: 99, bot: 0, foot: false, s, txt: "" };
     s.addText(no, { placeholder: "secno" }); s.addText(name, { placeholder: "sec" }); s.addText(en, { placeholder: "secen" }); s.addText(title, { placeholder: "title" }); s.addText(subtitle, { placeholder: "sub" });
     if (notes) s.addNotes(notes); return s;
   }
@@ -152,7 +160,15 @@ function makeDeck(cfg) {
   }
   function cover(f) { closePage(); nSlide++; pres.addSection({ title: "표지·목차" }); const s = pres.addSlide({ masterName: "COVER", sectionTitle: "표지·목차" }); Object.entries(f).forEach(([k, v]) => k === "notes" ? s.addNotes(v) : s.addText(v, { placeholder: k })); return s; }
   const toc = (title, subtitle) => content("표지·목차", "", "목 차", "CONTENTS", title, subtitle);
-  function closing(f) { closePage(); nSlide++; pres.addSection({ title: "맺음" }); const s = pres.addSlide({ masterName: "CLOSING", sectionTitle: "맺음" }); Object.entries(f).forEach(([k, v]) => s.addText(v, { placeholder: k })); return s; }
+  /** 별첨 약어 설명 쪽(자료에 나온 약어만, 한 쪽 14줄) */
+  function abbrPages() {
+    const rows = ABBR.items.filter(a => a.rx.test(ALLTXT)); if (rows.length < 3) return; const per = 14, n = Math.ceil(rows.length / per); pres.addSection({ title: "별첨" });
+    for (let i = 0; i < n; i++) { const s = content("별첨", "", "별 첨", "APPENDIX", `별첨 ${i + 1}.  약어 설명 (${i + 1}/${n})`, "이 자료에 쓰인 영문 약어, 단위 및 기호의 원어와 의미"); cur.noabbr = true; cur.top = L.TOP; cur.bot = L.TOP + 0.34 + 0.31 * Math.min(per, rows.length - i * per);
+      const hd = t => ({ text: t, options: { bold: true, align: "center", valign: "middle", fontSize: 12, color: HX.WHITE || "FFFFFF", fill: { color: HX.BROWN || "5B4A34" } } }), td = (t, b) => ({ text: t, options: { align: b ? "center" : "left", valign: "middle", fontSize: 12, bold: !!b, color: HX.INK || "24221D" } });
+      const part = rows.slice(i * per, (i + 1) * per);
+      const c0 = cur; cur = null; s.addTable([[hd("표기"), hd("원어"), hd("의미")]].concat(part.map(a => [td(a.k, 1), td(a.en), td(a.ko)])), { x: L.X, y: L.TOP, w: L.CW, colW: [2.2, 4.4, L.CW - 6.6], rowH: [0.34].concat(part.map(() => 0.31)), border: { type: "solid", color: HX.LINE || "C9BFAE", pt: 0.75 }, margin: 0.06 }); cur = c0; }
+  }
+  function closing(f) { abbrPages(); closePage(); nSlide++; pres.addSection({ title: "맺음" }); const s = pres.addSlide({ masterName: "CLOSING", sectionTitle: "맺음" }); Object.entries(f).forEach(([k, v]) => s.addText(v, { placeholder: k })); return s; }
 
   // ── 구성 요소
   const T = (s, text, o) => s.addText(text, Object.assign({ isTextBox: true, margin: 0, color: INK, fontSize: FS.body, valign: "top" }, o));

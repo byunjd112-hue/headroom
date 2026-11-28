@@ -66,7 +66,7 @@ def fix_pptx(path):
     with zipfile.ZipFile(path) as z:
         for i in z.infolist():
             data = z.read(i.filename)
-            if re.match(r"ppt/(slides|notesSlides)/[^/]+\.xml$", i.filename):
+            if re.match(r"ppt/(slides|notesSlides|slideMasters|slideLayouts)/[^/]+\.xml$", i.filename):
                 s = data.decode("utf-8")
 
                 def rep(m):
