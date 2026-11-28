@@ -66,7 +66,7 @@ def build_data(rev, date, site=None):
             "tree": tree, "s07_1": FT.S07_1, "s07_2": FT.S07_2, "s07_note": FT.S07_NOTE, "s07_3": FT.S07_3, "s07_4": FT.S07_4, "s08_1": FT.S08_1, "s08_h2": FT.S08_H2, "s08_2": FT.S08_2,
             "s09": FT.S09, "s10": [[str(a[0])] + a[1:] for a in FT.S10], "b_crit": FT.B_CRIT, "b_sys2": FT.B_SYS2, "b_design": FT.B_DESIGN, "b_design_note": FT.B_DESIGN_NOTE,
             "b_after": FT.B_AFTER, "b_abbr": FT.B_ABBR, "b_ref": FT.B_REF, "params": {"tm": 72, "hours": 8760, "beta": 0.1, "he0": 0.1, "he1": 0.03},
-            "meta": {"docno": "HAES-IFPS-TPCS-FMEA-001", "rev": rev, "date": date, "project": "IFPS 이동형 전력체계 TPCS", "org": "",
+            "meta": {"docno": "HAES-IFPS-TPCS-FMEA-001", "rev": rev, "date": date, "project": "IFPS 전술전력통제체계(TPCS)", "org": "",
                      "nOrg": sum(r["grp"] == "본체" for r in rows), "nSup": sum(r["grp"] == "연동" for r in rows)}}
 
 

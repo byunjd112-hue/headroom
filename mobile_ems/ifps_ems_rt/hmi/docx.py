@@ -12,7 +12,7 @@ FONT = "맑은 고딕"
 # 양식: 사무용 Word 문서와 같은 값(docs/lib.js 의 S · SP — 고치면 함께 고친다). 글자 크기는 반 포인트(22 = 11 pt)
 SZ = {"body": 22, "h1": 28, "h2": 24, "table": 20, "note": 18, "foot": 18}
 TEXT_W = 9638                                    # 본문 폭: A4, 좌·우 여백 20 mm
-FOOT = "IFPS 이동형 전력체계 TPCS  "              # 바닥글(쪽 번호 앞)
+FOOT = "IFPS 전술전력통제체계(TPCS)  "              # 바닥글(쪽 번호 앞)
 NS_R = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
 CT = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
       '<Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'

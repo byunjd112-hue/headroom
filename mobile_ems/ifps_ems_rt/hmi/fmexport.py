@@ -50,7 +50,7 @@ def fat_html(data, rev):
 body{{font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:11px;color:#222;margin:18px}} h1{{font-size:18px;margin:0 0 4px}} h2{{font-size:13px;margin:16px 0 6px}} p{{margin:4px 0;color:#555}}
 table{{border-collapse:collapse;width:100%}} th,td{{border:1px solid #999;padding:4px 6px;vertical-align:top;text-align:left}} thead th{{background:#e7e0d0}} td.b{{min-width:54px}} .sm th{{width:90px;background:#f3efe4}}
 @media print{{body{{margin:8mm}} tr{{page-break-inside:avoid}}}}</style></head><body>
-<h1>IFPS 이동형 전력체계 TPCS — FAT 점검표(현장 구성 반영)</h1><p>{rev} · 만든 때 {_h.escape(data["when"])} · 항목 {len(data["fat"])}건</p>
+<h1>IFPS 전술전력통제체계(TPCS) — FAT 점검표(현장 구성 반영)</h1><p>{rev} · 만든 때 {_h.escape(data["when"])} · 항목 {len(data["fat"])}건</p>
 <h2>1. 구성 요약</h2><table class="sm">{sm}</table>
 <h2>2. 점검 항목</h2>{_table(data["fat_head"], data["fat"], blank=(0, 7, 8))}
 <p>{_h.escape(NOTE)}</p><p>시험자: ________________ &nbsp; 확인자: ________________ &nbsp; 날짜: ________________</p></body></html>"""

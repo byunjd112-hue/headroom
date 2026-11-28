@@ -123,7 +123,7 @@ def _frame(d, title, sub="", *style, **o):
     s.box(0, 0, pptx.W_IN, 0.62, "", fill=DARK).box(0.45, 0.11, 0.42, 0.4, no, FS["head"], True, "FFFFFF", "ctr", TAN).box(0.92, 0.07, 8, 0.28, DOC, FS["head"], True, "FFFFFF").box(0.94, 0.33, 8, 0.22, "SCENARIO SEQUENCE", FS["small"], True, TAN)
     s.box(X - 0.06, 0.78, 12.4, 0.4, title, FS["title"], True, color, name=name)
     if sub: s.box(X - 0.06, 1.2, 12.4, 0.45, sub, FS["body"] if o.get("sub_body") else FS["sub"], not o.get("sub_body"), GRAY if o.get("sub_body") else GOLD, name=sub_name, valign="t")
-    s.box(0.39, 7.05, 7, 0.3, "IFPS 이동형 전력체계 TPCS  |  " + DOC, FS["foot"], False, GRAY)
+    s.box(0.39, 7.05, 7, 0.3, "IFPS 전술전력통제체계(TPCS)  |  " + DOC, FS["foot"], False, GRAY)
     return s
 
 
@@ -169,7 +169,7 @@ def _case(d, n, c, r):
 def export(cases, results=None, rev="", site=""):
     """시퀀스 문서(pptx) 바이트. results 는 검증 결과(scenarios.verify 의 results) — 있으면 관측 시간·통과 여부가 들어간다."""
     d = pptx.Deck(); res = {r["name"]: r for r in (results or [])}; s = d.slide()                  # 표지(글자 크기는 표지 전용)
-    s.box(0, 0, 13.333, 7.5, "", fill="F6F2EA").box(0.8, 2.3, 11.7, 0.9, DOC, 34, True, BROWN).box(0.8, 3.2, 11.7, 0.5, f"IFPS 이동형 전력체계 TPCS  ·  {site}  ·  {rev}  ·  {time.strftime('%Y-%m-%d %H:%M')}  ·  시나리오 {len(cases)}건", 14, False, GRAY)
+    s.box(0, 0, 13.333, 7.5, "", fill="F6F2EA").box(0.8, 2.3, 11.7, 0.9, DOC, 34, True, BROWN).box(0.8, 3.2, 11.7, 0.5, f"IFPS 전술전력통제체계(TPCS)  ·  {site}  ·  {rev}  ·  {time.strftime('%Y-%m-%d %H:%M')}  ·  시나리오 {len(cases)}건", 14, False, GRAY)
     s.box(0.8, 4.0, 11.7, 1.2, "회의에서 단계 표를 고친 뒤 화면의 [PPT 올리기]로 다시 올리면 시나리오에 반영된다. 시간은 가상 장치로 검증한 값이며 실장비 성능은 시험(FAT·SAT)으로 확인한다.", 12.5, False, "333333", valign="t")
     _guide(d)
     for n, c in enumerate(cases): _case(d, n, c, res.get(c["name"]))

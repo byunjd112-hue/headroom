@@ -9,7 +9,7 @@ import argparse, os, signal, sys, threading, webbrowser
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="ifps_ems_rt.hmi", description="이동형 전력체계 TPCS 제어화면")
+    ap = argparse.ArgumentParser(prog="ifps_ems_rt.hmi", description="전술전력통제체계(TPCS) 제어화면")
     ap.add_argument("config"); ap.add_argument("--sim", action="store_true", help="가상 장치(Modbus TCP 서버)를 함께 띄운다")
     ap.add_argument("--plan", metavar="모델폴더", help="예측·운전계획 연결(model_load.npz, model_pv.npz 폴더)")
     ap.add_argument("--days", type=int, default=30, help="전개 후 경과 일수(보수 계수)")
@@ -38,7 +38,7 @@ def main(argv=None):
         print(f"[기동 실패] 웹 서버 포트 사용 불가: {e}", file=sys.stderr); eng.stop(); return 3
     host, port = httpd.server_address[:2]; url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '') else host}:{port}/"  # nosec B104 — 표시용 주소 변환(바인드 아님)
     print("=" * 64)
-    print(" IFPS 이동형 전력체계 TPCS 제어화면")
+    print(" IFPS 전술전력통제체계(TPCS) 제어화면")
     print(f"  모드      : {'가상 장치(SIM)' if a.sim else '실장치 연동'}   운전 방식 {eng.rt.mode}   {eng.cfg.get('run_mode', '개발')}")
     print(f"  제어화면  : {url}")
     print(f"  상태 폴더 : {eng.rt.state_dir}")
