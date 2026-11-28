@@ -226,8 +226,8 @@ A.trunk = cab(SP.fsu_a); A.branch = cab(40);                 // 전압 강하 �
 const BR_M = 40, BR_PCT = +(R3 * 40 * BR_M / 1000 * ZC(A.branch) / (A.v * 1000) * 100).toFixed(1), TR_PCT = +(A.dv - BR_PCT).toFixed(1), LIM = (i, pc) => pc / 100 * A.v * 1000 / (R3 * i / 1000 * ZC(A.trunk)), r10 = x => Math.floor(x / 10) * 10;
 const RAD = i => { const c = r10(LIM(i, TR_PCT)), d = r10(c / Math.PI); return { c, d, r: d + BR_M }; };
 // ═══ 케이블 포설: 무게 계산은 선정 케이블(CBL)에서 구한다. 가정값은 RL. 릴 배전 차량은 5톤 중형전술차량 1대(사용자 지정)
-const RL = { rho: 8.9, k: 1.2, man: 25, nN: 0.5, nPE: 1, od: 32, fill: 0.65, kmh: 2, seg: 30, pay: 5000, reel: 1000, use: 0.9, dw: 0.9 };   // 구리 밀도, 피복 계수, 1인 취급 한도 kg, 중성선 비율, 보호 도체 가닥, 바깥지름 mm, 릴 충전율, 포설 속도 km/h, 구간 m, 적재 능력 kg, 릴과 구동부 kg(추정), 적재 이용률, 드럼 폭 m
-const TRK = CBL(SP.fsu_a), WM = TRK.mm * RL.rho * RL.k / 1000, NNE = Math.ceil(TRK.n * RL.nN), NST = 3 * TRK.n + NNE + RL.nPE, NST0 = 3 * TRK.n + TRK.n + RL.nPE, WRUN = WM * NST, CBUD = RL.pay * RL.use - RL.reel;
+const RL = { rho: 8.9, k: 1.2, man: 25, nN: 0.5, nPE: 1, od: 32, fill: 0.65, kmh: 2, seg: 30, pay: 5000, reel: 1000, legs: 200, use: 0.9, dw: 0.9 };   // 구리 밀도, 피복 계수, 1인 취급 한도 kg, 중성선 비율, 보호 도체 가닥, 바깥지름 mm, 릴 충전율, 포설 속도 km/h, 구간 m, 적재 능력 kg, 릴과 구동부 kg(추정), 적재 이용률, 드럼 폭 m
+const TRK = CBL(SP.fsu_a), WM = TRK.mm * RL.rho * RL.k / 1000, NNE = Math.ceil(TRK.n * RL.nN), NST = 3 * TRK.n + NNE + RL.nPE, NST0 = 3 * TRK.n + TRK.n + RL.nPE, WRUN = WM * NST, CBUD = RL.pay * RL.use - RL.reel - RL.legs, MODK = RL.reel + RL.legs;
 const RINGV = Math.min(RAD(SP.fsu_a).c, r10(CBUD / WRUN)), RING = RINGV, WTOT = WRUN * RING, WSEG1 = WM * RL.seg, MEN1 = Math.ceil(WSEG1 / RL.man), RADV = r10(RING / Math.PI) + BR_M;
 const VOL = RING * NST * Math.PI / 4 * Math.pow(RL.od / 1000, 2) / RL.fill, DRUM = Math.PI / 4 * (1.8 * 1.8 - 0.9 * 0.9) * RL.dw, NDR = Math.max(2, Math.ceil(VOL / DRUM)), TLAY = Math.ceil(RING / (RL.kmh * 1000 / 60));
 const FUSE = [16, 20, 25, 31.5, 40].reduce((a, x) => Math.abs(x - IHV * 2) < Math.abs(a - IHV * 2) ? x : a), ST_F = Math.round(SP.fsu_a * 3 / 100) * 100;
@@ -401,14 +401,24 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
 { const s = page(6, "릴 배전 차량: 5톤 중형전술차량 1대", "전동 릴을 실은 5톤 차량 1대가 환망 경로를 따라 주행하며 케이블을 풀고, 철수 때는 자동으로 감음",
     "5톤 차량 한 대에 릴을 실어 케이블을 풀고 감습니다. 한 대에 실리도록 무게를 맞췄습니다.");
   picTable(s, "pd2_reelcar", "릴 배전 차량의 자동 전개: 5톤 중형전술차량에 전동 릴 2개 탑재", [["항목", "적용안", "허용 범위와 사유"], [
-    ["적재 중량", `케이블 ${n0(WTOT)} kg + 릴 ${n0(RL.reel)} kg = ${n0(WTOT + RL.reel)} kg`, `한도 ${n0(RL.pay * RL.use)} kg(적재 능력의 ${RL.use * 100} %)`],
+    ["적재 중량", `케이블 ${n0(WTOT)} kg + 릴 묶음 ${n0(MODK)} kg = ${n0(WTOT + MODK)} kg`, `한도 ${n0(RL.pay * RL.use)} kg(적재 능력의 ${RL.use * 100} %)`],
     ["간선 가닥 수", `${NST}가닥(중성선 ${NNE}가닥)`, `불평형 전류 50 % 이하. 초과 시 ${NST0}가닥`],
     ["적재 둘레", `${RING} m`, `전압 강하 한도 ${RAD(SP.fsu_a).c} m 이내`],
     ["최대 전개 반경", `약 ${RADV} m`, "둘레 ÷ π + 분기 40 m"],
     ["릴", `전동 드럼 ${NDR}개`, `지름 1.8 m, 폭 ${RL.dw} m`],
     ["포설", `시속 ${RL.kmh} km, 주행 약 ${TLAY}분`, "접속 시간 별도"],
     ["운용 인원", "운전 1, 유도와 접속 2", "드는 작업 없음"]], [24, 40, 36], { dense: true }],
-    [["적용 원칙", [`구간 길이로 자른 케이블을 커넥터를 붙여 감아 둠. 둘레 ${RING} m 초과분은 2회 운반 또는 견인 트레일러로 보충. 릴과 구동부 중량은 추정값`]]]); }
+    [["적용 원칙", [`구간 길이로 자른 케이블을 커넥터를 붙여 감아 둠. 둘레 ${RING} m 초과분은 2회 운반 또는 견인 트레일러로 보충. 릴 묶음(릴, 구동부, 승강 다리) 중량은 추정값`]]]); }
+{ const s = page(6, "릴 묶음의 운용 방식", "차량에 실은 채 쓰는 것이 기본. 내려야 할 때는 네 다리로 스스로 올라가 차량이 빠져나옴",
+    "릴은 차량에서 내리지 않고 씁니다. 내려야 하면 릴 묶음이 스스로 다리를 뻗어 올라갑니다.");
+  picTable(s, "pd2_reelmod", "자체 승강 하차: 릴 묶음이 네 다리로 올라가고 차량이 아래에서 빠져나옴", [["구분", "적용안", "사유"], [
+    ["기본 운용", "차량에 실은 채 전개와 감김", "하차 장비와 시간이 필요 없음. 철수가 빠름"],
+    ["하차가 필요한 때", "차량을 다른 임무에 쓸 때, 장기 주둔", "릴 묶음만 남기고 차량 회수"],
+    ["하차와 상차", "전동 승강 다리 4개로 자체 승강", "크레인과 지게차 없이 운전병 1명이 조작"],
+    ["하차 후 사용", "외부 전원 또는 자체 축전지로 릴 구동", "내린 자리에서도 감김과 풀림 가능"],
+    ["옮기기", "지게차 포켓, 인양 고리, 고정 잠금", "적재함 표준 고정 장치에 체결"],
+    ["안전", "수평 감지, 다리 하중 감시, 비상 정지", "경사지 전도와 끼임 방지"]], [24, 40, 36], { dense: true }],
+    [["적용 원칙", [`승강 다리 ${n0(RL.legs)} kg 을 릴 묶음 무게에 포함해 적재 둘레를 계산함. 승강 높이, 다리 간격, 허용 경사는 탑재 차량의 적재함 높이와 폭에 맞춰 정함. 이 자료에서 제안하는 적용안이며 치수와 중량은 추정값`]]]); }
 { const s = page(6, "자동 감김과 회수", "철수 때는 역순으로 주행하며 세척, 정렬, 감김을 자동으로 수행",
     "철수할 때는 차량이 거꾸로 지나가며 케이블을 닦고 가지런히 감습니다.");
   picTable(s, "pd2_rewind", "자동 감김: 세척 솔, 정렬 안내 장치, 장력 표시와 비상 정지", [["기능", "내용", "사유"], [
@@ -464,13 +474,13 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
   table(s, L.X, TOP, L.CW, ["항목", "계산식", "대입", "결과"], [
     ["가닥 무게", "단면적 × 구리 밀도 × 피복 계수", `${TRK.mm} mm² × ${RL.rho} g/㎤ × ${RL.k} ÷ 1,000`, `약 ${WM.toFixed(2)} kg/m`],
     ["가닥 수", "상 3 × 병렬 수 + 중성선 + 보호 도체", `3 × ${TRK.n} + ${NNE} + ${RL.nPE}`, `${NST}가닥`],
-    ["케이블 적재 한도", "적재 능력 × 이용률 에서 릴과 구동부를 뺀 값", `${n0(RL.pay)} kg × ${RL.use} 에서 ${n0(RL.reel)} kg 을 뺌`, `${n0(CBUD)} kg`],
+    ["케이블 적재 한도", "적재 능력 × 이용률 에서 릴 묶음 무게를 뺀 값", `${n0(RL.pay)} kg × ${RL.use} 에서 ${n0(RL.reel)} + ${n0(RL.legs)} kg 을 뺌`, `${n0(CBUD)} kg`],
     ["적재 둘레", "케이블 적재 한도 ÷ (가닥 무게 × 가닥 수)", `${n0(CBUD)} kg ÷ (${WM.toFixed(2)} × ${NST}) kg/m`, `${RING} m(10 m 단위 내림)`],
-    ["적재 중량", "가닥 무게 × 가닥 수 × 둘레 + 릴과 구동부", `${WM.toFixed(2)} × ${NST} × ${RING} + ${n0(RL.reel)}`, `약 ${n0(WTOT + RL.reel)} kg`],
+    ["적재 중량", "가닥 무게 × 가닥 수 × 둘레 + 릴 묶음", `${WM.toFixed(2)} × ${NST} × ${RING} + ${n0(MODK)}`, `약 ${n0(WTOT + MODK)} kg`],
     ["필요 인원(인력 포설)", "구간 한 가닥 무게 ÷ 1인 취급 한도", `${n0(WSEG1)} kg ÷ ${RL.man} kg`, `${MEN1}명(올림)`],
     ["케이블 부피", "둘레 × 가닥 수 × π ÷ 4 × 바깥지름² ÷ 충전율", `${RING} × ${NST} × 0.785 × ${(RL.od / 1000)}² ÷ ${RL.fill}`, `약 ${VOL.toFixed(2)} ㎥`],
     ["드럼 한 개 용량", "π ÷ 4 × (바깥지름² 과 안지름² 의 차) × 폭", `0.785 × (1.8² 과 0.9² 의 차) × ${RL.dw}`, `약 ${DRUM.toFixed(2)} ㎥, ${NDR}개 탑재`],
     ["포설 주행 시간", "둘레 ÷ 포설 속도", `${RING} m ÷ 분당 ${n0(RL.kmh * 1000 / 60)} m`, `약 ${TLAY}분`]], [18, 32, 32, 18], { bold: [0], dense: true });
-  foot(s, `가정값: 피복 계수 ${RL.k}, 릴과 구동부 ${n0(RL.reel)} kg, 적재 이용률 ${RL.use}, 1인 취급 한도 ${RL.man} kg, 바깥지름 ${RL.od} mm, 릴 충전율 ${RL.fill}, 포설 속도 시속 ${RL.kmh} km. 5톤 중형전술차량의 적재 능력은 ${n0(RL.pay)} kg 으로 봄. 차량과 케이블 제작사 자료로 대체`); }
+  foot(s, `가정값: 피복 계수 ${RL.k}, 릴과 구동부 ${n0(RL.reel)} kg, 승강 다리 ${n0(RL.legs)} kg, 적재 이용률 ${RL.use}, 1인 취급 한도 ${RL.man} kg, 바깥지름 ${RL.od} mm, 릴 충전율 ${RL.fill}, 포설 속도 시속 ${RL.kmh} km. 5톤 중형전술차량의 적재 능력은 ${n0(RL.pay)} kg 으로 봄. 차량과 케이블 제작사 자료로 대체`); }
 D.closing({ title: "한 곳이 고장 나도\n끊기지 않는 배전", sub: "환망 간선 · 병렬 배전체계와 N+1 · 평소 열어 두는 우회 결선 · 무정전 점검", org: "한화에어로스페이스㈜ 에너지솔루션사업센터", date: `${YM}  ·  ${REV}` });
 D.save(OUT);
