@@ -161,9 +161,12 @@ function makeDeck(cfg) {
   function cover(f) { closePage(); nSlide++; pres.addSection({ title: "표지·목차" }); const s = pres.addSlide({ masterName: "COVER", sectionTitle: "표지·목차" }); Object.entries(f).forEach(([k, v]) => k === "notes" ? s.addNotes(v) : s.addText(v, { placeholder: k })); return s; }
   const toc = (title, subtitle) => content("표지·목차", "", "목 차", "CONTENTS", title, subtitle);
   /** 별첨 약어 설명 쪽(자료에 나온 약어만, 한 쪽 14줄) */
+  let apxOn = false;
+  /** 별첨 쪽(계산 근거 등). 약어 설명보다 앞에 온다 */
+  function appx(title, subtitle) { if (!apxOn) { apxOn = true; pres.addSection({ title: "별첨" }); } const s = content("별첨", "", "별 첨", "APPENDIX", title, subtitle); return s; }
   function abbrPages() {
-    const rows = ABBR.items.filter(a => a.rx.test(ALLTXT)); if (rows.length < 3) return; const per = 14, n = Math.ceil(rows.length / per); pres.addSection({ title: "별첨" });
-    for (let i = 0; i < n; i++) { const s = content("별첨", "", "별 첨", "APPENDIX", `별첨 ${i + 1}.  약어 설명 (${i + 1}/${n})`, "이 자료에 쓰인 영문 약어, 단위 및 기호의 원어와 의미"); cur.noabbr = true; cur.top = L.TOP; cur.bot = L.TOP + 0.34 + 0.31 * Math.min(per, rows.length - i * per);
+    const rows = ABBR.items.filter(a => a.rx.test(ALLTXT)); if (rows.length < 3) return; const per = 14, n = Math.ceil(rows.length / per); if (!apxOn) pres.addSection({ title: "별첨" });
+    for (let i = 0; i < n; i++) { const s = content("별첨", "", "별 첨", "APPENDIX", `별첨.  약어 설명 (${i + 1}/${n})`, "이 자료에 쓰인 영문 약어, 단위 및 기호의 원어와 의미"); cur.noabbr = true; cur.top = L.TOP; cur.bot = L.TOP + 0.34 + 0.31 * Math.min(per, rows.length - i * per);
       const hd = t => ({ text: t, options: { bold: true, align: "center", valign: "middle", fontSize: 12, color: HX.WHITE || "FFFFFF", fill: { color: HX.BROWN || "5B4A34" } } }), td = (t, b) => ({ text: t, options: { align: b ? "center" : "left", valign: "middle", fontSize: 12, bold: !!b, color: HX.INK || "24221D" } });
       const part = rows.slice(i * per, (i + 1) * per);
       const c0 = cur; cur = null; s.addTable([[hd("표기"), hd("원어"), hd("의미")]].concat(part.map(a => [td(a.k, 1), td(a.en), td(a.ko)])), { x: L.X, y: L.TOP, w: L.CW, colW: [2.2, 4.4, L.CW - 6.6], rowH: [0.34].concat(part.map(() => 0.31)), border: { type: "solid", color: HX.LINE || "C9BFAE", pt: 0.75 }, margin: 0.06 }); cur = c0; }
@@ -303,6 +306,6 @@ function makeDeck(cfg) {
     warn.forEach(m => console.error(m)); console.log("saved", out, warn.length ? `(배치 경고 ${warn.length}건)` : "");
     if (warn.length && process.env.DECK_STRICT) process.exit(1);
   }
-  return Object.assign({ pres, K, HX, FS, L, IMG, PNG, page, cover, toc, closing, save, T, body, head, card, cards, stat, stats, tag, table, frame, shot, caption, pic, legend, note, steps, foot, shotPage, shots2, chartOpt, textH, fit, noteNeed, cardNeed, fcard, fcardNeed, tocCards, MATH }, K);
+  return Object.assign({ pres, K, HX, FS, L, IMG, PNG, page, cover, toc, closing, save, T, body, head, card, cards, stat, stats, tag, table, frame, shot, caption, pic, legend, note, steps, foot, shotPage, shots2, chartOpt, textH, fit, noteNeed, cardNeed, fcard, fcardNeed, tocCards, MATH, appx }, K);
 }
 module.exports = { makeDeck, FS, L, THEME, textH };
