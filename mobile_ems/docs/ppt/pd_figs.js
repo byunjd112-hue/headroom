@@ -164,13 +164,13 @@ function sitePlan() {
   // 차량(9.0 × 2.5 m), 운전석은 오른쪽
   const TW = 9 * K, TH = 2.5 * K, TX = 380;
   const truck = (y, no, nm, sub) => `<rect x="${TX}" y="${y}" width="${TW}" height="${TH}" rx="2" fill="${OD}" stroke="${INK}" stroke-width="1.2"/><rect x="${TX + TW - 15}" y="${y + 2}" width="13" height="${TH - 4}" rx="2" fill="#4c5a2f"/>` + t(TX - 8, y + 9, no + " " + nm, { s: 11, b: 1, a: "end" }) + t(TX - 8, y + 21, sub, { s: 9.5, a: "end", c: GR });
-  const TY = [70, 130, 200, 290];
+  const TY = [70, 130, 200, 322];
   g += truck(TY[0], "①", "복합전력 차량", "디젤 발전기 + ESS") + truck(TY[1], "②", "ESS 차량", "이동형 에너지저장장치");
   g += `<rect x="${TX}" y="${TY[2]}" width="${TW}" height="${TH}" rx="2" fill="${OD}" stroke="${INK}" stroke-width="1.2"/><rect x="${TX + TW - 15}" y="${TY[2] + 2}" width="13" height="${TH - 4}" rx="2" fill="#4c5a2f"/><rect x="${TX + 2}" y="${TY[2] + 1.5}" width="12" height="${TH - 3}" fill="#22355c" stroke="${INK}" stroke-width="1"/>`;
   g += `<rect x="${TX - 40 * K}" y="${TY[2] + 1}" width="${40 * K}" height="${TH - 2}" fill="#2c4a86" stroke="#16264a" stroke-width="1"/>`;
   for (let i = 1; i < 20; i++) g += ln(TX - i * 2 * K, TY[2] + 1, TX - i * 2 * K, TY[2] + TH - 1, "#7f96c4", 0.6);
   g += t(TX - 20 * K, TY[2] - 6, "③ 롤러블 태양광 차량: 뒤쪽 드럼에서 차량 뒤로 패널 띠 전개(길이 40 m 예시)", { s: 11, b: 1, a: "middle" });
-  g += truck(TY[3], "④", "수소 차량", "연료전지 + 수소 저장") + t(TX - 8, TY[3] + 33, "이격 거리: 설계 확정 필요", { s: 9.5, a: "end", c: RED });
+  g += truck(TY[3], "④", "수소 차량", "연료전지 + 수소 저장") + t(TX - 8, TY[3] + 33, "다른 장비와 10 m, 지휘통제와 17 m 이상", { s: 9.5, a: "end", c: RED }) + `<rect x="${TX - 10 * K}" y="${TY[3] - 10 * K}" width="${TW + 20 * K}" height="${TH + 20 * K}" rx="${10 * K}" fill="none" stroke="${RED}" stroke-width="1" stroke-dasharray="4 4"/>` + t(TX + TW / 2, TY[3] - 10 * K + 12, "10 m", { s: 9, a: "middle", c: RED });
   // ⑥ 컨테이너(6.06 × 2.44 m), 세로 배치
   const CX = 500, CY = 160, CW = 2.44 * K, CH = 6.06 * K;
   g += `<rect x="${CX}" y="${CY}" width="${CW}" height="${CH}" fill="#56653a" stroke="${INK}" stroke-width="1.6"/>` + `<rect x="${CX}" y="${CY - 4}" width="${CW}" height="4" fill="${HV}"/>`;
@@ -210,7 +210,7 @@ function sitePlan() {
     ["TPCS", "전원 구역과 떨어진 통제 구역. 통신선 이중 경로"], ["환망", "급전 A, B 로 시설을 한 바퀴. 구간분전함 6대, 상시 개방점 1개소"], ["부하", "구간분전함에서 배전체계를 거쳐 시설로 공급"]].forEach((r, i) => {
     const y = 166 + i * 21; g += `<rect x="${PX}" y="${y}" width="${PW}" height="21" fill="${i % 2 ? "#fff" : "#f3f6f9"}" stroke="#c9d1d9" stroke-width="0.6"/>` + t(PX + 10, y + 14.5, r[0], { s: 11, b: 1 }) + t(PX + 92, y + 14.5, r[1], { s: 10.5 }); });
   g += hd(304, "설계 확정 필요 항목", RED);
-  ["장비 수량과 간격은 예시. 임무, 부지, 지형에 따라 확정", "수소 차량과 연료 보급 지점의 이격 거리(관련 기준 확인)", "케이블 길이 한도. 전압 강하와 보호 협조 검토 후 확정", "차량 치수는 일반 군용 차량 크기로 잡은 값. 실제 차량으로 확정", "태양광 패널 띠의 길이와 줄 수. 제품 제원으로 확정"].forEach((s1, i) => {
+  ["장비 수량과 간격은 예시. 임무, 부지, 지형에 따라 확정", "수소 차량 이격: 다른 장비 10 m, 사람이 있는 시설 12 ~ 17 m(법규 준용, 5장)", "케이블 길이 한도. 전압 강하와 보호 협조 검토 후 확정", "차량 치수는 일반 군용 차량 크기로 잡은 값. 실제 차량으로 확정", "태양광 패널 띠의 길이와 줄 수. 제품 제원으로 확정"].forEach((s1, i) => {
     const y = 324 + i * 22; g += `<rect x="${PX}" y="${y}" width="${PW}" height="22" fill="#fff" stroke="#e3c4c1" stroke-width="0.6"/>` + `<circle cx="${PX + 14}" cy="${y + 11}" r="7.5" fill="${RED}"/>` + t(PX + 14, y + 14.5, String(i + 1), { s: 9.5, b: 1, a: "middle", c: "#fff" }) + t(PX + 28, y + 15, s1, { s: 10.5 }); });
   const TY0 = 472; g += `<rect x="${PX}" y="${TY0}" width="${PW}" height="132" fill="#fff" stroke="${INK}" stroke-width="1.4"/>` + ln(PX, TY0 + 44, PX + PW, TY0 + 44, INK, 0.8) + ln(PX, TY0 + 88, PX + PW, TY0 + 88, INK, 0.8) + ln(PX + 300, TY0 + 44, PX + 300, TY0 + 132, INK, 0.8) + ln(PX + 150, TY0 + 88, PX + 150, TY0 + 132, INK, 0.8);
   g += t(PX + 10, TY0 + 15, "도면명", { s: 9, c: GR }) + t(PX + 10, TY0 + 35, "작전지 전개 배치도(예시)", { s: 15, b: 1 });

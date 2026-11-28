@@ -218,8 +218,8 @@ const U = V.units, STD = [250, 400, 630, 800, 1000, 1250, 1600, 2000, 2500, 3200
 const VEH = [["① 복합전력 차량", ST.dg_kw + ST.g1_kw, U.DG, "발전기와 ESS 를 차량 안에서 합쳐 인입"], ["② ESS 차량", ST.ess_kw, U.ESS, "충전과 방전 모두 같은 회로"], ["③ 태양광(1식)", ST.pv_kwp, U.PV, "인버터 출력 기준"], ["④ 수소 차량", Math.max(ST.fc_kw, ST.elz_kw), U.FC, "연료전지 발전 또는 수전해 부하"]];
 const NVEH = VEH.reduce((a, v) => a + v[2], 0), SEC = k => VEH.reduce((a, v, i) => a + (i === 3 ? (k ? 0 : ST.fc_kw * v[2]) : v[1] * (k ? Math.floor(v[2] / 2) : Math.ceil(v[2] / 2))), 0);
 const SECA = Math.max(amp(SEC(0)), amp(SEC(1))), BUS = up(SECA, 1.2), MAINF = up(ITR, 1.25), AUXK = 20, EXP = k => Math.floor((BUS - amp(SEC(k))) * R3 * A.v * A.pf / 10) * 10;
-const AMPC = [[10, 57], [16, 76], [25, 101], [35, 125], [50, 151], [70, 192], [95, 232], [120, 269], [150, 309], [185, 353], [240, 415]], STRAND = 320, UTIL = 0.8;
-const CBL = i => { const n = Math.ceil(i / STRAND), per = i / n, c = AMPC.find(x => x[1] * UTIL >= per) || AMPC[AMPC.length - 1]; return { n, per, mm: c[0], amp: c[1], t: `구리 ${c[0]} mm²${n > 1 ? " × " + n : ""}` }; };
+const AMPC = [[10, 57], [16, 76], [25, 101], [35, 125], [50, 151], [70, 192], [95, 232], [120, 269], [150, 309], [185, 353], [240, 415]], STRAND = 320, UTIL = 0.8, MARG = 1.05;
+const CBL = i => { const n = Math.ceil(i / STRAND), per = i / n, c = AMPC.find(x => x[1] * UTIL >= per * MARG) || AMPC[AMPC.length - 1]; return { n, per, mm: c[0], amp: c[1], t: `구리 ${c[0]} mm²${n > 1 ? " × " + n : ""}` }; };
 const FUSE = [16, 20, 25, 31.5, 40].reduce((a, x) => Math.abs(x - IHV * 2) < Math.abs(a - IHV * 2) ? x : a), ST_F = Math.round(SP.fsu_a * 3 / 100) * 100;
 const ISC_TR = ITR / (A.z / 100), INVK = ST.g1_kw + ST.ess_kw + ST.pv_kwp + ST.fc_kw, ISC_INV = INVK / (R3 * A.v) * A.inv, ISC_DG = ST.dg_kw / A.dgpf / (R3 * A.v) / A.xd;
 const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw * U.FC) / (R3 * A.v) * A.inv, DG2 = ISC_DG * U.DG, ISC2 = ISC_TR + INV2 + DG2, ICU = [25, 36, 50, 65, 85].find(x => x >= ISC2 / 1000 * 1.2), ST_SET = Math.floor((ISC_INV + ISC_DG) / 2 / 100) * 100;
@@ -275,7 +275,13 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
     ["동기 검정", "전압 차 5 %, 주파수 차 0.2 Hz, 위상 차 10°", "10 %, 0.5 Hz, 20° 이내", "투입 순간의 돌입 전류와 충격 억제"],
     ["역전력(32)", `변압기 정격의 5 %(${n0(A.tr * 0.05)} kW), 1초`, "2 ~ 10 %", "역송 불허 조건에서 상전 쪽 유출 차단"],
     ["전압 왜형률", "5 % 이하", "8 % 이하", "인버터 전원 비중이 높은 계통의 전력 품질"]], [18, 30, 20, 32], { bold: [0], dense: true });
-  foot(s, "수소 차량의 이격 거리와 한전 연계 조건은 법규와 협의로 정해지는 값이어서 이 자료에서 정하지 않음. 정정값은 보호 협조 검토에서 동작 곡선으로 검증"); }
+  foot(s, "수소 차량의 이격 거리는 다음 쪽. 한전 연계 조건은 협의로 정해지는 값이어서 이 자료에서 정하지 않음. 정정값은 보호 협조 검토에서 동작 곡선으로 검증"); }
+{ const s = page(5, "수소 차량의 이격 거리", "고압가스 안전관리법 시행규칙 별표 5(수소자동차 충전 시설 기준)의 거리를 준용",
+    "수소 차량은 다른 장비와 사람이 있는 시설에서 떨어뜨려 놓습니다. 법규의 거리를 따랐습니다.");
+  picTable(s, "pd2_h2", "수소 차량 배치 예: 구역 표시와 방호벽, 다른 장비와 떨어진 자리", [["대상", "적용 거리", "근거"], [
+    ["지휘통제, 의무시설", "17 m 이상", "제1종 보호시설"], ["막사", "12 m 이상", "제2종 보호시설"], ["전원 차량, ⑥ 컨테이너", "10 m, 방호벽 시 5 m", "사업소 경계 준용"],
+    ["저장부와 충전기", "8 m, 방호벽 시 제외", "저장식 충전 기준"], ["전선, 화기", "10 m(적용안)", "법규에 수치 없음"]], [36, 34, 30]],
+    [["적용 원칙", ["저장능력 1만 ㎥ 이하 기준(초과 시 21 m, 14 m). 30 m 안에 사람이 있는 시설이 있으면 방호벽 설치. 민수 충전 시설 기준(2022. 6. 2. 개정)이며 군 장비 적용 여부는 소관 부서 확인 필요"]]]); }
 { const s = page(5, "용량 수지", "전원 정격과 380 V 전류, 한전 수전 한도, 부하 비교. 기본 구성은 TPCS 의 기본 대수",
     "전원이 낼 수 있는 양과 부하가 쓰는 양을 비교했습니다.");
   const UN = [U.DG, U.DG, U.ESS, U.PV, U.FC], TOT2 = SRC.reduce((a, r, i) => a + r[1] * UN[i], 0);
@@ -291,7 +297,7 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
   const T2 = [30, 50].map(m => { const d = drop(40, m, A.branch); return [`분기 ${m} m`, "40 A", `${d.toFixed(1)} V`, `${pct(d)} %`]; });
   const LMAX = A.dv / 100 * A.v * 1000 / (R3 * SP.fsu_a / 1000 * (A.trunk[1] * A.pf + A.trunk[2] * Math.sqrt(1 - A.pf * A.pf)));
   picTable(s, "pd2_measure", "구간분전함에서의 전압 측정: 전개 후 말단 전압을 실측해 계산값과 대조", [["구간", "전류", "전압 강하", "비율"], T1.concat(T2), [34, 18, 24, 24], { center: [1, 2, 3] }],
-    [["가정과 판정", [`간선 ${A.trunk[0]}(2가닥 병렬), 분기 ${A.branch[0]}, 역률 ${A.pf} 가정. 허용 ${A.dv} % 가정 시 정격 전류에서 한쪽 급전 길이 약 ${n0(LMAX / 10) * 10} m 까지. 한 구간 고장으로 한쪽에서만 공급할 때가 가장 불리함. 케이블 규격과 허용 기준은 설계 확정 필요`]]]); }
+    [["가정과 판정", [`간선 ${A.trunk[0]}(2가닥 병렬), 분기 ${A.branch[0]}, 역률 ${A.pf} 가정. 허용 ${A.dv} % 가정 시 정격 전류에서 한쪽 급전 길이 약 ${n0(LMAX / 10) * 10} m 까지. 한 구간 고장으로 한쪽에서만 공급할 때가 가장 불리함. 케이블 규격은 5장의 설계 적용값을 따름`]]]); }
 { const s = page(5, "단락 전류와 차단 용량", "한전 연계 때와 자립 운전 때의 고장 전류가 크게 다름",
     "고장이 났을 때 흐르는 전류입니다. 한전에 붙었을 때와 떨어졌을 때가 크게 다릅니다.");
   picTable(s, "pd2_lvboard", "저압 분전부: 주 차단기와 분기 12회로. 차단 용량은 가장 큰 고장 전류로 선정", [["고장 전류의 출처", "계산", "값"], [
@@ -333,7 +339,7 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
   picTable(s, "pd2_cable", "간선 케이블 릴과 잠금식 원형 커넥터, 분기 케이블", [["구간", "전류", "케이블(가정)", "커넥터"], [
     ["고압 인입", `22.9 kV, 약 ${IHV.toFixed(1)} A`, "고압 케이블 1회선", "엘보형 접속재"], ["전원 차량 인입", `최대 약 ${n0(amp(ST.ess_kw))} A`, CBL(amp(ST.ess_kw)).t, "단극 잠금식 400 A급"],
     ["환상 간선", `${SP.fsu_a} A`, CBL(SP.fsu_a).t, "단극 잠금식 400 A급"], ["분기(PPDU-20)", "40 A", A.branch[0], "잠금식 원형"], ["통신", "해당 없음", "광케이블 이중화", "방수 방진형"]], [24, 26, 28, 22]],
-    [["적용안과 허용 범위", ["가닥당 전류 320 A 이하, 허용 전류의 80 % 이하로 선정(계산은 별첨). 커넥터는 체결 상태에서 방수 방진 IP67, 허용 IP65 이상. 허용 전류표는 가정값이며 선정 케이블의 제작사 값으로 대체"]]]); }
+    [["적용안과 허용 범위", ["가닥당 전류 320 A 이하, 여유 5 % 를 더한 값이 허용 전류의 80 % 이하가 되게 선정(계산은 별첨). 커넥터는 체결 상태에서 방수 방진 IP67, 허용 IP65 이상. 허용 전류표는 가정값이며 선정 케이블의 제작사 값으로 대체"]]]); }
 { const s = page(5, "피뢰, 서지 보호와 전력 품질", "고압 인입부의 피뢰기, 저압 모선의 서지 보호, 인버터 전원이 많은 계통의 고조파",
     "벼락과 순간 과전압으로부터 장비를 지키고, 전기의 질을 확인하는 항목입니다.");
   picTable(s, "pd2_surge", "고압 인입부의 엘보형 접속재와 상별 피뢰기, 접지 모선", [["항목", "검토 내용", "상태"], [
@@ -403,6 +409,6 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
 { const s = D.appx("별첨.  계산 근거 3: 케이블 선정", "가닥 수와 굵기를 정한 규칙과 회로별 결과");
   const rw = (nm, i) => { const c = CBL(i); return [nm, `약 ${cA(i)}`, `${n0(i)} ÷ ${STRAND} → ${c.n}가닥`, `${n0(c.per)} A`, `${c.mm} mm²(허용 ${c.amp} A × ${UTIL} = ${n0(c.amp * UTIL)} A)`]; };
   const y = table(s, L.X, TOP, L.CW, ["회로", "전류", "가닥 수", "가닥당 전류", "선정 굵기"], [rw("ESS 차량", amp(ST.ess_kw)), rw("태양광", amp(ST.pv_kwp)), rw("복합전력 차량", amp(ST.dg_kw + ST.g1_kw)), rw("수소 차량", amp(Math.max(ST.fc_kw, ST.elz_kw))), rw("환상 간선", SP.fsu_a), rw("분기(PPDU-20)", 40)], [20, 14, 20, 16, 30], { bold: [0], center: [1, 2, 3], dense: true });
-  note(s, L.X, y + G, L.CW, D.noteNeed(L.CW, ["x"]) + 0.45, "선정 규칙과 가정", [`가닥 수 = 전류 ÷ ${STRAND} A 를 올림. 굵기 = 허용 전류 × ${UTIL} 이 가닥당 전류 이상인 가장 가는 규격. 허용 전류 가정값(mm² : A): ${AMPC.map(c => c[0] + " : " + c[1]).join(", ")}. 선정 케이블의 제작사 허용 전류와 포설 조건 보정으로 대체`]); }
+  note(s, L.X, y + G, L.CW, D.noteNeed(L.CW, ["x"]) + 0.45, "선정 규칙과 가정", [`가닥 수 = 전류 ÷ ${STRAND} A 를 올림. 굵기 = 허용 전류 × ${UTIL} 이 가닥당 전류 × ${MARG}(여유 5 %) 이상인 가장 가는 규격. 허용 전류 가정값(mm² : A): ${AMPC.map(c => c[0] + " : " + c[1]).join(", ")}. 선정 케이블의 제작사 허용 전류와 포설 조건 보정으로 대체`]); }
 D.closing({ title: "한 곳이 고장 나도\n끊기지 않는 배전", sub: "환망 간선 · 병렬 배전체계와 N+1 · 평소 열어 두는 우회 결선 · 무정전 점검", org: "한화에어로스페이스㈜ 에너지솔루션사업센터", date: `${YM}  ·  ${REV}` });
 D.save(OUT);
