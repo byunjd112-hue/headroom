@@ -218,6 +218,18 @@ function sitePlan() {
   g += t(PX + 10, TY0 + 103, "리비전", { s: 9, c: GR }) + t(PX + 10, TY0 + 122, process.argv[3] || "Rev72", { s: 12.5, b: 1 }) + t(PX + 160, TY0 + 103, "축척", { s: 9, c: GR }) + t(PX + 160, TY0 + 122, "막대 축척 참조", { s: 12.5, b: 1 }) + t(PX + 310, TY0 + 103, "비고", { s: 9, c: GR }) + t(PX + 310, TY0 + 122, "시공 도면 아님", { s: 12.5, b: 1 });
   return g;
 }
+/** 보호 협조 개념도: 말단일수록 먼저 동작하는 계단(값은 미정). 1024 × 688 */
+function coord() {
+  let g = ""; const ST = [["① PPDU-20 출력 회로", "#2f7d4f"], ["② 구간분전함 분기", "#3a7ca5"], ["③ 환상 간선 구간(차동, 블로킹)", "#1d4f91"], ["④ 환망 급전 A, B", "#6a4c93"], ["⑤ 저압 주 차단기, 고압 측", "#a3261a"]];
+  g += T(512, 44, "보호 협조 개념: 고장 지점에 가까운 장치가 먼저 동작", { s: 22, b: 1 }) + T(512, 72, "세로는 동작 시간의 순서만 나타냄. 시간과 전류의 값은 보호 협조 검토에서 확정", { s: 14, c: "#8a4b12" });
+  const X0 = 150, Y0 = 560, W = 780, H = 420; g += LN(X0, Y0, X0 + W, Y0, "#1b2733", 2) + LN(X0, Y0, X0, Y0 - H - 20, "#1b2733", 2);
+  g += T(X0 + W / 2, Y0 + 44, "전원 쪽  ←  보호 장치의 위치  →  부하 쪽", { s: 14, c: "#55626f" }) + `<text x="${X0 - 46}" y="${Y0 - H / 2}" font-size="14" fill="#55626f" text-anchor="middle" transform="rotate(-90 ${X0 - 46} ${Y0 - H / 2})">동작 시간(늦음 ↑, 빠름 ↓)</text>`;
+  ST.forEach(([nm, col], i) => { const k = ST.length - 1 - i, x = X0 + 20 + k * 150, h = 60 + i * 78, y = Y0 - h;
+    g += R(x, y, 136, h, col + "22", col, 2) + LN(x, y, x + 136, y, col, 5) + T(x + 68, y - 12, nm.slice(0, 1) + " 단계", { s: 14, b: 1, c: col }) + `<text x="${x + 68}" y="${Y0 + 20}" font-size="12.5" fill="#1b2733" text-anchor="middle">${nm.slice(2).split("(")[0]}</text>`; });
+  g += `<path d="M${X0 + 20 + 4 * 150 + 68} ${Y0 - 60 - 50} l-16 -34 h10 v-30 h12 v30 h10 Z" fill="#b3261e"/>` + T(X0 + 20 + 4 * 150 + 68, Y0 - 60 - 122, "고장", { s: 15, b: 1, c: "#b3261e" });
+  g += R(72, 612, 880, 56, "#fff7e6", "#c98a1a", 1.2) + T(512, 636, "앞 단계가 끊지 못하면 다음 단계가 뒤를 받침(후비 보호). 환상 간선은 차동 보호로 고장 구간만 순시 분리", { s: 14, b: 1 }) + T(512, 656, "한전 연계 때와 자립 운전 때의 고장 전류가 달라 정정값을 따로 검토", { s: 13.5 });
+  return g;
+}
 function garrison() {
   let g = ""; const box = (x, y, w, h, f, st, t1, t2, t3) => R(x, y, w, h, f, st, 2, 'rx="8"') + T(x + w / 2, y + (t2 ? 30 : h / 2 + 5), t1, { s: 15, b: 1 }) + (t2 ? T(x + w / 2, y + 52, t2, { s: 13 }) : "") + (t3 ? T(x + w / 2, y + 71, t3, { s: 13, c: "#55626f" }) : "");
   const ar = (x1, y1, x2, y2, col, sw = 3) => LN(x1, y1, x2, y2, col, sw) + (y1 === y2 ? `<path d="M${x2} ${y2} l-12 -7 v14 Z" fill="${col}"/>` : `<path d="M${x2} ${y2} l-7 ${y2 > y1 ? -12 : 12} h14 Z" fill="${col}"/>`);
@@ -248,6 +260,6 @@ function garrison() {
   return g;
 }
 (async () => { const b = await chromium.launch();
-  for (const [n, f, w, h] of [["pd2_layout", plan, 1024, 688], ["pd2_sld", sldPro, 1640, 626], ["pd2_grid", garrison, 1024, 688], ["pd2_plan", sitePlan, 1640, 626]]) { const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+  for (const [n, f, w, h] of [["pd2_layout", plan, 1024, 688], ["pd2_sld", sldPro, 1640, 626], ["pd2_grid", garrison, 1024, 688], ["pd2_plan", sitePlan, 1640, 626], ["pd2_coord", coord, 1024, 688]]) { const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
     await p.setContent(`<style>${css} body{margin:0;background:#fff} text{font-family:NSK}</style><svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${f()}</svg>`); await p.evaluate(() => document.fonts.ready); await p.screenshot({ path: path.join(out, n + ".png") }); await p.close(); }
   await b.close(); })();
