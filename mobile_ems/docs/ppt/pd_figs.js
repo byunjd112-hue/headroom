@@ -26,7 +26,7 @@ function plan() {
   g += T(ix + iw / 2, iy + ih - mm(420), "조작 및 점검 통로(폭 1.1 m 이상 확보, 추정)", { s: 14, c: "#55626f" });
   // 문과 접속부
   g += R(X0 - 5, Y0 + mm(500), 10, mm(1400), "#a3261a", "#a3261a", 1) + `<text x="${X0 - 14}" y="${Y0 + mm(1200)}" font-size="14" font-weight="700" fill="#a3261a" text-anchor="middle" transform="rotate(-90 ${X0 - 14} ${Y0 + mm(1200)})">고압 케이블 인입부</text>`;
-  g += R(X0 + W - 5, Y0 + mm(500), 10, mm(1400), "#1d4f91", "#1d4f91", 1) + `<text x="${X0 + W + 22}" y="${Y0 + mm(1200)}" font-size="14" font-weight="700" fill="#1d4f91" text-anchor="middle" transform="rotate(90 ${X0 + W + 22} ${Y0 + mm(1200)})">저압 커넥터 인출부</text>`;
+  g += R(X0 + W - 5, Y0 + mm(500), 10, mm(1400), "#1d4f91", "#1d4f91", 1) + `<text x="${X0 + W + 22}" y="${Y0 + mm(1200)}" font-size="14" font-weight="700" fill="#1d4f91" text-anchor="middle" transform="rotate(90 ${X0 + W + 22} ${Y0 + mm(1200)})">저압 접속반(12회로)</text>`;
   g += R(ix + a + mm(550), Y0 + H - 5, mm(900), 10, "#2f7d4f", "#2f7d4f", 1) + T(ix + a + mm(1000), Y0 + H + 24, "출입문", { s: 14, b: 1, c: "#2f7d4f" });
   g += T(ix + a + mm(1000), Y0 - 10, "변압기 구획 상부: 강제 환기 팬과 루버", { s: 13, c: "#55626f" });
   // 치수
@@ -173,16 +173,16 @@ function sitePlan() {
   // ⑥ 컨테이너(6.06 × 2.44 m), 세로 배치
   const CX = 500, CY = 160, CW = 2.44 * K, CH = 6.06 * K;
   g += `<rect x="${CX}" y="${CY}" width="${CW}" height="${CH}" fill="#56653a" stroke="${INK}" stroke-width="1.6"/>` + `<rect x="${CX}" y="${CY - 4}" width="${CW}" height="4" fill="${HV}"/>`;
-  g += t(CX + CW / 2, CY + CH + 14, "⑥ 배전 및 변압", { s: 11, b: 1, a: "middle" }) + t(CX + CW / 2, CY + CH + 26, "20ft 컨테이너 1대", { s: 9.5, a: "middle", c: GR }) + t(CX + CW / 2, CY - 9, "고압 인입부", { s: 9.5, a: "middle", c: HV });
+  g += `<rect x="${CX}" y="${CY + CH}" width="${CW}" height="4" fill="${LV}"/>` + t(CX + CW / 2, CY - 24, "⑥ 배전 및 변압(컨테이너 1대)", { s: 11, b: 1, a: "middle" }) + t(CX + CW / 2, CY - 9, "고압 인입부(끝면)", { s: 9.5, a: "middle", c: HV }) + t(CX + CW + 8, CY + CH - 6, "저압 접속반(끝면)", { s: 9.5, c: LV });
   // 전원 케이블(차량 → 컨테이너 옆면)
-  TY.forEach((y, i) => { const yy = CY + 8 + i * 9; g += pl(`${TX + TW},${y + TH / 2} ${TX + TW + 14 + i * 5},${y + TH / 2} ${TX + TW + 14 + i * 5},${yy} ${CX},${yy}`, SRC, 1.8); });
+  TY.forEach((y, i) => { const yy = CY + CH + 9 + i * 5, xx = CX + 3 + i * 3; g += pl(`${TX + TW},${y + TH / 2} ${TX + TW + 14 + i * 5},${y + TH / 2} ${TX + TW + 14 + i * 5},${yy} ${xx},${yy} ${xx},${CY + CH + 4}`, SRC, 1.8); });
   // TPCS 쉘터(6.0 × 2.4 m)와 통신선
   const SX = 150, SY = 470; g += `<rect x="${SX}" y="${SY}" width="${6 * K}" height="${2.4 * K}" fill="#3d5a80" stroke="${INK}" stroke-width="1.4"/>` + t(SX + 3 * K, SY + 34, "⑤ TPCS 통제 쉘터", { s: 11, b: 1, a: "middle" }) + t(SX + 3 * K, SY + 46, "전원 구역의 소음원에서 이격", { s: 9.5, a: "middle", c: GR });
-  g += pl(`${SX + 6 * K},${SY + 9} ${CX + CW / 2},${SY + 9} ${CX + CW / 2},${CY + CH + 32}`, OR, 1.6, 'stroke-dasharray="6 3"') + t(360, SY + 3, "통신선(이중 경로)", { s: 9.5, a: "middle", c: OR });
+  g += pl(`${SX + 6 * K},${SY + 9} ${CX - 10},${SY + 9} ${CX - 10},${CY + 14} ${CX},${CY + 14}`, OR, 1.6, 'stroke-dasharray="6 3"') + t(360, SY + 3, "통신선(이중 경로)", { s: 9.5, a: "middle", c: OR });
   g += `<circle cx="${SX - 20}" cy="${SY + 9}" r="4" fill="none" stroke="${INK}" stroke-width="1.2"/>` + ln(SX - 20, SY + 9, SX, SY + 9, INK, 1) + t(SX - 28, SY + 13, "안테나", { s: 9.5, a: "end", c: GR });
   // 환망
-  const RX1 = 660, RX2 = 1010, RY1 = 90, RY2 = 540, FA = CY + 16, FB = CY + 30;
-  g += pl(`${CX + CW},${FA} ${RX1 - 60},${FA} ${RX1 - 60},${RY1} ${RX2},${RY1} ${RX2},${RY2} ${RX1 - 40},${RY2} ${RX1 - 40},${FB} ${CX + CW},${FB}`, LV, 2.6);
+  const RX1 = 660, RX2 = 1010, RY1 = 90, RY2 = 540, FA = CY + CH + 34, FB = CY + CH + 46;
+  g += pl(`${CX + CW - 2},${CY + CH + 4} ${CX + CW - 2},${FA} ${RX1 - 60},${FA} ${RX1 - 60},${RY1} ${RX2},${RY1} ${RX2},${RY2} ${RX1 - 40},${RY2} ${RX1 - 40},${FB} ${CX + CW - 6},${FB} ${CX + CW - 6},${CY + CH + 4}`, LV, 2.6);
   g += t(592, FA - 5, "급전 A", { s: 9.5, a: "end", c: LV }) + t(592, FB + 12, "급전 B", { s: 9.5, a: "end", c: LV });
   const fsu = (x, y, n) => `<rect x="${x - 7}" y="${y - 7}" width="14" height="14" fill="#eaf1f8" stroke="${LV}" stroke-width="1.8"/>` + t(x, y - 11, "FSU " + n, { s: 9.5, b: 1, a: "middle", c: LV });
   const F = [[720, RY1], [900, RY1], [RX2, 230], [RX2, 400], [900, RY2], [720, RY2]];
@@ -205,7 +205,7 @@ function sitePlan() {
   lg.forEach(([sy, nm], i) => { g += sy + t(PX + (i < 3 ? 44 : 310), 65 + (i % 3) * 22, nm, { s: 11 }); });
   g += `<rect x="${PX + 10}" y="120" width="12" height="12" fill="#eaf1f8" stroke="${LV}" stroke-width="1.8"/>` + t(PX + 30, 130, "구간분전함(FSU)", { s: 11 }) + `<rect x="${PX + 160}" y="122" width="8" height="8" fill="${OR}" stroke="${INK}" stroke-width="0.8"/>` + t(PX + 176, 130, "배전체계(PPDU-20)", { s: 11 }) + `<rect x="${PX + 320}" y="120" width="12" height="12" fill="#f2c200" stroke="${INK}" stroke-width="0.8"/>` + t(PX + 340, 130, "케이블 보호대", { s: 11 });
   g += hd(146, "배치 원칙");
-  [["전원 구역", "전원 차량을 ⑥ 컨테이너 한쪽에 모아 케이블 길이 최소화"], ["⑥ 컨테이너", "끝면은 고압 인입부, 옆면은 저압 접속반. 차량 접속 면과 환망 급전 면 구분"], ["태양광", "패널 띠는 차량 뒤로 전개. 그늘과 차량 동선을 피해 배치"],
+  [["전원 구역", "전원 차량을 ⑥ 컨테이너 한쪽에 모아 케이블 길이 최소화"], ["⑥ 컨테이너", "한쪽 끝면은 고압 인입부, 반대쪽 끝면은 저압 접속반(12회로)"], ["태양광", "패널 띠는 차량 뒤로 전개. 그늘과 차량 동선을 피해 배치"],
     ["TPCS", "전원 구역과 떨어진 통제 구역. 통신선 이중 경로"], ["환망", "급전 A, B 로 시설을 한 바퀴. 구간분전함 6대, 상시 개방점 1개소"], ["부하", "구간분전함에서 배전체계를 거쳐 시설로 공급"]].forEach((r, i) => {
     const y = 166 + i * 21; g += `<rect x="${PX}" y="${y}" width="${PW}" height="21" fill="${i % 2 ? "#fff" : "#f3f6f9"}" stroke="#c9d1d9" stroke-width="0.6"/>` + t(PX + 10, y + 14.5, r[0], { s: 11, b: 1 }) + t(PX + 92, y + 14.5, r[1], { s: 10.5 }); });
   g += hd(304, "설계 확정 필요 항목", RED);
