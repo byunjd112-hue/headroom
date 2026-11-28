@@ -96,7 +96,7 @@ const S1 = frame(1, "필요성", "전력이 끊기면", "작전도 멈춘다", "
   <div class="fn t" style="left:${X}px;top:972px;width:${CWD}px;text-align:right">현장 사진은 이해를 돕기 위한 개념도(생성 이미지)임</div>`);
 
 /* ── 2장 */
-const eq = [["dg.jpg", "① 기동형 복합전력", "발전기 90 kW, ESS 200 kWh"], ["ess.jpg", "② 이동형 ESS", "1000 kWh, 500 kW"], ["pv.jpg", "③ 이동형 태양광", "400 kWp(80 kWp × 5)"], ["fc.jpg", "④ 수소 생성 및 발전", "연료전지 100 kW"], ["dist.jpg", "⑥ 배전 및 변압", "모선 A, B, 연계 차단기"], ["fsu.jpg", "구간분전함", "환망 구성, 부하 직전 배전"]];
+const eq = [["dg.jpg", "① 기동형 복합전력", "발전기 90 kW, ESS 200 kWh"], ["ess.jpg", "② 이동형 ESS", "1000 kWh, 500 kW"], ["pv.jpg", "③ 이동형 태양광", "400 kWp(80 kWp × 5)"], ["fc.jpg", "④ 수소 생성 및 발전", "연료전지 100 kW"], ["dist.jpg", "⑥ 고전압 배전 및 변압", "22.9 kV / 380 V, 500 kVA"], ["fsu.jpg", "구간분전함", "환망 구성, 부하 직전 배전"]];
 const S2 = frame(2, "체계 구성과 운용", "작전지와 주둔지,", "하나의 EMS 로", "ONE EMS FOR FIELD AND GARRISON", "차량형 전원 4종과 배전 장비를<br>EMS 가 통신으로 연결함.<br>같은 장비와 같은 화면을<br>작전지와 주둔지에서 그대로 사용함.", "작전지에서도, 주둔지에서도 같은 체계",
   rb(X, 92, CWD, "체계 구성", "이동형 전원 4종, 배전 장비, EMS 중앙제어. 연결하면 종류와 수량을 자동 인식") +
   eq.map((e, i) => { const w = 226, x = X + i * (w + 15.600); return `<div class="card" style="left:${x}px;top:156px;width:${w}px;height:188px"><div class="ph" style="height:128px;background-image:url(${PH(e[0])})"></div><div class="ct t" style="top:122px;font-size:18px">${e[1]}</div><div class="cs t" style="top:152px;font-size:13.500px">${e[2]}</div></div>`; }).join("") +
