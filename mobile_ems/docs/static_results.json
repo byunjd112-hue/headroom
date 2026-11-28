@@ -1,6 +1,6 @@
 {
- "date": "2026-11-28 00:19",
- "unittest_s": 708.2,
+ "date": "2026-11-28 01:51",
+ "unittest_s": 686.3,
  "tests": [
   "test_api_csv_and_range | ok",
   "test_api_device_ess_xfer_routes | ok",
@@ -229,7 +229,7 @@
  "coverage_pct": 92.7,
  "stmt": {
   "n": 7820,
-  "hit": 7471,
+  "hit": 7468,
   "pct": 95.5
  },
  "branch": {
@@ -359,6 +359,14 @@
    "29, 78-79"
   ],
   [
+   "ifps_ems_rt/hmi/ringwatch.py",
+   92.9,
+   182,
+   74.0,
+   104,
+   "79-80, 188-193, 230-234"
+  ],
+  [
    "ifps_ems_rt/hmi/archapi.py",
    93.1,
    58,
@@ -373,14 +381,6 @@
    85.8,
    120,
    "74, 126-127, 263-264, 309, 321-322, 345, 358, 362, 364, 366, 391-396, 426"
-  ],
-  [
-   "ifps_ems_rt/hmi/ringwatch.py",
-   93.4,
-   182,
-   75.0,
-   104,
-   "80, 188-193, 230-234"
   ],
   [
    "ifps_ems_rt/hmi/scenarios.py",
@@ -535,6 +535,14 @@
    "52"
   ],
   [
+   "ifps_ems_rt/archdev.py",
+   97.9,
+   141,
+   88.3,
+   60,
+   "93-94, 110"
+  ],
+  [
    "ifps_ems_rt/archive.py",
    98.0,
    148,
@@ -613,14 +621,6 @@
    90.7,
    54,
    "67"
-  ],
-  [
-   "ifps_ems_rt/archdev.py",
-   99.3,
-   141,
-   88.3,
-   60,
-   "110"
   ],
   [
    "ifps_ems_rt/weather.py",
@@ -810,7 +810,7 @@
    "ifps_ems_rt/hmi/fuelwatch.py",
    100.0,
    17,
-   90.0,
+   100.0,
    10,
    ""
   ],
@@ -2130,8 +2130,7 @@
  "pyflakes": [
   "ifps_ems_rt/simplant.py:121:12: local variable 'cb' is assigned to but never used",
   "ifps_ems_rt/simplant.py:187:9: local variable 'on' is assigned to but never used",
-  "tools/build_workbooks.py:15:1: 'openpyxl.styles.Alignment' imported but unused",
-  "tools/build_workbooks.py:186:14: f-string is missing placeholders"
+  "tools/build_workbooks.py:196:14: f-string is missing placeholders"
  ],
  "bandit": {
   "totals": {
@@ -2143,7 +2142,7 @@
    "SEVERITY.LOW": 1,
    "SEVERITY.MEDIUM": 2,
    "SEVERITY.UNDEFINED": 0,
-   "loc": 10219,
+   "loc": 10258,
    "nosec": 0,
    "skipped_tests": 22
   },
