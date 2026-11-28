@@ -132,7 +132,9 @@ function solid(body) {
     else if (x && x.__h && !x.__nb) { let k = i; while (body[k + 1] && body[k + 1].__h) k++;
       if (isP(body[k + 1])) { out.push(BOX(body.slice(i, k + 2))); out.push(gap()); i = k + 1; } else out.push(x); }
     else out.push(x); }
-  return out;
+  // 표가 맞붙으면 Word 가 한 표로 합쳐, 쪽이 넘어갈 때 앞 표의 제목 · 머리줄을 다시 찍는다(사용자가 화면으로 알려 줌). 어떤 표든 두 개가 맞붙지 않게 사이에 아주 낮은 빈 문단을 둔다
+  const fin = []; out.forEach(x => { if (x instanceof Table && fin[fin.length - 1] instanceof Table) fin.push(gap()); fin.push(x); });
+  return fin;
 }
 /** 별첨: 이 문서에 나온 약어만 표기 · 원어 · 의미 표로(묶음 순서대로) */
 function appendix(body) {

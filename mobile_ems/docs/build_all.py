@@ -151,6 +151,7 @@ def main(argv=None):
         for f in fs:
             g = doc_rules_name(f)
             if g != f: os.replace(os.path.join(dp, f), os.path.join(dp, g))
+    run([sys.executable, os.path.join(ROOT, "tools", "docx_check.py"), OUT])                 # Word 구조 점검(맞붙은 표 · 묶음 속성 · 잘리는 줄) — 문제가 있으면 멈춘다
     names = sorted(os.path.relpath(os.path.join(dp, f), OUT) for dp, _, fs in os.walk(OUT) for f in fs)
     bad = [n for n in names if rev not in n]
     print(f"산출물 {len(names)}개 (docs/out):"); [print("   ", n) for n in names]
