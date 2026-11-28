@@ -247,6 +247,37 @@ function radius() {
   g += R(72, 612, 880, 56, "#fff7e6", "#c98a1a", 1.2) + T(512, 636, "둘레 C 는 한 구간이 고장 나 한쪽에서만 공급할 때의 전압 강하로 정함", { s: 14, b: 1 }) + T(512, 656, "붉은 점선 안이 전개 가능 범위. 환망이 원형이 아니면 둘레 한도로 판정", { s: 13.5 });
   return g;
 }
+/** 컨테이너형 릴 배전 묶음의 단면도와 평면도(실제 치수 비율). 1024 × 688. 단면 1 m = 100 px, 평면 1 m = 78 px */
+function reelBox() {
+  let g = ""; const LV = "#1f3a5f", GR = "#55626f", OD = "#56653a", RED = "#b3261e";
+  g += T(512, 40, "컨테이너형 릴 배전 묶음: 단면도와 평면도(치수 비율 그림)", { s: 21, b: 1 }) + T(512, 66, "20ft ISO 컨테이너 내부 폭 2.35 m 에 지름 1.1 m 드럼 두 줄. 치수는 검토안", { s: 14, c: "#8a4b12" });
+  // 단면도
+  const K = 100, cx = 262, gy = 540, W = 2.44 * K, H = 2.59 * K, x0 = cx - W / 2, y0 = gy - 110 - H, fl = y0 + H - 0.17 * K;
+  g += T(cx, 96, "단면도(뒤에서 본 모습)", { s: 15, b: 1, c: GR });
+  g += LN(60, gy, 470, gy, "#8a7f6a", 3) + R(cx - 1.25 * K, gy - 110, 2.5 * K, 22, "#3f4a2a", "#1b2733", 1.5) + `<circle cx="${cx - 150}" cy="${gy - 46}" r="46" fill="#2b2b2b"/><circle cx="${cx + 150}" cy="${gy - 46}" r="46" fill="#2b2b2b"/>` + T(cx, gy - 62, "차량", { s: 13, c: GR });
+  g += R(x0, y0, W, H, "#f4f8ec", OD, 4) + LN(x0, fl, x0 + W, fl, OD, 3);
+  [-1, 1].forEach(d => { const dx = cx + d * (0.075 + 0.55) * K, dy = fl - 0.12 * K - 0.55 * K;
+    g += `<circle cx="${dx}" cy="${dy}" r="${0.55 * K}" fill="#20242a" stroke="#1b2733" stroke-width="2"/><circle cx="${dx}" cy="${dy}" r="${0.3 * K}" fill="#c9d1d9" stroke="#1b2733" stroke-width="1.5"/>`;
+    const ex = cx + d * (W / 2 - 4), ry = fl - 8; g += `<circle cx="${ex - d * 10}" cy="${ry}" r="7" fill="#fff" stroke="#1b2733" stroke-width="1.5"/>`;
+    g += `<path d="M${dx} ${dy + 0.55 * K} L${ex - d * 10} ${ry + 7} Q${ex + d * 40} ${ry + 14} ${ex + d * 70} ${gy - 6} L${ex + d * 120} ${gy - 6}" fill="none" stroke="${LV}" stroke-width="5"/>`;
+    g += LN(ex, y0, ex + d * 96, y0 - 44, OD, 4) + T(ex + d * 78, y0 - 52, "옆면 개방", { s: 12, c: GR, a: "middle" });
+    g += T(dx, dy + 5, d < 0 ? "왼쪽 줄" : "오른쪽 줄", { s: 12, b: 1, c: "#1b2733" }) + T(ex + d * 78, gy + 22, d < 0 ? "급전 A 쪽" : "급전 B 쪽", { s: 13, b: 1, c: LV }); });
+  g += T(cx, y0 - 44, "외부 폭 2.44 m, 내부 2.35 m", { s: 12, c: GR });
+  g += T(cx, y0 + 26, "가운데 틈 0.15 m(통로 없음)", { s: 12, b: 1, c: RED }) + LN(cx, y0 + 34, cx, fl - 0.67 * K, RED, 1, 'stroke-dasharray="4 3"');
+  // 평면도
+  const P = 78, px = 520, py = 190, PL = 6.06 * P, PW = 2.44 * P;
+  g += T(px + PL / 2, 96, "평면도(위에서 본 모습)", { s: 15, b: 1, c: GR }) + R(px, py, PL, PW, "#f4f8ec", OD, 4);
+  for (let r = 0; r < 2; r++) for (let i = 0; i < 3; i++) { const x = px + 0.55 * P + i * 1.5 * P, y = py + 0.05 * P + r * (1.1 + 0.15) * P + 0.03 * P;
+    g += R(x, y, 1.3 * P, 1.08 * P, "#20242a", "#1b2733", 1.5) + R(x - 4, y - 2, 4, 1.08 * P + 4, "#c9d1d9", "#1b2733", 1) + R(x + 1.3 * P, y - 2, 4, 1.08 * P + 4, "#c9d1d9", "#1b2733", 1);
+    const cy2 = r ? py + PW : py, dir = r ? 1 : -1; g += LN(x + 0.65 * P, r ? y + 1.08 * P : y, x + 0.65 * P, cy2 + dir * 34, LV, 4) + `<path d="M${x + 0.65 * P - 6} ${cy2 + dir * 34} h12 l-6 ${dir * 10} Z" fill="${LV}"/>`; }
+  g += R(px + 5.2 * P, py + 0.3 * P, 0.7 * P, PW - 0.6 * P, "#d6e6f6", LV, 1.5) + `<text x="${px + 5.55 * P}" y="${py + PW / 2}" font-size="11" fill="#1b2733" text-anchor="middle" transform="rotate(90 ${px + 5.55 * P} ${py + PW / 2})">구동과 제어부</text>`;
+  g += T(px + 2.6 * P, py - 50, "왼쪽으로만 풀림(급전 A 쪽)", { s: 13, b: 1, c: LV }) + T(px + 2.6 * P, py + PW + 62, "오른쪽으로만 풀림(급전 B 쪽)", { s: 13, b: 1, c: LV });
+  g += T(px + PL / 2, py + PW + 86, "길이 6.06 m. 드럼 길이 1.3 m × 3개 × 2줄, 축은 길이 방향", { s: 12, c: GR });
+  g += `<path d="M${px - 30} ${py + PW / 2} h-34 m0 0 l10 -6 m-10 6 l10 6" fill="none" stroke="${GR}" stroke-width="2"/>` + T(px - 46, py + PW / 2 - 12, "진행 방향", { s: 11, c: GR });
+  g += R(500, 496, 500, 104, "#fff", "#c9d1d9", 1) + T(516, 518, "드럼: 바깥지름 1.1 m, 안지름 0.6 m(케이블 지름의 6배 0.23 m 이상)", { s: 12.5, a: "start" }) + T(516, 540, "용량: 두 줄 합계 약 5.6 ㎥, 전체 환망에 필요한 양 약 3.2 ㎥", { s: 12.5, a: "start" }) + T(516, 562, "풀림: 드럼 아래쪽에서 나와 옆면 아래 안내 롤러를 지나 바닥으로", { s: 12.5, a: "start" }) + T(516, 584, "정비: 가운데 통로가 없으므로 열린 옆면에서 접근", { s: 12.5, a: "start", c: RED });
+  g += R(72, 612, 880, 56, "#fff7e6", "#c98a1a", 1.2) + T(512, 636, "차량에 실은 채 주행하며 한쪽 옆으로 풀어 놓음. 케이블이 바퀴 자국 밖에 놓임", { s: 14, b: 1 }) + T(512, 656, "왼쪽 줄은 왼쪽, 오른쪽 줄은 오른쪽으로만 드나들어 방향이 섞이지 않음", { s: 13.5 });
+  return g;
+}
 function garrison() {
   let g = ""; const box = (x, y, w, h, f, st, t1, t2, t3) => R(x, y, w, h, f, st, 2, 'rx="8"') + T(x + w / 2, y + (t2 ? 30 : h / 2 + 5), t1, { s: 15, b: 1 }) + (t2 ? T(x + w / 2, y + 52, t2, { s: 13 }) : "") + (t3 ? T(x + w / 2, y + 71, t3, { s: 13, c: "#55626f" }) : "");
   const ar = (x1, y1, x2, y2, col, sw = 3) => LN(x1, y1, x2, y2, col, sw) + (y1 === y2 ? `<path d="M${x2} ${y2} l-12 -7 v14 Z" fill="${col}"/>` : `<path d="M${x2} ${y2} l-7 ${y2 > y1 ? -12 : 12} h14 Z" fill="${col}"/>`);
@@ -277,6 +308,6 @@ function garrison() {
   return g;
 }
 (async () => { const b = await chromium.launch();
-  for (const [n, f, w, h] of [["pd2_layout", plan, 1024, 688], ["pd2_sld", sldPro, 1640, 626], ["pd2_grid", garrison, 1024, 688], ["pd2_plan", sitePlan, 1640, 626], ["pd2_coord", coord, 1024, 688], ["pd2_radius", radius, 1024, 688]]) { const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+  for (const [n, f, w, h] of [["pd2_layout", plan, 1024, 688], ["pd2_sld", sldPro, 1640, 626], ["pd2_grid", garrison, 1024, 688], ["pd2_plan", sitePlan, 1640, 626], ["pd2_coord", coord, 1024, 688], ["pd2_radius", radius, 1024, 688], ["pd2_reelbox", reelBox, 1024, 688]]) { const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
     await p.setContent(`<style>${css} body{margin:0;background:#fff} text{font-family:NSK}</style><svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${f()}</svg>`); await p.evaluate(() => document.fonts.ready); await p.screenshot({ path: path.join(out, n + ".png") }); await p.close(); }
   await b.close(); })();

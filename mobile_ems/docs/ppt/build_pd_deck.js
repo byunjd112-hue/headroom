@@ -227,10 +227,11 @@ const BR_M = 40, BR_PCT = +(R3 * 40 * BR_M / 1000 * ZC(A.branch) / (A.v * 1000) 
 const RAD = i => { const c = r10(LIM(i, TR_PCT)), d = r10(c / Math.PI); return { c, d, r: d + BR_M }; };
 // ═══ 케이블 포설: 무게는 선정 케이블의 제품 자료 값. 릴 배전 차량의 표준은 15톤급 1대(전체 환망), 5톤 1대는 소규모 전개용(사용자 지정)
 const RL = { rho: 8.9, k: 1.3, cat: { 240: [2950, 38.3] }, man: 25, nPE: 1, od: 32, fill: 0.65, kmh: 2, seg: 30, use: 0.9, brw: 0.9, brn: V.slots,
-  v15: { pay: 15000, rack: 1500, reel: 1500, dw: 1.1 }, v5: { pay: 5000, reel: 1000, legs: 200, dw: 0.9 } };   // brw: 분기 케이블 kg/m(가정), brn: 배전체계 자리 수
+  v15: { pay: 15000, rack: 1500, reel: 1500, dw: 1.1 }, v5: { pay: 5000, reel: 1000, legs: 200, dw: 0.9 }, box: { tare: 2300, reel: 1800, d: 1.1, core: 0.6, len: 4.2, w: 2.35 } };   // brw: 분기 케이블 kg/m(가정), brn: 배전체계 자리 수
 const TRK = CBL(SP.fsu_a), CAT = RL.cat[TRK.mm], WM = CAT ? CAT[0] / 1000 : TRK.mm * RL.rho * RL.k / 1000, OD = CAT ? CAT[1] : RL.od;
 const NST = 3 * TRK.n + TRK.n + RL.nPE, WRUN = WM * NST, RING = RAD(SP.fsu_a).c, WTRK = WRUN * RING, WBR = RL.brn * BR_M * RL.brw, WSEG1 = WM * RL.seg, MEN1 = Math.ceil(WSEG1 / RL.man), RADV = RAD(SP.fsu_a).r;
 const W15 = WTRK + WBR + RL.v15.rack + RL.v15.reel, LIM15 = RL.v15.pay * RL.use, VOL = RING * NST * Math.PI / 4 * Math.pow(OD / 1000, 2) / RL.fill, DRUM = Math.PI / 4 * (1.8 * 1.8 - 0.9 * 0.9) * RL.v15.dw, NDR = Math.max(2, Math.ceil(VOL / DRUM)) + 1, TLAY = Math.ceil(RING / (RL.kmh * 1000 / 60));
+const BXV = Math.PI / 4 * (RL.box.d * RL.box.d - RL.box.core * RL.box.core) * RL.box.len, WBOX = WTRK + WBR + RL.box.tare + RL.box.reel, BXWALK = RL.box.w - 2 * RL.box.d, BEND = Math.ceil(OD * 6 / 10) * 10;
 const NST5 = 3 * TRK.n + Math.ceil(TRK.n / 2) + RL.nPE, CB5 = RL.v5.pay * RL.use - RL.v5.reel - RL.v5.legs, RING5 = Math.min(RING, r10(CB5 / (WM * NST5))), W5 = WM * NST5 * RING5 + RL.v5.reel + RL.v5.legs, RAD5 = r10(RING5 / Math.PI) + BR_M;
 const FUSE = [16, 20, 25, 31.5, 40].reduce((a, x) => Math.abs(x - IHV * 2) < Math.abs(a - IHV * 2) ? x : a), ST_F = Math.round(SP.fsu_a * 3 / 100) * 100;
 const ISC_TR = ITR / (A.z / 100), INVK = ST.g1_kw + ST.ess_kw + ST.pv_kwp + ST.fc_kw, ISC_INV = INVK / (R3 * A.v) * A.inv, ISC_DG = ST.dg_kw / A.dgpf / (R3 * A.v) / A.xd;
@@ -420,6 +421,15 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
     ["적재 중량과 한도", `${n0(W5)} kg, 한도 ${n0(RL.v5.pay * RL.use)} kg`, `${n0(W15)} kg, 한도 ${n0(LIM15)} kg`],
     ["하차 방식", "전동 승강 다리", "차량의 자체 상하차 장치"]], [26, 36, 38], { dense: true }],
     [["판정", [`전체 환망은 15톤급 1대로 구현. ⑥ 컨테이너를 운송하는 차량과 같은 계열이어서 정비와 운용이 공통. 5톤 1대는 중성선 전류가 상 전류의 50 % 이하인 소규모 전개에 한해 사용`]]]); }
+{ const s = page(6, "컨테이너형 릴 배전 묶음(양쪽 배열, 양쪽 개방)", "릴을 20ft 컨테이너 안 양쪽에 배열하고 양 옆면을 열어 풀고 감는 방식의 성립 검토",
+    "릴을 컨테이너 안 양쪽에 놓고 옆면을 열어 쓰는 방식입니다. 성립하는지 계산했습니다.");
+  picTable(s, "pd2_reelbox", "컨테이너형 릴 배전 묶음의 단면도와 평면도: 실제 치수 비율로 그린 검토 도면", [["검토 항목", "계산과 내용", "판정"], [
+    ["릴 배열", `지름 ${RL.box.d} m 드럼을 좌우 두 줄, 축은 길이 방향`, `폭 ${RL.box.w} m 에 수용`],
+    ["케이블 용량", `${BXV.toFixed(2)} ㎥ × 2줄 = ${(BXV * 2).toFixed(2)} ㎥, 필요 ${VOL.toFixed(2)} ㎥`, "전체 환망 수용"],
+    ["총 중량", `케이블 ${n0(WTRK + WBR)} + 컨테이너 ${n0(RL.box.tare)} + 릴 ${n0(RL.box.reel)} = ${n0(WBOX)} kg`, `한도 ${n0(LIM15)} kg 이내`],
+    ["풀림 방향", "왼쪽 줄은 왼쪽, 오른쪽 줄은 오른쪽으로만", "줄마다 한 방향"],
+    ["전개 방식", "차량에 실은 채 주행하며 옆으로 포설", "바퀴 자국 밖에 놓임"]], [20, 50, 30], { dense: true }],
+    [["평가", ["장점: ⑥ 과 같은 차량과 상하차 방식, 케이블과 구동부의 비와 먼지 보호, 보관함 겸용, 급전 A 쪽과 B 쪽을 좌우 줄로 구분. 유의점: 가운데 통로 " + BXWALK.toFixed(2) + " m 로 좁아 정비는 열린 옆면에서 수행. 내려놓고 쓸 때는 케이블을 끌어내는 견인 수단 필요"]]]); }
 { const s = page(6, "릴 묶음의 운용 방식", "차량에 실은 채 쓰는 것이 기본. 내려야 할 때는 차량의 상하차 장치로 적재대째 내림",
     "릴은 차량에서 내리지 않고 씁니다. 내려야 하면 차량이 적재대째 스스로 내립니다.");
   picTable(s, "pd2_reelmod", "자체 하차: 릴 묶음을 실은 적재대를 차량의 상하차 장치로 내림", [["구분", "적용안", "사유"], [
