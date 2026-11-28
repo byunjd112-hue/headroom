@@ -67,6 +67,35 @@ function sld() {
   g += T(512, 648, "작전지에서는 고압 측 미사용, 주둔지에서는 상전 22.9 kV 수전. 저압 모선 정격은 전원 합계 전류로 선정", { s: 14 });
   return g;
 }
+function garrison() {
+  let g = ""; const box = (x, y, w, h, f, st, t1, t2, t3) => R(x, y, w, h, f, st, 2, 'rx="8"') + T(x + w / 2, y + (t2 ? 30 : h / 2 + 5), t1, { s: 15, b: 1 }) + (t2 ? T(x + w / 2, y + 52, t2, { s: 13 }) : "") + (t3 ? T(x + w / 2, y + 71, t3, { s: 13, c: "#55626f" }) : "");
+  const ar = (x1, y1, x2, y2, col, sw = 3) => LN(x1, y1, x2, y2, col, sw) + (y1 === y2 ? `<path d="M${x2} ${y2} l-12 -7 v14 Z" fill="${col}"/>` : `<path d="M${x2} ${y2} l-7 ${y2 > y1 ? -12 : 12} h14 Z" fill="${col}"/>`);
+  g += T(512, 44, "주둔지에서의 한전(상전) 연결(검토안)", { s: 22, b: 1 });
+  g += T(512, 72, "붉은 선은 22.9 kV, 푸른 선은 380 V. 붉은 글씨는 받은 자료에 없어 설계 확정이 필요한 항목", { s: 14, c: "#8a4b12" });
+  // 윗줄: 한전 → 주둔지 수전 설비 → 기존 변압기 → 기존 부하
+  g += box(40, 120, 170, 84, "#f6d9d5", "#a3261a", "한전 배전선로", "22.9 kV");
+  g += ar(210, 162, 262, 162, "#a3261a") + box(262, 120, 200, 84, "#eef1f4", "#1b2733", "주둔지 수전 설비", "책임분계점, 기존 시설", "변경 최소화");
+  g += ar(462, 162, 560, 162, "#a3261a") + box(560, 120, 180, 84, "#eef1f4", "#1b2733", "기존 변압기와 배전반", "주둔지 기존 계통");
+  g += ar(740, 162, 800, 162, "#1d4f91") + box(800, 120, 184, 84, "#eef1f4", "#1b2733", "주둔지 기존 부하", "기존 배선 그대로");
+  // 분기
+  g += `<circle cx="511" cy="162" r="7" fill="#a3261a"/>` + LN(511, 162, 511, 262, "#a3261a", 3) + T(523, 232, "고압 분기점과 분기 개폐기: 설계 확정 필요", { s: 13, a: "start", c: "#a3261a", b: 1 });
+  g += T(523, 251, "기존 고압반의 예비 회로 사용 또는 분기 개폐기 신설 가운데 선택", { s: 13, a: "start", c: "#a3261a" });
+  g += ar(511, 262, 511, 300, "#a3261a") + T(499, 286, "22.9 kV 고압 케이블", { s: 13, a: "end", c: "#55626f" });
+  // ⑥ 컨테이너
+  g += R(150, 300, 724, 150, "#f4f8ec", "#4b5d23", 2.5, 'rx="8" stroke-dasharray="9 5"') + T(164, 322, "⑥ 고전압 배전 및 변압체계(20ft 컨테이너 1대)", { s: 14, a: "start", b: 1, c: "#4b5d23" });
+  g += box(180, 340, 190, 84, "#f6d9d5", "#a3261a", "고압 인입부와 개폐 장치", "24 kV급") + ar(370, 382, 416, 382, "#a3261a");
+  g += box(416, 340, 190, 84, "#f3c9a8", "#8a4b12", "몰드형 변압기", "500 kVA, 22.9 kV / 380 V") + ar(606, 382, 652, 382, "#1d4f91");
+  g += box(652, 340, 196, 84, "#d6e6f6", "#1d4f91", "저압 주 차단기와 모선", "TPCS 감시 신호 CB.GRID");
+  // 아래: 전원 차량, 환망
+  g += ar(750, 450, 750, 500, "#1d4f91") + box(600, 500, 300, 64, "#d6e6f6", "#1d4f91", "환망 간선, 구간분전함, 배전체계", "TPCS 관리 부하");
+  g += box(124, 500, 380, 64, "#e3f1e6", "#2f7d4f", "전원 차량(복합전력, ESS, 태양광, 수소)", "380 V 모선에 직접 접속") + LN(504, 532, 560, 532, "#2f7d4f", 3) + LN(560, 532, 560, 476, "#2f7d4f", 3) + LN(560, 476, 700, 476, "#2f7d4f", 3) + ar(700, 476, 700, 426, "#2f7d4f");
+  g += `<rect x="652" y="462" width="196" height="16" fill="none"/>`;
+  g += R(72, 592, 880, 76, "#fff7e6", "#c98a1a", 1.2);
+  g += T(512, 615, "한전 전기는 ⑥ 컨테이너 끝면의 고압 인입부로 받음. 주둔지 기존 계통과 기존 부하의 배선은 변경하지 않음", { s: 14, b: 1 });
+  g += T(512, 637, "수전 한도는 변압기 용량 500 kVA. 상전 상실 시 주 차단기 개방 상태에서 전원 차량으로 자립 운전", { s: 14 });
+  g += T(512, 658, "TPCS 는 수전 차단기 상태를 감시만 하고 조작하지 않음", { s: 14 });
+  return g;
+}
 (async () => { const b = await chromium.launch(), p = await b.newPage({ viewport: { width: 1024, height: 688 }, deviceScaleFactor: 2 });
-  for (const [n, f] of [["pd2_layout", plan], ["pd2_sld", sld]]) { await p.setContent(`<style>${css} body{margin:0;background:#fff} text{font-family:NSK}</style><svg xmlns="http://www.w3.org/2000/svg" width="1024" height="688" viewBox="0 0 1024 688">${f()}</svg>`); await p.evaluate(() => document.fonts.ready); await p.screenshot({ path: path.join(out, n + ".png") }); }
+  for (const [n, f] of [["pd2_layout", plan], ["pd2_sld", sld], ["pd2_grid", garrison]]) { await p.setContent(`<style>${css} body{margin:0;background:#fff} text{font-family:NSK}</style><svg xmlns="http://www.w3.org/2000/svg" width="1024" height="688" viewBox="0 0 1024 688">${f()}</svg>`); await p.evaluate(() => document.fonts.ready); await p.screenshot({ path: path.join(out, n + ".png") }); }
   await b.close(); })();
