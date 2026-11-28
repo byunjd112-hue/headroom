@@ -227,13 +227,13 @@ const BR_M = 40, BR_PCT = +(R3 * 40 * BR_M / 1000 * ZC(A.branch) / (A.v * 1000) 
 const RAD = i => { const c = r10(LIM(i, TR_PCT)), d = r10(c / Math.PI); return { c, d, r: d + BR_M }; };
 // ═══ 케이블 포설: 무게는 선정 케이블의 제품 자료 값. 릴 배전 차량의 표준은 15톤급 1대(전체 환망), 5톤 1대는 소규모 전개용(사용자 지정)
 const RL = { rho: 8.9, k: 1.3, cat: { 240: [2950, 38.3] }, man: 25, nPE: 1, od: 32, fill: 0.65, kmh: 2, seg: 30, use: 0.9, brw: 0.9, brn: V.slots,
-  v15: { pay: 15000, rack: 1500, reel: 1500, dw: 1.1 }, v5: { pay: 5000, reel: 1000, legs: 200, dw: 0.9 }, box: { tare: 2300, reel: 1500, d: 1.1, core: 0.6, len: 3.0, w: 2.35 },
+  v15: { pay: 15000, rack: 1500, reel: 1500, dw: 1.1 }, v5: { pay: 5000, reel: 1000, legs: 200, dw: 0.9 }, box: { tare: 2300, reel: 1500, d: 1.8, core: 0.9, len: 4.2, w: 2.35, store: 1.0 },
   kit: { brseg: 20, reelkg: 3, ppdu: 18, fo: 0.03, fom: 250, fsu: 60, prot: 12, nprot: 12, misc: 150 } };   // 휴대 릴 구간 m, 빈 릴 kg, PPDU kg(받은 자료), 광케이블 kg/m, 광케이블 릴 m, 구간분전함 kg(추정), 보호대 조각 kg과 수량, 보호구와 공구 kg   // brw: 분기 케이블 kg/m(가정), brn: 배전체계 자리 수
 const TRK = CBL(SP.fsu_a), CAT = RL.cat[TRK.mm], WM = CAT ? CAT[0] / 1000 : TRK.mm * RL.rho * RL.k / 1000, OD = CAT ? CAT[1] : RL.od;
 const NST = 3 * TRK.n + TRK.n + RL.nPE, WRUN = WM * NST, RING = RAD(SP.fsu_a).c, WTRK = WRUN * RING, WBR = RL.brn * BR_M * RL.brw, WSEG1 = WM * RL.seg, MEN1 = Math.ceil(WSEG1 / RL.man), RADV = RAD(SP.fsu_a).r;
 const W15 = WTRK + WBR + RL.v15.rack + RL.v15.reel, LIM15 = RL.v15.pay * RL.use, VOL = RING * NST * Math.PI / 4 * Math.pow(OD / 1000, 2) / RL.fill, DRUM = Math.PI / 4 * (1.8 * 1.8 - 0.9 * 0.9) * RL.v15.dw, NDR = Math.max(2, Math.ceil(VOL / DRUM)) + 1, TLAY = Math.ceil(RING / (RL.kmh * 1000 / 60));
-const KT = RL.kit, HREEL = KT.brseg * RL.brw + KT.reelkg, NHR = RL.brn * BR_M / KT.brseg, FOREEL = KT.fom * KT.fo + KT.reelkg, WKIT = NHR * KT.reelkg + RL.brn * KT.ppdu + 2 * FOREEL + V.nfsu * KT.fsu + KT.nprot * KT.prot + KT.misc;
-const BXV = Math.PI / 4 * (RL.box.d * RL.box.d - RL.box.core * RL.box.core) * RL.box.len, WBOX = WTRK + WBR + RL.box.tare + RL.box.reel + WKIT, BXWALK = RL.box.w - 2 * RL.box.d, BEND = Math.ceil(OD * 6 / 10) * 10;
+const KT = RL.kit, HREEL = KT.brseg * RL.brw + KT.reelkg, NHR = RL.brn * BR_M / KT.brseg, FOREEL = KT.fom * KT.fo + KT.reelkg, WKIT = NHR * KT.reelkg + RL.brn * KT.ppdu + 2 * FOREEL + KT.nprot * KT.prot + KT.misc;
+const BXV = Math.PI / 4 * (RL.box.d * RL.box.d - RL.box.core * RL.box.core) * RL.box.len, WBOX = WTRK + WBR + RL.box.tare + RL.box.reel + WKIT, BXWALK = RL.box.w - RL.box.d, BEND = Math.ceil(OD * 6 / 10) * 10;
 const NST5 = 3 * TRK.n + Math.ceil(TRK.n / 2) + RL.nPE, CB5 = RL.v5.pay * RL.use - RL.v5.reel - RL.v5.legs, RING5 = Math.min(RING, r10(CB5 / (WM * NST5))), W5 = WM * NST5 * RING5 + RL.v5.reel + RL.v5.legs, RAD5 = r10(RING5 / Math.PI) + BR_M;
 const FUSE = [16, 20, 25, 31.5, 40].reduce((a, x) => Math.abs(x - IHV * 2) < Math.abs(a - IHV * 2) ? x : a), ST_F = Math.round(SP.fsu_a * 3 / 100) * 100;
 const ISC_TR = ITR / (A.z / 100), INVK = ST.g1_kw + ST.ess_kw + ST.pv_kwp + ST.fc_kw, ISC_INV = INVK / (R3 * A.v) * A.inv, ISC_DG = ST.dg_kw / A.dgpf / (R3 * A.v) / A.xd;
@@ -423,28 +423,29 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
     ["적재 중량과 한도", `${n0(W5)} kg, 한도 ${n0(RL.v5.pay * RL.use)} kg`, `${n0(W15)} kg, 한도 ${n0(LIM15)} kg`],
     ["하차 방식", "전동 승강 다리", "차량의 자체 상하차 장치"]], [26, 36, 38], { dense: true }],
     [["판정", [`전체 환망은 15톤급 1대로 구현. ⑥ 컨테이너를 운송하는 차량과 같은 계열이어서 정비와 운용이 공통. 5톤 1대는 중성선 전류가 상 전류의 50 % 이하인 소규모 전개에 한해 사용`]]]); }
-{ const s = page(6, "컨테이너형 릴 배전 묶음(적용안)", "20ft 컨테이너 안 양쪽에 릴을 배열하고 양 옆면을 열어 풀고 감음. PLS 차량 1대로 운송",
-    "릴을 컨테이너 안 양쪽에 놓고 옆면을 열어 씁니다. 컨테이너 한 대에 전부 싣습니다.");
+{ const s = page(6, "컨테이너형 릴 배전 묶음(적용안)", "20ft 컨테이너 안에 릴을 한 줄로 놓고 한쪽 옆면만 열어 풀고 감음. PLS 차량 1대로 운송",
+    "릴을 컨테이너 안에 한 줄로 놓고 한쪽 옆면만 열어 씁니다. 반대쪽에는 정비 통로가 있습니다.");
   picTable(s, "pd2_reelbox", "컨테이너형 릴 배전 묶음의 단면도와 평면도: 실제 치수 비율로 그린 검토 도면", [["검토 항목", "계산과 내용", "판정"], [
-    ["릴 배열", `지름 ${RL.box.d} m 드럼을 좌우 두 줄, 축은 길이 방향`, `폭 ${RL.box.w} m 에 수용`],
-    ["케이블 용량", `${BXV.toFixed(2)} ㎥ × 2줄 = ${(BXV * 2).toFixed(2)} ㎥, 필요 ${VOL.toFixed(2)} ㎥`, "전체 환망 수용"],
-    ["보관 구획", "분기와 통신 휴대 릴, 배전 장비, 보호구", "길이 약 2 m"],
-    ["총 중량", `케이블 ${n0(WTRK + WBR)} + 컨테이너와 릴 ${n0(RL.box.tare + RL.box.reel)} + 부속 ${n0(WKIT)} = ${n0(WBOX)} kg`, `한도 ${n0(LIM15)} kg 이내`],
-    ["풀림 방향", "왼쪽 줄은 왼쪽, 오른쪽 줄은 오른쪽으로만", "줄마다 한 방향"]], [20, 50, 30], { dense: true }],
-    [["평가", ["⑥ 과 같은 차량과 상하차 방식, 케이블과 구동부의 비와 먼지 보호, 보관함 겸용. 가운데 통로가 없어 정비는 열린 옆면에서 수행. 평판 적재형은 대안으로 남김. 컨테이너와 릴 중량은 추정값"]]]); }
-{ const s = page(6, "컨테이너 실사 모습과 적재 구성", "뒤에서 보면 드럼 두 개가 폭을 채움. 깊이는 드럼 두 쌍과 보관 구획까지",
-    "실제 모습입니다. 드럼 두 개가 폭을 꽉 채우고, 안쪽에는 보관 칸이 있습니다.");
+    ["릴 배열", `지름 ${RL.box.d} m 드럼 3개를 한 줄, 축은 길이 방향`, `닫힌 쪽 통로 ${BXWALK.toFixed(2)} m`],
+    ["케이블 용량", `드럼 길이 합 ${RL.box.len} m 에 ${BXV.toFixed(1)} ㎥, 필요 ${VOL.toFixed(1)} ㎥`, "여유 약 " + (BXV / VOL).toFixed(1) + "배"],
+    ["풀림 방향", "모든 케이블이 열린 한쪽으로만 출입", "방향 하나"],
+    ["내려놓고 쓸 때", "출구의 전동 송출 롤러가 내보내고 경차량이 끝을 견인", "별도 장비 불필요"],
+    ["수납", `길이 ${RL.box.store.toFixed(1)} m 한 칸(휴대 릴, 배전체계, 보호구)`, "최소 구성"],
+    ["총 중량", `케이블 ${n0(WTRK + WBR)} + 컨테이너와 릴 ${n0(RL.box.tare + RL.box.reel)} + 부속 ${n0(WKIT)} = ${n0(WBOX)} kg`, `한도 ${n0(LIM15)} kg 이내`]], [20, 52, 28], { dense: true }],
+    [["평가", ["한쪽 개방이라 구조가 단순하고 닫힌 쪽 통로에서 정비 가능. 드럼이 커서 감는 층수가 적음. 드럼이 한쪽으로 약 0.28 m 치우치므로 무게 중심 검증 필요. 컨테이너와 릴 중량은 추정값"]]]); }
+{ const s = page(6, "컨테이너 실사 모습과 적재 구성", "뒤에서 보면 큰 드럼 한 줄과 정비 통로. 옆에서 보면 드럼 3개와 작은 수납 칸",
+    "실제 모습입니다. 큰 드럼이 한 줄로 놓이고 옆에 사람이 다닐 통로가 있습니다.");
   const pw = (L.CW - G) / 2, ph = D.frame(s, D.IMG("pd2_reelbox_rear"), L.X, TOP, pw, 1024 / 688, "그림 pd2_reelbox_rear"); D.frame(s, D.IMG("pd2_reelbox_side"), L.X + pw + G, TOP, pw, 1024 / 688, "그림 pd2_reelbox_side");
-  D.caption(s, L.X, TOP + ph, pw, "뒤에서 본 모습: PLS 차량에 실은 채 양 옆면을 열고 좌우로 풀어 놓음  (개념도 및 AI 생성)"); D.caption(s, L.X + pw + G, TOP + ph, pw, "옆에서 본 모습: 간선 드럼과 보관 구획(휴대 릴, 배전 장비, 보호구)  (개념도 및 AI 생성)");
-  foot(s, "그림은 단면도와 평면도의 치수를 따라 만든 개념도. 컨테이너는 폭 2.44 m, 길이 6.06 m 의 표준 규격이며 안쪽에 통로가 없음"); }
-{ const s = page(6, "함께 싣는 릴과 장비, 1인 취급 기준", "간선 외의 케이블, 배전 장비, 보호구를 같은 컨테이너에 보관. 사람이 드는 것은 한 사람이 들 수 있는 단위로 나눔",
+  D.caption(s, L.X, TOP + ph, pw, "뒤에서 본 모습: 한쪽 옆면만 열고 그쪽으로 풀어 놓음. 닫힌 쪽은 정비 통로  (개념도 및 AI 생성)"); D.caption(s, L.X + pw + G, TOP + ph, pw, "옆에서 본 모습: 간선 드럼 3개와 수납 한 칸  (개념도 및 AI 생성)");
+  foot(s, "그림은 단면도와 평면도의 치수를 따라 만든 개념도. 컨테이너는 폭 2.44 m, 길이 6.06 m 의 표준 규격"); }
+{ const s = page(6, "함께 싣는 릴과 장비, 1인 취급 기준", "간선 외에 꼭 필요한 것만 수납 한 칸에 보관. 사람이 드는 것은 한 사람이 들 수 있는 단위로 나눔",
     "필요한 것을 한 컨테이너에 모두 싣습니다. 사람이 드는 것은 한 명이 들 수 있게 나눴습니다.");
   table(s, L.X, TOP, L.CW, ["품목", "수량과 단위", "단위 무게", "취급", "근거"], [
     ["간선 케이블", `둘레 ${RING} m, ${NST}가닥`, `약 ${n0(WRUN)} kg/m`, "전동 릴. 사람은 커넥터 끝만 체결", "제품 자료"],
     ["분기 케이블", `${KT.brseg} m 휴대 릴 ${n0(NHR)}개(배전체계마다 ${BR_M / KT.brseg}개)`, `약 ${n0(HREEL)} kg`, "1인 운반", `${RL.brw} kg/m 가정`],
     ["통신 광케이블", `${KT.fom} m 휴대 릴 2개(이중 경로)`, `약 ${n0(FOREEL)} kg`, "1인 운반", "무게 가정"],
     ["배전체계(PPDU-20)", `${RL.brn}대`, `${KT.ppdu} kg`, "1인 운반", "받은 자료"],
-    ["구간분전함", `${V.nfsu}대`, `약 ${KT.fsu} kg(추정)`, "바퀴 달린 받침대로 1인 이동, 내릴 때 2인", "중량 확인 필요"],
+    ["구간분전함", `${V.nfsu}대`, "받은 자료에 없음", "컨테이너에 싣지 않음. 기존 방식으로 별도 운반", "설치 10분(2인)"],
     ["케이블 보호대", `${KT.nprot}조각`, `약 ${KT.prot} kg`, "1인 운반", "무게 가정"],
     ["보호구와 측정기", "절연 장갑, 보안면, 절연봉, 검전기, 접지저항계", "소형", "보관함에 정위치 보관", "고압과 저압 작업 공통"],
     ["접지와 공구", "접지봉과 접지선, 커넥터 마개, 공구", "소형", "보관함", "전개 때마다 사용"]], [16, 30, 14, 26, 14], { bold: [0], dense: true });
@@ -453,8 +454,8 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
     "차량이 케이블을 풀어 놓으면 장병은 가벼운 것만 나르고 꽂기만 하면 됩니다.");
   steps(s, L.X, TOP, L.CW, 2.0, [
     ["진입과 개방", "환망 경로 시작점에 정차. 양 옆면 개방, 접지"],
-    ["간선 포설", "주행하며 한쪽 옆으로 자동 풀림. 구간분전함 자리마다 정차"],
-    ["장비 배치", "구간분전함은 받침대로 이동. 배전체계와 휴대 릴은 1인 운반"],
+    ["간선 포설", "주행하며 열린 쪽 옆으로 자동 풀림. 구간분전함 자리마다 정차"],
+    ["장비 배치", "구간분전함 설치. 배전체계와 휴대 릴은 1인 운반"],
     ["접속", "간선 커넥터 체결과 색 구분 확인. 분기와 통신 케이블 연결"],
     ["확인", "접지저항과 전압 측정. TPCS 설치 점검 실행"]]);
   note(s, L.X, TOP + 2.0 + G, L.CW, D.noteNeed(L.CW, ["x"]) + 0.3, "인력 부담을 줄인 점", [`${RL.man} kg 을 넘는 것은 사람이 들지 않음. 간선은 전동 릴이 풀고 감으며, 사람은 커넥터 끝만 들어 체결. 철수는 역순이며 간선은 자동 감김. 운용 인원은 운전 1명과 배치 및 접속 2 ~ 4명(제안)`]); }
