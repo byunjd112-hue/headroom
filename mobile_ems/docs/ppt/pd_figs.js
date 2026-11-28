@@ -230,6 +230,23 @@ function coord() {
   g += R(72, 612, 880, 56, "#fff7e6", "#c98a1a", 1.2) + T(512, 636, "앞 단계가 끊지 못하면 다음 단계가 뒤를 받침(후비 보호). 환상 간선은 차동 보호로 고장 구간만 순시 분리", { s: 14, b: 1 }) + T(512, 656, "한전 연계 때와 자립 운전 때의 고장 전류가 달라 정정값을 따로 검토", { s: 13.5 });
   return g;
 }
+/** 최대 전개 반경의 정의 그림. 1024 × 688 */
+function radius() {
+  let g = ""; const cx = 470, cy = 340, r = 190, LV = "#1f3a5f", RED = "#b3261e", GR = "#55626f";
+  g += T(512, 44, "최대 전개 반경의 정의", { s: 22, b: 1 }) + T(512, 72, "환망을 원형으로 놓았을 때 ⑥ 컨테이너에서 가장 먼 부하까지의 직선거리", { s: 14, c: "#8a4b12" });
+  g += `<circle cx="${cx - r - 0}" cy="${cy}" r="${2 * r + 96}" fill="#f4f8ec" stroke="${RED}" stroke-width="1.6" stroke-dasharray="8 6" clip-path="inset(0)"/>`;
+  g += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${LV}" stroke-width="5"/>`;
+  g += R(cx - r - 22, cy - 34, 44, 68, "#56653a", "#1b2733", 2) + T(cx - r - 34, cy - 44, "⑥ 컨테이너", { s: 14, b: 1, a: "end" });
+  [[-60, "FSU"], [60, "FSU"], [-120, "FSU"], [120, "FSU"]].forEach(([a]) => { const x = cx + r * Math.cos(a * Math.PI / 180), y = cy + r * Math.sin(a * Math.PI / 180); g += R(x - 9, y - 9, 18, 18, "#eaf1f8", LV, 2); });
+  g += R(cx + r - 10, cy - 10, 20, 20, "#eaf1f8", LV, 2.4) + T(cx + r - 16, cy - 18, "가장 먼 구간분전함", { s: 13, b: 1, a: "end", c: LV });
+  g += LN(cx + r + 10, cy, cx + r + 96, cy, LV, 2.5) + R(cx + r + 96, cy - 16, 44, 32, "#a9b08a", "#5c6440", 1.5) + T(cx + r + 118, cy - 24, "부하", { s: 13, b: 1 });
+  g += LN(cx - r, cy + 70, cx + r, cy + 70, GR, 1.2) + LN(cx - r, cy + 62, cx - r, cy + 78, GR, 1.2) + LN(cx + r, cy + 62, cx + r, cy + 78, GR, 1.2) + T(cx, cy + 92, "D = 환망 둘레 C ÷ π", { s: 15, b: 1, c: GR });
+  g += LN(cx + r, cy + 70, cx + r + 96, cy + 70, GR, 1.2) + LN(cx + r + 96, cy + 62, cx + r + 96, cy + 78, GR, 1.2) + T(cx + r + 48, cy + 92, "분기 길이", { s: 13, b: 1, c: GR });
+  g += LN(cx - r, cy - 250, cx + r + 96, cy - 250, RED, 1.6) + LN(cx - r, cy - 258, cx - r, cy - 60, RED, 1, 'stroke-dasharray="4 4"') + LN(cx + r + 96, cy - 258, cx + r + 96, cy - 20, RED, 1, 'stroke-dasharray="4 4"') + T(cx + 48, cy - 258, "최대 전개 반경 = C ÷ π + 분기 길이", { s: 16, b: 1, c: RED });
+  g += T(cx, cy - 8, "환망 간선", { s: 14, b: 1, c: LV }) + T(cx, cy + 12, "둘레 C: 한쪽 급전의 허용 길이", { s: 13, c: GR });
+  g += R(72, 612, 880, 56, "#fff7e6", "#c98a1a", 1.2) + T(512, 636, "둘레 C 는 한 구간이 고장 나 한쪽에서만 공급할 때의 전압 강하로 정함", { s: 14, b: 1 }) + T(512, 656, "붉은 점선 안이 전개 가능 범위. 환망이 원형이 아니면 둘레 한도로 판정", { s: 13.5 });
+  return g;
+}
 function garrison() {
   let g = ""; const box = (x, y, w, h, f, st, t1, t2, t3) => R(x, y, w, h, f, st, 2, 'rx="8"') + T(x + w / 2, y + (t2 ? 30 : h / 2 + 5), t1, { s: 15, b: 1 }) + (t2 ? T(x + w / 2, y + 52, t2, { s: 13 }) : "") + (t3 ? T(x + w / 2, y + 71, t3, { s: 13, c: "#55626f" }) : "");
   const ar = (x1, y1, x2, y2, col, sw = 3) => LN(x1, y1, x2, y2, col, sw) + (y1 === y2 ? `<path d="M${x2} ${y2} l-12 -7 v14 Z" fill="${col}"/>` : `<path d="M${x2} ${y2} l-7 ${y2 > y1 ? -12 : 12} h14 Z" fill="${col}"/>`);
@@ -260,6 +277,6 @@ function garrison() {
   return g;
 }
 (async () => { const b = await chromium.launch();
-  for (const [n, f, w, h] of [["pd2_layout", plan, 1024, 688], ["pd2_sld", sldPro, 1640, 626], ["pd2_grid", garrison, 1024, 688], ["pd2_plan", sitePlan, 1640, 626], ["pd2_coord", coord, 1024, 688]]) { const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+  for (const [n, f, w, h] of [["pd2_layout", plan, 1024, 688], ["pd2_sld", sldPro, 1640, 626], ["pd2_grid", garrison, 1024, 688], ["pd2_plan", sitePlan, 1640, 626], ["pd2_coord", coord, 1024, 688], ["pd2_radius", radius, 1024, 688]]) { const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
     await p.setContent(`<style>${css} body{margin:0;background:#fff} text{font-family:NSK}</style><svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${f()}</svg>`); await p.evaluate(() => document.fonts.ready); await p.screenshot({ path: path.join(out, n + ".png") }); await p.close(); }
   await b.close(); })();

@@ -220,6 +220,11 @@ const NVEH = VEH.reduce((a, v) => a + v[2], 0), SEC = k => VEH.reduce((a, v, i) 
 const SECA = Math.max(amp(SEC(0)), amp(SEC(1))), BUS = up(SECA, 1.2), MAINF = up(ITR, 1.25), AUXK = 20, EXP = k => Math.floor((BUS - amp(SEC(k))) * R3 * A.v * A.pf / 10) * 10;
 const AMPC = [[10, 57], [16, 76], [25, 101], [35, 125], [50, 151], [70, 192], [95, 232], [120, 269], [150, 309], [185, 353], [240, 415]], STRAND = 320, UTIL = 0.8, MARG = 1.05;
 const CBL = i => { const n = Math.ceil(i / STRAND), per = i / n, c = AMPC.find(x => x[1] * UTIL >= per * MARG) || AMPC[AMPC.length - 1]; return { n, per, mm: c[0], amp: c[1], t: `구리 ${c[0]} mm²${n > 1 ? " × " + n : ""}` }; };
+const RXT = { 10: [2.24, 0.09], 16: [1.41, 0.09], 25: [0.889, 0.085], 35: [0.641, 0.083], 50: [0.473, 0.083], 70: [0.328, 0.08], 95: [0.236, 0.08], 120: [0.188, 0.08], 150: [0.153, 0.08], 185: [0.123, 0.08], 240: [0.094, 0.08] };
+const cab = i => { const c = CBL(i), z = RXT[c.mm]; return [c.t, z[0] / c.n, z[1] / c.n]; }, SIN = Math.sqrt(1 - A.pf * A.pf), ZC = c => c[1] * A.pf + c[2] * SIN;
+A.trunk = cab(SP.fsu_a); A.branch = cab(40);                 // 전압 강하 계산의 케이블 = 설계 적용값에서 선정한 케이블
+const BR_M = 40, BR_PCT = +(R3 * 40 * BR_M / 1000 * ZC(A.branch) / (A.v * 1000) * 100).toFixed(1), TR_PCT = +(A.dv - BR_PCT).toFixed(1), LIM = (i, pc) => pc / 100 * A.v * 1000 / (R3 * i / 1000 * ZC(A.trunk)), r10 = x => Math.floor(x / 10) * 10;
+const RAD = i => { const c = r10(LIM(i, TR_PCT)), d = r10(c / Math.PI); return { c, d, r: d + BR_M }; };
 const FUSE = [16, 20, 25, 31.5, 40].reduce((a, x) => Math.abs(x - IHV * 2) < Math.abs(a - IHV * 2) ? x : a), ST_F = Math.round(SP.fsu_a * 3 / 100) * 100;
 const ISC_TR = ITR / (A.z / 100), INVK = ST.g1_kw + ST.ess_kw + ST.pv_kwp + ST.fc_kw, ISC_INV = INVK / (R3 * A.v) * A.inv, ISC_DG = ST.dg_kw / A.dgpf / (R3 * A.v) / A.xd;
 const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw * U.FC) / (R3 * A.v) * A.inv, DG2 = ISC_DG * U.DG, ISC2 = ISC_TR + INV2 + DG2, ICU = [25, 36, 50, 65, 85].find(x => x >= ISC2 / 1000 * 1.2), ST_SET = Math.floor((ISC_INV + ISC_DG) / 2 / 100) * 100;
@@ -232,7 +237,7 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
     ["차단 용량", `저압 차단기 정격 차단 전류 ${ICU} kA 이상`, `기본 구성 한전 연계 합계 약 ${k1(ISC2)} kA`, "변압기 임피던스 확정"],
     ["분기 12회로 부족", `차량 1대를 1회로로 인입. 전원 ${NVEH}, 환망 2, 소내 1, 예비 ${12 - NVEH - 3}. 발전원 추가 시 예비 회로에 증설 분전반 연결`, "기본 구성의 차량 수", "증설 분전반 사양"],
     ["역가압과 상전 연계", "고압 개폐 장치 개방 시 주 차단기 투입 잠금. 상전 연계는 동기 검정 후 투입, 정전 시 주 차단기 개방", "TPCS 의 연계와 자립 판정 논리", "한전 협의, 역송 조건"],
-    ["전압 강하", `간선 전류(A) × 한쪽 급전 길이(m)를 ${n0(SP.fsu_a * 290)} 이하로 제한. 예: 630 A 는 290 m, 300 A 는 610 m`, `허용 ${A.dv} % 가정`, "케이블 규격"]], [24, 38, 22, 16], { bold: [0], dense: true });
+    ["전압 강하와 전개 반경", `환망 둘레를 한쪽 급전의 허용 길이 이하로 제한. 간선 ${SP.fsu_a} A 에서 둘레 ${RAD(SP.fsu_a).c} m, 최대 전개 반경 약 ${RAD(SP.fsu_a).r} m`, `허용 ${A.dv} %(간선 ${TR_PCT} %, 분기 ${BR_PCT} %)`, "부하 분포에 따른 실측"]], [24, 38, 22, 16], { bold: [0], dense: true });
   foot(s, "반영안은 받은 자료의 정격과 이 자료의 가정값으로 계산한 설계 제안임. 제작사 자료와 보호 협조 검토로 확정한 뒤 사양서와 TPCS 설정에 반영"); }
 { const s = page(5, "설계 적용값 1: 고압과 변압기", "받은 자료에 없던 항목마다 최적안을 정해 적용. 허용 범위와 사유를 함께 표기",
     "정해지지 않았던 항목에 가장 알맞은 값을 정해 넣었습니다. 허용 범위와 이유를 같이 적었습니다.");
@@ -261,7 +266,7 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
     ["커넥터", "단극 잠금식 400 A급, 가닥마다 1개", `가닥당 ${STRAND} A 이하`, "한 사람이 다룰 수 있는 굵기와 무게"],
     ["접지저항", "컨테이너 10 Ω 이하", "PPDU-20 은 100 Ω 이하(받은 자료)", "고압 기기 외함 접지의 통상 기준값. 초과 시 접지봉 추가"],
     ["전압 강하", `${A.dv} % 이하`, "3 ~ 5 %", "말단 부하의 정상 동작 범위"]], [20, 28, 24, 28], { bold: [0], dense: true });
-  foot(s, "복합전력 차량, 수소 차량, 분기 케이블의 선정 결과와 계산은 별첨의 계산 근거 3"); }
+  foot(s, "복합전력 차량, 수소 차량, 분기 케이블의 선정 결과와 계산은 별첨의 계산 근거 4"); }
 { const s = page(5, "설계 적용값 3: 보호와 상전 연계", "보호 정정값과 상전 연계 조건의 적용값. 보호 협조 검토에서 검증",
     "차단기와 보호 장치의 설정값, 한전 연계 조건을 정했습니다.");
   table(s, L.X, TOP, L.CW, ["항목", "적용값(최적안)", "허용 범위", "사유"], [
@@ -291,13 +296,17 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
     ["부하", "기본 부하 목록 합계", `${n1(RATED)} kW`, `약 ${cA(amp(RATED))}`, "해당 없음", "해당 없음"],
     ["부하", "수전해", `${n0(ST.elz_kw)} kW`, `약 ${cA(amp(ST.elz_kw))}`, `${U.FC}식`, `약 ${cA(amp(ST.elz_kw * U.FC))}`]]), [9, 23, 15, 17, 16, 20], { bold: [1], center: [0, 2, 3, 4, 5], dense: true });
   note(s, L.X, y + G, L.CW, D.noteNeed(L.CW, ["x"]) + 0.3, "반영안", [`전류는 역률 ${A.pf} 가정. 전원 합계는 동시에 정격을 내는 상한이며 실제 통과 전류는 부하와 충전량이 정함. 그래도 모선은 구획별 전원 합계(최대 약 ${cA(SECA)}) 이상인 ${n0(BUS)} A 로 선정. 환망 급전 ${SP.fsu_a} A 는 부하 전류만 흐르므로 그대로 둠`]); }
-{ const s = page(5, "전압 강하", "환상 간선과 분기 케이블의 길이별 전압 강하(가정한 케이블 기준)",
-    "케이블이 길어지면 전압이 떨어집니다. 길이별로 얼마나 떨어지는지 계산했습니다.");
+{ const s = page(5, "전압 강하", "환상 간선과 분기 케이블의 길이별 전압 강하. 케이블은 설계 적용값에서 선정한 규격",
+    "케이블이 길어지면 전압이 떨어집니다. 설계에서 정한 케이블로 길이별 값을 계산했습니다.");
   const T1 = [50, 100, 200, 300].map(m => { const d = drop(SP.fsu_a, m, A.trunk); return [`환상 간선 ${m} m`, `${SP.fsu_a} A`, `${d.toFixed(1)} V`, `${pct(d)} %`]; });
-  const T2 = [30, 50].map(m => { const d = drop(40, m, A.branch); return [`분기 ${m} m`, "40 A", `${d.toFixed(1)} V`, `${pct(d)} %`]; });
-  const LMAX = A.dv / 100 * A.v * 1000 / (R3 * SP.fsu_a / 1000 * (A.trunk[1] * A.pf + A.trunk[2] * Math.sqrt(1 - A.pf * A.pf)));
+  const T2 = [30, BR_M].map(m => { const d = drop(40, m, A.branch); return [`분기 ${m} m`, "40 A", `${d.toFixed(1)} V`, `${pct(d)} %`]; });
   picTable(s, "pd2_measure", "구간분전함에서의 전압 측정: 전개 후 말단 전압을 실측해 계산값과 대조", [["구간", "전류", "전압 강하", "비율"], T1.concat(T2), [34, 18, 24, 24], { center: [1, 2, 3] }],
-    [["가정과 판정", [`간선 ${A.trunk[0]}(2가닥 병렬), 분기 ${A.branch[0]}, 역률 ${A.pf} 가정. 허용 ${A.dv} % 가정 시 정격 전류에서 한쪽 급전 길이 약 ${n0(LMAX / 10) * 10} m 까지. 한 구간 고장으로 한쪽에서만 공급할 때가 가장 불리함. 케이블 규격은 5장의 설계 적용값을 따름`]]]); }
+    [["적용 케이블과 배분", [`간선 ${A.trunk[0]}, 분기 ${A.branch[0]}(5장의 설계 적용값과 같은 규격). 허용 ${A.dv} % 를 간선 ${TR_PCT} %, 분기 ${BR_PCT} %(${BR_M} m)로 배분. 역률 ${A.pf}. 한 구간 고장으로 한쪽에서만 공급할 때가 가장 불리함`]]]); }
+{ const s = page(5, "최대 전개 반경", "전압 강하 허용값 안에서 ⑥ 컨테이너로부터 가장 먼 부하까지 전개할 수 있는 거리",
+    "컨테이너에서 얼마나 멀리까지 부하를 놓을 수 있는지 계산했습니다.");
+  const RR = [[SP.fsu_a, "간선 정격"], [300, "중간 부하"], [Math.round(amp(RATED)), "기본 부하 목록"]].map(([i, nm]) => { const r = RAD(i); return [`${n0(i)} A(${nm})`, `${n0(r.c)} m`, `${n0(r.d)} m`, `${n0(r.r)} m`]; });
+  picTable(s, "pd2_radius", "최대 전개 반경의 정의: 환망을 원형으로 놓았을 때 컨테이너에서 가장 먼 부하까지의 직선거리", [["간선 전류", "환망 둘레 한도", "가장 먼 구간분전함", "최대 전개 반경"], RR, [30, 22, 24, 24], { center: [1, 2, 3] }],
+    [["조건과 확장 방법", [`한 구간 고장으로 한쪽에서만 공급하고 부하가 끝에 몰린 가장 불리한 조건. 간선 ${A.trunk[0]}, 간선 허용 ${TR_PCT} %, 분기 ${BR_M} m. 평상시 양쪽 급전에서는 여유가 약 2배. 반경을 넓히려면 간선 가닥 수 증가, 부하 분산, 전원 전압 설정 상향을 적용`]]]); }
 { const s = page(5, "단락 전류와 차단 용량", "한전 연계 때와 자립 운전 때의 고장 전류가 크게 다름",
     "고장이 났을 때 흐르는 전류입니다. 한전에 붙었을 때와 떨어졌을 때가 크게 다릅니다.");
   picTable(s, "pd2_lvboard", "저압 분전부: 주 차단기와 분기 12회로. 차단 용량은 가장 큰 고장 전류로 선정", [["고장 전류의 출처", "계산", "값"], [
@@ -392,21 +401,30 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
     ["회로 차단기", "회로 전류 × 1.15 이상의 표준 정격", `${n0(amp(ST.ess_kw))} A × 1.15 = ${n0(amp(ST.ess_kw) * 1.15)} A`, `${n0(up(amp(ST.ess_kw)))} A급`],
     ["주 차단기", "변압기 2차 전류 × 1.25 이상의 표준 정격", `${n0(ITR)} A × 1.25 = ${n0(ITR * 1.25)} A`, `${n0(MAINF)} A급`],
     ["전력 퓨즈", "변압기 1차 전류 × 2 에 가장 가까운 표준 정격", `${IHV.toFixed(1)} A × 2 = ${(IHV * 2).toFixed(1)} A`, `${FUSE} A`],
-    ["증설 허용 용량", "(모선 정격 - 구획 전류) × √3 × V × 역률", `(${n0(BUS)} - ${n0(amp(SEC(0)))}) A × 1.732 × 0.38 × ${A.pf}`, `모선 A 약 ${n0(EXP(0))} kW`]], [16, 30, 32, 22], { bold: [0], dense: true });
+    ["증설 허용 용량", "모선 정격에서 구획 전류를 뺀 값 × √3 × V × 역률", `(${n0(BUS)} - ${n0(amp(SEC(0)))}) A × 1.732 × 0.38 × ${A.pf}`, `모선 A 약 ${n0(EXP(0))} kW`]], [16, 30, 32, 22], { bold: [0], dense: true });
   foot(s, `표준 정격 계열: ${STD.map(n0).join(", ")} A. 역률 ${A.pf} 는 가정값`); }
 { const s = D.appx("별첨.  계산 근거 2: 전압 강하와 단락 전류", "전압 강하, 허용 길이, 고장 전류, 차단 용량, 단시간 정정을 구한 식과 대입 값");
   const zc = A.trunk[1] * A.pf + A.trunk[2] * Math.sqrt(1 - A.pf * A.pf), d1 = drop(SP.fsu_a, 100, A.trunk);
   table(s, L.X, TOP, L.CW, ["항목", "계산식", "대입", "결과"], [
     ["전압 강하", "ΔV = √3 × I × L × (R × cosθ + X × sinθ)", `1.732 × ${SP.fsu_a} A × 0.1 km × ${zc.toFixed(4)} Ω/km`, `${d1.toFixed(1)} V(${pct(d1)} %)`],
     ["케이블 상수", "R × cosθ + X × sinθ", `${A.trunk[1]} × ${A.pf} + ${A.trunk[2]} × ${Math.sqrt(1 - A.pf * A.pf).toFixed(3)}`, `${zc.toFixed(4)} Ω/km`],
-    ["허용 길이", "L = 허용 ΔV ÷ (√3 × I × 케이블 상수)", `${(A.dv / 100 * A.v * 1000).toFixed(0)} V ÷ (1.732 × ${SP.fsu_a} A × ${zc.toFixed(4)})`, `약 ${n0(SP.fsu_a * 290 / SP.fsu_a)} m`],
+    ["허용 길이", "L = 허용 ΔV ÷ (√3 × I × 케이블 상수)", `${(A.dv / 100 * A.v * 1000).toFixed(0)} V ÷ (1.732 × ${SP.fsu_a} A × ${zc.toFixed(4)})`, `약 ${n0(r10(LIM(SP.fsu_a, A.dv)))} m(허용 ${A.dv} % 전부를 간선에 쓸 때)`],
     ["변압기 고장 전류", "I = 정격 전류 ÷ 임피던스", `${n0(ITR)} A ÷ ${A.z / 100}`, `약 ${k1(ISC_TR)} kA`],
     ["인버터 고장 전류", "I = 정격 전류 합 × 주입 배수", `${n0(INV2 / A.inv)} A × ${A.inv.toFixed(1)}(기본 구성)`, `약 ${k1(INV2)} kA`],
     ["발전기 고장 전류", "I = 정격 전류 ÷ 과도 리액턴스", `${n0(ISC_DG * A.xd)} A ÷ ${A.xd} × ${U.DG}대`, `약 ${k1(DG2)} kA`],
     ["정격 차단 전류", "고장 전류 합 × 1.2 이상의 표준값", `${k1(ISC2)} kA × 1.2 = ${(ISC2 / 1000 * 1.2).toFixed(1)} kA`, `${ICU} kA`],
     ["단시간 정정 상한", "자립 운전 고장 전류(1식) ÷ 2", `${n0(ISC_INV + ISC_DG)} A ÷ 2`, `${n0(ST_SET)} A 이하`]], [16, 32, 32, 20], { bold: [0], dense: true });
   foot(s, `가정값: 간선 ${A.trunk[0]} 의 저항 ${A.trunk[1]} Ω/km, 리액턴스 ${A.trunk[2]} Ω/km, 변압기 임피던스 ${A.z} %, 발전기 과도 리액턴스 ${A.xd}, 발전기 역률 ${A.dgpf}, 인버터 주입 배수 ${A.inv.toFixed(1)}(받은 자료)`); }
-{ const s = D.appx("별첨.  계산 근거 3: 케이블 선정", "가닥 수와 굵기를 정한 규칙과 회로별 결과");
+{ const s = D.appx("별첨.  계산 근거 3: 최대 전개 반경", "전압 강하 배분, 환망 둘레 한도, 최대 전개 반경을 구한 식과 대입 값");
+  const r = RAD(SP.fsu_a), zb = ZC(A.branch), zt = ZC(A.trunk);
+  table(s, L.X, TOP, L.CW, ["항목", "계산식", "대입", "결과"], [
+    ["분기 전압 강하", "√3 × I × L × 케이블 상수 ÷ 380 V", `1.732 × 40 A × ${BR_M / 1000} km × ${zb.toFixed(3)} Ω/km ÷ 380 V`, `${BR_PCT} %`],
+    ["간선 허용 강하", "전체 허용에서 분기 강하를 뺀 값", `${A.dv} % - ${BR_PCT} %`, `${TR_PCT} %`],
+    ["환망 둘레 한도", "C = 간선 허용 ΔV ÷ (√3 × I × 케이블 상수)", `${(TR_PCT / 100 * 380).toFixed(1)} V ÷ (1.732 × ${SP.fsu_a} A × ${zt.toFixed(4)} Ω/km)`, `약 ${n0(r.c)} m`],
+    ["가장 먼 구간분전함", "D = C ÷ π(원형 배치의 지름)", `${n0(r.c)} m ÷ 3.1416`, `약 ${n0(r.d)} m`],
+    ["최대 전개 반경", "반경 = D + 분기 길이", `${n0(r.d)} m + ${BR_M} m`, `약 ${n0(r.r)} m`]], [18, 30, 34, 18], { bold: [0], dense: true });
+  foot(s, `케이블 상수(R × cosθ + X × sinθ)는 간선 ${A.trunk[0]} 이 ${zt.toFixed(4)} Ω/km, 분기 ${A.branch[0]} 이 ${zb.toFixed(3)} Ω/km. 저항과 리액턴스는 가정값. 결과는 10 m 단위로 내림. 환망이 원형이 아니면 둘레 한도로 판정`); }
+{ const s = D.appx("별첨.  계산 근거 4: 케이블 선정", "가닥 수와 굵기를 정한 규칙과 회로별 결과");
   const rw = (nm, i) => { const c = CBL(i); return [nm, `약 ${cA(i)}`, `${n0(i)} ÷ ${STRAND} → ${c.n}가닥`, `${n0(c.per)} A`, `${c.mm} mm²(허용 ${c.amp} A × ${UTIL} = ${n0(c.amp * UTIL)} A)`]; };
   const y = table(s, L.X, TOP, L.CW, ["회로", "전류", "가닥 수", "가닥당 전류", "선정 굵기"], [rw("ESS 차량", amp(ST.ess_kw)), rw("태양광", amp(ST.pv_kwp)), rw("복합전력 차량", amp(ST.dg_kw + ST.g1_kw)), rw("수소 차량", amp(Math.max(ST.fc_kw, ST.elz_kw))), rw("환상 간선", SP.fsu_a), rw("분기(PPDU-20)", 40)], [20, 14, 20, 16, 30], { bold: [0], center: [1, 2, 3], dense: true });
   note(s, L.X, y + G, L.CW, D.noteNeed(L.CW, ["x"]) + 0.45, "선정 규칙과 가정", [`가닥 수 = 전류 ÷ ${STRAND} A 를 올림. 굵기 = 허용 전류 × ${UTIL} 이 가닥당 전류 × ${MARG}(여유 5 %) 이상인 가장 가는 규격. 허용 전류 가정값(mm² : A): ${AMPC.map(c => c[0] + " : " + c[1]).join(", ")}. 선정 케이블의 제작사 허용 전류와 포설 조건 보정으로 대체`]); }
