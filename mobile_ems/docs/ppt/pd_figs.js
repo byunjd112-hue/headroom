@@ -147,6 +147,76 @@ function sldPro() {
   g += t(PX + 10, TY + 103, "리비전", { s: 9, c: GR }) + t(PX + 10, TY + 122, process.argv[3] || "Rev72", { s: 12.5, b: 1 }) + t(PX + 160, TY + 103, "축척", { s: 9, c: GR }) + t(PX + 160, TY + 122, "없음(계통도)", { s: 12.5, b: 1 }) + t(PX + 310, TY + 103, "비고", { s: 9, c: GR }) + t(PX + 310, TY + 122, "시공 도면 아님", { s: 12.5, b: 1 });
   return g;
 }
+/** 작전지 전개 배치도(실제 치수 비율, 도면 양식). 1640 × 626. 1 m = 7.4 px */
+function sitePlan() {
+  const HV = "#b3261e", LV = "#1f3a5f", SRC = "#2f6b3f", INK = "#1b2733", GR = "#5b6773", RED = "#b3261e", OR = "#d9731a", OD = "#6b7a45", K = 7.4; let g = "";
+  const t = (x, y, s, o = {}) => `<text x="${x}" y="${y}" font-size="${o.s || 11}" font-weight="${o.b ? 700 : 400}" fill="${o.c || INK}" text-anchor="${o.a || "start"}">${s}</text>`;
+  const ln = (a, b, c, d, col = INK, w = 1.6, ex = "") => `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="${col}" stroke-width="${w}" stroke-linecap="round" ${ex}/>`;
+  const pl = (pts, col, w, ex = "") => `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${ex}/>`;
+  g += `<rect x="6" y="6" width="1628" height="614" fill="#fff" stroke="${INK}" stroke-width="2"/><rect x="14" y="14" width="1612" height="598" fill="none" stroke="${INK}" stroke-width="0.8"/>`;
+  for (let i = 0; i < 8; i++) g += t(14 + 1612 / 16 + i * 1612 / 8, 12.5, String(i + 1), { s: 7, a: "middle", c: GR }) + (i ? ln(14 + i * 1612 / 8, 6, 14 + i * 1612 / 8, 14, INK, 0.8) : "");
+  ["A", "B", "C", "D"].forEach((c, i) => { g += t(10, 14 + 598 / 8 + i * 598 / 4 + 3, c, { s: 7, a: "middle", c: GR }) + (i ? ln(6, 14 + i * 598 / 4, 14, 14 + i * 598 / 4, INK, 0.8) : ""); });
+  g += `<rect x="24" y="24" width="1052" height="578" fill="#f4f1e8" stroke="#cfc8b4" stroke-width="1"/>`;                       // 부지
+  // 구역
+  const zone = (x, y, w, h, nm) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="none" stroke="${GR}" stroke-width="1" stroke-dasharray="7 5"/>` + t(x + 8, y + 15, nm, { s: 11, b: 1, c: GR });
+  g += zone(36, 36, 500, 330, "전원 구역") + zone(36, 392, 330, 198, "통제 구역") + zone(600, 36, 464, 554, "부하 구역(환망)");
+  // 차량(9.0 × 2.5 m), 운전석은 오른쪽
+  const TW = 9 * K, TH = 2.5 * K, TX = 380;
+  const truck = (y, no, nm, sub) => `<rect x="${TX}" y="${y}" width="${TW}" height="${TH}" rx="2" fill="${OD}" stroke="${INK}" stroke-width="1.2"/><rect x="${TX + TW - 15}" y="${y + 2}" width="13" height="${TH - 4}" rx="2" fill="#4c5a2f"/>` + t(TX - 8, y + 9, no + " " + nm, { s: 11, b: 1, a: "end" }) + t(TX - 8, y + 21, sub, { s: 9.5, a: "end", c: GR });
+  const TY = [70, 130, 200, 290];
+  g += truck(TY[0], "①", "복합전력 차량", "디젤 발전기 + ESS") + truck(TY[1], "②", "ESS 차량", "이동형 에너지저장장치");
+  g += `<rect x="${TX}" y="${TY[2]}" width="${TW}" height="${TH}" rx="2" fill="${OD}" stroke="${INK}" stroke-width="1.2"/><rect x="${TX + TW - 15}" y="${TY[2] + 2}" width="13" height="${TH - 4}" rx="2" fill="#4c5a2f"/><rect x="${TX + 2}" y="${TY[2] + 1.5}" width="12" height="${TH - 3}" fill="#22355c" stroke="${INK}" stroke-width="1"/>`;
+  g += `<rect x="${TX - 40 * K}" y="${TY[2] + 1}" width="${40 * K}" height="${TH - 2}" fill="#2c4a86" stroke="#16264a" stroke-width="1"/>`;
+  for (let i = 1; i < 20; i++) g += ln(TX - i * 2 * K, TY[2] + 1, TX - i * 2 * K, TY[2] + TH - 1, "#7f96c4", 0.6);
+  g += t(TX - 20 * K, TY[2] - 6, "③ 롤러블 태양광 차량: 뒤쪽 드럼에서 차량 뒤로 패널 띠 전개(길이 40 m 예시)", { s: 11, b: 1, a: "middle" });
+  g += truck(TY[3], "④", "수소 차량", "연료전지 + 수소 저장") + t(TX - 8, TY[3] + 33, "이격 거리: 설계 확정 필요", { s: 9.5, a: "end", c: RED });
+  // ⑥ 컨테이너(6.06 × 2.44 m), 세로 배치
+  const CX = 500, CY = 160, CW = 2.44 * K, CH = 6.06 * K;
+  g += `<rect x="${CX}" y="${CY}" width="${CW}" height="${CH}" fill="#56653a" stroke="${INK}" stroke-width="1.6"/>` + `<rect x="${CX}" y="${CY - 4}" width="${CW}" height="4" fill="${HV}"/>`;
+  g += t(CX + CW / 2, CY + CH + 14, "⑥ 배전 및 변압", { s: 11, b: 1, a: "middle" }) + t(CX + CW / 2, CY + CH + 26, "20ft 컨테이너 1대", { s: 9.5, a: "middle", c: GR }) + t(CX + CW / 2, CY - 9, "고압 인입부", { s: 9.5, a: "middle", c: HV });
+  // 전원 케이블(차량 → 컨테이너 옆면)
+  TY.forEach((y, i) => { const yy = CY + 8 + i * 9; g += pl(`${TX + TW},${y + TH / 2} ${TX + TW + 14 + i * 5},${y + TH / 2} ${TX + TW + 14 + i * 5},${yy} ${CX},${yy}`, SRC, 1.8); });
+  // TPCS 쉘터(6.0 × 2.4 m)와 통신선
+  const SX = 150, SY = 470; g += `<rect x="${SX}" y="${SY}" width="${6 * K}" height="${2.4 * K}" fill="#3d5a80" stroke="${INK}" stroke-width="1.4"/>` + t(SX + 3 * K, SY + 34, "⑤ TPCS 통제 쉘터", { s: 11, b: 1, a: "middle" }) + t(SX + 3 * K, SY + 46, "전원 구역의 소음원에서 이격", { s: 9.5, a: "middle", c: GR });
+  g += pl(`${SX + 6 * K},${SY + 9} ${CX + CW / 2},${SY + 9} ${CX + CW / 2},${CY + CH + 32}`, OR, 1.6, 'stroke-dasharray="6 3"') + t(360, SY + 3, "통신선(이중 경로)", { s: 9.5, a: "middle", c: OR });
+  g += `<circle cx="${SX - 20}" cy="${SY + 9}" r="4" fill="none" stroke="${INK}" stroke-width="1.2"/>` + ln(SX - 20, SY + 9, SX, SY + 9, INK, 1) + t(SX - 28, SY + 13, "안테나", { s: 9.5, a: "end", c: GR });
+  // 환망
+  const RX1 = 660, RX2 = 1010, RY1 = 90, RY2 = 540, FA = CY + 16, FB = CY + 30;
+  g += pl(`${CX + CW},${FA} ${RX1 - 60},${FA} ${RX1 - 60},${RY1} ${RX2},${RY1} ${RX2},${RY2} ${RX1 - 40},${RY2} ${RX1 - 40},${FB} ${CX + CW},${FB}`, LV, 2.6);
+  g += t(592, FA - 5, "급전 A", { s: 9.5, a: "end", c: LV }) + t(592, FB + 12, "급전 B", { s: 9.5, a: "end", c: LV });
+  const fsu = (x, y, n) => `<rect x="${x - 7}" y="${y - 7}" width="14" height="14" fill="#eaf1f8" stroke="${LV}" stroke-width="1.8"/>` + t(x, y - 11, "FSU " + n, { s: 9.5, b: 1, a: "middle", c: LV });
+  const F = [[720, RY1], [900, RY1], [RX2, 230], [RX2, 400], [900, RY2], [720, RY2]];
+  F.forEach(([x, y], i) => { g += fsu(x, y, i + 1); });
+  g += `<rect x="${RX2 - 7}" y="308" width="14" height="14" fill="#fff" stroke="${RED}" stroke-width="2"/>` + ln(RX2 - 4, 319, RX2 + 4, 311, RED, 1.6) + t(RX2 - 12, 319, "상시 개방점", { s: 9.5, b: 1, a: "end", c: RED });
+  const tent = (x, y, w, h, nm, f) => `<rect x="${x}" y="${y}" width="${w * K}" height="${h * K}" rx="2" fill="#a9b08a" stroke="#5c6440" stroke-width="1.2"/>` + ln(x, y + h * K / 2, x + w * K, y + h * K / 2, "#5c6440", 0.8) + t(x + w * K / 2, y + h * K + 12, nm, { s: 10, b: 1, a: "middle" });
+  const L = [[690, 130, 10, 5, "지휘통제(1등급)", 0], [870, 130, 10, 5, "의무시설(1등급)", 1], [860, 250, 12, 6, "막사(2등급)", 2], [860, 370, 12, 6, "막사(2등급)", 3], [870, 470, 8, 5, "정비 및 취사(3등급)", 4], [690, 470, 8, 5, "탄약저장(3등급)", 5]];
+  L.forEach(([x, y, w, h, nm, i]) => { const [fx, fy] = F[i], cx = x + w * K / 2, cy = y + (fy < y ? 0 : h * K), px = (fx + cx) / 2, py = (fy + cy) / 2;
+    g += tent(x, y, w, h, nm) + pl(`${fx},${fy} ${px},${py} ${cx},${cy}`, LV, 1.2) + `<rect x="${px - 4}" y="${py - 4}" width="8" height="8" fill="${OR}" stroke="${INK}" stroke-width="0.8"/>`; });
+  // 차량 통로와 보호대
+  g += `<rect x="556" y="36" width="34" height="554" fill="#e2dccb" stroke="none"/>` + t(573, 420, "차량 통로", { s: 10, a: "middle", c: GR }) + `<rect x="556" y="${FA - 5}" width="34" height="${FB - FA + 10}" fill="#f2c200" stroke="${INK}" stroke-width="0.8"/>`;
+  // 축척
+  g += ln(60, 574, 60 + 20 * K, 574, INK, 2) + [0, 10, 20].map(m => ln(60 + m * K, 569, 60 + m * K, 579, INK, 1.4) + t(60 + m * K, 592, m + " m", { s: 9.5, a: "middle" })).join("") + t(60 + 20 * K + 12, 578, "장비는 실제 치수 비율로 표시", { s: 9.5, c: GR });
+  // 오른쪽 단
+  const PX = 1100, PW = 518; g += ln(PX - 12, 14, PX - 12, 612, INK, 0.8);
+  const hd = (y, s1, col = LV) => `<rect x="${PX}" y="${y}" width="${PW}" height="20" fill="${col}"/>` + t(PX + 10, y + 14.5, s1, { s: 12, b: 1, c: "#fff" });
+  g += hd(24, "범례");
+  const lg = [[`<rect x="${PX + 8}" y="56" width="26" height="10" fill="${OD}" stroke="${INK}"/>`, "전원 차량(9.0 × 2.5 m)"], [`<rect x="${PX + 8}" y="78" width="18" height="10" fill="#56653a" stroke="${INK}"/>`, "⑥ 컨테이너(6.06 × 2.44 m)"], [`<rect x="${PX + 8}" y="100" width="18" height="10" fill="#3d5a80" stroke="${INK}"/>`, "⑤ TPCS 쉘터"],
+    [ln(PX + 268, 61, PX + 300, 61, SRC, 1.8), "전원 케이블(380 V)"], [ln(PX + 268, 83, PX + 300, 83, LV, 2.6), "환망 간선(380 V, 630 A)"], [ln(PX + 268, 105, PX + 300, 105, OR, 1.6, 'stroke-dasharray="6 3"'), "통신선"]];
+  lg.forEach(([sy, nm], i) => { g += sy + t(PX + (i < 3 ? 44 : 310), 65 + (i % 3) * 22, nm, { s: 11 }); });
+  g += `<rect x="${PX + 10}" y="120" width="12" height="12" fill="#eaf1f8" stroke="${LV}" stroke-width="1.8"/>` + t(PX + 30, 130, "구간분전함(FSU)", { s: 11 }) + `<rect x="${PX + 160}" y="122" width="8" height="8" fill="${OR}" stroke="${INK}" stroke-width="0.8"/>` + t(PX + 176, 130, "배전체계(PPDU-20)", { s: 11 }) + `<rect x="${PX + 320}" y="120" width="12" height="12" fill="#f2c200" stroke="${INK}" stroke-width="0.8"/>` + t(PX + 340, 130, "케이블 보호대", { s: 11 });
+  g += hd(146, "배치 원칙");
+  [["전원 구역", "전원 차량을 ⑥ 컨테이너 한쪽에 모아 케이블 길이 최소화"], ["⑥ 컨테이너", "끝면은 고압 인입부, 옆면은 저압 접속반. 차량 접속 면과 환망 급전 면 구분"], ["태양광", "패널 띠는 차량 뒤로 전개. 그늘과 차량 동선을 피해 배치"],
+    ["TPCS", "전원 구역과 떨어진 통제 구역. 통신선 이중 경로"], ["환망", "급전 A, B 로 시설을 한 바퀴. 구간분전함 6대, 상시 개방점 1개소"], ["부하", "구간분전함에서 배전체계를 거쳐 시설로 공급"]].forEach((r, i) => {
+    const y = 166 + i * 21; g += `<rect x="${PX}" y="${y}" width="${PW}" height="21" fill="${i % 2 ? "#fff" : "#f3f6f9"}" stroke="#c9d1d9" stroke-width="0.6"/>` + t(PX + 10, y + 14.5, r[0], { s: 11, b: 1 }) + t(PX + 92, y + 14.5, r[1], { s: 10.5 }); });
+  g += hd(304, "설계 확정 필요 항목", RED);
+  ["장비 수량과 간격은 예시. 임무, 부지, 지형에 따라 확정", "수소 차량과 연료 보급 지점의 이격 거리(관련 기준 확인)", "케이블 길이 한도. 전압 강하와 보호 협조 검토 후 확정", "차량 치수는 일반 군용 차량 크기로 잡은 값. 실제 차량으로 확정", "태양광 패널 띠의 길이와 줄 수. 제품 제원으로 확정"].forEach((s1, i) => {
+    const y = 324 + i * 22; g += `<rect x="${PX}" y="${y}" width="${PW}" height="22" fill="#fff" stroke="#e3c4c1" stroke-width="0.6"/>` + `<circle cx="${PX + 14}" cy="${y + 11}" r="7.5" fill="${RED}"/>` + t(PX + 14, y + 14.5, String(i + 1), { s: 9.5, b: 1, a: "middle", c: "#fff" }) + t(PX + 28, y + 15, s1, { s: 10.5 }); });
+  const TY0 = 472; g += `<rect x="${PX}" y="${TY0}" width="${PW}" height="132" fill="#fff" stroke="${INK}" stroke-width="1.4"/>` + ln(PX, TY0 + 44, PX + PW, TY0 + 44, INK, 0.8) + ln(PX, TY0 + 88, PX + PW, TY0 + 88, INK, 0.8) + ln(PX + 300, TY0 + 44, PX + 300, TY0 + 132, INK, 0.8) + ln(PX + 150, TY0 + 88, PX + 150, TY0 + 132, INK, 0.8);
+  g += t(PX + 10, TY0 + 15, "도면명", { s: 9, c: GR }) + t(PX + 10, TY0 + 35, "작전지 전개 배치도(예시)", { s: 15, b: 1 });
+  g += t(PX + 10, TY0 + 59, "체계", { s: 9, c: GR }) + t(PX + 10, TY0 + 78, "IFPS 이동형 전력체계", { s: 12.5, b: 1 }) + t(PX + 310, TY0 + 59, "구분", { s: 9, c: GR }) + t(PX + 310, TY0 + 78, "배치 예시(설계 확정 전)", { s: 12.5, b: 1, c: RED });
+  g += t(PX + 10, TY0 + 103, "리비전", { s: 9, c: GR }) + t(PX + 10, TY0 + 122, process.argv[3] || "Rev72", { s: 12.5, b: 1 }) + t(PX + 160, TY0 + 103, "축척", { s: 9, c: GR }) + t(PX + 160, TY0 + 122, "막대 축척 참조", { s: 12.5, b: 1 }) + t(PX + 310, TY0 + 103, "비고", { s: 9, c: GR }) + t(PX + 310, TY0 + 122, "시공 도면 아님", { s: 12.5, b: 1 });
+  return g;
+}
 function garrison() {
   let g = ""; const box = (x, y, w, h, f, st, t1, t2, t3) => R(x, y, w, h, f, st, 2, 'rx="8"') + T(x + w / 2, y + (t2 ? 30 : h / 2 + 5), t1, { s: 15, b: 1 }) + (t2 ? T(x + w / 2, y + 52, t2, { s: 13 }) : "") + (t3 ? T(x + w / 2, y + 71, t3, { s: 13, c: "#55626f" }) : "");
   const ar = (x1, y1, x2, y2, col, sw = 3) => LN(x1, y1, x2, y2, col, sw) + (y1 === y2 ? `<path d="M${x2} ${y2} l-12 -7 v14 Z" fill="${col}"/>` : `<path d="M${x2} ${y2} l-7 ${y2 > y1 ? -12 : 12} h14 Z" fill="${col}"/>`);
@@ -177,6 +247,6 @@ function garrison() {
   return g;
 }
 (async () => { const b = await chromium.launch();
-  for (const [n, f, w, h] of [["pd2_layout", plan, 1024, 688], ["pd2_sld", sldPro, 1640, 626], ["pd2_grid", garrison, 1024, 688]]) { const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+  for (const [n, f, w, h] of [["pd2_layout", plan, 1024, 688], ["pd2_sld", sldPro, 1640, 626], ["pd2_grid", garrison, 1024, 688], ["pd2_plan", sitePlan, 1640, 626]]) { const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
     await p.setContent(`<style>${css} body{margin:0;background:#fff} text{font-family:NSK}</style><svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${f()}</svg>`); await p.evaluate(() => document.fonts.ready); await p.screenshot({ path: path.join(out, n + ".png") }); await p.close(); }
   await b.close(); })();
