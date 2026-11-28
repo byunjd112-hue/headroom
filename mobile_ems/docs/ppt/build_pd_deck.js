@@ -226,10 +226,10 @@ A.trunk = cab(SP.fsu_a); A.branch = cab(40);                 // 전압 강하 �
 const BR_M = 40, BR_PCT = +(R3 * 40 * BR_M / 1000 * ZC(A.branch) / (A.v * 1000) * 100).toFixed(1), TR_PCT = +(A.dv - BR_PCT).toFixed(1), LIM = (i, pc) => pc / 100 * A.v * 1000 / (R3 * i / 1000 * ZC(A.trunk)), r10 = x => Math.floor(x / 10) * 10;
 const RAD = i => { const c = r10(LIM(i, TR_PCT)), d = r10(c / Math.PI); return { c, d, r: d + BR_M }; };
 // ═══ 케이블 포설: 무게 계산은 선정 케이블(CBL)에서 구한다. 가정값은 RL. 릴 배전 차량은 5톤 중형전술차량 1대(사용자 지정)
-const RL = { rho: 8.9, k: 1.2, man: 25, nN: 0.5, nPE: 1, od: 32, fill: 0.65, kmh: 2, seg: 30, pay: 5000, reel: 1000, legs: 200, use: 0.9, dw: 0.9 };   // 구리 밀도, 피복 계수, 1인 취급 한도 kg, 중성선 비율, 보호 도체 가닥, 바깥지름 mm, 릴 충전율, 포설 속도 km/h, 구간 m, 적재 능력 kg, 릴과 구동부 kg(추정), 적재 이용률, 드럼 폭 m
-const TRK = CBL(SP.fsu_a), WM = TRK.mm * RL.rho * RL.k / 1000, NNE = Math.ceil(TRK.n * RL.nN), NST = 3 * TRK.n + NNE + RL.nPE, NST0 = 3 * TRK.n + TRK.n + RL.nPE, WRUN = WM * NST, CBUD = RL.pay * RL.use - RL.reel - RL.legs, MODK = RL.reel + RL.legs;
+const RL = { rho: 8.9, k: 1.3, cat: { 240: [2950, 38.3] }, man: 25, nN: 0.5, nPE: 1, od: 32, fill: 0.65, kmh: 2, seg: 30, pay: 5000, reel: 1000, legs: 200, use: 0.9, dw: 0.9 };   // 구리 밀도, 피복 계수, 1인 취급 한도 kg, 중성선 비율, 보호 도체 가닥, 바깥지름 mm, 릴 충전율, 포설 속도 km/h, 구간 m, 적재 능력 kg, 릴과 구동부 kg(추정), 적재 이용률, 드럼 폭 m
+const TRK = CBL(SP.fsu_a), CAT = RL.cat[TRK.mm], WM = CAT ? CAT[0] / 1000 : TRK.mm * RL.rho * RL.k / 1000, OD = CAT ? CAT[1] : RL.od, NNE = Math.ceil(TRK.n * RL.nN), NST = 3 * TRK.n + NNE + RL.nPE, NST0 = 3 * TRK.n + TRK.n + RL.nPE, WRUN = WM * NST, CBUD = RL.pay * RL.use - RL.reel - RL.legs, MODK = RL.reel + RL.legs;
 const RINGV = Math.min(RAD(SP.fsu_a).c, r10(CBUD / WRUN)), RING = RINGV, WTOT = WRUN * RING, WSEG1 = WM * RL.seg, MEN1 = Math.ceil(WSEG1 / RL.man), RADV = r10(RING / Math.PI) + BR_M;
-const VOL = RING * NST * Math.PI / 4 * Math.pow(RL.od / 1000, 2) / RL.fill, DRUM = Math.PI / 4 * (1.8 * 1.8 - 0.9 * 0.9) * RL.dw, NDR = Math.max(2, Math.ceil(VOL / DRUM)), TLAY = Math.ceil(RING / (RL.kmh * 1000 / 60));
+const VOL = RING * NST * Math.PI / 4 * Math.pow(OD / 1000, 2) / RL.fill, DRUM = Math.PI / 4 * (1.8 * 1.8 - 0.9 * 0.9) * RL.dw, NDR = Math.max(2, Math.ceil(VOL / DRUM)), TLAY = Math.ceil(RING / (RL.kmh * 1000 / 60));
 const FUSE = [16, 20, 25, 31.5, 40].reduce((a, x) => Math.abs(x - IHV * 2) < Math.abs(a - IHV * 2) ? x : a), ST_F = Math.round(SP.fsu_a * 3 / 100) * 100;
 const ISC_TR = ITR / (A.z / 100), INVK = ST.g1_kw + ST.ess_kw + ST.pv_kwp + ST.fc_kw, ISC_INV = INVK / (R3 * A.v) * A.inv, ISC_DG = ST.dg_kw / A.dgpf / (R3 * A.v) / A.xd;
 const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw * U.FC) / (R3 * A.v) * A.inv, DG2 = ISC_DG * U.DG, ISC2 = ISC_TR + INV2 + DG2, ICU = [25, 36, 50, 65, 85].find(x => x >= ISC2 / 1000 * 1.2), ST_SET = Math.floor((ISC_INV + ISC_DG) / 2 / 100) * 100;
@@ -392,21 +392,20 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
 { const s = page(6, "간선 케이블의 무게와 인력 포설 한계", "선정한 간선 케이블은 사람이 들어 옮겨 깔 수 있는 무게가 아님",
     "간선 케이블은 매우 무겁습니다. 장병이 손으로 깔기 어렵다는 것을 계산으로 보였습니다.");
   picTable(s, "pd2_cable", "간선 케이블과 릴: 한 가닥만으로도 여러 사람이 필요한 무게", [["항목", "계산", "값"], [
-    ["한 가닥의 무게", `구리 ${TRK.mm} mm² × 밀도 ${RL.rho} × 피복 계수 ${RL.k}`, `약 ${WM.toFixed(1)} kg/m`],
+    ["한 가닥의 무게", `1 × ${TRK.mm} mm² 고무 절연 유연 케이블의 제품 자료 값`, `약 ${WM.toFixed(2)} kg/m`],
     ["간선의 가닥 수", `상 3 × ${TRK.n} + 중성선 ${NNE} + 보호 도체 ${RL.nPE}`, `${NST}가닥`],
-    ["간선 1 m 의 무게", `${WM.toFixed(1)} kg/m × ${NST}가닥`, `약 ${n0(WRUN)} kg/m`],
-    [`한 구간 ${RL.seg} m 한 가닥`, `${WM.toFixed(1)} kg/m × ${RL.seg} m`, `약 ${n0(WSEG1)} kg, ${MEN1}명 필요`],
+    ["간선 1 m 의 무게", `${WM.toFixed(2)} kg/m × ${NST}가닥`, `약 ${n0(WRUN)} kg/m`],
+    [`한 구간 ${RL.seg} m 한 가닥`, `${WM.toFixed(2)} kg/m × ${RL.seg} m`, `약 ${n0(WSEG1)} kg, ${MEN1}명 필요`],
     [`적재 둘레 ${RING} m 전체`, `${n0(WRUN)} kg/m × ${RING} m`, `약 ${(WTOT / 1000).toFixed(1)} t`]], [30, 44, 26], { center: [2] }],
-    [["판정", [`1인 취급 한도를 ${RL.man} kg 으로 보면 한 구간 한 가닥에 ${MEN1}명, 한 구간 전체(${NST}가닥)에 연인원 ${MEN1 * NST}명이 필요. 야지에서 인력 포설과 회수는 현실적이지 않으므로 기계식 포설을 적용. 피복 계수와 취급 한도는 가정값`]]]); }
+    [["판정", [`1인 취급 한도를 ${RL.man} kg 으로 보면 한 구간 한 가닥에 ${MEN1}명, 한 구간 전체(${NST}가닥)에 연인원 ${MEN1 * NST}명이 필요. 야지에서 인력 포설과 회수는 현실적이지 않으므로 기계식 포설을 적용. 무게는 시판 제품 자료 값, 취급 한도는 가정값`]]]); }
 { const s = page(6, "릴 배전 차량: 5톤 중형전술차량 1대", "전동 릴을 실은 5톤 차량 1대가 환망 경로를 따라 주행하며 케이블을 풀고, 철수 때는 자동으로 감음",
     "5톤 차량 한 대에 릴을 실어 케이블을 풀고 감습니다. 한 대에 실리도록 무게를 맞췄습니다.");
   picTable(s, "pd2_reelcar", "릴 배전 차량의 자동 전개: 5톤 중형전술차량에 전동 릴 2개 탑재", [["항목", "적용안", "허용 범위와 사유"], [
-    ["적재 중량", `케이블 ${n0(WTOT)} kg + 릴 묶음 ${n0(MODK)} kg = ${n0(WTOT + MODK)} kg`, `한도 ${n0(RL.pay * RL.use)} kg(적재 능력의 ${RL.use * 100} %)`],
-    ["간선 가닥 수", `${NST}가닥(중성선 ${NNE}가닥)`, `불평형 전류 50 % 이하. 초과 시 ${NST0}가닥`],
-    ["적재 둘레", `${RING} m`, `전압 강하 한도 ${RAD(SP.fsu_a).c} m 이내`],
-    ["최대 전개 반경", `약 ${RADV} m`, "둘레 ÷ π + 분기 40 m"],
-    ["릴", `전동 드럼 ${NDR}개`, `지름 1.8 m, 폭 ${RL.dw} m`],
-    ["포설", `시속 ${RL.kmh} km, 주행 약 ${TLAY}분`, "접속 시간 별도"],
+    ["적재 중량", `케이블 ${n0(WTOT)} kg + 릴 묶음 ${n0(MODK)} kg = ${n0(WTOT + MODK)} kg`, `한도 ${n0(RL.pay * RL.use)} kg`],
+    ["간선 가닥 수", `${NST}가닥(중성선 ${NNE}가닥)`, `불평형 50 % 이하일 때`],
+    ["적재 둘레", `${RING} m`, `전압 한도 ${RAD(SP.fsu_a).c} m 이내`],
+    ["최대 전개 반경", `약 ${RADV} m`, "분기 40 m 포함"],
+    ["릴과 포설", `전동 드럼 ${NDR}개, 시속 ${RL.kmh} km`, `둘레 주행 약 ${TLAY}분`],
     ["풀림 방향", "항상 차량 뒤쪽 안내 롤러로 출입", "드럼 축은 차폭 방향, 드럼 아래쪽에서 풀림"]], [24, 40, 36], { dense: true }],
     [["적용 원칙", [`풀 때는 전진, 감을 때는 후진하며 케이블은 뒤쪽으로만 드나듦. 둘레 ${RING} m 초과분은 2회 운반 또는 트레일러로 보충. 운용 인원 3명. 릴 묶음 중량은 추정값`]]]); }
 { const s = page(6, "릴 묶음의 운용 방식", "차량에 실은 채 쓰는 것이 기본. 내려야 할 때는 네 다리로 스스로 올라가 차량이 빠져나옴",
@@ -426,6 +425,15 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
     ["장력 제한", "설정 장력 초과 시 자동 정지", "케이블과 커넥터 손상 방지"], ["커넥터 보관", "마개를 끼우고 드럼 옆 고정구에 체결", "먼지와 물 침입 방지"],
     ["비상 정지", "차량과 무선 조작기 양쪽에 배치", "끼임 사고 방지"], ["수동 보조", "전동 고장 시 수동 크랭크", "구동부 고장 대비"]], [22, 44, 34], { dense: true }],
     [["남은 확인", ["릴 묶음의 실제 중량, 적재함 치수와의 간섭, 케이블 굽힘 반지름에 따른 드럼 지름은 차량과 케이블 제작사 자료로 검증"]]]); }
+{ const s = page(6, "참조한 현존 제품과 기술", "적용안이 실제로 만들 수 있는 것인지 시판 제품과 공개 기술로 확인",
+    "제안한 방식이 실제로 가능한지 지금 팔리는 제품과 공개된 기술로 확인했습니다.");
+  const y = table(s, L.X, TOP, L.CW, ["구성", "참조한 제품과 기술", "확인한 값", "이 자료에 쓴 곳"], [
+    ["간선 케이블", "고무 절연 유연 케이블 H07RN-F 1 × 240 mm²", "무게 2,730 ~ 2,950 kg/km, 바깥지름 최대 38.3 mm, 공기 중 허용 전류 559 A, 저항 0.0801 Ω/km 이하", "무게와 릴 부피 계산(무거운 쪽 값 적용)"],
+    ["커넥터", "단극 잠금식 전원 커넥터(Powerlock 계열)", "400 A 와 660 A 정격, 체결 시 IP67", "가닥당 320 A 이하, 400 A급 커넥터"],
+    ["탑재 차량", "기아 중형표준차량 6 × 6", "야지 적재 5톤, 전폭 2,500 mm 이하, 전장 7,900 mm 이하", "적재 한도 5,000 kg, 드럼 폭 배치"],
+    ["자체 승강 하차", "탈착식 적재대의 승강 다리 방식(차량이 다리 사이로 진입, 공개 특허)", "방식의 존재 확인. 하중 값은 미확인", "릴 묶음의 승강 다리"],
+    ["릴 전개와 회수", "차량 탑재 케이블 릴 구동 장치(공개 특허), 전술 광케이블 전개 장치", "차량 뒤에서 풀고 감는 방식의 존재 확인", "전동 릴, 뒤쪽 안내 롤러"]], [14, 30, 34, 22], { bold: [0], dense: true });
+  note(s, L.X, y + G, L.CW, D.noteNeed(L.CW, ["x"]) + 0.3, "확인 범위와 한계", ["케이블, 커넥터, 차량은 제조사 공개 자료의 값. 군용 전력 케이블 전용의 릴 배전 차량 제품은 찾지 못했으며, 릴 구동과 자체 승강은 각각 존재하는 기술을 조합한 제안임. 특정 제품의 채택이 아니라 실현 가능성의 근거로 참조. 실제 선정 제품의 값으로 다시 계산"]); }
 { const s = page(6, "확인한 것과 한계 · 미결 사항", "가상 장치의 자동 시험으로 확인한 것과, 하드웨어 설계 · FAT 에서 정해야 하는 것",
     "확인한 것과 남은 과제입니다.");
   table(s, L.X, TOP, W2, ["자동 시험으로 확인한 것(가상 장치)", "결과"], [["급전 쪽 구간 단선 — 1등급 배전체계", "끊기지 않음"], ["〃 — 2등급 배전체계", "끊겼다가 복구"], ["구간분전함 고립 7초 — 1등급", "끊기지 않음(우회 공급)"], ["1등급 앞 배전체계 한 대 트립", "남은 것이 떠안음, 과부하 없음"], ["선택 차단 + 절체 설정", `${n1(FDIR)}초(3초 이내)`], ["정격 · 가정값 변경", "대수 · 점검이 바로 따라감"]], [64, 36], { bold: [0], dense: true });
@@ -472,15 +480,15 @@ const INV2 = (ST.g1_kw * U.DG + ST.ess_kw * U.ESS + ST.pv_kwp * U.PV + ST.fc_kw 
   note(s, L.X, y + G, L.CW, D.noteNeed(L.CW, ["x"]) + 0.45, "선정 규칙과 가정", [`가닥 수 = 전류 ÷ ${STRAND} A 를 올림. 굵기 = 허용 전류 × ${UTIL} 이 가닥당 전류 × ${MARG}(여유 5 %) 이상인 가장 가는 규격. 허용 전류 가정값(mm² : A): ${AMPC.map(c => c[0] + " : " + c[1]).join(", ")}. 선정 케이블의 제작사 허용 전류와 포설 조건 보정으로 대체`]); }
 { const s = D.appx("별첨.  계산 근거 5: 케이블 무게와 릴 배전 차량 적재", "간선 케이블의 무게, 5톤 차량 1대의 적재 둘레, 릴 수량, 포설 시간을 구한 식과 대입 값");
   table(s, L.X, TOP, L.CW, ["항목", "계산식", "대입", "결과"], [
-    ["가닥 무게", "단면적 × 구리 밀도 × 피복 계수", `${TRK.mm} mm² × ${RL.rho} g/㎤ × ${RL.k} ÷ 1,000`, `약 ${WM.toFixed(2)} kg/m`],
+    ["가닥 무게", "시판 제품 자료의 무게", `1 × ${TRK.mm} mm² 고무 절연 유연 케이블 ${n0(WM * 1000)} kg/km`, `${WM.toFixed(2)} kg/m`],
     ["가닥 수", "상 3 × 병렬 수 + 중성선 + 보호 도체", `3 × ${TRK.n} + ${NNE} + ${RL.nPE}`, `${NST}가닥`],
     ["케이블 적재 한도", "적재 능력 × 이용률 에서 릴 묶음 무게를 뺀 값", `${n0(RL.pay)} kg × ${RL.use} 에서 ${n0(RL.reel)} + ${n0(RL.legs)} kg 을 뺌`, `${n0(CBUD)} kg`],
     ["적재 둘레", "케이블 적재 한도 ÷ (가닥 무게 × 가닥 수)", `${n0(CBUD)} kg ÷ (${WM.toFixed(2)} × ${NST}) kg/m`, `${RING} m(10 m 단위 내림)`],
     ["적재 중량", "가닥 무게 × 가닥 수 × 둘레 + 릴 묶음", `${WM.toFixed(2)} × ${NST} × ${RING} + ${n0(MODK)}`, `약 ${n0(WTOT + MODK)} kg`],
     ["필요 인원(인력 포설)", "구간 한 가닥 무게 ÷ 1인 취급 한도", `${n0(WSEG1)} kg ÷ ${RL.man} kg`, `${MEN1}명(올림)`],
-    ["케이블 부피", "둘레 × 가닥 수 × π ÷ 4 × 바깥지름² ÷ 충전율", `${RING} × ${NST} × 0.785 × ${(RL.od / 1000)}² ÷ ${RL.fill}`, `약 ${VOL.toFixed(2)} ㎥`],
+    ["케이블 부피", "둘레 × 가닥 수 × π ÷ 4 × 바깥지름² ÷ 충전율", `${RING} × ${NST} × 0.785 × ${(OD / 1000)}² ÷ ${RL.fill}`, `약 ${VOL.toFixed(2)} ㎥`],
     ["드럼 한 개 용량", "π ÷ 4 × (바깥지름² 과 안지름² 의 차) × 폭", `0.785 × (1.8² 과 0.9² 의 차) × ${RL.dw}`, `약 ${DRUM.toFixed(2)} ㎥, ${NDR}개 탑재`],
     ["포설 주행 시간", "둘레 ÷ 포설 속도", `${RING} m ÷ 분당 ${n0(RL.kmh * 1000 / 60)} m`, `약 ${TLAY}분`]], [18, 32, 32, 18], { bold: [0], dense: true });
-  foot(s, `가정값: 피복 계수 ${RL.k}, 릴과 구동부 ${n0(RL.reel)} kg, 승강 다리 ${n0(RL.legs)} kg, 적재 이용률 ${RL.use}, 1인 취급 한도 ${RL.man} kg, 바깥지름 ${RL.od} mm, 릴 충전율 ${RL.fill}, 포설 속도 시속 ${RL.kmh} km. 5톤 중형전술차량의 적재 능력은 ${n0(RL.pay)} kg 으로 봄. 차량과 케이블 제작사 자료로 대체`); }
+  foot(s, `제품 자료 값: 케이블 무게 ${n0(WM * 1000)} kg/km, 바깥지름 ${OD} mm, 차량 야지 적재 ${n0(RL.pay)} kg. 가정값: 릴과 구동부 ${n0(RL.reel)} kg, 승강 다리 ${n0(RL.legs)} kg, 적재 이용률 ${RL.use}, 1인 취급 한도 ${RL.man} kg, 릴 충전율 ${RL.fill}, 포설 속도 시속 ${RL.kmh} km`); }
 D.closing({ title: "한 곳이 고장 나도\n끊기지 않는 배전", sub: "환망 간선 · 병렬 배전체계와 N+1 · 평소 열어 두는 우회 결선 · 무정전 점검", org: "한화에어로스페이스㈜ 에너지솔루션사업센터", date: `${YM}  ·  ${REV}` });
 D.save(OUT);
