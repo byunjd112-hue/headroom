@@ -160,6 +160,7 @@ function sitePlan() {
   // 구역
   const zone = (x, y, w, h, nm) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="none" stroke="${GR}" stroke-width="1" stroke-dasharray="7 5"/>` + t(x + 8, y + 15, nm, { s: 11, b: 1, c: GR });
   g += zone(36, 36, 500, 330, "전원 구역") + zone(36, 392, 330, 198, "통제 구역") + zone(600, 36, 464, 554, "부하 구역(환망)");
+  g += `<rect x="556" y="36" width="34" height="554" fill="#e2dccb" stroke="none"/>` + t(573, 420, "차량 통로", { s: 10, a: "middle", c: GR });
   // 차량(9.0 × 2.5 m), 운전석은 오른쪽
   const TW = 9 * K, TH = 2.5 * K, TX = 380;
   const truck = (y, no, nm, sub) => `<rect x="${TX}" y="${y}" width="${TW}" height="${TH}" rx="2" fill="${OD}" stroke="${INK}" stroke-width="1.2"/><rect x="${TX + TW - 15}" y="${y + 2}" width="13" height="${TH - 4}" rx="2" fill="#4c5a2f"/>` + t(TX - 8, y + 9, no + " " + nm, { s: 11, b: 1, a: "end" }) + t(TX - 8, y + 21, sub, { s: 9.5, a: "end", c: GR });
@@ -173,7 +174,7 @@ function sitePlan() {
   // ⑥ 컨테이너(6.06 × 2.44 m), 세로 배치
   const CX = 500, CY = 160, CW = 2.44 * K, CH = 6.06 * K;
   g += `<rect x="${CX}" y="${CY}" width="${CW}" height="${CH}" fill="#56653a" stroke="${INK}" stroke-width="1.6"/>` + `<rect x="${CX}" y="${CY - 4}" width="${CW}" height="4" fill="${HV}"/>`;
-  g += `<rect x="${CX}" y="${CY + CH}" width="${CW}" height="4" fill="${LV}"/>` + t(CX + CW / 2, CY - 24, "⑥ 배전 및 변압(컨테이너 1대)", { s: 11, b: 1, a: "middle" }) + t(CX + CW / 2, CY - 9, "고압 인입부(끝면)", { s: 9.5, a: "middle", c: HV }) + t(CX + CW + 8, CY + CH - 6, "저압 접속반(끝면)", { s: 9.5, c: LV });
+  g += `<rect x="${CX}" y="${CY + CH}" width="${CW}" height="4" fill="${LV}"/>` + t(454, CY - 24, "⑥ 배전 및 변압(컨테이너 1대)", { s: 10.5, b: 1 }) + t(CX + CW + 32, CY - 9, "고압 인입부(끝면)", { s: 9.5, a: "end", c: HV }) + t(CX + CW + 6, CY + CH - 8, "저압", { s: 9.5, c: LV }) + t(CX + CW + 6, CY + CH + 3, "접속반", { s: 9.5, c: LV });
   // 전원 케이블(차량 → 컨테이너 옆면)
   TY.forEach((y, i) => { const yy = CY + CH + 9 + i * 5, xx = CX + 3 + i * 3; g += pl(`${TX + TW},${y + TH / 2} ${TX + TW + 14 + i * 5},${y + TH / 2} ${TX + TW + 14 + i * 5},${yy} ${xx},${yy} ${xx},${CY + CH + 4}`, SRC, 1.8); });
   // TPCS 쉘터(6.0 × 2.4 m)와 통신선
@@ -193,7 +194,7 @@ function sitePlan() {
   L.forEach(([x, y, w, h, nm, i]) => { const [fx, fy] = F[i], cx = x + w * K / 2, cy = y + (fy < y ? 0 : h * K), px = (fx + cx) / 2, py = (fy + cy) / 2;
     g += tent(x, y, w, h, nm) + pl(`${fx},${fy} ${px},${py} ${cx},${cy}`, LV, 1.2) + `<rect x="${px - 4}" y="${py - 4}" width="8" height="8" fill="${OR}" stroke="${INK}" stroke-width="0.8"/>`; });
   // 차량 통로와 보호대
-  g += `<rect x="556" y="36" width="34" height="554" fill="#e2dccb" stroke="none"/>` + t(573, 420, "차량 통로", { s: 10, a: "middle", c: GR }) + `<rect x="556" y="${FA - 5}" width="34" height="${FB - FA + 10}" fill="#f2c200" stroke="${INK}" stroke-width="0.8"/>`;
+  g += `<rect x="556" y="${FA - 5}" width="34" height="${FB - FA + 10}" fill="#f2c200" stroke="${INK}" stroke-width="0.8"/>`;
   // 축척
   g += ln(60, 574, 60 + 20 * K, 574, INK, 2) + [0, 10, 20].map(m => ln(60 + m * K, 569, 60 + m * K, 579, INK, 1.4) + t(60 + m * K, 592, m + " m", { s: 9.5, a: "middle" })).join("") + t(60 + 20 * K + 12, 578, "장비는 실제 치수 비율로 표시", { s: 9.5, c: GR });
   // 오른쪽 단
